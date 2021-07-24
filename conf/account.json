@@ -1,0 +1,18 @@
+{
+    "account" : [
+        {
+            "id" : 654321,
+            "password" : "123456",
+            "sdk_type" : "onebot",
+            "platform_type" : "qq",
+            "model_type" : "default",
+            "server" : {
+                "type" : "post",
+                "host" : "http://127.0.0.1",
+                "port" : 58000,
+                "access_token" : ""
+            },
+            "debug" : false
+        }
+    ]
+}

@@ -1,0 +1,73 @@
+# -*- encoding: utf-8 -*-
+'''
+_______________________    ________________
+__  __ \__  /____  _/_ |  / /_  __ \_  ___/
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
+
+@File      :   OlivOS\flaskServerAPI.py
+@Author    :   lunzhiPenxil仑质
+@Contact   :   lunzhipenxil@gmail.com
+@License   :   AGPL
+@Copyright :   (C) 2020-2021, OlivOS-Team
+@Desc      :   None
+'''
+
+from gevent import pywsgi
+from flask import Flask
+from flask import current_app
+from flask import request
+from flask import g
+
+import logging
+import json
+import multiprocessing
+import threading
+
+import OlivOS
+
+class server(OlivOS.API.Proc_templet):
+    def __init__(self, Proc_name, Flask_namespace, Flask_server_xpath, Flask_server_methods, Flask_host, Flask_port, tx_queue = None, debug_mode = False, logger_proc = None, scan_interval = 0.001):
+        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'Flask_rx', scan_interval = scan_interval, rx_queue = None, tx_queue = tx_queue, logger_proc = logger_proc)
+        self.Proc_config['Flask_namespace'] = Flask_namespace
+        self.Proc_config['Flask_app'] = None
+        self.Proc_config['Flask_name'] = Proc_name
+        self.Proc_config['Flask_server_xpath'] = Flask_server_xpath
+        self.Proc_config['Flask_server_methods'] = Flask_server_methods
+        self.Proc_config['Flask_server_host'] = Flask_host
+        self.Proc_config['Flask_server_port'] = Flask_port
+        self.Proc_config['config'] = self.config_T(debug_mode)
+
+    class config_T(object):
+        def __init__(self, debug_mode):
+            self.debug_mode = debug_mode
+
+    def app(self):
+        self.Proc_config['Flask_app'] = Flask(self.Proc_config['Flask_namespace'])
+        return self.Proc_config['Flask_app']
+
+    def set_config(self):
+        with self.Proc_config['Flask_app'].app_context():
+            @current_app.route(self.Proc_config['Flask_server_xpath'], methods = self.Proc_config['Flask_server_methods'])
+            def Flask_server_func():
+                sdk_event = OlivOS.onebotSDK.event(request.get_data(as_text=True))
+                tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                try:
+                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                except:
+                    pass
+                return '200'
+
+    def run(self):
+        self.app()
+        self.set_config()
+        self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
+        self.log(2, 'OlivOS flask server [' + self.Proc_config['Flask_name'] + '] is running')
+        if self.Proc_config['config'].debug_mode:
+            self.Proc_config['Flask_app'].run(host = server_host, port = server_port)
+        else:
+            server = pywsgi.WSGIServer((self.Proc_config['Flask_server_host'], self.Proc_config['Flask_server_port']), self.Proc_config['Flask_app'], log = None)
+            server.serve_forever()
+
+
