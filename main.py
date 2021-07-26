@@ -40,20 +40,18 @@ if __name__ == '__main__':
 
     #print('･ﾟ( ﾉヮ´ )(`ヮ´ )σ`∀´) ﾟ∀ﾟ)σ')
     start_up_show_str = (   
-                            '\n'
                             '_______________________    ________________\n'
                             '__  __ \\__  /____  _/_ |  / /_  __ \\_  ___/\n'
                             '_  / / /_  /  __  / __ | / /_  / / /____ \\\n'
                             '/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /\n'
                             '\\____/ /_____/___/  _____/  \\____/ /____/\n'
-                            '\n'
                         )
     print(start_up_show_str)
 
     print('init config from basic.json ... ', end = '')
     basic_conf = None
     basic_conf_models = None
-    with open('./conf/basic.json', 'r') as basic_conf_f:
+    with open('./conf/basic.json', 'r', encoding = 'utf-8') as basic_conf_f:
         basic_conf = json.loads(basic_conf_f.read())
     if basic_conf == None:
         sys.exit()
@@ -64,7 +62,7 @@ if __name__ == '__main__':
 
     print('init account from account.json ... ', end = '')
     account_conf = None
-    with open('./conf/account.json', 'r') as account_conf_f:
+    with open('./conf/account.json', 'r', encoding = 'utf-8') as account_conf_f:
         account_conf = json.loads(account_conf_f.read())
     if account_conf == None:
         sys.exit()

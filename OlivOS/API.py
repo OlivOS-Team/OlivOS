@@ -258,9 +258,9 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '<reply> QQ(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, '<reply> - QQ(' + str(self.data.user_id) + '): ' + message)
             elif flag_type == 'group':
-                self.log_func(2, '<reply> Group(' + str(self.data.group_id) + '): ' + message)
+                self.log_func(2, '<reply> - Group(' + str(self.data.group_id) + '): ' + message)
 
     def send(self, send_type, target_id, message, flag_log = True):
         flag_type = send_type
@@ -272,9 +272,9 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '<send> QQ(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, '<send> - QQ(' + str(self.data.user_id) + '): ' + message)
             elif flag_type == 'group':
-                self.log_func(2, '<send> Group(' + str(self.data.group_id) + '): ' + message)
+                self.log_func(2, '<send> - Group(' + str(self.data.group_id) + '): ' + message)
 
 
 class Proc_templet(object):

@@ -21,6 +21,7 @@ import datetime
 import sys
 import importlib
 import os
+import json
 
 import OlivOS
 
@@ -39,6 +40,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.Proc_data['plugin_func_dict'] = plugin_func_dict
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.plugin_models_dict = {}
+        self.plugin_models_call_list = []
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -58,11 +60,11 @@ class shallow(OlivOS.API.Proc_templet):
                     continue
                 if type(rx_packet_data) == OlivOS.API.Control.packet:
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
-                        self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] will restart')
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_save()
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init', self.Proc_name), block=False)
+                        self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] will restart')
                 else:
                     if self.Proc_config['treading_mode'] == 'none':
                         self.run_plugin(rx_packet_data.sdk_event)
@@ -83,17 +85,17 @@ class shallow(OlivOS.API.Proc_templet):
         plugin_event = OlivOS.API.Event(sdk_event, self.log)
         plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event.base_info['self_id']]
         if plugin_event.active:
-            for plugin_models_index_this in self.plugin_models_dict:
-                self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this])
-                self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] plugin call [' + plugin_event.plugin_info['func_type'] + '] done')
+            for plugin_models_index_this in self.plugin_models_call_list:
+                self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
+                self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
         return
 
     def run_plugin_save(self):
         func_save_name = 'save'
-        for plugin_models_index_this in self.plugin_models_dict:
-            if hasattr(self.plugin_models_dict[plugin_models_index_this].main.Event, func_save_name):
-                self.plugin_models_dict[plugin_models_index_this].main.Event.save(plugin_event = None, Proc = self)
-                self.log(2, 'OlivOS plugin [' + plugin_models_index_this + '] call [' + func_save_name + '] done')
+        for plugin_models_index_this in self.plugin_models_call_list:
+            if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_save_name):
+                self.plugin_models_dict[plugin_models_index_this]['model'].main.Event.save(plugin_event = None, Proc = self)
+                self.log(2, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_save_name + '] done')
         return
 
     def plugin_event_router(self, plugin_event, plugin_model):
@@ -135,6 +137,7 @@ class shallow(OlivOS.API.Proc_templet):
         return
 
     def load_plugin_list(self):
+        total_models_count = 0
         self.plugin_models_dict = {}
         skip_result = ''
         func_init_name = 'init'
@@ -143,14 +146,34 @@ class shallow(OlivOS.API.Proc_templet):
             plugin_models_tmp = importlib.import_module(plugin_dir_this)
             if hasattr(plugin_models_tmp, 'main'):
                 if hasattr(plugin_models_tmp.main, 'Event'):
-                    self.plugin_models_dict[plugin_dir_this] = plugin_models_tmp
-                    if hasattr(plugin_models_tmp.main.Event, func_init_name):
-                        plugin_models_tmp.main.Event.init(plugin_event=None, Proc=self)
-                        self.log(2, 'OlivOS plugin [' + plugin_dir_this + '] call [' + func_init_name + '] done')
-                    self.log(2, 'OlivOS plugin [' + plugin_dir_this + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
-                    continue
+                    try:
+                        with open(plugin_path + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
+                            plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
+                    except:
+                        plugin_models_app_conf = None
+                    if plugin_models_app_conf == None:
+                        skip_result = plugin_dir_this + '/app.json' + ' not found'
+                    else:
+                        plugin_models_dict_this = {}
+                        plugin_models_dict_this['model'] = plugin_models_tmp
+                        plugin_models_dict_this['appconf'] = plugin_models_app_conf
+                        plugin_models_dict_this['priority'] = plugin_models_app_conf['priority']
+                        plugin_models_dict_this['namespace'] = plugin_dir_this
+                        plugin_models_dict_this['name'] = plugin_models_app_conf['name']
+                        self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
+                        if hasattr(plugin_models_tmp.main.Event, func_init_name):
+                            plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
+                            self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
+                        total_models_count += 1
+                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+                        continue
                 else:
                     skip_result = plugin_dir_this + '.main.Event' + ' not found'
             else:
                 skip_result = plugin_dir_this + '.main' + ' not found'
             self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: ' + skip_result)
+        plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(), key = lambda i : (i['priority'], i['namespace']))
+        self.plugin_models_call_list = []
+        for namespace_this in plugin_models_call_list_tmp:
+            self.plugin_models_call_list.append(namespace_this['namespace'])
+        self.log(2, 'Total count ' + str(total_models_count) + ' OlivOS plugin is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
