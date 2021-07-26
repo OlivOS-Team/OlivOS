@@ -6,7 +6,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   OlivOS\API.py
+@File      :   OlivOS/API.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL

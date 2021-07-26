@@ -6,7 +6,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   OlivOS\multiprocessing_win.py
+@File      :   OlivOS/multiprocessing_win.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
