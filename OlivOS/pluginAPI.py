@@ -86,8 +86,29 @@ class shallow(OlivOS.API.Proc_templet):
         plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event.base_info['self_id']]
         if plugin_event.active:
             for plugin_models_index_this in self.plugin_models_call_list:
-                self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
-                self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
+                flag_support_found_dict = {}
+                flag_support_found_dict['sdk'] = False
+                flag_support_found_dict['platform'] = False
+                flag_support_found_dict['model'] = False
+                flag_support_found_dict['flag'] = False
+                for plugin_model_support_this in self.plugin_models_dict[plugin_models_index_this]['support']:
+                    if plugin_model_support_this['sdk'] == 'all':
+                        flag_support_found_dict['sdk'] = True
+                    elif plugin_model_support_this['sdk'] == plugin_event.platform['sdk']:
+                        flag_support_found_dict['sdk'] = True
+                    if plugin_model_support_this['platform'] == 'all':
+                        flag_support_found_dict['platform'] = True
+                    elif plugin_model_support_this['platform'] == plugin_event.platform['platform']:
+                        flag_support_found_dict['platform'] = True
+                    if plugin_model_support_this['model'] == 'all':
+                        flag_support_found_dict['model'] = True
+                    elif plugin_model_support_this['model'] == plugin_event.platform['model']:
+                        flag_support_found_dict['model'] = True
+                    if flag_support_found_dict['sdk'] and flag_support_found_dict['platform'] and flag_support_found_dict['model']:
+                        flag_support_found_dict['flag'] = True
+                if flag_support_found_dict['flag']:
+                    self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
+                    self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
         return
 
     def run_plugin_save(self):
@@ -160,6 +181,7 @@ class shallow(OlivOS.API.Proc_templet):
                         plugin_models_dict_this['priority'] = plugin_models_app_conf['priority']
                         plugin_models_dict_this['namespace'] = plugin_dir_this
                         plugin_models_dict_this['name'] = plugin_models_app_conf['name']
+                        plugin_models_dict_this['support'] = plugin_models_app_conf['support']
                         self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
                         if hasattr(plugin_models_tmp.main.Event, func_init_name):
                             plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
@@ -176,4 +198,4 @@ class shallow(OlivOS.API.Proc_templet):
         self.plugin_models_call_list = []
         for namespace_this in plugin_models_call_list_tmp:
             self.plugin_models_call_list.append(namespace_this['namespace'])
-        self.log(2, 'Total count ' + str(total_models_count) + ' OlivOS plugin is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+        self.log(2, 'Total count [' + str(total_models_count) + '] OlivOS plugin is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
