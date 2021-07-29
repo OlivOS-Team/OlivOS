@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 # here put the import lib
 
 import OlivOS.API
+import OlivOS.accountAPI
 import OlivOS.diagnoseAPI
 import OlivOS.flaskServerAPI
 import OlivOS.pluginAPI

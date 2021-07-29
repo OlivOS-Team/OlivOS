@@ -3,6 +3,7 @@
         "name" : "OlivOS",
         "init" : [
             "OlivOS_logger",
+            "OlivOS_account_config",
             "OlivOS_plugin",
             "OlivOS_flask_post_rx"
         ],
@@ -15,6 +16,15 @@
         "OlivOS_logger_queue"
     ],
     "models" : {
+        "OlivOS_account_config" : {
+            "enable" : true,
+            "name" : "OlivOS_account_config",
+            "type" : "account_config",
+            "logger_proc" : "OlivOS_logger",
+            "data" : {
+                "path" : "./conf/account.json"
+            }
+        },
         "OlivOS_logger" : {
             "enable" : true,
             "name" : "OlivOS_logger",
