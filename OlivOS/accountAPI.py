@@ -31,13 +31,17 @@ class Account(object):
             logger_proc.log(2, 'init account from [' + path + '] ... done')
         plugin_bot_info_dict = {}
         for account_conf_account_this in account_conf['account']:
-            plugin_bot_info_dict[account_conf_account_this['id']] = OlivOS.API.bot_info_T(
-                id = account_conf_account_this['id'], 
-                host = account_conf_account_this['server']['host'], 
-                port = account_conf_account_this['server']['port'], 
-                access_token = account_conf_account_this['server']['access_token']
+            bot_info_tmp = OlivOS.API.bot_info_T(
+                id = account_conf_account_this['id'],
+                host = account_conf_account_this['server']['host'],
+                port = account_conf_account_this['server']['port'],
+                access_token = account_conf_account_this['server']['access_token'],
+                platform_sdk = account_conf_account_this['sdk_type'],
+                platform_platform = account_conf_account_this['platform_type'],
+                platform_model = account_conf_account_this['model_type']
             )
-            plugin_bot_info_dict[account_conf_account_this['id']].debug_mode = account_conf_account_this['debug']
+            bot_info_tmp.debug_mode = account_conf_account_this['debug']
+            plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
             logger_proc.log(2, 'generate account [' + str(account_conf_account_this['id']) + '] ... done')
         logger_proc.log(2, 'generate account ... all done')
         return plugin_bot_info_dict

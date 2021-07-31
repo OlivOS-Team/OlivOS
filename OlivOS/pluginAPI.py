@@ -83,8 +83,14 @@ class shallow(OlivOS.API.Proc_templet):
         log_str_tmp = str(sdk_event.json)
         self.log(0, 'Received: ' + log_str_tmp)
         plugin_event = OlivOS.API.Event(sdk_event, self.log)
-        if plugin_event.base_info['self_id'] in self.Proc_data['bot_info_dict']:
-            plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event.base_info['self_id']]
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id = plugin_event.base_info['self_id'],
+            platform_sdk = plugin_event.platform['sdk'],
+            platform_platform = plugin_event.platform['platform'],
+            platform_model = plugin_event.platform['model']
+        )
+        if plugin_event_bot_hash in self.Proc_data['bot_info_dict']:
+            plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event_bot_hash]
         else:
             self.log(3, 'Account [' + str(plugin_event.base_info['self_id']) + '] not found, please check your account config')
             plugin_event.active = False
