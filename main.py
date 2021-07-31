@@ -141,5 +141,16 @@ if __name__ == '__main__':
                         path = basic_conf_models_this['data']['path'],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
                     )
+                elif basic_conf_models_this['type'] == 'telegram_poll':
+                    Proc_dict[basic_conf_models_this['name']] = OlivOS.telegramPollServerAPI.server(
+                        Proc_name = basic_conf_models_this['name'],
+                        scan_interval = basic_conf_models_this['interval'],
+                        rx_queuem = None,
+                        tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        bot_info_dict = plugin_bot_info_dict,
+                        debug_mode = False
+                    )
+                    Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
         elif rx_packet_data.action == 'restart_do':
             Proc_Proc_dict[rx_packet_data.key].terminate()

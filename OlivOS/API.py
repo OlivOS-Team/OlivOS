@@ -95,39 +95,41 @@ class Event(object):
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.onebotSDK.event:
             OlivOS.onebotSDK.get_Event_from_SDK(self)
+        if self.sdk_event_type is OlivOS.telegramSDK.event:
+            OlivOS.telegramSDK.get_Event_from_SDK(self)
 
     def do_init_log(self):
         if self.active:
             if self.plugin_info['func_type'] == 'private_message':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - QQ[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
             elif self.plugin_info['func_type'] == 'group_message':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
             elif self.plugin_info['func_type'] == 'group_file_upload':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') : ' + self.data.file['name'])
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') : ' + self.data.file['name'])
             elif self.plugin_info['func_type'] == 'group_admin':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') Action(' +  self.data.action + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Action(' +  self.data.action + ')')
             elif self.plugin_info['func_type'] == 'group_member_decrease':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
             elif self.plugin_info['func_type'] == 'group_member_increase':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
             elif self.plugin_info['func_type'] == 'group_ban':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Duration(' + str(self.data.duration) + ') Action(' + self.data.action + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Duration(' + str(self.data.duration) + ') Action(' + self.data.action + ')')
             elif self.plugin_info['func_type'] == 'group_message_recall':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Message_id(' + str(self.data.message_id) + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Message_id(' + str(self.data.message_id) + ')')
             elif self.plugin_info['func_type'] == 'private_message_recall':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - QQ(' + str(self.data.user_id) + ') Message_id(' + str(self.data.message_id) + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - User(' + str(self.data.user_id) + ') Message_id(' + str(self.data.message_id) + ')')
             elif self.plugin_info['func_type'] == 'poke':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
             elif self.plugin_info['func_type'] == 'group_lucky_king':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
             elif self.plugin_info['func_type'] == 'group_honor':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') Type(' + str(self.data.type) + ')')
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Type(' + str(self.data.type) + ')')
             elif self.plugin_info['func_type'] == 'friend_add_request':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - QQ(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
             elif self.plugin_info['func_type'] == 'group_add_request':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
             elif self.plugin_info['func_type'] == 'group_invite_request':
-                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') QQ(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
             elif self.plugin_info['func_type'] == 'lifecycle':
                 self.log_func(2, '[' + self.plugin_info['func_type'] + '] - Action(' + str(self.data.action) + ')')
             elif self.plugin_info['func_type'] == 'heartbeat':
@@ -279,7 +281,7 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '<reply> - QQ(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, '<reply> - User(' + str(self.data.user_id) + '): ' + message)
             elif flag_type == 'group':
                 self.log_func(2, '<reply> - Group(' + str(self.data.group_id) + '): ' + message)
 
@@ -293,7 +295,7 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '<send> - QQ(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, '<send> - User(' + str(self.data.user_id) + '): ' + message)
             elif flag_type == 'group':
                 self.log_func(2, '<send> - Group(' + str(self.data.group_id) + '): ' + message)
 

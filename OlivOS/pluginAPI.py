@@ -89,11 +89,12 @@ class shallow(OlivOS.API.Proc_templet):
             platform_platform = plugin_event.platform['platform'],
             platform_model = plugin_event.platform['model']
         )
-        if plugin_event_bot_hash in self.Proc_data['bot_info_dict']:
-            plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event_bot_hash]
-        else:
-            self.log(3, 'Account [' + str(plugin_event.base_info['self_id']) + '] not found, please check your account config')
-            plugin_event.active = False
+        if plugin_event.active:
+            if plugin_event_bot_hash in self.Proc_data['bot_info_dict']:
+                plugin_event.bot_info = self.Proc_data['bot_info_dict'][plugin_event_bot_hash]
+            else:
+                self.log(3, 'Account [' + str(plugin_event.base_info['self_id']) + '] not found, please check your account config')
+                plugin_event.active = False
         if plugin_event.active:
             for plugin_models_index_this in self.plugin_models_call_list:
                 flag_support_found_dict = {}

@@ -5,7 +5,8 @@
             "OlivOS_logger",
             "OlivOS_account_config",
             "OlivOS_plugin",
-            "OlivOS_flask_post_rx"
+            "OlivOS_flask_post_rx",
+            "OlivOS_telegram_poll"
         ],
         "control_queue" : "OlivOS_control_queue",
         "interval" : 0.2
@@ -45,7 +46,7 @@
             "treading_mode" : "full",
             "restart_gate" : 1000,
             "enable_auto_restart" : true,
-            "debug" : true
+            "debug" : false
         },
         "OlivOS_flask_post_rx" : {
             "enable" : true,
@@ -59,6 +60,15 @@
                 "host" : "0.0.0.0",
                 "port" : 55001
             }
+        },
+        "OlivOS_telegram_poll" : {
+            "enable" : true,
+            "name" : "OlivOS_telegram_poll",
+            "type" : "telegram_poll",
+            "interval" : 0.2,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : true
         }
     }
 }

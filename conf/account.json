@@ -13,6 +13,20 @@
                 "access_token" : ""
             },
             "debug" : false
+        },
+        {
+            "id" : 7654321,
+            "password" : "1234567",
+            "sdk_type" : "telegram_poll",
+            "platform_type" : "telegram",
+            "model_type" : "default",
+            "server" : {
+                "type" : "post",
+                "host" : "https://api.telegram.org",
+                "port" : 443,
+                "access_token" : "7654321:TOKEN"
+            },
+            "debug" : false
         }
     ]
 }

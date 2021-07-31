@@ -22,4 +22,5 @@ import OlivOS.diagnoseAPI
 import OlivOS.flaskServerAPI
 import OlivOS.pluginAPI
 import OlivOS.onebotSDK
-
+import OlivOS.telegramSDK
+import OlivOS.telegramPollServerAPI
