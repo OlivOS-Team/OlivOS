@@ -96,8 +96,17 @@ class event(object):
         if self.json != None:
             self.active = True
         self.base_info = {}
-        if self.active:
+        if checkByListAnd([
+            self.active,
+            checkInDictSafe('message', self.json, []),
+            checkInDictSafe('date', self.json, ['message'])
+        ]):
             self.base_info['time'] = self.json['message']['date']
+        else:
+            self.base_info['time'] = 0
+        if checkByListAnd([
+            self.active
+        ]):
             self.base_info['self_id'] = bot_info.id
             self.base_info['post_type'] = None
 
@@ -108,6 +117,38 @@ class event(object):
             res = None
         return res
 
+def checkInDictSafe(var_key, var_dict, var_path = []):
+    var_dict_this = var_dict
+    for var_key_this in var_path:
+        if var_key_this in var_dict_this:
+            var_dict_this = var_dict_this[var_key_this]
+        else:
+            return False
+    if var_key in var_dict_this:
+        return True
+    else:
+        return False
+
+def checkEquelInDictSafe(var_it, var_dict, var_path = []):
+    var_dict_this = var_dict
+    for var_key_this in var_path:
+        if var_key_this in var_dict_this:
+            var_dict_this = var_dict_this[var_key_this]
+        else:
+            return False
+    if var_it == var_dict_this:
+        return True
+    else:
+        return False
+
+def checkByListAnd(check_list):
+    flag_res = True
+    for check_list_this in check_list:
+        if not check_list_this:
+            flag_res = False
+            return flag_res
+    return flag_res
+
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
@@ -115,46 +156,108 @@ def get_Event_from_SDK(target_event):
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
-    if 'message' in target_event.sdk_event.json:
-        if 'text' in target_event.sdk_event.json['message']:
-            if 'chat' in target_event.sdk_event.json['message']:
-                if 'type' in target_event.sdk_event.json['message']['chat']:
-                    if 'message_id' in target_event.sdk_event.json['message']:
-                        if target_event.sdk_event.json['message']['chat']['type'] == 'private':
-                            if 'first_name' in target_event.sdk_event.json['message']['from']:
-                                target_event.active = True
-                                target_event.plugin_info['func_type'] = 'private_message'
-                                target_event.data = target_event.private_message(
-                                    target_event.sdk_event.json['message']['from']['id'],
-                                    target_event.sdk_event.json['message']['text'],
-                                    'friend'
-                                )
-                                target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
-                                target_event.data.raw_message = target_event.sdk_event.json['message']['text']
-                                target_event.data.font = None
-                                target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
-                                target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
-                                target_event.data.sender['sex'] = 'unknown'
-                                target_event.data.sender['age'] = 0
-                        elif target_event.sdk_event.json['message']['chat']['type'] == 'group':
-                            if 'from' in target_event.sdk_event.json['message']:
-                                if 'id' in target_event.sdk_event.json['message']['from']:
-                                    if 'first_name' in target_event.sdk_event.json['message']['from']:
-                                        target_event.active = True
-                                        target_event.plugin_info['func_type'] = 'group_message'
-                                        target_event.data = target_event.group_message(
-                                            target_event.sdk_event.json['message']['chat']['id'],
-                                            target_event.sdk_event.json['message']['from']['id'],
-                                            target_event.sdk_event.json['message']['text'],
-                                            'group'
-                                        )
-                                        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
-                                        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
-                                        target_event.data.font = None
-                                        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
-                                        target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
-                                        target_event.data.sender['sex'] = 'unknown'
-                                        target_event.data.sender['age'] = 0
+    if checkByListAnd([
+        not target_event.active,
+        checkInDictSafe('message', target_event.sdk_event.json, []),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
+        checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('from', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
+    ]):
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'private_message'
+        target_event.data = target_event.private_message(
+            target_event.sdk_event.json['message']['from']['id'],
+            target_event.sdk_event.json['message']['text'],
+            'friend'
+        )
+        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
+        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.font = None
+        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
+        target_event.data.sender['sex'] = 'unknown'
+        target_event.data.sender['age'] = 0
+    if checkByListAnd([
+        not target_event.active,
+        'message' in target_event.sdk_event.json,
+        checkInDictSafe('message', target_event.sdk_event.json, []),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
+        checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('from', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
+    ]):
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'group_message'
+        target_event.data = target_event.group_message(
+            target_event.sdk_event.json['message']['chat']['id'],
+            target_event.sdk_event.json['message']['from']['id'],
+            target_event.sdk_event.json['message']['text'],
+            'group'
+        )
+        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
+        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.font = None
+        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
+        target_event.data.sender['sex'] = 'unknown'
+        target_event.data.sender['age'] = 0
+    if checkByListAnd([
+        not target_event.active,
+        'message' in target_event.sdk_event.json,
+        checkInDictSafe('message', target_event.sdk_event.json, []),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
+        checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('from', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
+    ]):
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'group_message'
+        target_event.data = target_event.group_message(
+            target_event.sdk_event.json['message']['chat']['id'],
+            target_event.sdk_event.json['message']['from']['id'],
+            target_event.sdk_event.json['message']['text'],
+            'group'
+        )
+        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
+        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.font = None
+        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
+        target_event.data.sender['sex'] = 'unknown'
+        target_event.data.sender['age'] = 0
+    return target_event.active
+
+#支持OlivOS API调用的方法实现
+class event_action(object):
+    def send_msg(target_event, chat_id, message):
+        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = chat_id
+        this_msg.data.text = message
+        this_msg.do_api()
+
+    def send_private_msg(target_event, user_id, message):
+        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = user_id
+        this_msg.data.text = message
+        this_msg.do_api()
+
+    def send_group_msg(target_event, group_id, message):
+        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = group_id
+        this_msg.data.text = message
+        this_msg.do_api()
 
 class api_templet(object):
     def __init__(self):
@@ -171,7 +274,6 @@ class api_templet(object):
         self.res = this_post_json.send_onebot_post_json()
         return self.res
 
-
 class API(object):
     class getUpdates(api_templet):
         def __init__(self, bot_info = None):
@@ -184,3 +286,52 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.offset = 0
+                self.limit = 100
+                self.timeout = 0
+
+    class getUpdatesWithAllowed(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getUpdates'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.offset = 0
+                self.limit = 100
+                self.timeout = 0
+                self.allowed_updates = None
+
+    class sendMessage(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'sendMessage'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.text = ''
+                self.disable_web_page_preview = True
+                self.disable_notification = False
+
+    class sendMessageWithReply(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'sendMessage'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.text = ''
+                self.disable_web_page_preview = True
+                self.disable_notification = False
+                self.reply_to_message_id = 0
+                self.allow_sending_without_reply = True

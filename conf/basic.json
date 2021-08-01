@@ -68,7 +68,7 @@
             "interval" : 0.2,
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
-            "debug" : true
+            "debug" : false
         }
     }
 }

@@ -37,12 +37,14 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_update_id'] = {}
 
     def run(self):
+        self.log(2, 'OlivOS telegram poll server [' + self.Proc_name + '] is running')
         while True:
             time.sleep(self.Proc_info.scan_interval)
             self.run_poll_list()
 
     def run_poll_list(self):
         for bot_info_this in self.Proc_data['bot_info_dict']:
+            flag_not_attach = False
             bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
             if bot_info_this_obj.platform['sdk'] == 'telegram_poll':
                 flag_first_update = False
@@ -54,15 +56,19 @@ class server(OlivOS.API.Proc_templet):
                 sdk_bot_info_this = OlivOS.telegramSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_this_obj)
                 sdk_api_tmp = OlivOS.telegramSDK.API.getUpdates(sdk_bot_info_this)
                 sdk_api_tmp.data.offset = self.Proc_data['bot_info_update_id'][bot_info_this]
-                sdk_api_tmp.do_api()
-                res_obj = json.loads(sdk_api_tmp.res.text)
-                if res_obj['result'] != []:
-                    self.Proc_data['bot_info_update_id'][bot_info_this] = res_obj['result'][-1]['update_id'] + 1
-                    if not flag_first_update:
-                        for result_this in res_obj['result']:
-                            sdk_event = OlivOS.telegramSDK.event(result_this, 'poll', sdk_bot_info_this)
-                            tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                            try:
-                                self.Proc_info.tx_queue.put(tx_packet_data, block = False)
-                            except:
-                                pass
+                try:
+                    sdk_api_tmp.do_api()
+                except:
+                    flag_not_attach = True
+                if not flag_not_attach:
+                    try:
+                        res_obj = json.loads(sdk_api_tmp.res.text)
+                        if type(res_obj['result']) == list and res_obj['result'] != []:
+                            self.Proc_data['bot_info_update_id'][bot_info_this] = res_obj['result'][-1]['update_id'] + 1
+                            if not flag_first_update:
+                                for result_this in res_obj['result']:
+                                    sdk_event = OlivOS.telegramSDK.event(result_this, 'poll', bot_info_this_obj)
+                                    tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                    except:
+                        pass

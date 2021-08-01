@@ -292,6 +292,8 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, message)
             elif flag_type == 'group':
                 OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, message)
+        elif self.platform['sdk'] == 'telegram_poll':
+            OlivOS.telegramSDK.event_action.send_msg(self, target_id, message)
 
         if flag_log:
             if flag_type == 'private':
