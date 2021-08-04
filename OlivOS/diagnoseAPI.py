@@ -21,8 +21,8 @@ import datetime
 import OlivOS
 
 class logger(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name = 'native_logger', scan_interval = 0.001, logger_queue = None, logger_mode = 'console', logger_vis_level = [2, 3, 4, 5]):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'logger', scan_interval = scan_interval, rx_queue = logger_queue, tx_queue = None, logger_proc = self)
+    def __init__(self, Proc_name = 'native_logger', scan_interval = 0.001, dead_interval = 1, logger_queue = None, logger_mode = 'console', logger_vis_level = [2, 3, 4, 5]):
+        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'logger', scan_interval = scan_interval, dead_interval = dead_interval, rx_queue = logger_queue, tx_queue = None, logger_proc = self)
         self.Proc_config['logger_queue'] = logger_queue
         self.Proc_config['logger_mode'] = logger_mode
         self.Proc_config['level_dict'] = {

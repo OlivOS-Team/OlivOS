@@ -31,6 +31,7 @@
             "name" : "OlivOS_logger",
             "type" : "logger",
             "interval" : 0.002,
+            "dead_interval" : 1,
             "rx_queue" : "OlivOS_logger_queue",
             "mode" : "console",
             "fliter" : [2, 3, 4, 5]
@@ -40,6 +41,7 @@
             "name" : "OlivOS_plugin",
             "type" : "plugin",
             "interval" : 0.002,
+            "dead_interval" : 1,
             "rx_queue" : "OlivOS_rx_queue",
             "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger",
@@ -53,6 +55,7 @@
             "name" : "OlivOS_flask_post_rx",
             "type" : "post",
             "interval" : 0.002,
+            "dead_interval" : 1,
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : false,
@@ -66,6 +69,7 @@
             "name" : "OlivOS_telegram_poll",
             "type" : "telegram_poll",
             "interval" : 0.2,
+            "dead_interval" : 1,
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : false

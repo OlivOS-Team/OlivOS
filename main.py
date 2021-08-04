@@ -97,6 +97,7 @@ if __name__ == '__main__':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.diagnoseAPI.logger(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
                         logger_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
                         logger_mode = basic_conf_models_this['mode'],
                         logger_vis_level = basic_conf_models_this['fliter']
@@ -110,6 +111,7 @@ if __name__ == '__main__':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.pluginAPI.shallow(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
                         rx_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
                         tx_queue = None,
                         control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
@@ -126,6 +128,7 @@ if __name__ == '__main__':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.flaskServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
                         Flask_namespace = __name__,
                         Flask_server_xpath = '/OlivOSMsgApi',
                         Flask_server_methods = ['POST'],
@@ -145,6 +148,7 @@ if __name__ == '__main__':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.telegramPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
                         rx_queuem = None,
                         tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
@@ -153,4 +157,5 @@ if __name__ == '__main__':
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
         elif rx_packet_data.action == 'restart_do':
+            time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
             Proc_Proc_dict[rx_packet_data.key].terminate()

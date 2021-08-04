@@ -29,8 +29,8 @@ plugin_path = './plugin/app/'
 sys.path.append(plugin_path)
 
 class shallow(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name = 'native_plugin', scan_interval = 0.001, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None, debug_mode = False, plugin_func_dict = {}, bot_info_dict = {}, treading_mode = 'full', restart_gate = 10000, enable_auto_restart = False):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'shallow', scan_interval = scan_interval, rx_queue = rx_queue, tx_queue = tx_queue, control_queue = control_queue, logger_proc = logger_proc)
+    def __init__(self, Proc_name = 'native_plugin', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None, debug_mode = False, plugin_func_dict = {}, bot_info_dict = {}, treading_mode = 'full', restart_gate = 10000, enable_auto_restart = False):
+        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'shallow', scan_interval = scan_interval, dead_interval = dead_interval, rx_queue = rx_queue, tx_queue = tx_queue, control_queue = control_queue, logger_proc = logger_proc)
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_config['treading_mode'] = treading_mode
         self.Proc_config['shallow_dict'] = {}
