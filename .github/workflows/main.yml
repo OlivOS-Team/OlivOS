@@ -1,4 +1,4 @@
-name: OlivOS-pyinstaller-action-packing-for-Windows
+name: CI-Packing
 on:
   push:
     branches: [ main ]
