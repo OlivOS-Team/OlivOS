@@ -1,0 +1,26 @@
+name: OlivOS-pyinstaller-action-packing-for-Windows
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Packing by PyInstaller Windows
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: ./
+    - name: Perform a Pester test from the Tests.ps1 file
+      run: |
+        cd ./dist/windows
+        mkdir ./OlivOS-Win
+        cd ./OlivOS-Win
+        cp ../main.exe ./OlivOS.exe
+    - uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win
+        path: ./dist/windows/OlivOS-Win

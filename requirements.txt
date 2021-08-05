@@ -1,0 +1,5 @@
+pyinstaller==3.5
+flask
+gevent
+psutil
+requests==2.23.0
