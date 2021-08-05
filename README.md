@@ -11,6 +11,10 @@
 **青果核心交互栈**  
 **Witness Union / 见证联合**  
 
+  <a href="https://github.com/OlivOS-Team/OlivOS/actions">
+    <img src="https://github.com/OlivOS-Team/OlivOS/workflows/CI-Packing/badge.svg" alt="action">
+  </a>
+
 </div>
 
 ## 兼容
