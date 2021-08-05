@@ -14,7 +14,8 @@
 </div>
 
 ## 兼容
-[![Onebot](https://img.shields.io/badge/-Onebot-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
+[![Onebot](https://img.shields.io/badge/-Onebot-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/botuniverse/onebot)
+[![Go-CQHttp](https://img.shields.io/badge/-Onebot-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
 
 ## 概述
