@@ -28,4 +28,6 @@
 ## 方针
 技术路线上，基于Python、采用模块化框架、进程分离、消息队列通信、前后端分离、响应式布局、渐进式渲染的基本思路，实现一个高并发性、高可靠性、高适应性的整体方案。
 
-正在开发施工中
+## 插件
+请参考插件默认模板[OlivOS-Plugin-Template](https://github.com/OlivOS-Team/OlivOS-Plugin-Template)进行插件开发
+
