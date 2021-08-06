@@ -19,7 +19,7 @@ jobs:
         cd ./dist/windows
         mkdir ./OlivOS-Win
         cd ./OlivOS-Win
-        cp ../../../conf ./conf
+        cp -rf ../../../conf ./conf
         mkdir ./plugin
         mkdir ./plugin/app
         mkdir ./plugin/data
