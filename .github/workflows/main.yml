@@ -19,6 +19,11 @@ jobs:
         cd ./dist/windows
         mkdir ./OlivOS-Win
         cd ./OlivOS-Win
+        cp ../../../conf ./conf
+        mkdir ./plugin
+        mkdir ./plugin/app
+        mkdir ./plugin/data
+        mkdir ./plugin/conf
         cp ../main.exe ./OlivOS.exe
     - uses: actions/upload-artifact@v2
       with:
