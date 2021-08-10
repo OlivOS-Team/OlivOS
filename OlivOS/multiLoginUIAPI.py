@@ -48,14 +48,14 @@ class HostUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('ID', 'SDK', 'PLATFORM', 'MODEL')
+        self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
         self.UIObject['tree'].column('ID', width = 100)
-        self.UIObject['tree'].column('SDK', width = 100)
         self.UIObject['tree'].column('PLATFORM', width = 100)
+        self.UIObject['tree'].column('SDK', width = 100)
         self.UIObject['tree'].column('MODEL', width = 100)
         self.UIObject['tree'].heading('ID', text = 'ID')
-        self.UIObject['tree'].heading('SDK', text = 'SDK')
         self.UIObject['tree'].heading('PLATFORM', text = 'PLATFORM')
+        self.UIObject['tree'].heading('SDK', text = 'SDK')
         self.UIObject['tree'].heading('MODEL', text = 'MODEL')
         self.tree_load()
         self.UIObject['tree'].place(x = 0, y = 0, width = 500, height = 350)
