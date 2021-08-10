@@ -16,9 +16,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
+import platform
+
 import OlivOS.data
 import OlivOS.API
-import OlivOS.multiLoginUIAPI
 import OlivOS.accountAPI
 import OlivOS.diagnoseAPI
 import OlivOS.flaskServerAPI
@@ -26,3 +27,5 @@ import OlivOS.pluginAPI
 import OlivOS.onebotSDK
 import OlivOS.telegramSDK
 import OlivOS.telegramPollServerAPI
+if(platform.system() == 'Windows'):
+    import OlivOS.multiLoginUIAPI

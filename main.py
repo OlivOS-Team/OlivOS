@@ -26,6 +26,7 @@ import json
 import multiprocessing
 import psutil
 import threading
+import platform
 
 import OlivOS
 
@@ -163,14 +164,15 @@ if __name__ == '__main__':
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                 elif basic_conf_models_this['type'] == 'multiLoginUI':
-                    Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
-                        Model_name = basic_conf_models_this['name'],
-                        Account_data = plugin_bot_info_dict,
-                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
-                    )
-                    Proc_dict[basic_conf_models_this['name']].start()
-                    if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
-                        plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
+                    if(platform.system() == 'Windows'):
+                        Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
+                            Model_name = basic_conf_models_this['name'],
+                            Account_data = plugin_bot_info_dict,
+                            logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                        )
+                        Proc_dict[basic_conf_models_this['name']].start()
+                        if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
+                            plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
                 elif basic_conf_models_this['type'] == 'account_config_save':
                     OlivOS.accountAPI.Account.save(
                         path = basic_conf_models_this['data']['path'],
