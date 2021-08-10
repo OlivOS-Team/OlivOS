@@ -7,6 +7,7 @@
             "platform_type" : "qq",
             "model_type" : "default",
             "server" : {
+                "auto" : true,
                 "type" : "post",
                 "host" : "http://127.0.0.1",
                 "port" : 58000,
@@ -21,6 +22,7 @@
             "platform_type" : "telegram",
             "model_type" : "default",
             "server" : {
+                "auto" : true,
                 "type" : "post",
                 "host" : "https://api.telegram.org",
                 "port" : 443,

@@ -38,19 +38,28 @@ class Control(object):
             self.key = key
 
 class bot_info_T(object):
-    def __init__(self, id = -1, host = '', port = -1, access_token = None, platform_sdk = None, platform_platform = None, platform_model = None):
+    def __init__(self, id = -1, password = '', server_type = 'post', server_auto = False, host = '', port = -1, access_token = None, platform_sdk = None, platform_platform = None, platform_model = None):
         self.id = id
+        self.password = password
         self.platform = {}
         self.platform['sdk'] = platform_sdk
         self.platform['platform'] = platform_platform
         self.platform['model'] = platform_model
         self.hash = None
-        self.post_info = self.post_info_T(host, port, access_token)
+        self.post_info = self.post_info_T(
+            server_auto = server_auto,
+            server_type = server_type,
+            host = host,
+            port = port,
+            access_token = access_token
+        )
         self.debug_mode = False
         self.getHash()
 
     class post_info_T(object):
-        def __init__(self, host = '', port = -1, access_token = None):
+        def __init__(self, host = '', port = -1, access_token = None, server_type = 'post', server_auto = False):
+            self.auto = server_auto
+            self.type = server_type
             self.host = host
             self.port = port
             self.access_token = access_token

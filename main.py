@@ -144,6 +144,12 @@ if __name__ == '__main__':
                         path = basic_conf_models_this['data']['path'],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
                     )
+                elif basic_conf_models_this['type'] == 'account_config_safe':
+                    plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
+                        path = basic_conf_models_this['data']['path'],
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        safe_mode = True
+                    )
                 elif basic_conf_models_this['type'] == 'telegram_poll':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.telegramPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
@@ -156,6 +162,21 @@ if __name__ == '__main__':
                         debug_mode = False
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                elif basic_conf_models_this['type'] == 'multiLoginUI':
+                    Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
+                        Model_name = basic_conf_models_this['name'],
+                        Account_data = plugin_bot_info_dict,
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                    )
+                    Proc_dict[basic_conf_models_this['name']].start()
+                    if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
+                        plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
+                elif basic_conf_models_this['type'] == 'account_config_save':
+                    OlivOS.accountAPI.Account.save(
+                        path = basic_conf_models_this['data']['path'],
+                        Account_data = plugin_bot_info_dict,
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                    )
         elif rx_packet_data.action == 'restart_do':
             time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
             Proc_Proc_dict[rx_packet_data.key].terminate()

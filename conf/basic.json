@@ -4,6 +4,9 @@
         "init" : [
             "OlivOS_logger",
             "OlivOS_account_config",
+            "OlivOS_multiLoginUI",
+            "OlivOS_account_config_save",
+            "OlivOS_account_config_safe",
             "OlivOS_plugin",
             "OlivOS_flask_post_rx",
             "OlivOS_telegram_poll"
@@ -17,10 +20,34 @@
         "OlivOS_logger_queue"
     ],
     "models" : {
+        "OlivOS_multiLoginUI" : {
+            "enable" : true,
+            "name" : "OlivOS_multiLoginUI",
+            "type" : "multiLoginUI",
+            "logger_proc" : "OlivOS_logger"
+        },
+        "OlivOS_account_config_save" : {
+            "enable" : true,
+            "name" : "OlivOS_account_config_save",
+            "type" : "account_config_save",
+            "logger_proc" : "OlivOS_logger",
+            "data" : {
+                "path" : "./conf/account.json"
+            }
+        },
         "OlivOS_account_config" : {
             "enable" : true,
             "name" : "OlivOS_account_config",
             "type" : "account_config",
+            "logger_proc" : "OlivOS_logger",
+            "data" : {
+                "path" : "./conf/account.json"
+            }
+        },
+        "OlivOS_account_config_safe" : {
+            "enable" : true,
+            "name" : "OlivOS_account_config_safe",
+            "type" : "account_config_safe",
             "logger_proc" : "OlivOS_logger",
             "data" : {
                 "path" : "./conf/account.json"
