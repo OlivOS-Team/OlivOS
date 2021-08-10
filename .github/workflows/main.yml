@@ -14,7 +14,7 @@ jobs:
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
         path: ./
-    - name: ready for packing
+    - name: Ready for Packing
       run: |
         cd ./dist/windows
         mkdir ./OlivOS-Win
