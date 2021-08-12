@@ -109,40 +109,63 @@ class Event(object):
 
     def do_init_log(self):
         if self.active:
+            tmp_log_level = 0
+            tmp_log_message = ''
             if self.plugin_info['func_type'] == 'private_message':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
+                tmp_log_level = 2
+                tmp_log_message = 'User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message
             elif self.plugin_info['func_type'] == 'group_message':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message)
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User[' + self.data.sender['nickname'] + '](' + str(self.data.user_id) + ') : ' + self.data.message
             elif self.plugin_info['func_type'] == 'group_file_upload':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') : ' + self.data.file['name'])
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') : ' + self.data.file['name']
             elif self.plugin_info['func_type'] == 'group_admin':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Action(' +  self.data.action + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Action(' +  self.data.action + ')'
             elif self.plugin_info['func_type'] == 'group_member_decrease':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')'
             elif self.plugin_info['func_type'] == 'group_member_increase':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Action(' + self.data.action + ')'
             elif self.plugin_info['func_type'] == 'group_ban':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Duration(' + str(self.data.duration) + ') Action(' + self.data.action + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Duration(' + str(self.data.duration) + ') Action(' + self.data.action + ')'
             elif self.plugin_info['func_type'] == 'group_message_recall':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Message_id(' + str(self.data.message_id) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Message_id(' + str(self.data.message_id) + ')'
             elif self.plugin_info['func_type'] == 'private_message_recall':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - User(' + str(self.data.user_id) + ') Message_id(' + str(self.data.message_id) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'User(' + str(self.data.user_id) + ') Message_id(' + str(self.data.message_id) + ')'
             elif self.plugin_info['func_type'] == 'poke':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')'
             elif self.plugin_info['func_type'] == 'group_lucky_king':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') -> Target(' +  str(self.data.target_id) + ')'
             elif self.plugin_info['func_type'] == 'group_honor':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Type(' + str(self.data.type) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Type(' + str(self.data.type) + ')'
             elif self.plugin_info['func_type'] == 'friend_add_request':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                tmp_log_level = 2
+                tmp_log_message = 'User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment']
             elif self.plugin_info['func_type'] == 'group_add_request':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment']
             elif self.plugin_info['func_type'] == 'group_invite_request':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment'])
+                tmp_log_level = 2
+                tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') Flag(' + str(self.data.flag) + ') : ' + self.sdk_event.json['comment']
             elif self.plugin_info['func_type'] == 'lifecycle':
-                self.log_func(2, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Action(' + str(self.data.action) + ')')
+                tmp_log_level = 2
+                tmp_log_message = 'Action(' + str(self.data.action) + ')'
             elif self.plugin_info['func_type'] == 'heartbeat':
-                self.log_func(1, '[' + self.platform['platform'] + '] - [' + self.plugin_info['func_type'] + '] - Interval(' + str(self.data.interval) + ')')
+                tmp_log_level = 1
+                tmp_log_message = 'Interval(' + str(self.data.interval) + ')'
+            self.log_func(tmp_log_level, tmp_log_message, [
+                (self.platform['platform'], 'default'),
+                (self.plugin_info['func_type'], 'default')
+            ])
 
     class private_message(object):
         def __init__(self, user_id, message, sub_type, flag_lazy = True):
@@ -272,29 +295,71 @@ class Event(object):
 
     #以下为统一事件动作调用方法实现，各接入sdk需完全支持
 
-    def reply(self, message, flag_log = True):
+    def __reply(self, message, flag_log = True):
         flag_type = None
-        if self.plugin_info['func_type'] == 'private_message':
-            self.send('private', self.data.user_id, message, flag_log = False)
+        if checkByListOrEqual(
+            self.plugin_info['func_type'],
+            [
+                'private_message',
+                'friend_add',
+                'private_message_recall',
+                'friend_add_request'
+            ]
+        ):
+            self.__send('private', self.data.user_id, message, flag_log = False)
             flag_type = 'private'
-        elif self.plugin_info['func_type'] == 'group_message':
-            self.send('group', self.data.group_id, message, flag_log = False)
+        elif checkByListOrEqual(
+            self.plugin_info['func_type'],
+            [
+                'group_message',
+                'group_file_upload',
+                'group_admin',
+                'group_member_decrease',
+                'group_member_increase',
+                'group_ban',
+                'group_message_recall',
+                'group_lucky_king',
+                'group_honor',
+                'group_add_request',
+                'group_invite_request'
+                
+            ]
+        ):
+            self.__send('group', self.data.group_id, message, flag_log = False)
             flag_type = 'group'
-        elif self.plugin_info['func_type'] == 'poke':
+        elif checkByListOrEqual(
+            self.plugin_info['func_type'],
+            [
+                'poke'
+            ]
+        ):
             if self.data.group_id == -1:
-                self.send('private', self.data.user_id, message, flag_log = False)
+                self.__send('private', self.data.user_id, message, flag_log = False)
                 flag_type = 'private'
             else:
-                self.send('group', self.data.group_id, message, flag_log = False)
+                self.__send('group', self.data.group_id, message, flag_log = False)
                 flag_type = 'group'
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '[' + self.platform['platform'] + '] - <reply> - User(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + message, [
+                    (self.platform['platform'], 'default'),
+                    ('reply', 'callback')
+                ])
             elif flag_type == 'group':
-                self.log_func(2, '[' + self.platform['platform'] + '] - <reply> - Group(' + str(self.data.group_id) + '): ' + message)
+                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + message, [
+                    (self.platform['platform'], 'default'),
+                    ('reply', 'callback')
+                ])
 
-    def send(self, send_type, target_id, message, flag_log = True):
+    def reply(self, message, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__reply(message, flag_log = True)
+
+
+    def __send(self, send_type, target_id, message, flag_log = True):
         flag_type = send_type
         if self.platform['sdk'] == 'onebot':
             if flag_type == 'private':
@@ -306,10 +371,21 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, '[' + self.platform['platform'] + '] - <send> - User(' + str(self.data.user_id) + '): ' + message)
+                self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + message, [
+                    (self.platform['platform'], 'default'),
+                    ('send', 'callback')
+                ])
             elif flag_type == 'group':
-                self.log_func(2, '[' + self.platform['platform'] + '] - <send> - Group(' + str(self.data.group_id) + '): ' + message)
+                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + message, [
+                    (self.platform['platform'], 'default'),
+                    ('send', 'callback')
+                ])
 
+    def send(self, send_type, target_id, message, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__send(send_type, target_id, message, flag_log = True)
 
 class Proc_templet(object):
     def __init__(self, Proc_name = 'native_plugin', Proc_type = 'default', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None):
@@ -347,9 +423,9 @@ class Proc_templet(object):
         self.Proc = proc_this
         return self.Proc
 
-    def log(self, log_level, log_message):
+    def log(self, log_level, log_message, log_segment = []):
         if self.Proc_info.logger_proc != None:
-            self.Proc_info.logger_proc.log(log_level, log_message)
+            self.Proc_info.logger_proc.log(log_level, log_message, log_segment)
 
 #兼容Win平台的进程生成方法
 def Proc_start(proc_this):
@@ -571,3 +647,35 @@ class PARA(object):
                 self['user_id'] = user_id
                 self['nickname'] = nickname
                 self['content'] = content
+
+def checkByListAnd(check_list):
+    flag_res = True
+    for check_list_this in check_list:
+        if not check_list_this:
+            flag_res = False
+            return flag_res
+    return flag_res
+
+def checkByListOr(check_list):
+    flag_res = False
+    for check_list_this in check_list:
+        if check_list_this:
+            flag_res = True
+            return flag_res
+    return flag_res
+
+def checkByListAndEqual(checked_obj, check_list):
+    flag_res = True
+    for check_list_this in check_list:
+        if checked_obj != check_list_this:
+            flag_res = False
+            return flag_res
+    return flag_res
+
+def checkByListOrEqual(checked_obj, check_list):
+    flag_res = False
+    for check_list_this in check_list:
+        if checked_obj == check_list_this:
+            flag_res = True
+            return flag_res
+    return flag_res

@@ -35,12 +35,17 @@ class logger(OlivOS.API.Proc_templet):
             5 : 'FATAL'
         }
         self.Proc_config['logger_vis_level'] = logger_vis_level
+        self.Proc_config['segment_type'] = {
+            'default' : ['[', ']'],
+            'callback' : ['<', '>']
+        }
 
     class log_packet(dict):
-        def __init__(self, log_level, log_message, log_time):
+        def __init__(self, log_level, log_message, log_time, log_segment = []):
             self['log_level'] = log_level
             self['log_message'] = log_message
             self['log_time'] = log_time
+            self['log_segment'] = log_segment
 
     def run(self):
         self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
@@ -55,9 +60,9 @@ class logger(OlivOS.API.Proc_templet):
                     continue
                 self.log_output(packet_this)
 
-    def log(self, log_level, log_message):
+    def log(self, log_level, log_message, log_segment = []):
         try:
-            self.Proc_config['logger_queue'].put(self.log_packet(log_level, log_message, time.time()), block = False)
+            self.Proc_config['logger_queue'].put(self.log_packet(log_level, log_message, time.time(), log_segment), block = False)
         except:
             pass
 
@@ -65,9 +70,13 @@ class logger(OlivOS.API.Proc_templet):
         if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
             if self.Proc_config['logger_mode'] == 'console':
                 log_output_str = ''
-                #log_output_str += '\n'
                 log_output_str += '[' + str(datetime.datetime.fromtimestamp(log_packet_this['log_time'])) + '] - '
                 log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
+                for segment_this in log_packet_this['log_segment']:
+                    (segment_this_mark, segment_this_type) = segment_this
+                    log_output_str += self.Proc_config['segment_type'][segment_this_type][0]
+                    log_output_str += str(segment_this_mark)
+                    log_output_str += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
                 log_output_str += log_packet_this['log_message']
                 print(log_output_str)
 

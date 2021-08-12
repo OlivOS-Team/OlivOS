@@ -65,7 +65,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
         self.log(2, 'OlivOS flask server [' + self.Proc_config['Flask_name'] + '] is running')
         if self.Proc_config['config'].debug_mode:
-            self.Proc_config['Flask_app'].run(host = server_host, port = server_port)
+            self.Proc_config['Flask_app'].run(host = self.Proc_config['Flask_server_host'], port = self.Proc_config['Flask_server_port'])
         else:
             server = pywsgi.WSGIServer((self.Proc_config['Flask_server_host'], self.Proc_config['Flask_server_port']), self.Proc_config['Flask_app'], log = None)
             server.serve_forever()
