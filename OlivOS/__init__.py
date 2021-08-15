@@ -29,3 +29,4 @@ import OlivOS.telegramSDK
 import OlivOS.telegramPollServerAPI
 if(platform.system() == 'Windows'):
     import OlivOS.multiLoginUIAPI
+    import OlivOS.libEXEModelAPI

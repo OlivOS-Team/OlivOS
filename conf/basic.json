@@ -6,6 +6,8 @@
             "OlivOS_account_config",
             "OlivOS_multiLoginUI",
             "OlivOS_account_config_save",
+            "OlivOS_account_config",
+            "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
             "OlivOS_flask_post_rx",
@@ -87,6 +89,7 @@
             "logger_proc" : "OlivOS_logger",
             "debug" : false,
             "server" : {
+                "auto" : true,
                 "host" : "0.0.0.0",
                 "port" : 55001
             }
@@ -99,6 +102,17 @@
             "dead_interval" : 1,
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
+            "debug" : false
+        },
+        "OlivOS_gocqhttp_lib_exe_model" : {
+            "enable" : true,
+            "name" : "OlivOS_gocqhttp_lib_exe_model",
+            "type" : "gocqhttp_lib_exe_model",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "target_proc" : "OlivOS_flask_post_rx",
             "debug" : false
         }
     }

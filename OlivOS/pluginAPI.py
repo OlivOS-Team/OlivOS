@@ -47,6 +47,10 @@ class shallow(OlivOS.API.Proc_templet):
             self.sdk_event = sdk_event
 
     def run(self):
+        releaseDir('./plugin')
+        releaseDir('./plugin/app')
+        releaseDir('./plugin/conf')
+        releaseDir('./plugin/data')
         self.load_plugin_list()
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] is running')
         rx_count = 0
@@ -210,3 +214,7 @@ class shallow(OlivOS.API.Proc_templet):
         for namespace_this in plugin_models_call_list_tmp:
             self.plugin_models_call_list.append(namespace_this['namespace'])
         self.log(2, 'Total count [' + str(total_models_count) + '] OlivOS plugin is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+
+def releaseDir(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)

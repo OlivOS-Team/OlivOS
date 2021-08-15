@@ -27,6 +27,7 @@ import multiprocessing
 import psutil
 import threading
 import platform
+import subprocess
 
 import OlivOS
 
@@ -131,7 +132,6 @@ if __name__ == '__main__':
                         scan_interval = basic_conf_models_this['interval'],
                         dead_interval = basic_conf_models_this['dead_interval'],
                         Flask_namespace = __name__,
-                        Flask_server_xpath = '/OlivOSMsgApi',
                         Flask_server_methods = ['POST'],
                         Flask_host = basic_conf_models_this['server']['host'],
                         Flask_port = basic_conf_models_this['server']['port'],
@@ -156,7 +156,7 @@ if __name__ == '__main__':
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
                         dead_interval = basic_conf_models_this['dead_interval'],
-                        rx_queuem = None,
+                        rx_queue = None,
                         tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         bot_info_dict = plugin_bot_info_dict,
@@ -179,6 +179,23 @@ if __name__ == '__main__':
                         Account_data = plugin_bot_info_dict,
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
                     )
+                elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
+                    if(platform.system() == 'Windows'):
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp' and plugin_bot_info_dict[bot_info_key].post_info.auto == True:
+                                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                Proc_dict[tmp_Proc_name] = OlivOS.libEXEModelAPI.server(
+                                    Proc_name = tmp_Proc_name,
+                                    scan_interval = basic_conf_models_this['interval'],
+                                    dead_interval = basic_conf_models_this['dead_interval'],
+                                    rx_queue = None,
+                                    tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                    bot_info_dict = plugin_bot_info_dict[bot_info_key],
+                                    target_proc = basic_conf_models[basic_conf_models_this['target_proc']],
+                                    debug_mode = False
+                                )
+                                Proc_Proc_dict[tmp_Proc_name] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
         elif rx_packet_data.action == 'restart_do':
             time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
             Proc_Proc_dict[rx_packet_data.key].terminate()
