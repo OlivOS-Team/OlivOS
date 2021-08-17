@@ -248,7 +248,9 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq']['onebot'] = [
             'default',
-            'gocqhttp'
+            'gocqhttp',
+            'gocqhttp_hide',
+            'gocqhttp_show'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram']['telegram_poll'] = [

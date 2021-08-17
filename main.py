@@ -182,7 +182,7 @@ if __name__ == '__main__':
                 elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
                     if(platform.system() == 'Windows'):
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp' and plugin_bot_info_dict[bot_info_key].post_info.auto == True:
+                            if plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp' or plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp_hide' or plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp_show':
                                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                 Proc_dict[tmp_Proc_name] = OlivOS.libEXEModelAPI.server(
                                     Proc_name = tmp_Proc_name,

@@ -49,23 +49,25 @@ class server(OlivOS.API.Proc_templet):
                 tmp.write('{}')
             releaseDir('./conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash)
             goTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
-            model_Proc = subprocess.Popen(
-                '..\\..\\..\\lib\\go-cqhttp.exe faststart',
-                cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
-                shell = True,
-                stdin = subprocess.PIPE,
-                stdout = subprocess.PIPE,
-                stderr = subprocess.PIPE
-            )
-            self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] is running')
-            model_Proc.communicate(timeout = None)
-            self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] is exited')
-            self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
-            subprocess.call(
-                "start /wait ..\\..\\..\\lib\\go-cqhttp.exe faststart",
-                shell = True,
-                cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
-            )
+            if self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp' or self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp_hide':
+                model_Proc = subprocess.Popen(
+                    '..\\..\\..\\lib\\go-cqhttp.exe faststart',
+                    cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
+                    shell = True,
+                    stdin = subprocess.PIPE,
+                    stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE
+                )
+                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] is running')
+                model_Proc.communicate(timeout = None)
+                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] exited')
+            if self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp' or self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp_show':
+                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                subprocess.call(
+                    "start /wait ..\\..\\..\\lib\\go-cqhttp.exe faststart",
+                    shell = True,
+                    cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
+                )
 
 
 class goTypeConfig(object):

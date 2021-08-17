@@ -27,6 +27,8 @@ import OlivOS
 
 plugin_path = './plugin/app/'
 sys.path.append(plugin_path)
+sys.path.append('./lib/Lib')
+sys.path.append('./lib/DLLs')
 
 class shallow(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name = 'native_plugin', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None, debug_mode = False, plugin_func_dict = {}, bot_info_dict = {}, treading_mode = 'full', restart_gate = 10000, enable_auto_restart = False):
@@ -51,6 +53,9 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./plugin/app')
         releaseDir('./plugin/conf')
         releaseDir('./plugin/data')
+        releaseDir('./lib')
+        releaseDir('./lib/Lib')
+        releaseDir('./lib/DLLs')
         self.load_plugin_list()
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] is running')
         rx_count = 0

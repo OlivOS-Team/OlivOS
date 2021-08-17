@@ -77,7 +77,7 @@ def getBotHash(bot_id = None, platform_sdk = None, platform_platform = None, pla
     hash_tmp.update(str(bot_id).encode(encoding='UTF-8'))
     hash_tmp.update(str(platform_sdk).encode(encoding='UTF-8'))
     hash_tmp.update(str(platform_platform).encode(encoding='UTF-8'))
-    hash_tmp.update(str(platform_model).encode(encoding='UTF-8'))
+    #hash_tmp.update(str(platform_model).encode(encoding='UTF-8'))
     return hash_tmp.hexdigest()
 
 class Event(object):
