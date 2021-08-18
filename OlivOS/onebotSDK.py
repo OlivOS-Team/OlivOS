@@ -49,7 +49,7 @@ class send_onebot_post_json_T(object):
             return None
         else:
             json_str_tmp = json.dumps(obj = self.obj.__dict__)
-            send_url = self.bot_info.host + ':' + str(self.bot_info.port) + '/' + self.node_ext + '/?access_token=' + self.bot_info.access_token
+            send_url = self.bot_info.host + ':' + str(self.bot_info.port) + '/' + self.node_ext + '?access_token=' + self.bot_info.access_token
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger != None:
