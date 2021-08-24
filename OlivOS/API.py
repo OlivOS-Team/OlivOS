@@ -371,12 +371,12 @@ class Event(object):
 
         if flag_log:
             if flag_type == 'private':
-                self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + message, [
+                self.log_func(2, 'User(' + str(target_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
-                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + message, [
+                self.log_func(2, 'Group(' + str(target_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
                     ('send', 'callback')
                 ])
