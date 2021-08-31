@@ -199,3 +199,4 @@ if __name__ == '__main__':
         elif rx_packet_data.action == 'restart_do':
             time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
             Proc_Proc_dict[rx_packet_data.key].terminate()
+            Proc_Proc_dict[rx_packet_data.key].join()
