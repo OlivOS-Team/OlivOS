@@ -78,7 +78,10 @@ class api_templet(object):
         this_post_json.bot_info = self.bot_info
         this_post_json.obj = self.data
         this_post_json.node_ext = self.node_ext
-        self.res = this_post_json.send_onebot_post_json()
+        try:
+            self.res = this_post_json.send_onebot_post_json()
+        except:
+            self.res = None
         return self.res
 
     def do_api_async(self):
@@ -86,7 +89,10 @@ class api_templet(object):
         this_post_json.bot_info = self.bot_info
         this_post_json.obj = self.data
         this_post_json.node_ext = self.node_ext + '_async'
-        self.res = this_post_json.send_onebot_post_json()
+        try:
+            self.res = this_post_json.send_onebot_post_json()
+        except:
+            self.res = None
         return self.res
 
     def do_api_rate_limited(self):
@@ -94,7 +100,10 @@ class api_templet(object):
         this_post_json.bot_info = self.bot_info
         this_post_json.obj = self.data
         this_post_json.node_ext = self.node_ext + '_rate_limited'
-        self.res = this_post_json.send_onebot_post_json()
+        try:
+            self.res = this_post_json.send_onebot_post_json()
+        except:
+            self.res = None
         return self.res
 
 class event(object):
@@ -281,6 +290,100 @@ class event_action(object):
         this_msg.data.group_id = group_id
         this_msg.data.message = message
         this_msg.do_api()
+
+    def get_login_info(target_event):
+        res_data = OlivOS.API.api_result_data_template.get_login_info()
+        raw_obj = None
+        this_msg = api.get_login_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+        return res_data
+
+    def get_group_info(target_event, group_id):
+        res_data = OlivOS.API.api_result_data_template.get_group_info()
+        raw_obj = None
+        this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['group_id'], int)
+                res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['group_memo'], str)
+                res_data['data']['max_member_count'] = init_api_do_mapping_for_dict(raw_obj, ['max_member_count'], int)
+        return res_data
+
+    def get_group_list(target_event):
+        res_data = OlivOS.API.api_result_data_template.get_group_list()
+        raw_obj = None
+        this_msg = api.get_group_list(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_group_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
+                    tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
+                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['max_member_count'], int)
+                    res_data['data'].append(tmp_res_data_this)
+        return res_data
+
+def init_api_json(raw_str):
+    res_data = None
+    tmp_obj = None
+    flag_is_active = False
+    try:
+        tmp_obj = json.loads(raw_str)
+    except:
+        tmp_obj = None
+    if type(tmp_obj) == dict:
+        if 'status' in tmp_obj:
+            if type(tmp_obj['status']) == str:
+                if tmp_obj['status'] == 'ok':
+                    flag_is_active = True
+        if 'retcode' in tmp_obj:
+            if type(tmp_obj['retcode']) == int:
+                if tmp_obj['retcode'] == 0:
+                    flag_is_active = True
+    if flag_is_active:
+        if 'data' in tmp_obj:
+            if type(tmp_obj['data']) == dict:
+                res_data = tmp_obj['data'].copy()
+            elif type(tmp_obj['data']) == list:
+                res_data = tmp_obj['data'].copy()
+    return res_data
+
+def init_api_do_mapping(src_type, src_data):
+    if type(src_data) == src_type:
+        return src_data
+
+def init_api_do_mapping_for_dict(src_data, path_list, src_type):
+    res_data = None
+    flag_active = True
+    tmp_src_data = src_data
+    for path_list_this in path_list:
+        if type(tmp_src_data) == dict:
+            if path_list_this in tmp_src_data:
+                tmp_src_data = tmp_src_data[path_list_this]
+            else:
+                return None
+        else:
+            return None
+    res_data = init_api_do_mapping(src_type, tmp_src_data)
+    return res_data
 
 #onebot协议标准api调用实现
 class api(object):

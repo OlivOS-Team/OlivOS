@@ -387,6 +387,154 @@ class Event(object):
         else:
             self.__send(send_type, target_id, message, flag_log = True)
 
+
+    def __get_login_info(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active'],
+                    ['data', 'nickname'],
+                    ['data', 'id']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': nickname(' + res_data['data']['nickname'] + ') id(' + str(res_data['data']['id']) + ')' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_login_info', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_login_info', 'callback')
+                    ])
+        return res_data
+
+    def get_login_info(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_login_info(flag_log = True)
+        return res_data
+
+
+    def __get_group_info(self, group_id, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_group_info', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_group_info', 'callback')
+                    ])
+        return res_data
+
+    def get_group_info(self, group_id, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_group_info(group_id, flag_log = True)
+        return res_data
+
+
+    def __get_group_list(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_group_list', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_group_list', 'callback')
+                    ])
+        return res_data
+
+    def get_group_list(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_group_list(flag_log = True)
+        return res_data
+
+
+class api_result_data_template(object):
+    class get_login_info(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'nickname': None,
+                    'id': -1
+                }
+            )
+
+    class get_group_info_strip(dict):
+        def __init__(self):
+            self.update(
+                {
+                    'name': None,
+                    'id': -1,
+                    'memo': None,
+                    'max_member_count': 0
+                }
+            )
+
+    class get_group_info(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(api_result_data_template.get_group_info_strip())
+
+    class get_group_list(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
 class Proc_templet(object):
     def __init__(self, Proc_name = 'native_plugin', Proc_type = 'default', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None):
         self.deamon = True
@@ -678,4 +826,16 @@ def checkByListOrEqual(checked_obj, check_list):
         if checked_obj == check_list_this:
             flag_res = True
             return flag_res
+    return flag_res
+
+def checkDictByListAnd(checked_obj, check_list):
+    flag_res = True
+    for check_list_this in check_list:
+        tmp_checked_obj = checked_obj
+        for check_list_this_this in check_list_this:
+            if check_list_this_this in tmp_checked_obj:
+                tmp_checked_obj = tmp_checked_obj[check_list_this_this]
+            else:
+                flag_res = False
+                return flag_res
     return flag_res
