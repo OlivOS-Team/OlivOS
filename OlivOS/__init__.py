@@ -18,6 +18,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
+import OlivOS.infoAPI
 import OlivOS.data
 import OlivOS.API
 import OlivOS.accountAPI

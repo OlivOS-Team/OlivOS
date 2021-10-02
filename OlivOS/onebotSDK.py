@@ -291,6 +291,32 @@ class event_action(object):
         this_msg.data.message = message
         this_msg.do_api()
 
+    def delete_msg(target_event, message_id):
+        this_msg = api.delete_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.message_id = message_id
+        this_msg.do_api()
+
+    def get_msg(target_event, message_id):
+        res_data = OlivOS.API.api_result_data_template.get_msg()
+        raw_obj = None
+        this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.message_id = message_id
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                print(raw_obj['sender'])
+                res_data['active'] = True
+                res_data['data']['message_id'] = init_api_do_mapping_for_dict(raw_obj, ['message_id'], int)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['real_id'], int)
+                res_data['data']['sender']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                res_data['data']['sender']['name'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
+                res_data['data']['time'] = init_api_do_mapping_for_dict(raw_obj, ['time'], int)
+                res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
+                res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)
+        return res_data
+
     def get_login_info(target_event):
         res_data = OlivOS.API.api_result_data_template.get_login_info()
         raw_obj = None
@@ -301,8 +327,40 @@ class event_action(object):
         if raw_obj != None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
-                res_data['data']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+        return res_data
+
+    def get_stranger_info(target_event, user_id):
+        res_data = OlivOS.API.api_result_data_template.get_stranger_info()
+        raw_obj = None
+        this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = user_id
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+        return res_data
+
+    def get_friend_list(target_event):
+        res_data = OlivOS.API.api_result_data_template.get_friend_list()
+        raw_obj = None
+        this_msg = api.get_friend_list(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_user_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
+                    res_data['data'].append(tmp_res_data_this)
         return res_data
 
     def get_group_info(target_event, group_id):
