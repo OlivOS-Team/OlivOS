@@ -39,4 +39,4 @@ if sys.platform.startswith('win'):
                         os.unsetenv('_MEIPASS2')
                     else:
                         os.putenv('_MEIPASS2', '')
-    forking.Popen = _Popen​
+    forking.Popen = _Popen
