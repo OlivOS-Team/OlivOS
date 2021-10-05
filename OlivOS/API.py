@@ -958,7 +958,7 @@ class PARA(object):
             PARA_templet.__init__(self, 'node', self.data_T(id, user_id, nickname, content))
 
         class data_T(dict):
-            def __init__(self, id):
+            def __init__(self, id, user_id, nickname, content):
                 self['id'] = id
                 self['user_id'] = user_id
                 self['nickname'] = nickname
