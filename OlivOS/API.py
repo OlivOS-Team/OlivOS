@@ -458,12 +458,12 @@ class Event(object):
             if checkDictByListAnd(
                 res_data, [
                     ['active'],
-                    ['data', 'nickname'],
+                    ['data', 'name'],
                     ['data', 'id']
                 ]
             ):
                 if res_data['active'] == True:
-                    self.log_func(2, ': nickname(' + res_data['data']['nickname'] + ') id(' + str(res_data['data']['id']) + ')' , [
+                    self.log_func(2, ': name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
                         (self.platform['platform'], 'default'),
                         ('get_login_info', 'callback')
                     ])
@@ -483,10 +483,10 @@ class Event(object):
         return res_data
 
 
-    def __get_stranger_info(self, user_id, flag_log = True):
+    def __get_stranger_info(self, user_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id)
+            res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -511,12 +511,12 @@ class Event(object):
                     ])
         return res_data
 
-    def get_stranger_info(self, user_id, flag_log = True, remote = False):
+    def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):
         res_data = None
         if remote:
             pass
         else:
-            res_data = self.__get_stranger_info(user_id, flag_log = True)
+            res_data = self.__get_stranger_info(user_id, no_cache, flag_log = True)
         return res_data
 
 
@@ -557,10 +557,10 @@ class Event(object):
         return res_data
 
 
-    def __get_group_info(self, group_id, flag_log = True):
+    def __get_group_info(self, group_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id)
+            res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -585,12 +585,12 @@ class Event(object):
                     ])
         return res_data
 
-    def get_group_info(self, group_id, flag_log = True, remote = False):
+    def get_group_info(self, group_id, no_cache = False, flag_log = True, remote = False):
         res_data = None
         if remote:
             pass
         else:
-            res_data = self.__get_group_info(group_id, flag_log = True)
+            res_data = self.__get_group_info(group_id, no_cache, flag_log = True)
         return res_data
 
 
@@ -628,6 +628,80 @@ class Event(object):
             pass
         else:
             res_data = self.__get_group_list(flag_log = True)
+        return res_data
+
+
+    def __get_group_member_info(self, group_id, user_id, no_cache, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_stranger_info', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_stranger_info', 'callback')
+                    ])
+        return res_data
+
+    def get_group_member_info(self, group_id, user_id, no_cache = False, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_group_member_info(group_id, user_id, no_cache, flag_log = True)
+        return res_data
+
+
+    def __get_group_member_list(self, group_id, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_friend_list', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_friend_list', 'callback')
+                    ])
+        return res_data
+
+    def get_group_member_list(self, group_id, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_group_member_list(group_id, flag_log = True)
         return res_data
 
 
@@ -699,6 +773,36 @@ class api_result_data_template(object):
             self['data'].update(api_result_data_template.get_group_info_strip())
 
     class get_group_list(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
+    class get_group_member_info_strip(dict):
+        def __init__(self):
+            self.update(
+                {
+                    'name': None,
+                    'id': -1,
+                    'user_id': -1,
+                    'group_id': -1,
+                    'times': {
+                        'join_time': 0,
+                        'last_sent_time': 0,
+                        'shut_up_timestamp': 0
+                    },
+                    'role': None,
+                    'card': None,
+                    'title': None
+                }
+            )
+
+    class get_group_member_info(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(api_result_data_template.get_group_member_info_strip())
+
+    class get_group_member_list(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = []

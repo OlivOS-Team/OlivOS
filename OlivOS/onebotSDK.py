@@ -331,11 +331,12 @@ class event_action(object):
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
         return res_data
 
-    def get_stranger_info(target_event, user_id):
+    def get_stranger_info(target_event, user_id, no_cache = False):
         res_data = OlivOS.API.api_result_data_template.get_stranger_info()
         raw_obj = None
         this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = user_id
+        this_msg.data.no_cache = no_cache
         this_msg.do_api()
         if this_msg.res != None:
             raw_obj = init_api_json(this_msg.res.text)
@@ -363,11 +364,12 @@ class event_action(object):
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def get_group_info(target_event, group_id):
+    def get_group_info(target_event, group_id, no_cache = False):
         res_data = OlivOS.API.api_result_data_template.get_group_info()
         raw_obj = None
         this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = group_id
+        this_msg.data.no_cache = no_cache
         this_msg.do_api()
         if this_msg.res != None:
             raw_obj = init_api_json(this_msg.res.text)
@@ -396,6 +398,57 @@ class event_action(object):
                     tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
                     tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['max_member_count'], int)
+                    res_data['data'].append(tmp_res_data_this)
+        return res_data
+
+    def get_group_member_info(target_event, group_id, user_id, no_cache = False):
+        res_data = OlivOS.API.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = api.get_group_member_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.no_cache = no_cache
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+                res_data['data']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+                res_data['data']['group_id'] = init_api_do_mapping_for_dict(raw_obj, ['group_id'], int)
+                res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['join_time'], int)
+                res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj, ['last_sent_time'], int)
+                res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj, ['shut_up_timestamp'], int)
+                res_data['data']['role'] = init_api_do_mapping_for_dict(raw_obj, ['role'], str)
+                res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['card'], str)
+                res_data['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
+        return res_data
+
+    def get_group_member_list(target_event, group_id):
+        res_data = OlivOS.API.api_result_data_template.get_group_member_list()
+        raw_obj = None
+        this_msg = api.get_group_member_list(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_group_member_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
+                    tmp_res_data_this['user_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
+                    tmp_res_data_this['group_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
+                    tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['join_time'], int)
+                    tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['last_sent_time'], int)
+                    tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj_this, ['shut_up_timestamp'], int)
+                    tmp_res_data_this['role'] = init_api_do_mapping_for_dict(raw_obj_this, ['role'], str)
+                    tmp_res_data_this['card'] = init_api_do_mapping_for_dict(raw_obj_this, ['card'], str)
+                    tmp_res_data_this['title'] = init_api_do_mapping_for_dict(raw_obj_this, ['title'], str)
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
