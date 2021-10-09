@@ -452,6 +452,70 @@ class event_action(object):
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
+    def can_send_image(target_event):
+        res_data = OlivOS.API.api_result_data_template.can_send_image()
+        raw_obj = None
+        this_msg = api.can_send_image(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
+        return res_data
+
+    def can_send_record(target_event):
+        res_data = OlivOS.API.api_result_data_template.can_send_record()
+        raw_obj = None
+        this_msg = api.can_send_record(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
+        return res_data
+
+    def get_status(target_event):
+        res_data = OlivOS.API.api_result_data_template.get_status()
+        raw_obj = None
+        this_msg = api.get_status(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['online'] = init_api_do_mapping_for_dict(raw_obj, ['online'], bool)
+                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_received'], int)
+                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_sent'], int)
+                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_lost'], int)
+                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'message_received'], int)
+                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'message_sent'], int)
+                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'disconnect_times'], int)
+                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'lost_times'], int)
+                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'last_message_time'], int)
+        return res_data
+
+    def get_version_info(target_event):
+        res_data = OlivOS.API.api_result_data_template.get_version_info()
+        raw_obj = None
+        this_msg = api.get_version_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['app_name'], str)
+                res_data['data']['version_full'] = init_api_do_mapping_for_dict(raw_obj, ['app_full_name'], str)
+                res_data['data']['version'] = init_api_do_mapping_for_dict(raw_obj, ['app_version'], str)
+                res_data['data']['path'] = init_api_do_mapping_for_dict(raw_obj, ['coolq_directory'], str)
+                res_data['data']['os'] = init_api_do_mapping_for_dict(raw_obj, ['runtime_os'], str)
+        return res_data
+
 def init_api_json(raw_str):
     res_data = None
     tmp_obj = None

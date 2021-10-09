@@ -650,12 +650,12 @@ class Event(object):
                 if res_data['active'] == True:
                     self.log_func(2, ': succeed' , [
                         (self.platform['platform'], 'default'),
-                        ('get_stranger_info', 'callback')
+                        ('get_group_member_info', 'callback')
                     ])
                 else:
                     self.log_func(2, ': failed' , [
                         (self.platform['platform'], 'default'),
-                        ('get_stranger_info', 'callback')
+                        ('get_group_member_info', 'callback')
                     ])
         return res_data
 
@@ -687,12 +687,12 @@ class Event(object):
                 if res_data['active'] == True:
                     self.log_func(2, ': succeed' , [
                         (self.platform['platform'], 'default'),
-                        ('get_friend_list', 'callback')
+                        ('get_group_member_list', 'callback')
                     ])
                 else:
                     self.log_func(2, ': failed' , [
                         (self.platform['platform'], 'default'),
-                        ('get_friend_list', 'callback')
+                        ('get_group_member_list', 'callback')
                     ])
         return res_data
 
@@ -702,6 +702,154 @@ class Event(object):
             pass
         else:
             res_data = self.__get_group_member_list(group_id, flag_log = True)
+        return res_data
+
+
+    def __can_send_image(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('can_send_image', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('can_send_image', 'callback')
+                    ])
+        return res_data
+
+    def can_send_image(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__can_send_image(flag_log = True)
+        return res_data
+
+
+    def __can_send_record(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('can_send_record', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('can_send_record', 'callback')
+                    ])
+        return res_data
+
+    def can_send_record(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__can_send_record(flag_log = True)
+        return res_data
+
+
+    def __get_status(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_status(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_status', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_status', 'callback')
+                    ])
+        return res_data
+
+    def get_status(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_status(flag_log = True)
+        return res_data
+
+
+    def __get_version_info(self, flag_log = True):
+        res_data = None
+        if self.platform['sdk'] == 'onebot':
+            res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if res_data == None:
+            return None
+
+        if flag_log:
+            if checkDictByListAnd(
+                res_data, [
+                    ['active']
+                ]
+            ):
+                if res_data['active'] == True:
+                    self.log_func(2, ': succeed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_version_info', 'callback')
+                    ])
+                else:
+                    self.log_func(2, ': failed' , [
+                        (self.platform['platform'], 'default'),
+                        ('get_version_info', 'callback')
+                    ])
+        return res_data
+
+    def get_version_info(self, flag_log = True, remote = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_version_info(flag_log = True)
         return res_data
 
 
@@ -806,6 +954,70 @@ class api_result_data_template(object):
         def __init__(self):
             self['active'] = False
             self['data'] = []
+
+    class can_send_image(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'yes': False
+                }
+            )
+
+        def yes(self):
+            if self['data']['yes'] == True:
+                return True
+            return False
+
+    class can_send_record(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'yes': False
+                }
+            )
+
+        def yes(self):
+            if self['data']['yes'] == True:
+                return True
+            return False
+
+    class get_status(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'online': False,
+                    'status': {
+                        'packet_received': 0,
+                        'packet_sent': 0,
+                        'packet_lost': 0,
+                        'message_received': 0,
+                        'message_sent': 0,
+                        'disconnect_times': 0,
+                        'lost_times': 0,
+                        'last_message_time': 0
+                    }
+                }
+            )
+
+    class get_version_info(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'name': None,
+                    'version_full': None,
+                    'version': None,
+                    'path': None,
+                    'os': None
+                }
+            )
 
 class Proc_templet(object):
     def __init__(self, Proc_name = 'native_plugin', Proc_type = 'default', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None):
