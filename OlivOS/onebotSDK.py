@@ -197,7 +197,6 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add'
             target_event.data = target_event.friend_add(target_event.sdk_event.json['user_id'])
-            target_event.log_func(2, '[' + target_event.plugin_info['func_type'] + '] - QQ(' + str(target_event.data.user_id) + ')')
         elif target_event.sdk_event.json['notice_type'] == 'group_recall':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message_recall'
@@ -316,6 +315,95 @@ class event_action(object):
                 res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
                 res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)
         return res_data
+
+    def send_like(target_event, user_id, times = 1):
+        this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = user_id
+        this_msg.data.times = times
+        this_msg.do_api()
+
+    def set_group_kick(target_event, group_id, user_id, rehect_add_request = False):
+        this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.rehect_add_request = rehect_add_request
+        this_msg.do_api()
+
+    def set_group_ban(target_event, group_id, user_id, duration = 1800):
+        this_msg = api.set_group_ban(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.duration = duration
+        this_msg.do_api()
+
+    def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration = 1800):
+        this_msg = api.set_group_anonymous_ban(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.anonymous = anonymous
+        this_msg.data.anonymous_flag = anonymous_flag
+        this_msg.data.duration = duration
+        this_msg.do_api()
+
+    def set_group_whole_ban(target_event, group_id, enable):
+        this_msg = api.set_group_whole_ban(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.enable = enable
+        this_msg.do_api()
+
+    def set_group_admin(target_event, group_id, user_id, enable):
+        this_msg = api.set_group_admin(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.enable = enable
+        this_msg.do_api()
+
+    def set_group_anonymous(target_event, group_id, enable):
+        this_msg = api.set_group_anonymous(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.enable = enable
+        this_msg.do_api()
+
+    def set_group_card(target_event, group_id, user_id, card):
+        this_msg = api.set_group_card(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.enable = card
+        this_msg.do_api()
+
+    def set_group_name(target_event, group_id, group_name):
+        this_msg = api.set_group_name(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.group_name = group_name
+        this_msg.do_api()
+
+    def set_group_leave(target_event, group_id, is_dismiss = False):
+        this_msg = api.set_group_leave(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.is_dismiss = is_dismiss
+        this_msg.do_api()
+
+    def set_group_special_title(target_event, group_id, user_id, special_title, duration):
+        this_msg = api.set_group_special_title(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = group_id
+        this_msg.data.user_id = user_id
+        this_msg.data.special_title = special_title
+        this_msg.data.duration = duration
+        this_msg.do_api()
+
+    def set_friend_add_request(target_event, flag, approve, remark):
+        this_msg = api.set_friend_add_request(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.flag = flag
+        this_msg.data.approve = approve
+        this_msg.data.remark = remark
+        this_msg.do_api()
+
+    def set_group_add_request(target_event, flag, sub_type, approve, reason):
+        this_msg = api.set_group_add_request(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.flag = flag
+        this_msg.data.sub_type = sub_type
+        this_msg.data.approve = approve
+        this_msg.data.reason = reason
+        this_msg.do_api()
 
     def get_login_info(target_event):
         res_data = OlivOS.API.api_result_data_template.get_login_info()

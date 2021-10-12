@@ -132,6 +132,9 @@ class Event(object):
             elif self.plugin_info['func_type'] == 'group_ban':
                 tmp_log_level = 2
                 tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Duration(' + str(self.data.duration) + ') Action(' + self.data.action + ')'
+            elif self.plugin_info['func_type'] == 'friend_add':
+                tmp_log_level = 2
+                tmp_log_message = 'User(' + str(self.data.user_id) + ')'
             elif self.plugin_info['func_type'] == 'group_message_recall':
                 tmp_log_level = 2
                 tmp_log_message = 'Group(' + str(self.data.group_id) + ') User(' + str(self.data.user_id) + ') <- Operator(' +  str(self.data.operator_id) + ') Message_id(' + str(self.data.message_id) + ')'
@@ -442,6 +445,253 @@ class Event(object):
         else:
             res_data = self.__get_msg(message_id, flag_log = True)
         return res_data
+
+
+    def __send_like(self, user_id, times, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('send_like', 'callback')
+            ])
+
+    def send_like(self, user_id, times = 1, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__send_like(user_id, times, flag_log = True)
+
+
+    def __set_group_kick(self, group_id, user_id, rehect_add_request, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_kick', 'callback')
+            ])
+
+    def set_group_kick(self, group_id, user_id, rehect_add_request = False, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_kick(group_id, user_id, rehect_add_request, flag_log = True)
+
+
+    def __set_group_ban(self, group_id, user_id, duration, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_ban', 'callback')
+            ])
+
+    def set_group_ban(self, group_id, user_id, duration = 1800, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_ban(group_id, user_id, duration, flag_log = True)
+
+
+    def __set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_anonymous_ban', 'callback')
+            ])
+
+    def set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration = 1800, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_anonymous_ban(group_id, anonymous, anonymous_flag, duration, flag_log = True)
+
+
+    def __set_group_whole_ban(self, group_id, enable, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_whole_ban', 'callback')
+            ])
+
+    def set_group_whole_ban(self, group_id, enable, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_whole_ban(group_id, enable, flag_log = True)
+
+
+    def __set_group_admin(self, group_id, user_id, enable, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_admin', 'callback')
+            ])
+
+    def set_group_admin(self, group_id, user_id, enable, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_admin(group_id, user_id, enable, flag_log = True)
+
+
+    def __set_group_anonymous(self, group_id, enable, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_anonymous', 'callback')
+            ])
+
+    def set_group_anonymous(self, group_id, enable, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_anonymous(group_id, enable, flag_log = True)
+
+
+    def __set_group_card(self, group_id, user_id, card, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_card', 'callback')
+            ])
+
+    def set_group_card(self, group_id, user_id, card, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_card(group_id, user_id, card, flag_log = True)
+
+
+    def __set_group_name(self, group_id, group_name, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_name', 'callback')
+            ])
+
+    def set_group_name(self, group_id, group_name, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_name(group_id, group_name, flag_log = True)
+
+
+    def __set_group_leave(self, group_id, is_dismiss, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_leave', 'callback')
+            ])
+
+    def set_group_leave(self, group_id, is_dismiss = False, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_leave(group_id, is_dismiss, flag_log = True)
+
+
+    def __set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_special_title', 'callback')
+            ])
+
+    def set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_special_title(group_id, user_id, special_title, duration, flag_log = True)
+
+
+    def __set_friend_add_request(self, flag, approve, remark, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_friend_add_request', 'callback')
+            ])
+
+    def set_friend_add_request(self, flag, approve, remark, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_friend_add_request(flag, approve, remark, flag_log = True)
+
+
+    def __set_group_add_request(self, flag, sub_type, approve, reason, flag_log = True):
+        if self.platform['sdk'] == 'onebot':
+            OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+        elif self.platform['sdk'] == 'telegram_poll':
+            pass
+
+        if flag_log:
+            self.log_func(2, ': done' , [
+                (self.platform['platform'], 'default'),
+                ('set_group_add_request', 'callback')
+            ])
+
+    def set_group_add_request(self, flag, sub_type, approve, reason, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_group_add_request(flag, sub_type, approve, reason, flag_log = True)
 
 
     def __get_login_info(self, flag_log = True):
