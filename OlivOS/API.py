@@ -19,6 +19,8 @@ import json
 import multiprocessing
 import hashlib
 
+from functools import wraps
+
 import OlivOS
 
 OlivOS_Version = OlivOS.infoAPI.OlivOS_Version
@@ -89,6 +91,7 @@ class Event(object):
         self.platform['model'] = None
         self.data = None
         self.active = False
+        self.blocked = False
         self.log_func = log_func
         self.base_info = {}
         self.base_info['time'] = None
@@ -296,7 +299,54 @@ class Event(object):
         def __init__(self, interval, flag_lazy = True):
             self.interval = interval
 
+
+    def callbackLogger(func_name = None):
+        def callbackLoggerDecorator(func):
+            @wraps(func)
+            def funcWarpped(*args, **kwargs):
+                warppedRes = func(*args, **kwargs)
+                flag_log = True
+                event_obj = None
+                callback_msg = 'done'
+                if 'flag_log' in kwargs:
+                    flag_log = kwargs['flag_log']
+                if len(args) >= 1:
+                    event_obj = args[0]
+                if flag_log and event_obj != None:
+                    if warppedRes == None:
+                        callback_msg = 'done'
+                    elif warppedRes.__class__.__base__ == dict:
+                        if 'active' in warppedRes:
+                            if warppedRes['active'] == True:
+                                callback_msg = 'succeed'
+                            else:
+                                callback_msg = 'failed'
+                        else:
+                            callback_msg = 'done'
+                    event_obj.log_func(2, callback_msg , [
+                        (event_obj.platform['platform'], 'default'),
+                        (func_name, 'callback')
+                    ])
+                return warppedRes
+            return funcWarpped
+        return callbackLoggerDecorator
+
+
     #以下为统一事件动作调用方法实现，各接入sdk需完全支持
+
+    def __set_block(self, enable, flag_log = True):
+        self.blocked = enable
+        if flag_log:
+            self.log_func(2, str(enable) , [
+                (self.platform['platform'], 'default'),
+                ('set_block', 'callback')
+            ])
+
+    def set_block(self, enable = True, flag_log = True, remote = False):
+        if remote:
+            pass
+        else:
+            self.__set_block(enable, flag_log = True)
 
     def __reply(self, message, flag_log = True):
         flag_type = None
@@ -390,18 +440,12 @@ class Event(object):
         else:
             self.__send(send_type, target_id, message, flag_log = True)
 
-
+    @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('delete_msg', 'callback')
-            ])
 
     def delete_msg(self, message_id, flag_log = True, remote = False):
         if remote:
@@ -409,33 +453,13 @@ class Event(object):
         else:
             self.__delete_msg(message_id, flag_log = True)
 
-
+    @callbackLogger('get_msg')
     def __get_msg(self, message_id, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_msg', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_msg', 'callback')
-                    ])
         return res_data
 
     def get_msg(self, message_id, flag_log = True, remote = False):
@@ -447,17 +471,12 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('send_like')
     def __send_like(self, user_id, times, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('send_like', 'callback')
-            ])
 
     def send_like(self, user_id, times = 1, flag_log = True, remote = False):
         if remote:
@@ -466,17 +485,12 @@ class Event(object):
             self.__send_like(user_id, times, flag_log = True)
 
 
+    @callbackLogger('set_group_kick')
     def __set_group_kick(self, group_id, user_id, rehect_add_request, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_kick', 'callback')
-            ])
 
     def set_group_kick(self, group_id, user_id, rehect_add_request = False, flag_log = True, remote = False):
         if remote:
@@ -485,17 +499,12 @@ class Event(object):
             self.__set_group_kick(group_id, user_id, rehect_add_request, flag_log = True)
 
 
+    @callbackLogger('set_group_ban')
     def __set_group_ban(self, group_id, user_id, duration, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_ban', 'callback')
-            ])
 
     def set_group_ban(self, group_id, user_id, duration = 1800, flag_log = True, remote = False):
         if remote:
@@ -504,17 +513,12 @@ class Event(object):
             self.__set_group_ban(group_id, user_id, duration, flag_log = True)
 
 
+    @callbackLogger('set_group_anonymous_ban')
     def __set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_anonymous_ban', 'callback')
-            ])
 
     def set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration = 1800, flag_log = True, remote = False):
         if remote:
@@ -523,17 +527,12 @@ class Event(object):
             self.__set_group_anonymous_ban(group_id, anonymous, anonymous_flag, duration, flag_log = True)
 
 
+    @callbackLogger('set_group_whole_ban')
     def __set_group_whole_ban(self, group_id, enable, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_whole_ban', 'callback')
-            ])
 
     def set_group_whole_ban(self, group_id, enable, flag_log = True, remote = False):
         if remote:
@@ -542,17 +541,12 @@ class Event(object):
             self.__set_group_whole_ban(group_id, enable, flag_log = True)
 
 
+    @callbackLogger('set_group_admin')
     def __set_group_admin(self, group_id, user_id, enable, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_admin', 'callback')
-            ])
 
     def set_group_admin(self, group_id, user_id, enable, flag_log = True, remote = False):
         if remote:
@@ -561,17 +555,12 @@ class Event(object):
             self.__set_group_admin(group_id, user_id, enable, flag_log = True)
 
 
+    @callbackLogger('set_group_anonymous')
     def __set_group_anonymous(self, group_id, enable, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_anonymous', 'callback')
-            ])
 
     def set_group_anonymous(self, group_id, enable, flag_log = True, remote = False):
         if remote:
@@ -580,17 +569,12 @@ class Event(object):
             self.__set_group_anonymous(group_id, enable, flag_log = True)
 
 
+    @callbackLogger('set_group_card')
     def __set_group_card(self, group_id, user_id, card, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_card', 'callback')
-            ])
 
     def set_group_card(self, group_id, user_id, card, flag_log = True, remote = False):
         if remote:
@@ -599,17 +583,12 @@ class Event(object):
             self.__set_group_card(group_id, user_id, card, flag_log = True)
 
 
+    @callbackLogger('set_group_name')
     def __set_group_name(self, group_id, group_name, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_name', 'callback')
-            ])
 
     def set_group_name(self, group_id, group_name, flag_log = True, remote = False):
         if remote:
@@ -618,17 +597,12 @@ class Event(object):
             self.__set_group_name(group_id, group_name, flag_log = True)
 
 
+    @callbackLogger('set_group_leave')
     def __set_group_leave(self, group_id, is_dismiss, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_leave', 'callback')
-            ])
 
     def set_group_leave(self, group_id, is_dismiss = False, flag_log = True, remote = False):
         if remote:
@@ -637,17 +611,12 @@ class Event(object):
             self.__set_group_leave(group_id, is_dismiss, flag_log = True)
 
 
+    @callbackLogger('set_group_special_title')
     def __set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_special_title', 'callback')
-            ])
 
     def set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True, remote = False):
         if remote:
@@ -656,17 +625,12 @@ class Event(object):
             self.__set_group_special_title(group_id, user_id, special_title, duration, flag_log = True)
 
 
+    @callbackLogger('set_friend_add_request')
     def __set_friend_add_request(self, flag, approve, remark, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_friend_add_request', 'callback')
-            ])
 
     def set_friend_add_request(self, flag, approve, remark, flag_log = True, remote = False):
         if remote:
@@ -675,17 +639,12 @@ class Event(object):
             self.__set_friend_add_request(flag, approve, remark, flag_log = True)
 
 
+    @callbackLogger('set_group_add_request')
     def __set_group_add_request(self, flag, sub_type, approve, reason, flag_log = True):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if flag_log:
-            self.log_func(2, ': done' , [
-                (self.platform['platform'], 'default'),
-                ('set_group_add_request', 'callback')
-            ])
 
     def set_group_add_request(self, flag, sub_type, approve, reason, flag_log = True, remote = False):
         if remote:
@@ -713,12 +672,12 @@ class Event(object):
                 ]
             ):
                 if res_data['active'] == True:
-                    self.log_func(2, ': name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
+                    self.log_func(2, 'name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
                         (self.platform['platform'], 'default'),
                         ('get_login_info', 'callback')
                     ])
                 else:
-                    self.log_func(2, ': failed' , [
+                    self.log_func(2, 'failed' , [
                         (self.platform['platform'], 'default'),
                         ('get_login_info', 'callback')
                     ])
@@ -733,6 +692,7 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_stranger_info')
     def __get_stranger_info(self, user_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
@@ -742,23 +702,6 @@ class Event(object):
 
         if res_data == None:
             return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_stranger_info', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_stranger_info', 'callback')
-                    ])
         return res_data
 
     def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):
@@ -770,32 +713,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_friend_list')
     def __get_friend_list(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_friend_list', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_friend_list', 'callback')
-                    ])
         return res_data
 
     def get_friend_list(self, flag_log = True, remote = False):
@@ -807,32 +731,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_group_info')
     def __get_group_info(self, group_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_info', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_info', 'callback')
-                    ])
         return res_data
 
     def get_group_info(self, group_id, no_cache = False, flag_log = True, remote = False):
@@ -844,32 +749,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_group_list')
     def __get_group_list(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_list', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_list', 'callback')
-                    ])
         return res_data
 
     def get_group_list(self, flag_log = True, remote = False):
@@ -881,32 +767,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_group_member_info')
     def __get_group_member_info(self, group_id, user_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_member_info', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_member_info', 'callback')
-                    ])
         return res_data
 
     def get_group_member_info(self, group_id, user_id, no_cache = False, flag_log = True, remote = False):
@@ -918,32 +785,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_group_member_list')
     def __get_group_member_list(self, group_id, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_member_list', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_group_member_list', 'callback')
-                    ])
         return res_data
 
     def get_group_member_list(self, group_id, flag_log = True, remote = False):
@@ -955,32 +803,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('can_send_image')
     def __can_send_image(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('can_send_image', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('can_send_image', 'callback')
-                    ])
         return res_data
 
     def can_send_image(self, flag_log = True, remote = False):
@@ -992,32 +821,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('can_send_record')
     def __can_send_record(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('can_send_record', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('can_send_record', 'callback')
-                    ])
         return res_data
 
     def can_send_record(self, flag_log = True, remote = False):
@@ -1029,32 +839,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_status')
     def __get_status(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_status(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_status', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_status', 'callback')
-                    ])
         return res_data
 
     def get_status(self, flag_log = True, remote = False):
@@ -1066,32 +857,13 @@ class Event(object):
         return res_data
 
 
+    @callbackLogger('get_version_info')
     def __get_version_info(self, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
-
-        if flag_log:
-            if checkDictByListAnd(
-                res_data, [
-                    ['active']
-                ]
-            ):
-                if res_data['active'] == True:
-                    self.log_func(2, ': succeed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_version_info', 'callback')
-                    ])
-                else:
-                    self.log_func(2, ': failed' , [
-                        (self.platform['platform'], 'default'),
-                        ('get_version_info', 'callback')
-                    ])
         return res_data
 
     def get_version_info(self, flag_log = True, remote = False):

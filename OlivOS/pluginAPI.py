@@ -129,6 +129,8 @@ class shallow(OlivOS.API.Proc_templet):
                 if flag_support_found_dict['flag']:
                     self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
                     self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
+                if plugin_event.blocked:
+                    break
         return
 
     def run_plugin_save(self):

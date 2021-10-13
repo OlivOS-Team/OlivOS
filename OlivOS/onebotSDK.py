@@ -305,7 +305,6 @@ class event_action(object):
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj != None:
             if type(raw_obj) == dict:
-                print(raw_obj['sender'])
                 res_data['active'] = True
                 res_data['data']['message_id'] = init_api_do_mapping_for_dict(raw_obj, ['message_id'], int)
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['real_id'], int)
