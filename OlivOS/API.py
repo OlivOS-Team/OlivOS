@@ -99,6 +99,8 @@ class Event(object):
         self.base_info['type'] = None
         self.plugin_info = {}
         self.plugin_info['func_type'] = None
+        self.plugin_info['name'] = 'unity'
+        self.plugin_info['namespace'] = 'unity'
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
         self.get_Event_from_SDK()
@@ -170,6 +172,7 @@ class Event(object):
                 tmp_log_message = 'Interval(' + str(self.data.interval) + ')'
             self.log_func(tmp_log_level, tmp_log_message, [
                 (self.platform['platform'], 'default'),
+                (self.plugin_info['name'], 'default'),
                 (self.plugin_info['func_type'], 'default')
             ])
 
@@ -325,6 +328,7 @@ class Event(object):
                             callback_msg = 'done'
                     event_obj.log_func(2, callback_msg , [
                         (event_obj.platform['platform'], 'default'),
+                        (event_obj.plugin_info['name'], 'default'),
                         (func_name, 'callback')
                     ])
                 return warppedRes
@@ -339,6 +343,7 @@ class Event(object):
         if flag_log:
             self.log_func(2, str(enable) , [
                 (self.platform['platform'], 'default'),
+                (self.plugin_info['name'], 'default'),
                 ('set_block', 'callback')
             ])
 
@@ -397,11 +402,13 @@ class Event(object):
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
+                    (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
                 ])
             elif flag_type == 'group':
                 self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
+                    (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
                 ])
 
@@ -426,11 +433,13 @@ class Event(object):
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(target_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
+                    (self.plugin_info['name'], 'default'),
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
                 self.log_func(2, 'Group(' + str(target_id) + '): ' + message, [
                     (self.platform['platform'], 'default'),
+                    (self.plugin_info['name'], 'default'),
                     ('send', 'callback')
                 ])
 
@@ -674,11 +683,13 @@ class Event(object):
                 if res_data['active'] == True:
                     self.log_func(2, 'name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
                         (self.platform['platform'], 'default'),
+                        (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
                 else:
                     self.log_func(2, 'failed' , [
                         (self.platform['platform'], 'default'),
+                        (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
         return res_data
@@ -699,9 +710,6 @@ class Event(object):
             res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
-
-        if res_data == None:
-            return None
         return res_data
 
     def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):

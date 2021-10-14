@@ -84,9 +84,11 @@ class shallow(OlivOS.API.Proc_templet):
                 if self.Proc_config['enable_auto_restart']:
                     rx_count += 1
                     if rx_count == self.Proc_config['step_to_restart']:
-                        self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] call restart')
-                        self.Proc_info.rx_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
+                        self.set_restart()
 
+    def set_restart(self):
+        self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] call restart')
+        self.Proc_info.rx_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
 
     def run_plugin(self, sdk_event):
         log_str_tmp = str(sdk_event.json)
@@ -127,9 +129,12 @@ class shallow(OlivOS.API.Proc_templet):
                     if flag_support_found_dict['sdk'] and flag_support_found_dict['platform'] and flag_support_found_dict['model']:
                         flag_support_found_dict['flag'] = True
                 if flag_support_found_dict['flag']:
+                    plugin_event.plugin_info['name'] = self.plugin_models_dict[plugin_models_index_this]['name']
+                    plugin_event.plugin_info['namespace'] = self.plugin_models_dict[plugin_models_index_this]['namespace']
                     self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
                     self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
                 if plugin_event.blocked:
+                    self.log(2, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call blocked by plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + ']')
                     break
         return
 

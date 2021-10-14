@@ -70,7 +70,7 @@ class logger(OlivOS.API.Proc_templet):
         if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
             if self.Proc_config['logger_mode'] == 'console':
                 log_output_str = ''
-                log_output_str += '[' + str(datetime.datetime.fromtimestamp(log_packet_this['log_time'])) + '] - '
+                log_output_str += '[' + str(datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
                 log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
                 for segment_this in log_packet_this['log_segment']:
                     (segment_this_mark, segment_this_type) = segment_this
