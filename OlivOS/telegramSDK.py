@@ -156,6 +156,7 @@ def get_Event_from_SDK(target_event):
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
+    target_event.plugin_info['message_mode_rx'] = 'old_string'
     if checkByListAnd([
         not target_event.active,
         checkInDictSafe('message', target_event.sdk_event.json, []),
@@ -174,8 +175,10 @@ def get_Event_from_SDK(target_event):
             target_event.sdk_event.json['message']['text'],
             'friend'
         )
+        target_event.data.message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
         target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.raw_message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
@@ -202,8 +205,10 @@ def get_Event_from_SDK(target_event):
             target_event.sdk_event.json['message']['text'],
             'group'
         )
+        target_event.data.message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
         target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.raw_message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
@@ -230,8 +235,10 @@ def get_Event_from_SDK(target_event):
             target_event.sdk_event.json['message']['text'],
             'group'
         )
+        target_event.data.message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
         target_event.data.raw_message = target_event.sdk_event.json['message']['text']
+        target_event.data.raw_message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']

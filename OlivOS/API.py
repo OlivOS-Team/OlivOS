@@ -99,6 +99,8 @@ class Event(object):
         self.base_info['type'] = None
         self.plugin_info = {}
         self.plugin_info['func_type'] = None
+        self.plugin_info['message_mode_rx'] = 'old_string'
+        self.plugin_info['message_mode_tx'] = 'old_string'
         self.plugin_info['name'] = 'unity'
         self.plugin_info['namespace'] = 'unity'
         self.sdk_event = sdk_event
@@ -111,6 +113,20 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         if self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
+
+    def get_Event_on_Plugin(self):
+        if self.plugin_info['func_type'] in [
+            'private_message',
+            'group_message'
+        ]:
+            if self.data.message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
+                self.data.message = self.data.message_sdk.data_raw
+            else:
+                pass
+            if self.data.raw_message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
+                self.data.raw_message = self.data.raw_message_sdk.data_raw
+            else:
+                pass
 
     def do_init_log(self):
         if self.active:
@@ -180,8 +196,10 @@ class Event(object):
         def __init__(self, user_id, message, sub_type, flag_lazy = True):
             self.sub_type = sub_type
             self.message = message
+            self.message_sdk = message
             self.message_id = None
             self.raw_message = None
+            self.raw_message_sdk = None
             self.user_id = user_id
             self.font = None
             self.sender = {}
@@ -193,8 +211,10 @@ class Event(object):
             self.sub_type = sub_type
             self.group_id = group_id
             self.message = message
+            self.message_sdk = message
             self.message_id = None
             self.raw_message = None
+            self.raw_message_sdk = None
             self.user_id = user_id
             self.font = None
             self.sender = {}
@@ -1105,6 +1125,183 @@ class Proc_info_T(object):
         self.logger_proc = logger_proc
         self.scan_interval = scan_interval
 
+class Message_templet(object):
+    def __init__(self, mode_rx, data_raw):
+        self.active = True
+        self.mode_rx = mode_rx
+        self.data = []
+        self.data_raw = data_raw
+        self.init_data()
+        #try:
+            #self.init_data()
+        #except:
+            #self.active = False
+
+    def append(self, para_append):
+        self.data.append(para_append)
+
+    def match_str(self, src_str, match_str_src):
+        if len(src_str) >= len(match_str_src):
+            if src_str[:len(match_str_src)] == match_str_src:
+                return True
+        return False
+
+    def get_from_dict(self, src_dict, key_list, default_val = None):
+        tmp_src_dict = src_dict
+        for key_list_this in key_list:
+            if key_list_this in tmp_src_dict:
+                tmp_src_dict = tmp_src_dict[key_list_this]
+            else:
+                return default_val
+        return tmp_src_dict
+
+    def init_data(self):
+        if self.mode_rx == 'old_string':
+            self.init_from_old_string()
+
+    def init_from_old_string(self):
+        tmp_data_raw = self.data_raw
+        tmp_data = []
+        it_data = range(0, len(tmp_data_raw))
+        it_data_base = 0
+        tmp_data_type = 'string'
+        for it_data_this in it_data:
+            if tmp_data_type == 'string' and self.match_str(tmp_data_raw[it_data_this:], '[CQ:'):
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this]
+                    tmp_para_this = PARA.text(tmp_data_raw_this)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this
+                tmp_data_type = 'code'
+            elif tmp_data_type == 'code' and self.match_str(tmp_data_raw[it_data_this:], ']'):
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this = tmp_data_raw_this_bak
+                    tmp_data_raw_this = tmp_data_raw_this[len('[CQ:'):]
+                    tmp_data_raw_this = tmp_data_raw_this[:-len(']')]
+                    tmp_data_raw_this_list = tmp_data_raw_this.split(',')
+                    tmp_data_type_key = tmp_data_raw_this_list[0]
+                    tmp_code_data_list = tmp_data_raw_this_list[1:]
+                    tmp_code_data_dict = {}
+                    for tmp_code_data_list_this in tmp_code_data_list:
+                        tmp_code_data_list_this_list = tmp_code_data_list_this.split('=')
+                        tmp_code_data_list_this_key = tmp_code_data_list_this_list[0]
+                        tmp_code_data_list_this_val = ''
+                        flag_tmp_code_data_list_this_val_begin = True
+                        for tmp_code_data_list_this_val_this in tmp_code_data_list_this_list[1:]:
+                            if not flag_tmp_code_data_list_this_val_begin:
+                                tmp_code_data_list_this_val += '='
+                            else:
+                                flag_tmp_code_data_list_this_val_begin = False
+                            tmp_code_data_list_this_val += tmp_code_data_list_this_val_this
+                        tmp_code_data_dict[tmp_code_data_list_this_key] = tmp_code_data_list_this_val
+                    if tmp_data_type_key == 'face':
+                        tmp_para_this = PARA.face(
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id']))
+                        )
+                    elif tmp_data_type_key == 'at':
+                        tmp_para_this = PARA.at(
+                            id = int(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
+                        )
+                    elif tmp_data_type_key == 'reply':
+                        tmp_para_this = PARA.reply(
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id'], 0))
+                        )
+                    elif tmp_data_type_key == 'image':
+                        tmp_para_this = PARA.image(
+                            file = str(self.get_from_dict(tmp_code_data_dict, ['file'])),
+                            type = str(self.get_from_dict(tmp_code_data_dict, ['type'], 'show')),
+                            url = str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                        )
+                    elif tmp_data_type_key == 'record':
+                        tmp_para_this = PARA.record(
+                            file = str(self.get_from_dict(tmp_code_data_dict, ['file'])),
+                            url = str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                        )
+                    elif tmp_data_type_key == 'video':
+                        tmp_para_this = PARA.video(
+                            file = str(self.get_from_dict(tmp_code_data_dict, ['file'])),
+                            url = str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                        )
+                    elif tmp_data_type_key == 'rps':
+                        tmp_para_this = PARA.rps()
+                    elif tmp_data_type_key == 'dice':
+                        tmp_para_this = PARA.dice()
+                    elif tmp_data_type_key == 'shake':
+                        tmp_para_this = PARA.shake()
+                    elif tmp_data_type_key == 'poke':
+                        tmp_para_this = PARA.poke(
+                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                        )
+                    elif tmp_data_type_key == 'anonymous':
+                        tmp_para_this = PARA.anonymous()
+                    elif tmp_data_type_key == 'share':
+                        tmp_para_this = PARA.share(
+                            url = str(self.get_from_dict(tmp_code_data_dict, ['url'], '')),
+                            title = str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
+                            content = str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
+                            image = str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                        )
+                    elif tmp_data_type_key == 'location':
+                        tmp_para_this = PARA.location(
+                            lat = str(self.get_from_dict(tmp_code_data_dict, ['lat'], '')),
+                            lon = str(self.get_from_dict(tmp_code_data_dict, ['lon'], '')),
+                            title = str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
+                            content = str(self.get_from_dict(tmp_code_data_dict, ['content'], ''))
+                        )
+                    elif tmp_data_type_key == 'music':
+                        tmp_para_this = PARA.music(
+                            type = str(self.get_from_dict(tmp_code_data_dict, ['type'], '')),
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id'], '')),
+                            url = str(self.get_from_dict(tmp_code_data_dict, ['url'], '')),
+                            audio = str(self.get_from_dict(tmp_code_data_dict, ['audio'], '')),
+                            title = str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
+                            content = str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
+                            image = str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                        )
+                    elif tmp_data_type_key == 'forward':
+                        tmp_para_this = PARA.forward(
+                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                        )
+                    elif tmp_data_type_key == 'xml':
+                        tmp_para_this = PARA.xml(
+                            data = str(self.get_from_dict(tmp_code_data_dict, ['data'], ''))
+                        )
+                    elif tmp_data_type_key == 'json':
+                        tmp_para_this = PARA.json(
+                            data = str(self.get_from_dict(tmp_code_data_dict, ['data'], ''))
+                        )
+                    else:
+                        tmp_para_this = PARA.text(tmp_data_raw_this_bak)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this + 1
+                tmp_data_type = 'string'
+            elif it_data_this >= len(tmp_data_raw) - 1:
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_para_this = PARA.text(tmp_data_raw_this)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this
+        self.data = tmp_data
+
+    def get(self, get_type):
+        res = None
+        if get_type == 'old_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.CQ()
+        return res
+
+    def __str__(self):
+        tmp_res = self.__dict__.copy()
+        tmp_res_data = []
+        for data_this in tmp_res['data']:
+            tmp_res_data.append(data_this.__dict__)
+        tmp_res['data'] = tmp_res_data
+        return str(tmp_res)
 
 class PARA_templet(object):
     def __init__(self, type = None, data = None):
@@ -1139,6 +1336,9 @@ class PARA_templet(object):
                 else:
                     copy_tmp.data[key_this] = str(copy_tmp.data[key_this])
         return copy_tmp
+
+    def __str__(self):
+        return str(self.__dict__)
 
 class PARA(object):
     class text(PARA_templet):
@@ -1181,7 +1381,7 @@ class PARA(object):
 
     class record(PARA_templet):
         def __init__(self, file, magic = None, url = None, cache = None, proxy = None, timeout = None):
-            PARA_templet.__init__(self, 'record', self.data_T(file, type, url, cache, proxy, timeout))
+            PARA_templet.__init__(self, 'record', self.data_T(file, magic, url, cache, proxy, timeout))
 
         class data_T(dict):
             def __init__(self, file, magic, url, cache, proxy, timeout):
@@ -1194,7 +1394,7 @@ class PARA(object):
 
     class video(PARA_templet):
         def __init__(self, file, url = None, cache = None, proxy = None, timeout = None):
-            PARA_templet.__init__(self, 'record', self.data_T(file, type, url, cache, proxy, timeout))
+            PARA_templet.__init__(self, 'record', self.data_T(file, url, cache, proxy, timeout))
 
         class data_T(dict):
             def __init__(self, file, url, cache, proxy, timeout):
@@ -1205,12 +1405,24 @@ class PARA(object):
                 self['timeout'] = timeout
 
     class at(PARA_templet):
-        def __init__(self, qq):
-            PARA_templet.__init__(self, 'at', self.data_T(qq))
+        def __init__(self, id):
+            PARA_templet.__init__(self, 'at', self.data_T(id))
 
         class data_T(dict):
-            def __init__(self, qq):
-                self['qq'] = qq
+            def __init__(self, id):
+                self['id'] = id
+
+        def CQ(self):
+            CQ_tmp = '[CQ:' + self.type
+            if self.data != None:
+                for key_this in self.data:
+                    if self.data[key_this] != None:
+                        if key_this == 'id':
+                            CQ_tmp += ',qq=' + str(self.data[key_this])
+                        else:
+                            CQ_tmp += ',' + key_this + '=' + str(self.data[key_this])
+            CQ_tmp += ']'
+            return CQ_tmp
 
     class rps(PARA_templet):
         def __init__(self):
@@ -1236,7 +1448,7 @@ class PARA(object):
 
     class anonymous(PARA_templet):
         def __init__(self):
-            PARA_templet.__init__(self, 'shake', None)
+            PARA_templet.__init__(self, 'anonymous', None)
 
     class share(PARA_templet):
         def __init__(self, url, title, content = None, image = None):
@@ -1309,6 +1521,24 @@ class PARA(object):
                 self['user_id'] = user_id
                 self['nickname'] = nickname
                 self['content'] = content
+
+    class xml(PARA_templet):
+        def __init__(self, data, resid = None):
+            PARA_templet.__init__(self, 'xml', self.data_T(data, resid))
+
+        class data_T(dict):
+            def __init__(self, data, resid):
+                self['data'] = data
+                self['resid'] = resid
+
+    class json(PARA_templet):
+        def __init__(self, data, resid = None):
+            PARA_templet.__init__(self, 'json', self.data_T(data, resid))
+
+        class data_T(dict):
+            def __init__(self, data, resid):
+                self['data'] = data
+                self['resid'] = resid
 
 def checkByListAnd(check_list):
     flag_res = True

@@ -17,6 +17,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.0.1'
+OlivOS_Version = '0.6.0-alpha'
 
 
