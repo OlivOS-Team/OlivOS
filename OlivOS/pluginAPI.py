@@ -136,6 +136,8 @@ class shallow(OlivOS.API.Proc_templet):
                     plugin_event.plugin_info['namespace'] = self.plugin_models_dict[plugin_models_index_this]['namespace']
                     if 'message_mode' in self.plugin_models_dict[plugin_models_index_this]:
                         plugin_event.plugin_info['message_mode_tx'] = self.plugin_models_dict[plugin_models_index_this]['message_mode']
+                    else:
+                        plugin_event.plugin_info['message_mode_tx'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
                     plugin_event.get_Event_on_Plugin()
                     self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
                     self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
@@ -215,6 +217,10 @@ class shallow(OlivOS.API.Proc_templet):
                         plugin_models_dict_this['namespace'] = plugin_dir_this
                         plugin_models_dict_this['name'] = plugin_models_app_conf['name']
                         plugin_models_dict_this['support'] = plugin_models_app_conf['support']
+                        if 'message_mode' in plugin_models_app_conf:
+                            plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
+                        else:
+                            plugin_models_dict_this['message_mode'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
                         self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
                         if hasattr(plugin_models_tmp.main.Event, func_init_name):
                             plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)

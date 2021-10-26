@@ -99,19 +99,20 @@ class Event(object):
         self.base_info['type'] = None
         self.plugin_info = {}
         self.plugin_info['func_type'] = None
-        self.plugin_info['message_mode_rx'] = 'old_string'
-        self.plugin_info['message_mode_tx'] = 'old_string'
+        self.plugin_info['message_mode_rx'] = OlivOS.infoAPI.OlivOS_message_mode_rx_default
+        self.plugin_info['message_mode_tx'] = OlivOS.infoAPI.OlivOS_message_mode_tx_unity
         self.plugin_info['name'] = 'unity'
         self.plugin_info['namespace'] = 'unity'
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
         self.get_Event_from_SDK()
+        self.get_Event_on_Plugin()
         self.do_init_log()
 
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.onebotSDK.event:
             OlivOS.onebotSDK.get_Event_from_SDK(self)
-        if self.sdk_event_type is OlivOS.telegramSDK.event:
+        elif self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
 
     def get_Event_on_Plugin(self):
@@ -122,11 +123,11 @@ class Event(object):
             if self.data.message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
                 self.data.message = self.data.message_sdk.data_raw
             else:
-                pass
+                self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
             if self.data.raw_message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
                 self.data.raw_message = self.data.raw_message_sdk.data_raw
             else:
-                pass
+                self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
 
     def do_init_log(self):
         if self.active:
@@ -1131,11 +1132,19 @@ class Message_templet(object):
         self.mode_rx = mode_rx
         self.data = []
         self.data_raw = data_raw
-        self.init_data()
-        #try:
-            #self.init_data()
-        #except:
-            #self.active = False
+        try:
+            self.init_data()
+        except:
+            self.active = False
+            self.data = []
+
+    def __str__(self):
+        tmp_res = self.__dict__.copy()
+        tmp_res_data = []
+        for data_this in tmp_res['data']:
+            tmp_res_data.append(data_this.__dict__)
+        tmp_res['data'] = tmp_res_data
+        return str(tmp_res)
 
     def append(self, para_append):
         self.data.append(para_append)
@@ -1155,18 +1164,43 @@ class Message_templet(object):
                 return default_val
         return tmp_src_dict
 
-    def init_data(self):
-        if self.mode_rx == 'old_string':
-            self.init_from_old_string()
+    def get(self, get_type):
+        res = None
+        if not self.active:
+            res = str(self)
+        elif get_type == 'olivos_para':
+            res = self
+        elif get_type == 'olivos_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.OP()
+        elif get_type == 'old_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.CQ()
+        else:
+            res = str(self)
+        return res
 
-    def init_from_old_string(self):
+    def init_data(self):
+        if self.mode_rx == 'olivos_para':
+            self.init_from_olivos_para()
+        elif self.mode_rx == 'olivos_para':
+            self.init_from_code_string('OP')
+        elif self.mode_rx == 'old_string':
+            self.init_from_code_string('CQ')
+
+    def init_from_olivos_para(self):
+        self.data = self.data_raw
+
+    def init_from_code_string(self, code_key):
         tmp_data_raw = self.data_raw
         tmp_data = []
-        it_data = range(0, len(tmp_data_raw))
+        it_data = range(0, len(tmp_data_raw) + 1)
         it_data_base = 0
         tmp_data_type = 'string'
         for it_data_this in it_data:
-            if tmp_data_type == 'string' and self.match_str(tmp_data_raw[it_data_this:], '[CQ:'):
+            if tmp_data_type == 'string' and self.match_str(tmp_data_raw[it_data_this:], '[' + code_key + ':'):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
                     tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this]
@@ -1179,7 +1213,7 @@ class Message_templet(object):
                 if it_data_this > it_data_base:
                     tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + 1]
                     tmp_data_raw_this = tmp_data_raw_this_bak
-                    tmp_data_raw_this = tmp_data_raw_this[len('[CQ:'):]
+                    tmp_data_raw_this = tmp_data_raw_this[len('[' + code_key + ':'):]
                     tmp_data_raw_this = tmp_data_raw_this[:-len(']')]
                     tmp_data_raw_this_list = tmp_data_raw_this.split(',')
                     tmp_data_type_key = tmp_data_raw_this_list[0]
@@ -1202,8 +1236,10 @@ class Message_templet(object):
                             id = str(self.get_from_dict(tmp_code_data_dict, ['id']))
                         )
                     elif tmp_data_type_key == 'at':
+                        if code_key == 'CQ':
+                            tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
                         tmp_para_this = PARA.at(
-                            id = int(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
+                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
                         )
                     elif tmp_data_type_key == 'reply':
                         tmp_para_this = PARA.reply(
@@ -1278,7 +1314,7 @@ class Message_templet(object):
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this + 1
                 tmp_data_type = 'string'
-            elif it_data_this >= len(tmp_data_raw) - 1:
+            elif it_data_this >= len(tmp_data_raw):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
                     tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
@@ -1287,35 +1323,25 @@ class Message_templet(object):
                 it_data_base = it_data_this
         self.data = tmp_data
 
-    def get(self, get_type):
-        res = None
-        if get_type == 'old_string':
-            res = ''
-            for data_this in self.data:
-                res += data_this.CQ()
-        return res
-
-    def __str__(self):
-        tmp_res = self.__dict__.copy()
-        tmp_res_data = []
-        for data_this in tmp_res['data']:
-            tmp_res_data.append(data_this.__dict__)
-        tmp_res['data'] = tmp_res_data
-        return str(tmp_res)
-
 class PARA_templet(object):
     def __init__(self, type = None, data = None):
         self.type = type
         self.data = data
 
     def CQ(self):
-        CQ_tmp = '[CQ:' + self.type
+        return self.get_string_by_key('CQ')
+
+    def OP(self):
+        return self.get_string_by_key('OP')
+
+    def get_string_by_key(self, code_key):
+        code_tmp = '[' + code_key + ':' + self.type
         if self.data != None:
             for key_this in self.data:
                 if self.data[key_this] != None:
-                    CQ_tmp += ',' + key_this + '=' + str(self.data[key_this])
-        CQ_tmp += ']'
-        return CQ_tmp
+                    code_tmp += ',' + key_this + '=' + str(self.data[key_this])
+        code_tmp += ']'
+        return code_tmp
 
     def PARA(self):
         PARA_tmp = self.cut()
@@ -1349,12 +1375,12 @@ class PARA(object):
             def __init__(self, text = ''):
                 self['text'] = text
 
-        def CQ(self):
+        def get_string_by_key(self, code_key):
             if self.data != None:
-                if type(self.data.text) is str:
-                    return self.data.text
+                if type(self.data['text']) is str:
+                    return self.data['text']
                 else:
-                    return str(self.data.text)
+                    return str(self.data['text'])
             else:
                 return ''
 
@@ -1412,17 +1438,17 @@ class PARA(object):
             def __init__(self, id):
                 self['id'] = id
 
-        def CQ(self):
-            CQ_tmp = '[CQ:' + self.type
+        def get_string_by_key(self, code_key):
+            code_tmp = '[' + code_key + ':' + self.type
             if self.data != None:
                 for key_this in self.data:
                     if self.data[key_this] != None:
-                        if key_this == 'id':
-                            CQ_tmp += ',qq=' + str(self.data[key_this])
+                        if code_key == 'CQ' and key_this == 'id':
+                            code_tmp += ',qq=' + str(self.data[key_this])
                         else:
-                            CQ_tmp += ',' + key_this + '=' + str(self.data[key_this])
-            CQ_tmp += ']'
-            return CQ_tmp
+                            code_tmp += ',' + key_this + '=' + str(self.data[key_this])
+            code_tmp += ']'
+            return code_tmp
 
     class rps(PARA_templet):
         def __init__(self):

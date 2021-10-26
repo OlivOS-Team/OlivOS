@@ -19,4 +19,7 @@ import OlivOS
 
 OlivOS_Version = '0.6.0-alpha'
 
+OlivOS_message_mode_rx_default = 'old_string'
+OlivOS_message_mode_tx_default = 'old_string'
+OlivOS_message_mode_tx_unity = 'olivos_string'
 
