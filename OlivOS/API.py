@@ -442,8 +442,37 @@ class Event(object):
         else:
             self.__set_block(enable, flag_log = True)
 
+    def __message_router(self, message):
+        tmp_message_obj = None
+        tmp_message = None
+        if type(message) == str and self.plugin_info['message_mode_tx'] == self.plugin_info['message_mode_rx']:
+            tmp_message = message
+            tmp_message_obj = OlivOS.messageAPI.Message_templet(
+                self.plugin_info['message_mode_tx'],
+                message
+            )
+        else:
+            if type(message) == str or type(message) == list:
+                tmp_message_obj = OlivOS.messageAPI.Message_templet(
+                    self.plugin_info['message_mode_tx'],
+                    message
+                )
+            elif type(message) == OlivOS.messageAPI.Message_templet:
+                tmp_message_obj = message
+            else:
+                return None
+            if tmp_message_obj.active:
+                tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
+        return [tmp_message, tmp_message_obj]
+
     def __reply(self, message, flag_log = True):
         flag_type = None
+        tmp_message = None
+        tmp_message_obj = None
+        tmp_message_log = None
+        [tmp_message, tmp_message_obj] = self.__message_router(message)
+        if tmp_message == None:
+            return
         if checkByListOrEqual(
             self.plugin_info['func_type'],
             [
@@ -453,7 +482,7 @@ class Event(object):
                 'friend_add_request'
             ]
         ):
-            self.__send('private', self.data.user_id, message, flag_log = False)
+            self.__send('private', self.data.user_id, tmp_message, flag_log = False)
             flag_type = 'private'
         elif checkByListOrEqual(
             self.plugin_info['func_type'],
@@ -472,7 +501,7 @@ class Event(object):
                 
             ]
         ):
-            self.__send('group', self.data.group_id, message, flag_log = False)
+            self.__send('group', self.data.group_id, tmp_message, flag_log = False)
             flag_type = 'group'
         elif checkByListOrEqual(
             self.plugin_info['func_type'],
@@ -481,21 +510,25 @@ class Event(object):
             ]
         ):
             if self.data.group_id == -1:
-                self.__send('private', self.data.user_id, message, flag_log = False)
+                self.__send('private', self.data.user_id, tmp_message, flag_log = False)
                 flag_type = 'private'
             else:
-                self.__send('group', self.data.group_id, message, flag_log = False)
+                self.__send('group', self.data.group_id, tmp_message, flag_log = False)
                 flag_type = 'group'
 
         if flag_log:
+            if tmp_message_obj.active:
+                tmp_message_log = tmp_message_obj.get(OlivOS.infoAPI.OlivOS_message_mode_tx_unity)
+            else:
+                tmp_message_log = tmp_message
             if flag_type == 'private':
-                self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + message, [
+                self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + tmp_message_log, [
                     (self.platform['platform'], 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
                 ])
             elif flag_type == 'group':
-                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + message, [
+                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
                     (self.platform['platform'], 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
@@ -510,23 +543,33 @@ class Event(object):
 
     def __send(self, send_type, target_id, message, flag_log = True):
         flag_type = send_type
+        tmp_message = None
+        tmp_message_obj = None
+        tmp_message_log = None
+        [tmp_message, tmp_message_obj] = self.__message_router(message)
+        if tmp_message == None:
+            return
         if self.platform['sdk'] == 'onebot':
             if flag_type == 'private':
-                OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, message)
+                OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
             elif flag_type == 'group':
-                OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, message)
+                OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'telegram_poll':
-            OlivOS.telegramSDK.event_action.send_msg(self, target_id, message)
+            OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
 
         if flag_log:
+            if tmp_message_obj.active:
+                tmp_message_log = tmp_message_obj.get(OlivOS.infoAPI.OlivOS_message_mode_tx_unity)
+            else:
+                tmp_message_log = tmp_message
             if flag_type == 'private':
-                self.log_func(2, 'User(' + str(target_id) + '): ' + message, [
+                self.log_func(2, 'User(' + str(target_id) + '): ' + tmp_message_log, [
                     (self.platform['platform'], 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
-                self.log_func(2, 'Group(' + str(target_id) + '): ' + message, [
+                self.log_func(2, 'Group(' + str(target_id) + '): ' + tmp_message_log, [
                     (self.platform['platform'], 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('send', 'callback')

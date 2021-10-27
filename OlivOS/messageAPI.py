@@ -81,10 +81,17 @@ class Message_templet(object):
             self.init_from_code_string('CQ')
 
     def init_from_olivos_para(self):
-        self.data = self.data_raw
+        tmp_data = []
+        if type(self.data_raw) == list:
+            for data_raw_this in self.data_raw:
+                if data_raw_this.__class__.__base__ == PARA_templet:
+                    tmp_data.append(data_raw_this)
+            self.data = tmp_data
+        else:
+            self.active = False
 
     def init_from_code_string(self, code_key):
-        tmp_data_raw = self.data_raw
+        tmp_data_raw = str(self.data_raw)
         tmp_data = []
         it_data = range(0, len(tmp_data_raw) + 1)
         it_data_base = 0
