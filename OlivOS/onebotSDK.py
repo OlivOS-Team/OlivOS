@@ -145,10 +145,10 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
-            target_event.data.message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message'])
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
             target_event.data.message_id = target_event.sdk_event.json['message_id']
             target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-            target_event.data.raw_message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
         elif target_event.sdk_event.json['message_type'] == 'group':
@@ -156,10 +156,10 @@ def get_Event_from_SDK(target_event):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
                 target_event.data = target_event.group_message(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
-                target_event.data.message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
                 target_event.data.message_id = target_event.sdk_event.json['message_id']
                 target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-                target_event.data.raw_message_sdk = OlivOS.API.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
     elif target_event.base_info['type'] == 'notice':
@@ -301,7 +301,7 @@ class event_action(object):
         this_msg.do_api()
 
     def get_msg(target_event, message_id):
-        res_data = OlivOS.API.api_result_data_template.get_msg()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_msg()
         raw_obj = None
         this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = message_id
@@ -410,7 +410,7 @@ class event_action(object):
         this_msg.do_api()
 
     def get_login_info(target_event):
-        res_data = OlivOS.API.api_result_data_template.get_login_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         this_msg = api.get_login_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -424,7 +424,7 @@ class event_action(object):
         return res_data
 
     def get_stranger_info(target_event, user_id, no_cache = False):
-        res_data = OlivOS.API.api_result_data_template.get_stranger_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
         this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = user_id
@@ -440,7 +440,7 @@ class event_action(object):
         return res_data
 
     def get_friend_list(target_event):
-        res_data = OlivOS.API.api_result_data_template.get_friend_list()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_friend_list()
         raw_obj = None
         this_msg = api.get_friend_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -450,14 +450,14 @@ class event_action(object):
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
-                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_user_info_strip()
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
                     tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
     def get_group_info(target_event, group_id, no_cache = False):
-        res_data = OlivOS.API.api_result_data_template.get_group_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
         this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = group_id
@@ -475,7 +475,7 @@ class event_action(object):
         return res_data
 
     def get_group_list(target_event):
-        res_data = OlivOS.API.api_result_data_template.get_group_list()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
         raw_obj = None
         this_msg = api.get_group_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -485,7 +485,7 @@ class event_action(object):
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
-                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_group_info_strip()
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
                     tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
@@ -494,7 +494,7 @@ class event_action(object):
         return res_data
 
     def get_group_member_info(target_event, group_id, user_id, no_cache = False):
-        res_data = OlivOS.API.api_result_data_template.get_group_member_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
         this_msg = api.get_group_member_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = group_id
@@ -519,7 +519,7 @@ class event_action(object):
         return res_data
 
     def get_group_member_list(target_event, group_id):
-        res_data = OlivOS.API.api_result_data_template.get_group_member_list()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
         raw_obj = None
         this_msg = api.get_group_member_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = group_id
@@ -530,7 +530,7 @@ class event_action(object):
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
-                    tmp_res_data_this = OlivOS.API.api_result_data_template.get_group_member_info_strip()
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
                     tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
                     tmp_res_data_this['user_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
@@ -545,7 +545,7 @@ class event_action(object):
         return res_data
 
     def can_send_image(target_event):
-        res_data = OlivOS.API.api_result_data_template.can_send_image()
+        res_data = OlivOS.contentAPI.api_result_data_template.can_send_image()
         raw_obj = None
         this_msg = api.can_send_image(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -558,7 +558,7 @@ class event_action(object):
         return res_data
 
     def can_send_record(target_event):
-        res_data = OlivOS.API.api_result_data_template.can_send_record()
+        res_data = OlivOS.contentAPI.api_result_data_template.can_send_record()
         raw_obj = None
         this_msg = api.can_send_record(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -571,7 +571,7 @@ class event_action(object):
         return res_data
 
     def get_status(target_event):
-        res_data = OlivOS.API.api_result_data_template.get_status()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_status()
         raw_obj = None
         this_msg = api.get_status(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
@@ -592,7 +592,7 @@ class event_action(object):
         return res_data
 
     def get_version_info(target_event):
-        res_data = OlivOS.API.api_result_data_template.get_version_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_version_info()
         raw_obj = None
         this_msg = api.get_version_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
