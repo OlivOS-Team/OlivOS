@@ -129,7 +129,7 @@ class Message_templet(object):
                         if code_key == 'CQ':
                             tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
                         tmp_para_this = PARA.at(
-                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
                         )
                     elif tmp_data_type_key == 'reply':
                         tmp_para_this = PARA.reply(
@@ -159,7 +159,7 @@ class Message_templet(object):
                         tmp_para_this = PARA.shake()
                     elif tmp_data_type_key == 'poke':
                         tmp_para_this = PARA.poke(
-                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
                         )
                     elif tmp_data_type_key == 'anonymous':
                         tmp_para_this = PARA.anonymous()
@@ -189,7 +189,7 @@ class Message_templet(object):
                         )
                     elif tmp_data_type_key == 'forward':
                         tmp_para_this = PARA.forward(
-                            id = int(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                            id = str(self.get_from_dict(tmp_code_data_dict, ['id'], 'NULLHASH'))
                         )
                     elif tmp_data_type_key == 'xml':
                         tmp_para_this = PARA.xml(

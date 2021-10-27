@@ -30,6 +30,18 @@ def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res = 'N/
             tmp_res = default_res
     return tmp_res
 
+def getPairMapping(pair_list = []):
+    tmp_res = {}
+    for pair_list_this in pair_list:
+        if type(pair_list_this) == list:
+            if len(pair_list_this) == 2:
+                tmp_res[pair_list_this[0]] = str(pair_list_this[1])
+            else:
+                continue
+        else:
+            continue
+    return tmp_res
+
 globalMetaTableTemp = {
     'nickname': 'N/A',
     'message': 'N/A',
