@@ -7,7 +7,11 @@ a = Analysis(['main.py'],
              pathex=['./'],
              binaries=[],
              datas=[],
-             hiddenimports=[],
+             hiddenimports=[
+                 'websockets.legacy.auth',
+                 'websockets.legacy.client',
+                 'websockets.legacy.server'
+             ],
              hookspath=['./hook'],
              runtime_hooks=[],
              excludes=[],
