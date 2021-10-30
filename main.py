@@ -110,12 +110,15 @@ if __name__ == '__main__':
                     Proc_logger_name = basic_conf_models_this['name']
                 elif basic_conf_models_this['type'] == 'plugin':
                     proc_plugin_func_dict = {}
+                    tmp_tx_queue_list = []
+                    for tmp_tx_queue_list_this in basic_conf_models_this['tx_queue']:
+                        tmp_tx_queue_list.append(multiprocessing_dict[tmp_tx_queue_list_this])
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.pluginAPI.shallow(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
                         dead_interval = basic_conf_models_this['dead_interval'],
                         rx_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
-                        tx_queue = None,
+                        tx_queue = tmp_tx_queue_list,
                         control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         debug_mode = basic_conf_models_this['debug'],
@@ -157,6 +160,30 @@ if __name__ == '__main__':
                         scan_interval = basic_conf_models_this['interval'],
                         dead_interval = basic_conf_models_this['dead_interval'],
                         rx_queue = None,
+                        tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        bot_info_dict = plugin_bot_info_dict,
+                        debug_mode = False
+                    )
+                    Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                elif basic_conf_models_this['type'] == 'dodobot_ea':
+                    Proc_dict[basic_conf_models_this['name']] = OlivOS.dodobotEAServerAPI.server(
+                        Proc_name = basic_conf_models_this['name'],
+                        scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
+                        rx_queue = None,
+                        tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        bot_info_dict = plugin_bot_info_dict,
+                        debug_mode = False
+                    )
+                    Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                elif basic_conf_models_this['type'] == 'dodobot_ea_tx':
+                    Proc_dict[basic_conf_models_this['name']] = OlivOS.dodobotEATXAPI.server(
+                        Proc_name = basic_conf_models_this['name'],
+                        scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
+                        rx_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
                         tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         bot_info_dict = plugin_bot_info_dict,
