@@ -49,13 +49,13 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
-class send_onebot_post_json_T(object):
+class send_telegram_post_json_T(object):
     def __init__(self):
         self.bot_info = None
         self.obj = None
         self.node_ext = ''
 
-    def send_onebot_post_json(self):
+    def send_telegram_post_json(self):
         if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj == None or self.node_ext == '':
             return None
         else:
@@ -274,11 +274,11 @@ class api_templet(object):
         self.res = None
 
     def do_api(self):
-        this_post_json = send_onebot_post_json_T()
+        this_post_json = send_telegram_post_json_T()
         this_post_json.bot_info = self.bot_info
         this_post_json.obj = self.data
         this_post_json.node_ext = self.node_ext
-        self.res = this_post_json.send_onebot_post_json()
+        self.res = this_post_json.send_telegram_post_json()
         return self.res
 
 class API(object):

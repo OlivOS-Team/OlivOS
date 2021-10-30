@@ -103,6 +103,7 @@ class Event(object):
         self.plugin_info['message_mode_tx'] = OlivOS.infoAPI.OlivOS_message_mode_tx_unity
         self.plugin_info['name'] = 'unity'
         self.plugin_info['namespace'] = 'unity'
+        self.plugin_info['tx_queue'] = []
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
         self.get_Event_from_SDK()
@@ -114,6 +115,8 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.dodobotEASDK.event:
+            OlivOS.dodobotEASDK.get_Event_from_SDK(self)
 
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
@@ -556,6 +559,12 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
+        elif self.platform['sdk'] == 'dodobot_ea':
+            if flag_type == 'group':
+                tmp_send_msg = OlivOS.dodobotEASDK.event_action.send_msg(self, target_id, tmp_message)
+                tx_packet_data = OlivOS.dodobotEATXAPI.server.rx_packet('send', tmp_send_msg)
+                for tx_queue_this in self.plugin_info['tx_queue']:
+                    tx_queue_this.put(tx_packet_data, block = False)
 
         if flag_log:
             if tmp_message_obj.active:

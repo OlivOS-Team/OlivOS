@@ -235,7 +235,8 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_list'] = [
             'qq',
-            'telegram'
+            'telegram',
+            'dodo'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qq'] = [
@@ -243,6 +244,9 @@ class TreeEditUI(object):
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['telegram'] = [
             'telegram_poll'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
+            'dodobot_ea'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq'] = {}
@@ -256,6 +260,10 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram']['telegram_poll'] = [
             'default'
         ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodobot_ea'] = [
+            'default'
+        ]
 
         self.UIData['edit_root_Combobox_Server_auto_list'] = [
             'False',
@@ -263,7 +271,8 @@ class TreeEditUI(object):
         ]
 
         self.UIData['edit_root_Combobox_Server_type_list'] = [
-            'post'
+            'post',
+            'websocket'
         ]
 
     def start(self):

@@ -43,6 +43,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.plugin_models_dict = {}
         self.plugin_models_call_list = []
+        self.tx_queue = []
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -110,6 +111,7 @@ class shallow(OlivOS.API.Proc_templet):
                 self.log(3, 'Account [' + str(plugin_event.base_info['self_id']) + '] not found, please check your account config')
                 plugin_event.active = False
         if plugin_event.active:
+            plugin_event.plugin_info['tx_queue'] = self.Proc_info.tx_queue
             for plugin_models_index_this in self.plugin_models_call_list:
                 flag_support_found_dict = {}
                 flag_support_found_dict['sdk'] = False
