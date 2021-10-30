@@ -77,19 +77,23 @@ class server(OlivOS.API.Proc_templet):
 
     async def run_websockets_tx_connect(self):
         while True:
-            async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(OlivOS.dodobotEASDK.websocket_port)) as websocket:
-                while True:
-                    if self.Proc_info.rx_queue.empty():
-                        time.sleep(self.Proc_info.scan_interval)
-                    else:
-                        try:
-                            rx_packet_data = self.Proc_info.rx_queue.get(block = False)
-                            if rx_packet_data.pkg_type == 'send':
-                                rx_packet_data_data = rx_packet_data.data
-                                if rx_packet_data_data['Account']['Uid'] in self.Proc_data['platform_bot_info_dict']:
-                                    rx_packet_data_data['Account']['Token'] = self.Proc_data['platform_bot_info_dict'][rx_packet_data_data['Account']['Uid']].access_token
-                                await websocket.send(json.dumps(rx_packet_data_data))
-                        except:
-                            continue
+            try:
+                async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(OlivOS.dodobotEASDK.websocket_port)) as websocket:
+                    while True:
+                        if self.Proc_info.rx_queue.empty():
+                            time.sleep(self.Proc_info.scan_interval)
+                        else:
+                            try:
+                                rx_packet_data = self.Proc_info.rx_queue.get(block = False)
+                                if rx_packet_data.pkg_type == 'send':
+                                    rx_packet_data_data = rx_packet_data.data
+                                    if rx_packet_data_data['Account']['Uid'] in self.Proc_data['platform_bot_info_dict']:
+                                        rx_packet_data_data['Account']['Token'] = self.Proc_data['platform_bot_info_dict'][rx_packet_data_data['Account']['Uid']].access_token
+                                    await websocket.send(json.dumps(rx_packet_data_data))
+                            except:
+                                continue
+            except:
+                time.sleep(self.Proc_info.scan_interval)
+                continue
 
 

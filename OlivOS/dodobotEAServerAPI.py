@@ -72,31 +72,35 @@ class server(OlivOS.API.Proc_templet):
 
     async def run_websockets_rx_connect(self):
         while True:
-            async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(OlivOS.dodobotEASDK.websocket_port)) as websocket:
-                while True:
-                    tmp_recv_pkg = None
-                    tmp_recv_pkg_data = None
-                    tmp_recv_pkg_str = await websocket.recv()
-                    try:
-                        tmp_recv_pkg = json.loads(tmp_recv_pkg_str)
-                    except:
+            try:
+                async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(OlivOS.dodobotEASDK.websocket_port)) as websocket:
+                    while True:
                         tmp_recv_pkg = None
-                    if tmp_recv_pkg != None and type(tmp_recv_pkg) == dict:
-                        if 'Data' in tmp_recv_pkg:
-                            if type(tmp_recv_pkg['Data']) == str:
-                                try:
-                                    tmp_recv_pkg_data = json.loads(tmp_recv_pkg['Data'])
-                                except:
-                                    tmp_recv_pkg_data = None
-                    if tmp_recv_pkg_data != None:
-                        for bot_info_this in self.Proc_data['bot_info_dict']:
-                            bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
-                            if bot_info_this_obj.id in self.Proc_data['platform_bot_info_dict']:
-                                sdk_bot_info_this = OlivOS.dodobotEASDK.get_SDK_bot_info_from_Plugin_bot_info(
-                                    bot_info_this_obj,
-                                    self.Proc_data['platform_bot_info_dict'][bot_info_this_obj.id]
-                                )
-                                sdk_event = OlivOS.dodobotEASDK.event(tmp_recv_pkg_data, sdk_bot_info_this)
-                                tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                                self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                        tmp_recv_pkg_data = None
+                        tmp_recv_pkg_str = await websocket.recv()
+                        try:
+                            tmp_recv_pkg = json.loads(tmp_recv_pkg_str)
+                        except:
+                            tmp_recv_pkg = None
+                        if tmp_recv_pkg != None and type(tmp_recv_pkg) == dict:
+                            if 'Data' in tmp_recv_pkg:
+                                if type(tmp_recv_pkg['Data']) == str:
+                                    try:
+                                        tmp_recv_pkg_data = json.loads(tmp_recv_pkg['Data'])
+                                    except:
+                                        tmp_recv_pkg_data = None
+                        if tmp_recv_pkg_data != None:
+                            for bot_info_this in self.Proc_data['bot_info_dict']:
+                                bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+                                if bot_info_this_obj.id in self.Proc_data['platform_bot_info_dict']:
+                                    sdk_bot_info_this = OlivOS.dodobotEASDK.get_SDK_bot_info_from_Plugin_bot_info(
+                                        bot_info_this_obj,
+                                        self.Proc_data['platform_bot_info_dict'][bot_info_this_obj.id]
+                                    )
+                                    sdk_event = OlivOS.dodobotEASDK.event(tmp_recv_pkg_data, sdk_bot_info_this)
+                                    tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+            except:
+                time.sleep(self.Proc_info.scan_interval)
+                tmp_recv_pkg_data = None
 
