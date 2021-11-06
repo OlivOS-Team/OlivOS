@@ -132,29 +132,46 @@ def get_Event_from_SDK(target_event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if True:
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_para',
-            [
-                OlivOS.messageAPI.PARA.text(target_event.sdk_event.json['content'])
-            ]
-        )
-        target_event.active = True
-        target_event.plugin_info['func_type'] = 'group_message'
-        target_event.data = target_event.group_message(
-            target_event.sdk_event.json['channelId'],
-            target_event.sdk_event.json['uid'],
-            message_obj,
-            'group'
-        )
-        target_event.data.message_sdk = message_obj
-        target_event.data.message_id = target_event.sdk_event.json['id']
-        target_event.data.raw_message = message_obj
-        target_event.data.raw_message_sdk = message_obj
-        target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['uid']
-        target_event.data.sender['nickname'] = target_event.sdk_event.json['nickName']
-        target_event.data.sender['sex'] = 'unknown'
-        target_event.data.sender['age'] = 0
+        message_obj = None
+        if 'content' in target_event.sdk_event.json:
+            if target_event.sdk_event.json['content'] != '':
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'olivos_para',
+                    [
+                        OlivOS.messageAPI.PARA.text(target_event.sdk_event.json['content'])
+                    ]
+                )
+        if 'resourceJson' in target_event.sdk_event.json:
+            if target_event.sdk_event.json['resourceJson'] != '':
+                resourceJson_obj = None
+                try:
+                    resourceJson_obj = json.loads(target_event.sdk_event.json['resourceJson'])
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        [
+                            OlivOS.messageAPI.PARA.image(resourceJson_obj['resourceUrl'])
+                        ]
+                    )
+                except:
+                    return
+        if message_obj != None:
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_message'
+            target_event.data = target_event.group_message(
+                target_event.sdk_event.json['channelId'],
+                target_event.sdk_event.json['uid'],
+                message_obj,
+                'group'
+            )
+            target_event.data.message_sdk = message_obj
+            target_event.data.message_id = target_event.sdk_event.json['id']
+            target_event.data.raw_message = message_obj
+            target_event.data.raw_message_sdk = message_obj
+            target_event.data.font = None
+            target_event.data.sender['user_id'] = target_event.sdk_event.json['uid']
+            target_event.data.sender['nickname'] = target_event.sdk_event.json['nickName']
+            target_event.data.sender['sex'] = 'unknown'
+            target_event.data.sender['age'] = 0
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
