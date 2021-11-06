@@ -246,6 +246,7 @@ class TreeEditUI(object):
             'telegram_poll'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
+            'dodo_poll',
             'dodobot_ea'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'] = {}
@@ -261,6 +262,9 @@ class TreeEditUI(object):
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodo_poll'] = [
+            'default'
+        ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodobot_ea'] = [
             'default'
         ]

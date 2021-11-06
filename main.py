@@ -166,6 +166,18 @@ if __name__ == '__main__':
                         debug_mode = False
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                elif basic_conf_models_this['type'] == 'dodo_poll':
+                    Proc_dict[basic_conf_models_this['name']] = OlivOS.dodoPollServerAPI.server(
+                        Proc_name = basic_conf_models_this['name'],
+                        scan_interval = basic_conf_models_this['interval'],
+                        dead_interval = basic_conf_models_this['dead_interval'],
+                        rx_queue = None,
+                        tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        bot_info_dict = plugin_bot_info_dict,
+                        debug_mode = False
+                    )
+                    Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                 elif basic_conf_models_this['type'] == 'dodobot_ea':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.dodobotEAServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],

@@ -34,6 +34,8 @@ import OlivOS.telegramPollServerAPI
 import OlivOS.dodobotEAServerAPI
 import OlivOS.dodobotEATXAPI
 import OlivOS.dodobotEASDK
+import OlivOS.dodoSDK
+import OlivOS.dodoPollServerAPI
 if(platform.system() == 'Windows'):
     import OlivOS.multiLoginUIAPI
     import OlivOS.libEXEModelAPI
