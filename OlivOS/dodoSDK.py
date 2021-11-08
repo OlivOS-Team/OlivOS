@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import requests as req
 import json
 import time
+import uuid
 #import urllib
 
 import OlivOS
@@ -268,7 +269,7 @@ class API(object):
                 self.content = ''
                 self.resourceJson = '{}'
                 self.referencedMessageId = None
-                self.tk = 1
+                self.tk = uuid.uuid4()
 
 
     class sendMessagePrivate(api_templet):
@@ -287,7 +288,7 @@ class API(object):
                 self.content = ''
                 self.resourceJson = '{}'
                 self.referencedMessageId = None
-                self.tk = 1
+                self.tk = uuid.uuid4()
 
 
     class setMemberNickname(api_templet):
