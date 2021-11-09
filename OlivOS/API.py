@@ -115,6 +115,8 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.fanbookSDK.event:
+            OlivOS.fanbookSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dodoSDK.event:
             OlivOS.dodoSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dodobotEASDK.event:
@@ -561,6 +563,8 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
+        elif self.platform['sdk'] == 'fanbook_poll':
+            OlivOS.fanbookSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodo_poll':
             OlivOS.dodoSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodobot_ea':

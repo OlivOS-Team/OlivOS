@@ -68,6 +68,10 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.CQ()
+        elif get_type == 'fanbook_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.fanbook()
         else:
             res = str(self)
         return res
@@ -79,6 +83,8 @@ class Message_templet(object):
             self.init_from_code_string('OP')
         elif self.mode_rx == 'old_string':
             self.init_from_code_string('CQ')
+        elif self.mode_rx == 'fanbook_string':
+            self.init_from_fanbook_code_string()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -220,6 +226,49 @@ class Message_templet(object):
                 it_data_base = it_data_this
         self.data = tmp_data
 
+    def init_from_fanbook_code_string(self):
+        tmp_data_raw = str(self.data_raw)
+        tmp_data = []
+        it_data = range(0, len(tmp_data_raw) + 1)
+        it_data_base = 0
+        tmp_data_type = 'string'
+        for it_data_this in it_data:
+            if tmp_data_type == 'string' and self.match_str(tmp_data_raw[it_data_this:], '${'):
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this]
+                    tmp_para_this = PARA.text(tmp_data_raw_this)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this
+                tmp_data_type = 'code'
+            elif tmp_data_type == 'code' and self.match_str(tmp_data_raw[it_data_this:], '}'):
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this = tmp_data_raw_this_bak
+                    tmp_data_raw_this = tmp_data_raw_this[len('${'):]
+                    tmp_data_raw_this = tmp_data_raw_this[:-len('}')]
+                    tmp_data_raw_this_list = tmp_data_raw_this.split('!')
+                    tmp_data_type_key = tmp_data_raw_this_list[0]
+                    tmp_code_data_list = tmp_data_raw_this_list[1:]
+                    if tmp_data_type_key == '@':
+                        tmp_para_this = PARA.at(
+                            id = str(tmp_code_data_list[0])
+                        )
+                    else:
+                        tmp_para_this = PARA.text(tmp_data_raw_this_bak)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this + 1
+                tmp_data_type = 'string'
+            elif it_data_this >= len(tmp_data_raw):
+                tmp_para_this = None
+                if it_data_this > it_data_base:
+                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_para_this = PARA.text(tmp_data_raw_this)
+                    tmp_data.append(tmp_para_this)
+                it_data_base = it_data_this
+        self.data = tmp_data
+
 class PARA_templet(object):
     def __init__(self, type = None, data = None):
         self.type = type
@@ -230,6 +279,25 @@ class PARA_templet(object):
 
     def OP(self):
         return self.get_string_by_key('OP')
+
+    def fanbook(self):
+        code_tmp = '${'
+        if type(self) == PARA.at:
+            if self.data != None:
+                for key_this in self.data:
+                    if self.data[key_this] != None:
+                        code_tmp += '@'
+                        code_tmp += '!' + str(self.data[key_this])
+        elif type(self) == PARA.text:
+            if self.data != None:
+                if type(self.data['text']) is str:
+                    return self.data['text']
+                else:
+                    return str(self.data['text'])
+            else:
+                return ''
+        code_tmp += '}'
+        return code_tmp
 
     def get_string_by_key(self, code_key):
         code_tmp = '[' + code_key + ':' + self.type

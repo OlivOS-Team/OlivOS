@@ -236,7 +236,8 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_list'] = [
             'qq',
             'telegram',
-            'dodo'
+            'dodo',
+            'fanbook'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qq'] = [
@@ -248,6 +249,9 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
             'dodo_poll',
             'dodobot_ea'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['fanbook'] = [
+            'fanbook_poll'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq'] = {}
@@ -266,6 +270,10 @@ class TreeEditUI(object):
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodobot_ea'] = [
+            'default'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook']['fanbook_poll'] = [
             'default'
         ]
 

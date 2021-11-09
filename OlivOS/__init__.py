@@ -36,6 +36,8 @@ import OlivOS.dodobotEATXAPI
 import OlivOS.dodobotEASDK
 import OlivOS.dodoSDK
 import OlivOS.dodoPollServerAPI
+import OlivOS.fanbookSDK
+import OlivOS.fanbookPollServerAPI
 if(platform.system() == 'Windows'):
     import OlivOS.multiLoginUIAPI
     import OlivOS.libEXEModelAPI

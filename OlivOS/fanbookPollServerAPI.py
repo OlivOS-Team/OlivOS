@@ -1,0 +1,83 @@
+# -*- encoding: utf-8 -*-
+'''
+_______________________    ________________
+__  __ \__  /____  _/_ |  / /_  __ \_  ___/
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
+
+@File      :   OlivOS/fanbookPollServerAPI.py
+@Author    :   lunzhiPenxil仑质
+@Contact   :   lunzhipenxil@gmail.com
+@License   :   AGPL
+@Copyright :   (C) 2020-2021, OlivOS-Team
+@Desc      :   None
+'''
+
+import multiprocessing
+import threading
+import time
+import json
+
+import OlivOS
+
+class server(OlivOS.API.Proc_templet):
+    def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, logger_proc = None, debug_mode = False, bot_info_dict = None):
+        OlivOS.API.Proc_templet.__init__(
+            self,
+            Proc_name = Proc_name,
+            Proc_type = 'fanbook_poll',
+            scan_interval = scan_interval,
+            dead_interval = dead_interval,
+            rx_queue = None,
+            tx_queue = tx_queue,
+            logger_proc = logger_proc
+        )
+        self.Proc_config['debug_mode'] = debug_mode
+        self.Proc_data['bot_info_dict'] = bot_info_dict
+        self.Proc_data['bot_info_update_id'] = {}
+        self.Proc_data['bot_info_first'] = {}
+        self.Proc_data['bot_info_token_life_counter'] = 1000
+        self.Proc_data['bot_info_token_life'] = {}
+        self.Proc_data['bot_info_island_list'] = {}
+
+    def run(self):
+        self.log(2, 'OlivOS fanbook poll server [' + self.Proc_name + '] is running')
+        while True:
+            time.sleep(self.Proc_info.scan_interval)
+            self.run_poll_list()
+
+    def run_poll_list(self):
+        for bot_info_this in self.Proc_data['bot_info_dict']:
+            flag_not_attach = False
+            bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+            if bot_info_this_obj.platform['sdk'] == 'fanbook_poll':
+                sdk_bot_info_this = OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_this_obj)
+                flag_not_attach = False
+                sdk_api_tmp = OlivOS.fanbookSDK.API.getUpdates(sdk_bot_info_this)
+                sdk_api_res = None
+                try:
+                    sdk_api_res = sdk_api_tmp.do_api()
+                except:
+                    flag_not_attach = True
+                if not flag_not_attach:
+                    if bot_info_this in self.Proc_data['bot_info_first']:
+                        try:
+                            res_obj = json.loads(sdk_api_res)
+                            if res_obj['ok'] == True:
+                                if type(res_obj['result']) == list:
+                                    for tmp_messages_this in res_obj['result']:
+                                        sdk_event = OlivOS.fanbookSDK.event(tmp_messages_this, bot_info_this_obj)
+                                        tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                                        self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                                else:
+                                    continue
+                            else:
+                                continue
+                        except:
+                            continue
+                    else:
+                        self.Proc_data['bot_info_first'][bot_info_this] = True
+
+    def run_sdk_api(self, sdk_api):
+        sdk_api.do_api()

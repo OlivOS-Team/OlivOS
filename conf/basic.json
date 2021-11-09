@@ -12,6 +12,7 @@
             "OlivOS_plugin",
             "OlivOS_flask_post_rx",
             "OlivOS_telegram_poll",
+            "OlivOS_fanbook_poll",
             "OlivOS_dodo_poll"
         ],
         "control_queue" : "OlivOS_control_queue",
@@ -103,6 +104,16 @@
             "enable" : true,
             "name" : "OlivOS_telegram_poll",
             "type" : "telegram_poll",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : false
+        },
+        "OlivOS_fanbook_poll" : {
+            "enable" : true,
+            "name" : "OlivOS_fanbook_poll",
+            "type" : "fanbook_poll",
             "interval" : 0.2,
             "dead_interval" : 1,
             "tx_queue" : "OlivOS_rx_queue",
