@@ -182,9 +182,25 @@ class event_action(object):
         this_msg.data.content = ''
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.text:
-                this_msg.data.content += message_this.OP()
-        if this_msg.data.content != '':
-            this_msg.do_api()
+                this_msg.data.content = message_this.OP()
+                this_msg.data.resourceJson = '{}'
+                this_msg.data.type = 1
+                this_msg.data.tk = uuid.uuid4()
+                if this_msg.data.content != '':
+                    this_msg.do_api()
+            elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                this_msg.data.content = ''
+                this_msg.data.resourceJson = json.dumps({
+                        'resourceType': 1,
+                        'useType': 1,
+                        'width': 283,
+                        'height': 283,
+                        'resourceUrl': message_this.data['file']
+                })
+                this_msg.data.type = 2
+                this_msg.data.tk = uuid.uuid4()
+                if this_msg.data.resourceJson != '{}':
+                    this_msg.do_api()
 
 class API(object):
     class extendMyLife(api_templet):
