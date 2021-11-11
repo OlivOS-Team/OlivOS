@@ -249,11 +249,18 @@ class Message_templet(object):
                     tmp_data_raw_this = tmp_data_raw_this[len('${'):]
                     tmp_data_raw_this = tmp_data_raw_this[:-len('}')]
                     tmp_data_raw_this_list = tmp_data_raw_this.split('!')
+                    tmp_data_raw_this_list_2 = tmp_data_raw_this.split('&')
                     tmp_data_type_key = tmp_data_raw_this_list[0]
+                    tmp_data_type_key_2 = tmp_data_raw_this_list_2[0]
                     tmp_code_data_list = tmp_data_raw_this_list[1:]
-                    if tmp_data_type_key == '@':
+                    tmp_code_data_list_2 = tmp_data_raw_this_list_2[1:]
+                    if tmp_data_type_key == '@' and len(tmp_code_data_list) > 0:
                         tmp_para_this = PARA.at(
                             id = str(tmp_code_data_list[0])
+                        )
+                    elif tmp_data_type_key_2 == '@' and len(tmp_code_data_list_2) > 0:
+                        tmp_para_this = PARA.at(
+                            id = 'all'
                         )
                     else:
                         tmp_para_this = PARA.text(tmp_data_raw_this_bak)

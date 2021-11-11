@@ -124,7 +124,7 @@ class server(OlivOS.API.Proc_templet):
                                         for tmp_messages_this in res_obj_2['data']['messages']:
                                             if self.Proc_data['bot_info_update_id'][bot_info_this] < tmp_messages_this['id']:
                                                 if tmp_messages_this['uid'] != bot_info_this_obj.id:
-                                                    sdk_event = OlivOS.dodoSDK.event(tmp_messages_this, bot_info_this_obj)
+                                                    sdk_event = OlivOS.dodoSDK.event(tmp_messages_this, bot_info_this_obj, sdk_api_tmp_2.data.islandId)
                                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                                     self.Proc_info.tx_queue.put(tx_packet_data, block = False)
                                             if tmp_message_id_max < tmp_messages_this['id']:

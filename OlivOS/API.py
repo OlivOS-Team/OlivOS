@@ -279,8 +279,10 @@ class Event(object):
             self.user_id = user_id
             self.font = None
             self.sender = {}
+            self.extend = {}
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
+                self.extend['host_group_id'] = None
 
     class group_message(object):
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy = True):
@@ -294,8 +296,10 @@ class Event(object):
             self.user_id = user_id
             self.font = None
             self.sender = {}
+            self.extend = {}
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
+                self.extend['host_group_id'] = None
 
     class group_file_upload(object):
         def __init__(self, group_id, user_id, flag_lazy = True):
@@ -564,9 +568,15 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':
-            OlivOS.fanbookSDK.event_action.send_msg(self, target_id, tmp_message)
+            if flag_type == 'private':
+                OlivOS.fanbookSDK.event_action.send_private_msg(self, target_id, tmp_message)
+            elif flag_type == 'group':
+                OlivOS.fanbookSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodo_poll':
-            OlivOS.dodoSDK.event_action.send_msg(self, target_id, tmp_message)
+            if flag_type == 'private':
+                OlivOS.dodoSDK.event_action.send_private_msg(self, target_id, tmp_message)
+            elif flag_type == 'group':
+                OlivOS.dodoSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodobot_ea':
             if flag_type == 'group':
                 tmp_send_msg = OlivOS.dodobotEASDK.event_action.send_msg(self, target_id, tmp_message)

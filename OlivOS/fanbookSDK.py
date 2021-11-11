@@ -209,6 +209,20 @@ class event_action(object):
         if this_msg.data.text != '':
             this_msg.do_api()
 
+    def send_private_msg(target_event, chat_id, message):
+        private_chat_id = None
+        this_msg = API.getPrivateChat(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = chat_id
+        try:
+            tmp_res = this_msg.do_api()
+            tmp_res_obj = json.loads(tmp_res)
+            if tmp_res_obj['ok'] == True:
+                private_chat_id = tmp_res_obj['result']['id']
+        except:
+            return
+        if private_chat_id != None:
+            event_action.send_msg(target_event, private_chat_id, message)
+
 class API(object):
     class getMe(api_templet):
         def __init__(self, bot_info = None):
@@ -247,3 +261,15 @@ class API(object):
                 self.text = ''
                 self.disable_web_page_preview = True
                 self.disable_notification = False
+
+    class getPrivateChat(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.host = dodoAPIHost['a1']
+            self.route = dodoAPIRoute['apiroot'] + '/{token}/getPrivateChat'
+
+        class data_T(object):
+            def __init__(self):
+                self.user_id = 0

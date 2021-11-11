@@ -101,13 +101,14 @@ class api_templet(object):
             return None
 
 class event(object):
-    def __init__(self, json_obj = None, bot_info = None):
+    def __init__(self, json_obj = None, bot_info = None, islandId = None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
         self.platform = {}
         self.platform['sdk'] = 'dodo_poll'
         self.platform['platform'] = 'dodo'
         self.platform['model'] = 'default'
+        self.islandId = islandId
         self.active = False
         if self.json != None:
             self.active = True
@@ -173,12 +174,42 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['nickname'] = target_event.sdk_event.json['nickName']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
+            if target_event.sdk_event.islandId != None:
+                target_event.data.extend['host_group_id'] = target_event.sdk_event.islandId
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = chat_id
+        this_msg.data.content = ''
+        for message_this in message.data:
+            if type(message_this) == OlivOS.messageAPI.PARA.text:
+                this_msg.data.content = message_this.OP()
+                this_msg.data.resourceJson = '{}'
+                this_msg.data.type = 1
+                this_msg.data.tk = uuid.uuid4()
+                if this_msg.data.content != '':
+                    this_msg.do_api()
+            elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                this_msg.data.content = ''
+                this_msg.data.resourceJson = json.dumps({
+                        'resourceType': 1,
+                        'useType': 1,
+                        'width': 283,
+                        'height': 283,
+                        'resourceUrl': message_this.data['file']
+                })
+                this_msg.data.type = 2
+                this_msg.data.tk = uuid.uuid4()
+                if this_msg.data.resourceJson != '{}':
+                    this_msg.do_api()
+
+    def send_private_msg(target_event, chat_id, message):
+        this_msg = API.sendMessagePrivate(get_SDK_bot_info_from_Event(target_event))
+        if target_event.data.extend['host_group_id'] != None:
+            this_msg.data.islandId = target_event.data.extend['host_group_id']
+        this_msg.data.toUid = chat_id
         this_msg.data.content = ''
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.text:
