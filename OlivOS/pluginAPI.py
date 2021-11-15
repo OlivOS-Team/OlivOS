@@ -22,6 +22,7 @@ import sys
 import importlib
 import os
 import json
+import traceback
 
 import OlivOS
 
@@ -201,7 +202,20 @@ class shallow(OlivOS.API.Proc_templet):
         func_init_name = 'init'
         plugin_dir_list = os.listdir(plugin_path)
         for plugin_dir_this in plugin_dir_list:
-            plugin_models_tmp = importlib.import_module(plugin_dir_this)
+            try:
+                if len(plugin_dir_this) > 0:
+                    if plugin_dir_this[0] not in ['.']:
+                        plugin_models_tmp = importlib.import_module(plugin_dir_this)
+                    else:
+                        self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % ('mask path',))
+                        continue
+                else:
+                    self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % ('name too short',))
+                    continue
+            except Exception as e:
+                traceback.print_exc()
+                self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % (str(e),))
+                continue
             if hasattr(plugin_models_tmp, 'main'):
                 if hasattr(plugin_models_tmp.main, 'Event'):
                     try:

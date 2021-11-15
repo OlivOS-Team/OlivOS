@@ -81,3 +81,30 @@ class server(OlivOS.API.Proc_templet):
 
     def run_sdk_api(self, sdk_api):
         sdk_api.do_api()
+
+def accountFix(bot_info_dict, logger_proc):
+    res = {}
+    for bot_info_dict_this in bot_info_dict:
+        bot_hash = bot_info_dict_this
+        if bot_info_dict[bot_hash].platform['sdk'] == 'fanbook_poll':
+            this_msg = OlivOS.fanbookSDK.API.getMe(OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
+            try:
+                this_msg_res = this_msg.do_api()
+                this_msg_res_obj = json.loads(this_msg_res)
+                if this_msg_res_obj['ok'] == True:
+                    if type(this_msg_res_obj['result']['id']) == int:
+                        logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] will be updated as [' + str(this_msg_res_obj['result']['id']) + ']')
+                        bot_info_dict[bot_hash].id = this_msg_res_obj['result']['id']
+                        bot_info_dict[bot_hash].getHash()
+                    else:
+                        logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
+                else:
+                    logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
+                res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
+                continue
+            except:
+                logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
+                continue
+        else:
+            res[bot_info_dict_this] = bot_info_dict[bot_info_dict_this]
+    return res

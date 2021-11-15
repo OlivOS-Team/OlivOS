@@ -154,6 +154,11 @@ if __name__ == '__main__':
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         safe_mode = True
                     )
+                elif basic_conf_models_this['type'] == 'account_fix':
+                    plugin_bot_info_dict = OlivOS.fanbookPollServerAPI.accountFix(
+                        bot_info_dict = plugin_bot_info_dict,
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                    )
                 elif basic_conf_models_this['type'] == 'telegram_poll':
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.telegramPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],

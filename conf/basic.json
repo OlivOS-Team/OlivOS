@@ -5,6 +5,7 @@
             "OlivOS_logger",
             "OlivOS_account_config",
             "OlivOS_multiLoginUI",
+            "OlivOS_account_fix",
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_gocqhttp_lib_exe_model",
@@ -39,6 +40,12 @@
             "data" : {
                 "path" : "./conf/account.json"
             }
+        },
+        "OlivOS_account_fix" : {
+            "enable" : true,
+            "name" : "OlivOS_account_fix",
+            "type" : "account_fix",
+            "logger_proc" : "OlivOS_logger"
         },
         "OlivOS_account_config" : {
             "enable" : true,
