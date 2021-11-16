@@ -130,6 +130,12 @@ if __name__ == '__main__':
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                 elif basic_conf_models_this['type'] == 'post':
+                    flag_need_enable = False
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
+                            flag_need_enable = True
+                    if not flag_need_enable:
+                        continue
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.flaskServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
@@ -160,6 +166,12 @@ if __name__ == '__main__':
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                     )
                 elif basic_conf_models_this['type'] == 'telegram_poll':
+                    flag_need_enable = False
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'telegram_poll':
+                            flag_need_enable = True
+                    if not flag_need_enable:
+                        continue
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.telegramPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
@@ -172,6 +184,12 @@ if __name__ == '__main__':
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                 elif basic_conf_models_this['type'] == 'fanbook_poll':
+                    flag_need_enable = False
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'fanbook_poll':
+                            flag_need_enable = True
+                    if not flag_need_enable:
+                        continue
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.fanbookPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
@@ -184,6 +202,12 @@ if __name__ == '__main__':
                     )
                     Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                 elif basic_conf_models_this['type'] == 'dodo_poll':
+                    flag_need_enable = False
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'dodo_poll':
+                            flag_need_enable = True
+                    if not flag_need_enable:
+                        continue
                     Proc_dict[basic_conf_models_this['name']] = OlivOS.dodoPollServerAPI.server(
                         Proc_name = basic_conf_models_this['name'],
                         scan_interval = basic_conf_models_this['interval'],
