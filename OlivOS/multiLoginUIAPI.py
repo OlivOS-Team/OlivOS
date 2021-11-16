@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import tkinter
 import base64
 import os
+import hashlib
 
 from tkinter import ttk
 
@@ -603,6 +604,29 @@ class TreeEditUI(object):
             tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
             tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
             tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
+            if tmp_platform_platform == 'qq' and tmp_platform_sdk == 'onebot' and tmp_server_auto == 'True':
+                if tmp_host == '':
+                    tmp_host = 'http://127.0.0.1'
+                if tmp_port == '':
+                    tmp_port = '58000'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'fanbook' and tmp_platform_sdk == 'fanbook_poll':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_poll':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
             if not checkByListEmptyOr([
                 tmp_id,
                 tmp_password,
@@ -660,3 +684,8 @@ def releaseBase64Data(dir_path, file_name, base64_data):
         os.makedirs(dir_path) 
     with open(dir_path + '/' + file_name, 'wb+') as tmp:
         tmp.write(base64.b64decode(base64_data))
+
+def getHash(key):
+    hash_tmp = hashlib.new('md5')
+    hash_tmp.update(str(key).encode(encoding='UTF-8'))
+    return hash_tmp.hexdigest()
