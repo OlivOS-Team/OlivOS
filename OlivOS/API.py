@@ -149,7 +149,11 @@ class Event(object):
                     ['message', self.data.message]
                 ])
             elif self.plugin_info['func_type'] == 'group_message':
+                tmp_host_id = '-'
+                if self.data.extend['host_group_id'] != None:
+                    tmp_host_id = str(self.data.extend['host_group_id'])
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['host_id', tmp_host_id],
                     ['group_id', self.data.group_id],
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
@@ -498,7 +502,14 @@ class Event(object):
         elif checkByListOrEqual(
             self.plugin_info['func_type'],
             [
-                'group_message',
+                'group_message'
+            ]
+        ):
+            self.__send('group', self.data.group_id, tmp_message, host_id = self.data.extend['host_group_id'], flag_log = False)
+            flag_type = 'group'
+        elif checkByListOrEqual(
+            self.plugin_info['func_type'],
+            [
                 'group_file_upload',
                 'group_admin',
                 'group_member_decrease',
@@ -509,7 +520,6 @@ class Event(object):
                 'group_honor',
                 'group_add_request',
                 'group_invite_request'
-                
             ]
         ):
             self.__send('group', self.data.group_id, tmp_message, flag_log = False)
@@ -539,6 +549,19 @@ class Event(object):
                     ('reply', 'callback')
                 ])
             elif flag_type == 'group':
+                if checkByListOrEqual(
+                    self.plugin_info['func_type'],
+                    [
+                        'group_message'
+                    ]
+                ):
+                    if self.data.extend['host_group_id'] != None:
+                        self.log_func(2, 'Host(' + str(self.data.extend['host_group_id']) + ') Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
+                            (self.platform['platform'], 'default'),
+                            (self.plugin_info['name'], 'default'),
+                            ('reply', 'callback')
+                        ])
+                        return
                 self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
                     (self.platform['platform'], 'default'),
                     (self.plugin_info['name'], 'default'),
@@ -552,7 +575,7 @@ class Event(object):
             self.__reply(message, flag_log = True)
 
 
-    def __send(self, send_type, target_id, message, flag_log = True):
+    def __send(self, send_type, target_id, message, host_id = None, flag_log = True):
         flag_type = send_type
         tmp_message = None
         tmp_message_obj = None
@@ -564,7 +587,10 @@ class Event(object):
             if flag_type == 'private':
                 OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
             elif flag_type == 'group':
-                OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+                if host_id != None:
+                    OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                else:
+                    OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':
@@ -596,17 +622,24 @@ class Event(object):
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
-                self.log_func(2, 'Group(' + str(target_id) + '): ' + tmp_message_log, [
-                    (self.platform['platform'], 'default'),
-                    (self.plugin_info['name'], 'default'),
-                    ('send', 'callback')
-                ])
+                if host_id != None:
+                    self.log_func(2, 'Host(' + str(host_id) + ') Group(' + str(target_id) + '): ' + tmp_message_log, [
+                        (self.platform['platform'], 'default'),
+                        (self.plugin_info['name'], 'default'),
+                        ('send', 'callback')
+                    ])
+                else:
+                    self.log_func(2, 'Group(' + str(target_id) + '): ' + tmp_message_log, [
+                        (self.platform['platform'], 'default'),
+                        (self.plugin_info['name'], 'default'),
+                        ('send', 'callback')
+                    ])
 
-    def send(self, send_type, target_id, message, flag_log = True, remote = False):
+    def send(self, send_type, target_id, message, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__send(send_type, target_id, message, flag_log = True)
+            self.__send(send_type, target_id, message, host_id = host_id, flag_log = True)
 
     @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log = True):

@@ -38,7 +38,8 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['target_proc'] = target_proc
 
     def run(self):
-        while True:
+        flag_run = True
+        while flag_run:
             releaseDir('./lib')
             if not os.path.exists('./lib/go-cqhttp.exe'):
                 self.log(3, 'OlivOS libEXEModel server [' + self.Proc_name + '] can`t found target lib')
@@ -64,10 +65,11 @@ class server(OlivOS.API.Proc_templet):
             if self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp' or self.Proc_data['bot_info_dict'].platform['model'] == 'gocqhttp_show':
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
                 subprocess.call(
-                    "start /wait ..\\..\\..\\lib\\go-cqhttp.exe faststart",
+                    "start cmd /K ..\\..\\..\\lib\\go-cqhttp.exe faststart",
                     shell = True,
                     cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
                 )
+            flag_run = False
 
 
 class goTypeConfig(object):

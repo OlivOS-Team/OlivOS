@@ -162,6 +162,19 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
+        elif target_event.sdk_event.json['message_type'] == 'guild':
+            if target_event.sdk_event.json['sub_type'] == 'channel':
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_message'
+                target_event.data = target_event.group_message(target_event.sdk_event.json['channel_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.message_id = target_event.sdk_event.json['message_id']
+                target_event.data.raw_message = target_event.sdk_event.json['message']
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.font = None
+                target_event.data.sender.update(target_event.sdk_event.json['sender'])
+                if 'guild_id' in target_event.sdk_event.json != None:
+                    target_event.data.extend['host_group_id'] = target_event.sdk_event.json['guild_id']
     elif target_event.base_info['type'] == 'notice':
         if target_event.sdk_event.json['notice_type'] == 'group_upload':
             target_event.active = True
@@ -607,6 +620,16 @@ class event_action(object):
                 res_data['data']['path'] = init_api_do_mapping_for_dict(raw_obj, ['coolq_directory'], str)
                 res_data['data']['os'] = init_api_do_mapping_for_dict(raw_obj, ['runtime_os'], str)
         return res_data
+
+    #以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
+
+    def send_guild_channel_msg(target_event, guild_id, channel_id, message):
+        this_msg = api.send_guild_channel_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = guild_id
+        this_msg.data.channel_id = channel_id
+        this_msg.data.message = message
+        this_msg.do_api()
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -1196,3 +1219,20 @@ class api(object):
         class data_T(object):
             def __init__(self):
                 self.default = None
+
+
+    #以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
+
+    class send_guild_channel_msg(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'send_guild_channel_msg'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = -1
+                self.channel_id = -1
+                self.message = ''

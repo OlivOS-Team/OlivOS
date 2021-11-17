@@ -48,6 +48,7 @@ globalMetaTableTemp = {
     'message_id': 'N/A',
     'user_id': 'N/A',
     'group_id': 'N/A',
+    'host_id': 'N/A',
     'operator_id': 'N/A',
     'target_id': 'N/A',
     'name': 'N/A',
@@ -61,7 +62,7 @@ globalMetaTableTemp = {
 
 globalMetaTable = {
     'event_private_message_log': 'User[{nickname}]({user_id}) : {message}',
-    'event_group_message_log': 'Group({group_id}) User[{nickname}]({user_id}) : {message}',
+    'event_group_message_log': 'Host({host_id}) Group({group_id}) User[{nickname}]({user_id}) : {message}',
     'event_group_file_upload_log': 'Group({group_id}) User({user_id}) : {name}',
     'event_group_admin_log': 'Group({group_id}) User({user_id}) Action({action})',
     'event_group_member_decrease_log': 'Group({group_id}) User({user_id}) <- Operator({operator_id}) Action({action})',
