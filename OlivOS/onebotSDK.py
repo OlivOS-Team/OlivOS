@@ -173,8 +173,13 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
                 target_event.data.font = None
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
-                if 'guild_id' in target_event.sdk_event.json != None:
+                if 'guild_id' in target_event.sdk_event.json:
+                    target_event.data.host_id = target_event.sdk_event.json['guild_id']
                     target_event.data.extend['host_group_id'] = target_event.sdk_event.json['guild_id']
+                if 'self_tiny_id' in target_event.sdk_event.json:
+                    target_event.data.extend['sub_self_id'] = target_event.sdk_event.json['self_tiny_id']
+                    if target_event.sdk_event.json['user_id'] == target_event.sdk_event.json['self_tiny_id']:
+                        target_event.active = False
     elif target_event.base_info['type'] == 'notice':
         if target_event.sdk_event.json['notice_type'] == 'group_upload':
             target_event.active = True

@@ -175,6 +175,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             if target_event.sdk_event.islandId != None:
+                target_event.data.host_id = target_event.sdk_event.islandId
                 target_event.data.extend['host_group_id'] = target_event.sdk_event.islandId
 
 #支持OlivOS API调用的方法实现
@@ -205,10 +206,10 @@ class event_action(object):
                 if this_msg.data.resourceJson != '{}':
                     this_msg.do_api()
 
-    def send_private_msg(target_event, chat_id, message):
+    def send_private_msg(target_event, host_id, chat_id, message):
         this_msg = API.sendMessagePrivate(get_SDK_bot_info_from_Event(target_event))
-        if target_event.data.extend['host_group_id'] != None:
-            this_msg.data.islandId = target_event.data.extend['host_group_id']
+        if host_id != None:
+            this_msg.data.islandId = host_id
         this_msg.data.toUid = chat_id
         this_msg.data.content = ''
         for message_this in message.data:

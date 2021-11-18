@@ -199,6 +199,8 @@ def get_Event_from_SDK(target_event):
         target_event.data.sender['nickname'] = target_event.sdk_event.json['channel_post']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
+        target_event.data.host_id = target_event.sdk_event.json['channel_post']['chat']['guild_id']
+        target_event.data.extend['host_group_id'] = target_event.sdk_event.json['channel_post']['chat']['guild_id']
 
 #支持OlivOS API调用的方法实现
 class event_action(object):

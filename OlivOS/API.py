@@ -150,8 +150,8 @@ class Event(object):
                 ])
             elif self.plugin_info['func_type'] == 'group_message':
                 tmp_host_id = '-'
-                if self.data.extend['host_group_id'] != None:
-                    tmp_host_id = str(self.data.extend['host_group_id'])
+                if self.data.host_id != None:
+                    tmp_host_id = str(self.data.host_id)
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['host_id', tmp_host_id],
                     ['group_id', self.data.group_id],
@@ -291,6 +291,7 @@ class Event(object):
     class group_message(object):
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy = True):
             self.sub_type = sub_type
+            self.host_id = None
             self.group_id = group_id
             self.message = message
             self.message_sdk = message
@@ -505,7 +506,7 @@ class Event(object):
                 'group_message'
             ]
         ):
-            self.__send('group', self.data.group_id, tmp_message, host_id = self.data.extend['host_group_id'], flag_log = False)
+            self.__send('group', self.data.group_id, tmp_message, host_id = self.data.host_id, flag_log = False)
             flag_type = 'group'
         elif checkByListOrEqual(
             self.plugin_info['func_type'],
@@ -555,18 +556,19 @@ class Event(object):
                         'group_message'
                     ]
                 ):
-                    if self.data.extend['host_group_id'] != None:
-                        self.log_func(2, 'Host(' + str(self.data.extend['host_group_id']) + ') Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
+                    if self.data.host_id != None:
+                        self.log_func(2, 'Host(' + str(self.data.host_id) + ') Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
                             (self.platform['platform'], 'default'),
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
                         return
-                self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                    (self.platform['platform'], 'default'),
-                    (self.plugin_info['name'], 'default'),
-                    ('reply', 'callback')
-                ])
+                    else:
+                        self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
+                            (self.platform['platform'], 'default'),
+                            (self.plugin_info['name'], 'default'),
+                            ('reply', 'callback')
+                        ])
 
     def reply(self, message, flag_log = True, remote = False):
         if remote:
@@ -585,7 +587,14 @@ class Event(object):
             return
         if self.platform['sdk'] == 'onebot':
             if flag_type == 'private':
-                OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                if 'host_id' in self.data.__dict__:
+                    if self.data.host_id != None:
+                        #此处缺少接口
+                        pass
+                    else:
+                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                else:
+                    OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
             elif flag_type == 'group':
                 if host_id != None:
                     OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
@@ -600,7 +609,10 @@ class Event(object):
                 OlivOS.fanbookSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodo_poll':
             if flag_type == 'private':
-                OlivOS.dodoSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                if host_id != None:
+                    OlivOS.dodoSDK.event_action.send_private_msg(self, host_id, target_id, tmp_message)
+                else:
+                    OlivOS.dodoSDK.event_action.send_private_msg(self, self.data.host_id, target_id, tmp_message)
             elif flag_type == 'group':
                 OlivOS.dodoSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodobot_ea':
