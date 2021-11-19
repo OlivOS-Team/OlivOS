@@ -36,3 +36,6 @@
 ## 插件
 请参考插件默认模板[OlivOS-Plugin-Template](https://github.com/OlivOS-Team/OlivOS-Plugin-Template)进行插件开发
 
+## 开始使用
+请参考启程手册[OlivOS_Login](https://wiki.dice.center/OlivOS_Login.html)进行插件开发
+
