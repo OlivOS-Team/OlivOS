@@ -252,7 +252,6 @@ class shallow(OlivOS.API.Proc_templet):
                 continue
         #统一载入插件
         for plugin_dir_this_tmp in plugin_dir_list:
-            print(plugin_dir_this_tmp)
             flag_is_opk = False
             try:
                 plugin_dir_this = plugin_dir_this_tmp
