@@ -569,6 +569,12 @@ class Event(object):
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
+                else:
+                    self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
+                        (self.platform['platform'], 'default'),
+                        (self.plugin_info['name'], 'default'),
+                        ('reply', 'callback')
+                    ])
 
     def reply(self, message, flag_log = True, remote = False):
         if remote:

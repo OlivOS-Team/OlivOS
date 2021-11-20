@@ -227,6 +227,8 @@ class shallow(OlivOS.API.Proc_templet):
         skip_result = ''
         func_init_name = 'init'
         plugin_dir_list = os.listdir(plugin_path)
+        opk_plugin_list = []
+        #解包opk格式插件
         for plugin_dir_this_tmp in plugin_dir_list:
             flag_is_opk = False
             try:
@@ -239,9 +241,25 @@ class shallow(OlivOS.API.Proc_templet):
                         opkFile_list = opkFile.namelist()
                         releaseDir(plugin_path_tmp)
                         doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                        opk_plugin_list.append(plugin_dir_this_tmp)
                         releaseDir(plugin_path_tmp + plugin_dir_this)
                         for opkFile_list_this in opkFile_list:
                             opkFile.extract(opkFile_list_this, plugin_path_tmp + plugin_dir_this)
+            except Exception as e:
+                doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                traceback.print_exc()
+                self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % (str(e),))
+                continue
+        #统一载入插件
+        for plugin_dir_this_tmp in plugin_dir_list:
+            print(plugin_dir_this_tmp)
+            flag_is_opk = False
+            try:
+                plugin_dir_this = plugin_dir_this_tmp
+                if len(plugin_dir_this_tmp) > 4:
+                    if plugin_dir_this_tmp[-4:] == '.opk':
+                        flag_is_opk = True
+                        plugin_dir_this = plugin_dir_this_tmp[:-4]
                 if len(plugin_dir_this) > 0:
                     if plugin_dir_this[0] not in ['.']:
                         plugin_models_tmp = importlib.import_module(plugin_dir_this)
@@ -268,6 +286,7 @@ class shallow(OlivOS.API.Proc_templet):
                             with open(plugin_path + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
                                 plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
                     except:
+                        traceback.print_exc()
                         plugin_models_app_conf = None
                     if plugin_models_app_conf == None:
                         skip_result = plugin_dir_this + '/app.json' + ' not found'
@@ -289,14 +308,18 @@ class shallow(OlivOS.API.Proc_templet):
                             self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
                         total_models_count += 1
                         self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
-                        doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                         continue
                 else:
                     skip_result = plugin_dir_this + '.main.Event' + ' not found'
             else:
                 skip_result = plugin_dir_this + '.main' + ' not found'
-            doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+            #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
             self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: ' + skip_result)
+        #清理opk格式插件缓存
+        for opk_plugin_list_this in opk_plugin_list:
+            doOpkRemove(plugin_path_tmp, opk_plugin_list_this)
+        #插件调用列表按照优先级排序
         plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(), key = lambda i : (i['priority'], i['namespace']))
         self.plugin_models_call_list = []
         for namespace_this in plugin_models_call_list_tmp:
