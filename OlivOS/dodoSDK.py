@@ -138,11 +138,11 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.json:
             if target_event.sdk_event.json['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    [
-                        OlivOS.messageAPI.PARA.text(target_event.sdk_event.json['content'])
-                    ]
+                    'dodo_string',
+                    ' '.join(str(target_event.sdk_event.json['content']).split())
                 )
+                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                message_obj.data_raw = message_obj.data.copy()
         if 'resourceJson' in target_event.sdk_event.json:
             if target_event.sdk_event.json['resourceJson'] != '':
                 resourceJson_obj = None
@@ -181,18 +181,15 @@ def get_Event_from_SDK(target_event):
 #支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
+        flag_now_type = 'string'
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = chat_id
         this_msg.data.content = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.text:
-                this_msg.data.content = message_this.OP()
-                this_msg.data.resourceJson = '{}'
-                this_msg.data.type = 1
-                this_msg.data.tk = uuid.uuid4()
-                if this_msg.data.content != '':
-                    this_msg.do_api()
-            elif type(message_this) == OlivOS.messageAPI.PARA.image:
+            if type(message_this) == OlivOS.messageAPI.PARA.image:
+                if flag_now_type != 'image':
+                    if this_msg.data.content != '':
+                        this_msg.do_api()
                 this_msg.data.content = ''
                 this_msg.data.resourceJson = json.dumps({
                         'resourceType': 1,
@@ -205,6 +202,18 @@ class event_action(object):
                 this_msg.data.tk = uuid.uuid4()
                 if this_msg.data.resourceJson != '{}':
                     this_msg.do_api()
+                flag_now_type = 'image'
+            else:
+                if flag_now_type == 'image':
+                    this_msg.data.content = ''
+                    this_msg.data.resourceJson = '{}'
+                    this_msg.data.type = 1
+                    this_msg.data.tk = uuid.uuid4()
+                this_msg.data.content += message_this.dodo()
+                flag_now_type = 'string'
+        if flag_now_type != 'image':
+            if this_msg.data.content != '':
+                this_msg.do_api()
 
     def send_private_msg(target_event, host_id, chat_id, message):
         this_msg = API.sendMessagePrivate(get_SDK_bot_info_from_Event(target_event))
