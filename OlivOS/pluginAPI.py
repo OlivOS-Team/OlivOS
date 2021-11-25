@@ -85,6 +85,7 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib/Lib')
         releaseDir('./lib/DLLs')
         self.load_plugin_list()
+        self.run_plugin_func(None, 'init_after')
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] is running')
         rx_count = 0
         while True:
@@ -98,7 +99,7 @@ class shallow(OlivOS.API.Proc_templet):
                 if type(rx_packet_data) == OlivOS.API.Control.packet:
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
-                        self.run_plugin_save()
+                        self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init', self.Proc_name), block=False)
                         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] will restart')
@@ -175,14 +176,6 @@ class shallow(OlivOS.API.Proc_templet):
                     break
         return
 
-    def run_plugin_save(self):
-        func_save_name = 'save'
-        for plugin_models_index_this in self.plugin_models_call_list:
-            if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_save_name):
-                self.plugin_models_dict[plugin_models_index_this]['model'].main.Event.save(plugin_event = None, Proc = self)
-                self.log(2, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_save_name + '] done')
-        return
-
     def plugin_event_router(self, plugin_event, plugin_model):
         if hasattr(plugin_model.main.Event, plugin_event.plugin_info['func_type']):
             if plugin_event.plugin_info['func_type'] == 'private_message':
@@ -219,6 +212,13 @@ class shallow(OlivOS.API.Proc_templet):
                 plugin_model.main.Event.lifecycle(plugin_event = plugin_event, Proc = self)
             elif plugin_event.plugin_info['func_type'] == 'heartbeat':
                 plugin_model.main.Event.heartbeat(plugin_event = plugin_event, Proc = self)
+        return
+
+    def run_plugin_func(self, plugin_event, func_name):
+        for plugin_models_index_this in self.plugin_models_call_list:
+            if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name):
+                getattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name)(plugin_event = plugin_event, Proc = self)
+                self.log(2, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_name + '] done')
         return
 
     def load_plugin_list(self):
