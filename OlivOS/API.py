@@ -82,6 +82,8 @@ def getBotHash(bot_id = None, platform_sdk = None, platform_platform = None, pla
     #hash_tmp.update(str(platform_model).encode(encoding='UTF-8'))
     return hash_tmp.hexdigest()
 
+
+
 class Event(object):
     def __init__(self, sdk_event = None, log_func = None):
         self.bot_info = None
@@ -121,6 +123,8 @@ class Event(object):
             OlivOS.dodoSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dodobotEASDK.event:
             OlivOS.dodobotEASDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.contentAPI.fake_sdk_event:
+            OlivOS.contentAPI.get_Event_from_fake_SDK(self)
 
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
@@ -142,7 +146,11 @@ class Event(object):
             tmp_log_level = 0
             tmp_log_message = ''
             tmp_log_message_default = 'N/A'
-            if self.plugin_info['func_type'] == 'private_message':
+            if self.plugin_info['func_type'] == 'fake_event':
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['self', self.base_info['self_id']]
+                ])
+            elif self.plugin_info['func_type'] == 'private_message':
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
@@ -266,11 +274,16 @@ class Event(object):
             else:
                 tmp_log_level = 3
                 tmp_log_message = tmp_log_message_default
-            self.log_func(tmp_log_level, tmp_log_message, [
-                (self.platform['platform'], 'default'),
-                (self.plugin_info['name'], 'default'),
-                (self.plugin_info['func_type'], 'default')
-            ])
+            if self.log_func != None:
+                self.log_func(tmp_log_level, tmp_log_message, [
+                    (self.platform['platform'], 'default'),
+                    (self.plugin_info['name'], 'default'),
+                    (self.plugin_info['func_type'], 'default')
+                ])
+
+    class fake_event(object):
+        def __init__(self):
+            self.default = None
 
     class private_message(object):
         def __init__(self, user_id, message, sub_type, flag_lazy = True):
@@ -431,11 +444,12 @@ class Event(object):
                                 callback_msg = 'failed'
                         else:
                             callback_msg = 'done'
-                    event_obj.log_func(2, callback_msg , [
-                        (event_obj.platform['platform'], 'default'),
-                        (event_obj.plugin_info['name'], 'default'),
-                        (func_name, 'callback')
-                    ])
+                    if event_obj.log_func != None:
+                        event_obj.log_func(2, callback_msg , [
+                            (event_obj.platform['platform'], 'default'),
+                            (event_obj.plugin_info['name'], 'default'),
+                            (func_name, 'callback')
+                        ])
                 return warppedRes
             return funcWarpped
         return callbackLoggerDecorator
@@ -445,7 +459,7 @@ class Event(object):
 
     def __set_block(self, enable, flag_log = True):
         self.blocked = enable
-        if flag_log:
+        if flag_log and self.log_func != None:
             self.log_func(2, str(enable) , [
                 (self.platform['platform'], 'default'),
                 (self.plugin_info['name'], 'default'),
@@ -538,7 +552,7 @@ class Event(object):
                 self.__send('group', self.data.group_id, tmp_message, flag_log = False)
                 flag_type = 'group'
 
-        if flag_log:
+        if flag_log and self.log_func != None:
             if tmp_message_obj.active:
                 tmp_message_log = tmp_message_obj.get(OlivOS.infoAPI.OlivOS_message_mode_tx_unity)
             else:
@@ -617,7 +631,7 @@ class Event(object):
             if flag_type == 'private':
                 if host_id != None:
                     OlivOS.dodoSDK.event_action.send_private_msg(self, host_id, target_id, tmp_message)
-                else:
+                elif 'host_id' in self.data.__dict__:
                     OlivOS.dodoSDK.event_action.send_private_msg(self, self.data.host_id, target_id, tmp_message)
             elif flag_type == 'group':
                 OlivOS.dodoSDK.event_action.send_msg(self, target_id, tmp_message)
@@ -628,7 +642,7 @@ class Event(object):
                 for tx_queue_this in self.plugin_info['tx_queue']:
                     tx_queue_this.put(tx_packet_data, block = False)
 
-        if flag_log:
+        if flag_log and self.log_func != None:
             if tmp_message_obj.active:
                 tmp_message_log = tmp_message_obj.get(OlivOS.infoAPI.OlivOS_message_mode_tx_unity)
             else:
@@ -882,7 +896,7 @@ class Event(object):
         if res_data == None:
             return None
 
-        if flag_log:
+        if flag_log and self.log_func != None:
             if checkDictByListAnd(
                 res_data, [
                     ['active'],

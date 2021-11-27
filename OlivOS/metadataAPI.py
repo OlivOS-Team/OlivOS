@@ -61,6 +61,7 @@ globalMetaTableTemp = {
 }
 
 globalMetaTable = {
+    'event_fake_event_log': 'Self({self})',
     'event_private_message_log': 'User[{nickname}]({user_id}) : {message}',
     'event_group_message_log': 'Host({host_id}) Group({group_id}) User[{nickname}]({user_id}) : {message}',
     'event_group_file_upload_log': 'Group({group_id}) User({user_id}) : {name}',
@@ -82,6 +83,10 @@ globalMetaTable = {
 }
 
 eventLogMetaTable = {
+    'fake_event' : {
+        'level' : 2,
+        'message_key' : 'event_fake_event_log'
+    },
     'private_message' : {
         'level' : 2,
         'message_key' : 'event_private_message_log'

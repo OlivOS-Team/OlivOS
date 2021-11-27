@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
+import time
 
 class api_result_data_template(object):
     class get_msg(dict):
@@ -182,3 +183,57 @@ class api_result_data_template(object):
                     'os': None
                 }
             )
+
+def get_Event_from_fake_SDK(target_event):
+    target_event.base_info['time'] = target_event.sdk_event.base_info['time']
+    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
+    target_event.platform['sdk'] = target_event.sdk_event.bot_info.platform['sdk']
+    target_event.platform['platform'] = target_event.sdk_event.bot_info.platform['platform']
+    target_event.platform['model'] = target_event.sdk_event.bot_info.platform['model']
+    target_event.bot_info = target_event.sdk_event.bot_info
+    target_event.plugin_info['message_mode_rx'] = 'olivos_para'
+    if target_event.platform['platform'] in OlivOS.messageAPI.dictMessageType:
+        if target_event.platform['sdk'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']]:
+            if target_event.platform['model'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']]:
+                target_event.plugin_info['message_mode_rx'] = OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']][target_event.platform['model']]
+    if True:
+        if target_event.sdk_event.data['type'] == 'fake_event':
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'fake_event'
+            target_event.data = target_event.fake_event()
+
+class fake_sdk_event(object):
+    def __init__(self, bot_info, data = None, platform = None):
+        tmp_platform = {
+            'sdk': 'fake',
+            'platform': 'fake',
+            'model': 'default'
+        }
+        tmp_data = {
+            'type': 'fake_event'
+        }
+        if type(data) == dict:
+            tmp_data.update(data)
+        self.raw = self.event_dump(data)
+        self.data = tmp_data
+        self.platform = {}
+        self.platform.update(tmp_platform)
+        if type(platform) == dict:
+            self.platform.update(platform)
+        self.active = False
+        self.bot_info = bot_info
+        if self.bot_info != None:
+            self.active = True
+        self.base_info = {}
+        if self.active:
+            self.base_info['time'] = int(time.time())
+            self.base_info['self_id'] = self.bot_info.id
+            self.base_info['post_type'] = None
+
+    def event_dump(self, raw):
+        try:
+            res = str(raw)
+        except:
+            res = None
+        return res

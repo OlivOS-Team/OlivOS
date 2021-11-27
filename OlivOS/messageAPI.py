@@ -16,6 +16,39 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
+#platform sdk model
+dictMessageType = {
+    'qq': {
+        'onebot': {
+            'default': 'old_string',
+            'gocqhttp_show': 'old_string'
+        }
+    },
+    'telegram': {
+        'telegram_poll': {
+            'default': 'old_string'
+        }
+    },
+    'fanbook': {
+        'fanbook_poll': {
+            'default': 'fanbook_string'
+        }
+    },
+    'dodo': {
+        'dodo_poll': {
+            'default': 'olivos_para'
+        },
+        'dodobot_ea': {
+            'default': 'olivos_para'
+        }
+    },
+    'fake': {
+        'fake': {
+            'default': 'olivos_para'
+        }
+    }
+}
+
 class Message_templet(object):
     def __init__(self, mode_rx, data_raw):
         self.active = True
