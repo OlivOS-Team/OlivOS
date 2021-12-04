@@ -236,6 +236,7 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_list'] = [
             'qq',
+            'qqGuild',
             'telegram',
             'dodo',
             'fanbook'
@@ -243,6 +244,9 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qq'] = [
             'onebot'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qqGuild'] = [
+            'qqGuild_link'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['telegram'] = [
             'telegram_poll'
@@ -262,6 +266,10 @@ class TreeEditUI(object):
             #'gocqhttp_hide',
             'gocqhttp_show'
         ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild']['qqGuild_link'] = [
+            'default'
+        ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram']['telegram_poll'] = [
             'default'
@@ -275,7 +283,8 @@ class TreeEditUI(object):
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook']['fanbook_poll'] = [
-            'default'
+            'default',
+            'private'
         ]
 
         self.UIData['edit_root_Combobox_Server_auto_list'] = [
@@ -611,6 +620,13 @@ class TreeEditUI(object):
                     tmp_port = '58000'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'qqGuild' and tmp_platform_sdk == 'qqGuild_link':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
             if tmp_platform_platform == 'fanbook' and tmp_platform_sdk == 'fanbook_poll':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)

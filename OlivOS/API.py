@@ -115,6 +115,8 @@ class Event(object):
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.onebotSDK.event:
             OlivOS.onebotSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
+            OlivOS.qqGuildSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.fanbookSDK.event:
@@ -620,6 +622,12 @@ class Event(object):
                     OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
                 else:
                     OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+        elif self.platform['sdk'] == 'qqGuild_link':
+            if flag_type == 'group':
+                if 'reply_msg_id' in self.data.extend:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                else:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':

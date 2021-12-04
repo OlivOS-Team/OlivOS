@@ -165,6 +165,27 @@ if __name__ == '__main__':
                         bot_info_dict = plugin_bot_info_dict,
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                     )
+                elif basic_conf_models_this['type'] == 'qqGuild_link':
+                    flag_need_enable = False
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuild_link':
+                            flag_need_enable = True
+                    if not flag_need_enable:
+                        continue
+                    for bot_info_key in plugin_bot_info_dict:
+                        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuild_link':
+                            tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                            Proc_dict[tmp_Proc_name] = OlivOS.qqGuildLinkServerAPI.server(
+                                Proc_name = tmp_Proc_name,
+                                scan_interval = basic_conf_models_this['interval'],
+                                dead_interval = basic_conf_models_this['dead_interval'],
+                                rx_queue = None,
+                                tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                bot_info_dict = plugin_bot_info_dict[bot_info_key],
+                                debug_mode = False
+                            )
+                            Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
                 elif basic_conf_models_this['type'] == 'telegram_poll':
                     flag_need_enable = False
                     for bot_info_key in plugin_bot_info_dict:

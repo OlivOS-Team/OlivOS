@@ -123,8 +123,6 @@ class shallow(OlivOS.API.Proc_templet):
         return self.plugin_models_call_list
 
     def run_plugin(self, sdk_event):
-        log_str_tmp = str(sdk_event.json)
-        self.log(0, 'Received: ' + log_str_tmp)
         plugin_event = OlivOS.API.Event(sdk_event, self.log)
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id = plugin_event.base_info['self_id'],

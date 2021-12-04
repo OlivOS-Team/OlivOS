@@ -109,6 +109,10 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.dodo()
+        elif get_type == 'qqGuild_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.OP()
         else:
             res = str(self)
         return res
@@ -123,7 +127,9 @@ class Message_templet(object):
         elif self.mode_rx == 'fanbook_string':
             self.init_from_fanbook_code_string()
         elif self.mode_rx == 'dodo_string':
-            self.init_from_dodo_code_string()
+            self.init_from_angle_code_string()
+        elif self.mode_rx == 'qqGuild_string':
+            self.init_from_angle_code_string()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -315,7 +321,7 @@ class Message_templet(object):
                 it_data_base = it_data_this
         self.data = tmp_data
 
-    def init_from_dodo_code_string(self):
+    def init_from_angle_code_string(self):
         tmp_data_raw = str(self.data_raw)
         tmp_data = []
         it_data = range(0, len(tmp_data_raw) + 1)

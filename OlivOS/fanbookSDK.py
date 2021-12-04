@@ -22,15 +22,15 @@ import uuid
 import OlivOS
 
 
-dodoAPIHost = {
+fanbookAPIHost = {
     'a1': 'https://a1.fanbook.mobi'
 }
 
-dodoAPIRoute = {
+fanbookAPIRoute = {
     'apiroot': '/api/bot'
 }
 
-dodoAPIRouteTemp = {
+fanbookAPIRouteTemp = {
     'token': 'TOKEN'
 }
 
@@ -70,8 +70,8 @@ class api_templet(object):
     def do_api(self):
         try:
             tmp_payload_dict = {}
-            tmp_dodoAPIRouteTemp = dodoAPIRouteTemp.copy()
-            tmp_dodoAPIRouteTemp.update({
+            tmp_fanbookAPIRouteTemp = fanbookAPIRouteTemp.copy()
+            tmp_fanbookAPIRouteTemp.update({
                 'token': self.bot_info.access_token
             })
             if self.data != None:
@@ -81,10 +81,10 @@ class api_templet(object):
 
             payload = json.dumps(obj = tmp_payload_dict)
             send_url_temp = self.host + ':' + str(self.port) + self.route
-            send_url = send_url_temp.format(**tmp_dodoAPIRouteTemp)
+            send_url = send_url_temp.format(**tmp_fanbookAPIRouteTemp)
             headers = {
                 'Content-Type': 'application/json',
-                'User-Agent': 'OlivOS/0.0.1'
+                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
             if self.bot_info.debug_mode:
@@ -231,8 +231,8 @@ class API(object):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
-            self.host = dodoAPIHost['a1']
-            self.route = dodoAPIRoute['apiroot'] + '/{token}/getMe'
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/{token}/getMe'
 
 
     class getUpdates(api_templet):
@@ -240,8 +240,8 @@ class API(object):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
-            self.host = dodoAPIHost['a1']
-            self.route = dodoAPIRoute['apiroot'] + '/{token}/getUpdates'
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/{token}/getUpdates'
 
         class data_T(object):
             def __init__(self):
@@ -254,8 +254,8 @@ class API(object):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
-            self.host = dodoAPIHost['a1']
-            self.route = dodoAPIRoute['apiroot'] + '/{token}/sendMessage'
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/{token}/sendMessage'
 
         class data_T(object):
             def __init__(self):
@@ -269,8 +269,8 @@ class API(object):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
-            self.host = dodoAPIHost['a1']
-            self.route = dodoAPIRoute['apiroot'] + '/{token}/getPrivateChat'
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/{token}/getPrivateChat'
 
         class data_T(object):
             def __init__(self):

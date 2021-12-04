@@ -12,6 +12,7 @@
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
             "OlivOS_flask_post_rx",
+            "OlivOS_qqGuild_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
             "OlivOS_dodo_poll"
@@ -106,6 +107,17 @@
                 "host" : "0.0.0.0",
                 "port" : 55001
             }
+        },
+        "OlivOS_qqGuild_link" : {
+            "enable" : true,
+            "name" : "OlivOS_qqGuild_link",
+            "type" : "qqGuild_link",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "rx_queue" : null,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : false
         },
         "OlivOS_telegram_poll" : {
             "enable" : true,

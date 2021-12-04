@@ -68,7 +68,7 @@ class send_telegram_post_json_T(object):
 
             headers = {
                 'Content-Type': 'application/json',
-                'User-Agent': 'OlivOS/0.0.1'
+                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
             msg_res = req.request("POST", send_url, headers = headers, data = json_str_tmp)
 

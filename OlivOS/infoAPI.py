@@ -17,7 +17,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.6.0-alpha'
+OlivOS_Version = '0.7.0'
+
+OlivOS_Header_UA = 'OlivOS/' + OlivOS_Version
 
 OlivOS_message_mode_rx_default = 'old_string'
 OlivOS_message_mode_tx_default = 'old_string'

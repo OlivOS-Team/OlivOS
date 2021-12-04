@@ -82,7 +82,7 @@ class api_templet(object):
             send_url = self.host + ':' + str(self.port) + self.route
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'OlivOS/0.0.1'
+                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
             if self.bot_info.debug_mode:

@@ -29,6 +29,8 @@ import OlivOS.diagnoseAPI
 import OlivOS.flaskServerAPI
 import OlivOS.pluginAPI
 import OlivOS.onebotSDK
+import OlivOS.qqGuildSDK
+import OlivOS.qqGuildLinkServerAPI
 import OlivOS.telegramSDK
 import OlivOS.telegramPollServerAPI
 import OlivOS.dodobotEAServerAPI
