@@ -114,7 +114,7 @@ class server(OlivOS.API.Proc_templet):
                 break
 
     def run_websocket_rx_connect_start(self):
-        websocket.enableTrace(False)
+        #websocket.enableTrace(False)
         ws = websocket.WebSocketApp(
             self.Proc_data['extend_data']['websocket_url'],
             on_open = self.on_open,
