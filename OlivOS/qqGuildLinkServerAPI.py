@@ -109,7 +109,10 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_data['extend_data']['last_s']
             ).dump()
             if self.Proc_data['extend_data']['ws_obj'] != None:
-                self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
+                try:
+                    self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
+                except:
+                    break
             else:
                 break
 
@@ -124,3 +127,5 @@ class server(OlivOS.API.Proc_templet):
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         ws.run_forever()
+        self.Proc_data['extend_data']['pulse_interval'] = None
+        self.Proc_data['extend_data']['ws_obj'] = None
