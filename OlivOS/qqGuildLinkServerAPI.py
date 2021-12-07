@@ -76,6 +76,8 @@ class server(OlivOS.API.Proc_templet):
                     sdk_event = OlivOS.qqGuildSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                elif tmp_data_rx_obj.data.t == 'READY':
+                    self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify ACK')
             elif tmp_data_rx_obj.data.op == 10:
                 self.Proc_data['extend_data']['pulse_interval'] = tmp_data_rx_obj.data.d['heartbeat_interval'] / 1000
                 tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendIdentify(
@@ -88,33 +90,43 @@ class server(OlivOS.API.Proc_templet):
                     args = ()
                 ).start()
                 ws.send(tmp_data)
+                self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
+            elif tmp_data_rx_obj.data.op == 11:
+                self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse ACK')
         except:
             pass
 
     def on_error(self, ws, error):
-        pass
+        self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link error')
 
     def on_close(self, ws, close_status_code, close_msg):
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
+        self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link close')
 
     def on_open(self, ws):
-        pass
+        self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link start')
 
 
     def run_pulse(self):
         while self.Proc_data['extend_data']['pulse_interval'] != None:
-            time.sleep(self.Proc_data['extend_data']['pulse_interval'])
+            tmp_pulse_interval = self.Proc_data['extend_data']['pulse_interval']
+            if tmp_pulse_interval > 1:
+                tmp_pulse_interval -= 1
+            time.sleep(tmp_pulse_interval)
             tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendHeartbeat(
                 self.Proc_data['extend_data']['last_s']
             ).dump()
             if self.Proc_data['extend_data']['ws_obj'] != None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
+                    self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse send')
                 except:
                     break
             else:
                 break
+        self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse lost')
+        return
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
@@ -129,3 +141,4 @@ class server(OlivOS.API.Proc_templet):
         ws.run_forever()
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
+        self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link lost')
