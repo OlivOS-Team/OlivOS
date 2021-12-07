@@ -21,6 +21,7 @@ import json
 import websocket
 import ssl
 import asyncio
+import uuid
 import requests as req
 
 import OlivOS
@@ -43,7 +44,8 @@ class server(OlivOS.API.Proc_templet):
             'websocket_url': None,
             'pulse_interval': None,
             'last_s': None,
-            'ws_obj': None
+            'ws_obj': None,
+            'ws_item': None
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
@@ -100,8 +102,6 @@ class server(OlivOS.API.Proc_templet):
         self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link error')
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.Proc_data['extend_data']['pulse_interval'] = None
-        self.Proc_data['extend_data']['ws_obj'] = None
         self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link close')
 
     def on_open(self, ws):
@@ -109,6 +109,7 @@ class server(OlivOS.API.Proc_templet):
 
 
     def run_pulse(self):
+        tmp_ws_item = self.Proc_data['extend_data']['ws_item']
         while self.Proc_data['extend_data']['pulse_interval'] != None:
             tmp_pulse_interval = self.Proc_data['extend_data']['pulse_interval']
             if tmp_pulse_interval > 1:
@@ -117,6 +118,9 @@ class server(OlivOS.API.Proc_templet):
             tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendHeartbeat(
                 self.Proc_data['extend_data']['last_s']
             ).dump()
+            if tmp_ws_item != self.Proc_data['extend_data']['ws_item'] or self.Proc_data['extend_data']['ws_item'] == None:
+                self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse giveup')
+                return
             if self.Proc_data['extend_data']['ws_obj'] != None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
@@ -138,7 +142,9 @@ class server(OlivOS.API.Proc_templet):
             on_close = self.on_close
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
+        self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
         ws.run_forever()
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
+        self.Proc_data['extend_data']['ws_item'] = None
         self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link lost')
