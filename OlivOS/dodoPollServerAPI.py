@@ -138,6 +138,7 @@ class server(OlivOS.API.Proc_templet):
                                 continue
                         except:
                             continue
+                    time.sleep(1)
 
     def run_sdk_api(self, sdk_api):
         sdk_api.do_api()

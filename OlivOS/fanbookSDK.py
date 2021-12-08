@@ -165,7 +165,7 @@ def get_Event_from_SDK(target_event):
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
-    target_event.plugin_info['message_mode_rx'] = 'fanbook_string'
+    target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if checkByListAnd([
         not target_event.active,
         checkInDictSafe('channel_post', target_event.sdk_event.json, []),
@@ -181,6 +181,48 @@ def get_Event_from_SDK(target_event):
         message_obj = OlivOS.messageAPI.Message_templet(
             'fanbook_string',
             target_event.sdk_event.json['channel_post']['text']
+        )
+        message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+        message_obj.data_raw = message_obj.data.copy()
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'group_message'
+        target_event.data = target_event.group_message(
+            target_event.sdk_event.json['channel_post']['chat']['id'],
+            target_event.sdk_event.json['channel_post']['from']['id'],
+            message_obj,
+            'group'
+        )
+        target_event.data.message_sdk = message_obj
+        target_event.data.message_id = target_event.sdk_event.json['channel_post']['message_id']
+        target_event.data.raw_message = message_obj
+        target_event.data.raw_message_sdk = message_obj
+        target_event.data.font = None
+        target_event.data.sender['user_id'] = target_event.sdk_event.json['channel_post']['from']['id']
+        target_event.data.sender['nickname'] = target_event.sdk_event.json['channel_post']['from']['first_name']
+        target_event.data.sender['sex'] = 'unknown'
+        target_event.data.sender['age'] = 0
+        target_event.data.host_id = target_event.sdk_event.json['channel_post']['chat']['guild_id']
+        target_event.data.extend['host_group_id'] = target_event.sdk_event.json['channel_post']['chat']['guild_id']
+    elif checkByListAnd([
+        not target_event.active,
+        checkInDictSafe('channel_post', target_event.sdk_event.json, []),
+        checkInDictSafe('photo', target_event.sdk_event.json, ['channel_post']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['channel_post']),
+        checkInDictSafe('type', target_event.sdk_event.json, ['channel_post', 'chat']),
+        checkInDictSafe('message_id', target_event.sdk_event.json, ['channel_post']),
+        checkInDictSafe('from', target_event.sdk_event.json, ['channel_post']),
+        checkInDictSafe('first_name', target_event.sdk_event.json, ['channel_post', 'from']),
+        checkEquelInDictSafe('channel', target_event.sdk_event.json, ['channel_post', 'chat', 'type'])
+    ]):
+        message_obj = None
+        message_para_list = []
+        if type(target_event.sdk_event.json['channel_post']['photo']) == list:
+            for photo_this in target_event.sdk_event.json['channel_post']['photo']:
+                if 'file_id' in photo_this:
+                    message_para_list.append(OlivOS.messageAPI.PARA.image(photo_this['file_id']))
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_para',
+            message_para_list
         )
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
@@ -205,11 +247,30 @@ def get_Event_from_SDK(target_event):
 #支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
+        flag_now_type = 'string'
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg_image = API.sendPhoto(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = chat_id
-        this_msg.data.text = message
-        if this_msg.data.text != '':
-            this_msg.do_api()
+        this_msg_image.data.chat_id = chat_id
+        this_msg.data.text = ''
+        for message_this in message.data:
+            if type(message_this) == OlivOS.messageAPI.PARA.image:
+                if flag_now_type != 'image':
+                    if this_msg.data.text != '':
+                        this_msg.do_api()
+                        this_msg.data.text = ''
+                this_msg_image.data.photo['Url'] = message_this.data['file']
+                this_msg_image.do_api()
+                flag_now_type = 'image'
+            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+                this_msg.data.text += message_this.fanbook()
+                flag_now_type = 'string'
+            elif type(message_this) == OlivOS.messageAPI.PARA.at:
+                this_msg.data.text += message_this.fanbook()
+                flag_now_type = 'string'
+        if flag_now_type != 'image':
+            if this_msg.data.text != '':
+                this_msg.do_api()
 
     def send_private_msg(target_event, chat_id, message):
         private_chat_id = None
@@ -263,6 +324,21 @@ class API(object):
                 self.text = ''
                 self.disable_web_page_preview = True
                 self.disable_notification = False
+
+    class sendPhoto(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/{token}/sendPhoto'
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.photo = {
+                    'Url': ''
+                }
 
     class getPrivateChat(api_templet):
         def __init__(self, bot_info = None):

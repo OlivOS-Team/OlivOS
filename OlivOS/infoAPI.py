@@ -17,7 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.7.0'
+OlivOS_Version = '0.7.1'
 
 OlivOS_Header_UA = 'OlivOS/' + OlivOS_Version
 
