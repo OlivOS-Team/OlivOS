@@ -165,6 +165,11 @@ if __name__ == '__main__':
                         bot_info_dict = plugin_bot_info_dict,
                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                     )
+                    plugin_bot_info_dict = OlivOS.accountAPI.accountFix(
+                        basic_conf_models = basic_conf_models,
+                        bot_info_dict = plugin_bot_info_dict,
+                        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                    )
                 elif basic_conf_models_this['type'] == 'qqGuild_link':
                     flag_need_enable = False
                     for bot_info_key in plugin_bot_info_dict:

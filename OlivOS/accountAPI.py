@@ -15,6 +15,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import socket
+from contextlib import closing
 
 import OlivOS
 
@@ -74,3 +76,43 @@ class Account(object):
             tmp_total_account_data['account'].append(tmp_this_account_data)
         with open(path, 'w', encoding = 'utf-8') as account_conf_f:
             account_conf_f.write(json.dumps(tmp_total_account_data, indent = 4))
+
+def accountFix(basic_conf_models, bot_info_dict, logger_proc):
+    res = {}
+    for basic_conf_models_this in basic_conf_models:
+        if basic_conf_models[basic_conf_models_this]['type'] == 'post':
+            if basic_conf_models[basic_conf_models_this]['server']['auto'] == True:
+                basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
+                if isInuse(
+                    '127.0.0.1',
+                    basic_conf_models[basic_conf_models_this]['server']['port']
+                ):
+                    basic_conf_models[basic_conf_models_this]['server']['port'] = get_free_port()
+    for bot_info_dict_this in bot_info_dict:
+        Account_data_this = bot_info_dict[bot_info_dict_this]
+        if Account_data_this.platform['model'] == 'gocqhttp_show':
+            if Account_data_this.post_info.auto == True:
+                Account_data_this.post_info.type = 'post'
+                Account_data_this.post_info.host = 'http://127.0.0.1'
+                Account_data_this.post_info.port = get_free_port()
+                Account_data_this.post_info.access_token = bot_info_dict_this
+        res[bot_info_dict_this] = Account_data_this
+    return res
+
+def isInuse(ip, port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    flag = True
+    try:
+        s.connect((ip, port))
+        s.shutdown(2)
+        flag = True
+    except:
+        flag = False
+    return flag
+
+
+def get_free_port():
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s: 
+        s.bind(('', 0)) 
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        return s.getsockname()[1] 
