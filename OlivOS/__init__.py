@@ -20,6 +20,7 @@ import platform
 
 import OlivOS.infoAPI
 import OlivOS.data
+import OlivOS.hook
 import OlivOS.contentAPI
 import OlivOS.messageAPI
 import OlivOS.metadataAPI
