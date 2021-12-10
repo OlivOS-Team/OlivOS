@@ -6,3 +6,4 @@ requests==2.23.0
 pybase64
 websockets
 websocket-client
+pillow
