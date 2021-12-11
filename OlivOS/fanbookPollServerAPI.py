@@ -43,11 +43,13 @@ class server(OlivOS.API.Proc_templet):
 
     def run(self):
         self.log(2, 'OlivOS fanbook poll server [' + self.Proc_name + '] is running')
+        flag_first = True
         while True:
             time.sleep(self.Proc_info.scan_interval)
-            self.run_poll_list()
+            self.run_poll_list(flag_first)
+            flag_first = False
 
-    def run_poll_list(self):
+    def run_poll_list(self, flag_first):
         for bot_info_this in self.Proc_data['bot_info_dict']:
             flag_not_attach = False
             bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
@@ -60,7 +62,7 @@ class server(OlivOS.API.Proc_templet):
                     sdk_api_res = sdk_api_tmp.do_api()
                 except:
                     flag_not_attach = True
-                if not flag_not_attach:
+                if not flag_not_attach and not flag_first:
                     if bot_info_this in self.Proc_data['bot_info_first']:
                         try:
                             res_obj = json.loads(sdk_api_res)
