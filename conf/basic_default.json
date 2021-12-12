@@ -72,7 +72,7 @@
             "type" : "logger",
             "interval" : 0.002,
             "dead_interval" : 1,
-            "proc_mode" : "threading",
+            "proc_mode" : "processing",
             "rx_queue" : "OlivOS_logger_queue",
             "mode" : "console",
             "fliter" : [2, 3, 4, 5]

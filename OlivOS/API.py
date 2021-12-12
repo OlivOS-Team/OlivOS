@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import sys
 import json
 import multiprocessing
+import threading
 import hashlib
 
 from functools import wraps
@@ -1146,6 +1147,12 @@ class Proc_templet(object):
     def start(self):
         proc_this = multiprocessing.Process(name = self.Proc_name, target = self.run, args = ())
         proc_this.daemon = self.deamon
+        proc_this.start()
+        self.Proc = proc_this
+        return self.Proc
+
+    def start_lite(self):
+        proc_this = threading.Thread(name = self.Proc_name, target = self.run, args = ())
         proc_this.start()
         self.Proc = proc_this
         return self.Proc

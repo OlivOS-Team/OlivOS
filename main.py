@@ -104,7 +104,15 @@ if __name__ == '__main__':
                         logger_mode = basic_conf_models_this['mode'],
                         logger_vis_level = basic_conf_models_this['fliter']
                     )
-                    Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                    tmp_proc_mode = 'processing'
+                    if 'proc_mode' in basic_conf_models_this:
+                        tmp_proc_mode = basic_conf_models_this['proc_mode']
+                    if tmp_proc_mode == 'processing':
+                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                    elif tmp_proc_mode == 'threading':
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_lite()
+                    else:
+                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                     for this_bot_info in  plugin_bot_info_dict:
                         plugin_bot_info_dict[this_bot_info].debug_logger = Proc_dict[basic_conf_models_this['name']]
                     Proc_logger_name = basic_conf_models_this['name']
