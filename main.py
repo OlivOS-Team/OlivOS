@@ -107,6 +107,10 @@ if __name__ == '__main__':
                     tmp_proc_mode = 'processing'
                     if 'proc_mode' in basic_conf_models_this:
                         tmp_proc_mode = basic_conf_models_this['proc_mode']
+                    #不完全轻量模式原本就是是为了解决Linux下日志挂载问题设计的
+                    #不完全轻量模式在Win下存在问题，强制全量模式
+                    if platform.system() == 'Windows':
+                        tmp_proc_mode = 'processing'
                     if tmp_proc_mode == 'processing':
                         Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
                     elif tmp_proc_mode == 'threading':
