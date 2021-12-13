@@ -16,7 +16,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
+from enum import Enum
 import time
+
+class api_result_error_template(object):
+    class OlivOSTypeError(TypeError):
+        def __init__(self, arg):
+            TypeError.__init__(self, arg)
 
 class api_result_data_template(object):
     class get_msg(dict):

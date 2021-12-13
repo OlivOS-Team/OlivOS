@@ -19,6 +19,7 @@ import json
 import multiprocessing
 import threading
 import hashlib
+import traceback
 
 from functools import wraps
 
@@ -457,6 +458,12 @@ class Event(object):
             return funcWarpped
         return callbackLoggerDecorator
 
+    def __errorCatchLogger(self, e):
+        self.log_func(3, str(e) , [
+            (self.platform['platform'], 'default'),
+            (self.plugin_info['name'], 'default'),
+            ('error', 'callback')
+        ])
 
     #以下为统一事件动作调用方法实现，各接入sdk需完全支持
 
@@ -493,7 +500,10 @@ class Event(object):
             elif type(message) == OlivOS.messageAPI.Message_templet:
                 tmp_message_obj = message
             else:
-                return None
+                error_note = 'Wrong message type from plugin, please check your plugin first'
+                error_obj = OlivOS.contentAPI.api_result_error_template.OlivOSTypeError(error_note)
+                self.__errorCatchLogger(error_obj)
+                raise error_obj
             if tmp_message_obj.active:
                 tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
         return [tmp_message, tmp_message_obj]
