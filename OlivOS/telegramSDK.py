@@ -156,11 +156,10 @@ def get_Event_from_SDK(target_event):
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
-    target_event.plugin_info['message_mode_rx'] = 'old_string'
+    target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if checkByListAnd([
         not target_event.active,
         checkInDictSafe('message', target_event.sdk_event.json, []),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
         checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
@@ -168,17 +167,58 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
-        target_event.active = True
+        message_obj = None
+        if checkByListAnd([
+            checkInDictSafe('text', target_event.sdk_event.json, ['message'])
+        ]):
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'old_string',
+                target_event.sdk_event.json['message']['text']
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('photo', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            if type(target_event.sdk_event.json['message']['photo']) == list:
+                message_list.append(
+                    OlivOS.messageAPI.PARA.image(
+                        target_event.sdk_event.json['message']['photo'][0]['file_id']
+                    )
+                )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('sticker', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            message_list.append(
+                OlivOS.messageAPI.PARA.image(
+                    target_event.sdk_event.json['message']['sticker']['file_id']
+                )
+            )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        if not target_event.active:
+            return target_event.active
         target_event.plugin_info['func_type'] = 'private_message'
         target_event.data = target_event.private_message(
             target_event.sdk_event.json['message']['from']['id'],
-            target_event.sdk_event.json['message']['text'],
+            message_obj,
             'friend'
         )
-        target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.message_sdk = message_obj
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
-        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
-        target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.raw_message = message_obj
+        target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
@@ -188,7 +228,6 @@ def get_Event_from_SDK(target_event):
         not target_event.active,
         'message' in target_event.sdk_event.json,
         checkInDictSafe('message', target_event.sdk_event.json, []),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
         checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
@@ -197,18 +236,60 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
+        message_obj = None
+        if checkByListAnd([
+            checkInDictSafe('text', target_event.sdk_event.json, ['message'])
+        ]):
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'old_string',
+                target_event.sdk_event.json['message']['text']
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('photo', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            if type(target_event.sdk_event.json['message']['photo']) == list:
+                message_list.append(
+                    OlivOS.messageAPI.PARA.image(
+                        target_event.sdk_event.json['message']['photo'][0]['file_id']
+                    )
+                )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('sticker', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            message_list.append(
+                OlivOS.messageAPI.PARA.image(
+                    target_event.sdk_event.json['message']['sticker']['file_id']
+                )
+            )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        else:
+            return target_event.active
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
             target_event.sdk_event.json['message']['chat']['id'],
             target_event.sdk_event.json['message']['from']['id'],
-            target_event.sdk_event.json['message']['text'],
+            message_obj,
             'group'
         )
-        target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.message_sdk = message_obj
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
-        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
-        target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.raw_message = message_obj
+        target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
@@ -218,7 +299,6 @@ def get_Event_from_SDK(target_event):
         not target_event.active,
         'message' in target_event.sdk_event.json,
         checkInDictSafe('message', target_event.sdk_event.json, []),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
         checkInDictSafe('type', target_event.sdk_event.json, ['message', 'chat']),
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
@@ -227,18 +307,60 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
+        message_obj = None
+        if checkByListAnd([
+            checkInDictSafe('text', target_event.sdk_event.json, ['message'])
+        ]):
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'old_string',
+                target_event.sdk_event.json['message']['text']
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('photo', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            if type(target_event.sdk_event.json['message']['photo']) == list:
+                message_list.append(
+                    OlivOS.messageAPI.PARA.image(
+                        target_event.sdk_event.json['message']['photo'][0]['file_id']
+                    )
+                )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        elif checkByListAnd([
+            checkInDictSafe('sticker', target_event.sdk_event.json, ['message'])
+        ]):
+            message_list = []
+            message_list.append(
+                OlivOS.messageAPI.PARA.image(
+                    target_event.sdk_event.json['message']['sticker']['file_id']
+                )
+            )
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                message_list
+            )
+            target_event.active = True
+        else:
+            return target_event.active
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
             target_event.sdk_event.json['message']['chat']['id'],
             target_event.sdk_event.json['message']['from']['id'],
-            target_event.sdk_event.json['message']['text'],
+            message_obj,
             'group'
         )
-        target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.message_sdk = message_obj
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
-        target_event.data.raw_message = target_event.sdk_event.json['message']['text']
-        target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message']['text'])
+        target_event.data.raw_message = message_obj
+        target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
@@ -250,21 +372,34 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg_image = API.sendPhoto(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = chat_id
-        this_msg.data.text = message
-        this_msg.do_api()
+        this_msg_image.data.chat_id = chat_id
+        this_msg.data.text = ''
+        flag_now_type = 'string'
+        if message != None:
+            if type(message.data) == list:
+                for message_this in message.data:
+                    if type(message_this) == OlivOS.messageAPI.PARA.image:
+                        if flag_now_type != 'image':
+                            if this_msg.data.text != '':
+                                this_msg.do_api()
+                                this_msg.data.text = ''
+                        this_msg_image.data.photo = message_this.data['file']
+                        this_msg_image.do_api()
+                        flag_now_type = 'image'
+                    elif type(message_this) == OlivOS.messageAPI.PARA.text:
+                        this_msg.data.text += message_this.OP()
+                        flag_now_type = 'string'
+        if flag_now_type != 'image':
+            if this_msg.data.text != '':
+                this_msg.do_api()
 
     def send_private_msg(target_event, user_id, message):
-        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.chat_id = user_id
-        this_msg.data.text = message
-        this_msg.do_api()
+        event_action.send_msg(target_event, user_id, message)
 
     def send_group_msg(target_event, group_id, message):
-        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.chat_id = group_id
-        this_msg.data.text = message
-        this_msg.do_api()
+        event_action.send_msg(target_event, group_id, message)
 
 class api_templet(object):
     def __init__(self):
@@ -342,3 +477,16 @@ class API(object):
                 self.disable_notification = False
                 self.reply_to_message_id = 0
                 self.allow_sending_without_reply = True
+
+    class sendPhoto(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'sendPhoto'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.photo = ''

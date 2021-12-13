@@ -7,3 +7,4 @@ pybase64
 websockets
 websocket-client
 pillow
+lxml

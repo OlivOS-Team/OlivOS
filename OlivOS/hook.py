@@ -14,4 +14,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+#pillow
 from PIL import Image
+
+#lxml
+from lxml import etree
