@@ -17,8 +17,18 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import multiprocessing
 import time
 import datetime
+import os
 
 import OlivOS
+
+logfile_dir = './logfile'
+logfile_file = 'OlivOS_logfile_%s.log'
+logfile_file_unity = 'OlivOS_logfile_unity.log'
+
+
+def releaseDir(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
 
 class logger(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name = 'native_logger', scan_interval = 0.001, dead_interval = 1, logger_queue = None, logger_mode = 'console', logger_vis_level = [2, 3, 4, 5]):
@@ -39,6 +49,13 @@ class logger(OlivOS.API.Proc_templet):
             'default' : ['[', ']'],
             'callback' : ['<', '>']
         }
+        self.Proc_config['logfile_count'] = 10
+        self.Proc_data['logfile_count'] = self.Proc_config['logfile_count']
+        self.Proc_config['logfile_count_out'] = 5000
+        self.Proc_data['logfile_count_out'] = self.Proc_config['logfile_count_out']
+        self.Proc_data['data_tmp'] = {
+            'logfile': ''
+        }
 
     class log_packet(dict):
         def __init__(self, log_level, log_message, log_time, log_segment = []):
@@ -48,8 +65,16 @@ class logger(OlivOS.API.Proc_templet):
             self['log_segment'] = log_segment
 
     def run(self):
+        releaseDir(logfile_dir)
+        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w') as logfile_f:
+            pass
         self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
+        flag_need_refresh = False
         while True:
+            if self.Proc_data['logfile_count_out'] >= 0:
+                self.Proc_data['logfile_count_out'] -= 1
+            if self.Proc_data['logfile_count_out'] == 0:
+                flag_need_refresh = True
             if self.Proc_info.rx_queue.empty():
                 time.sleep(self.Proc_info.scan_interval)
                 continue
@@ -59,6 +84,10 @@ class logger(OlivOS.API.Proc_templet):
                 except:
                     continue
                 self.log_output(packet_this)
+            if flag_need_refresh:
+                self.save_logfile()
+                flag_need_refresh = False
+                self.Proc_data['logfile_count_out'] = self.Proc_config['logfile_count_out']
 
     def log(self, log_level, log_message, log_segment = []):
         try:
@@ -66,17 +95,45 @@ class logger(OlivOS.API.Proc_templet):
         except:
             pass
 
-    def log_output(self, log_packet_this):
-        if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
-            if self.Proc_config['logger_mode'] == 'console':
-                log_output_str = ''
-                log_output_str += '[' + str(datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
-                log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
-                for segment_this in log_packet_this['log_segment']:
-                    (segment_this_mark, segment_this_type) = segment_this
-                    log_output_str += self.Proc_config['segment_type'][segment_this_type][0]
-                    log_output_str += str(segment_this_mark)
-                    log_output_str += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
-                log_output_str += log_packet_this['log_message']
-                print(log_output_str)
+    def save_logfile(self):
+        if self.Proc_data['data_tmp']['logfile'] != '':
+            file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
+            file_name_unity = logfile_file_unity
+            with open('%s/%s' % (logfile_dir, file_name), 'a+') as logfile_f:
+                logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+') as logfile_f:
+                logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+            self.Proc_data['data_tmp']['logfile'] = ''
 
+    def log_output(self, log_packet_this, flag_need_refresh_out = False):
+        tmp_logger_mode_list = []
+        flag_need_refresh = False
+        if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
+            self.Proc_data['logfile_count'] -= 1
+            if self.Proc_data['logfile_count'] <= 0 or flag_need_refresh_out:
+                self.Proc_data['logfile_count'] = self.Proc_config['logfile_count']
+                flag_need_refresh = True
+            if type(self.Proc_config['logger_mode']) == str:
+                tmp_logger_mode_list = [self.Proc_config['logger_mode']]
+            elif type(self.Proc_config['logger_mode']) == list:
+                tmp_logger_mode_list = self.Proc_config['logger_mode']
+            for tmp_logger_mode_list_this in tmp_logger_mode_list:
+                if tmp_logger_mode_list_this in [
+                    'console',
+                    'logfile'
+                ]:
+                    log_output_str = ''
+                    log_output_str += '[' + str(datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
+                    log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
+                    for segment_this in log_packet_this['log_segment']:
+                        (segment_this_mark, segment_this_type) = segment_this
+                        log_output_str += self.Proc_config['segment_type'][segment_this_type][0]
+                        log_output_str += str(segment_this_mark)
+                        log_output_str += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
+                    log_output_str += log_packet_this['log_message']
+                    if tmp_logger_mode_list_this == 'console':
+                        print(log_output_str)
+                    elif tmp_logger_mode_list_this == 'logfile':
+                        self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
+                        if flag_need_refresh:
+                            self.save_logfile()

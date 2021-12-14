@@ -399,23 +399,23 @@ class event_action(object):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.metadata.channel_id = chat_id
         this_msg.data.msg_id = reply_msg_id
+        flag_now_type = 'string'
         res = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.text:
+            if type(message_this) == OlivOS.messageAPI.PARA.image:
+                pass
+            elif type(message_this) == OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
-        res_list = []
-        for res_this in res.split('\n'):
-            res_list.append({
-                'name': res_this,
-                'value': ''
-            })
-        this_msg.data.embed = {
-            'prompt': res,
-            'fields': res_list
-        }
-        this_msg.do_api()
-        #this_msg.data.content = ''
-        #for message_this in message.data:
-        #    this_msg.data.content += message_this.OP()
-        #if this_msg.data.content != '':
-        #    this_msg.do_api()
+                flag_now_type = 'string'
+        if res != '':
+            res_list = []
+            for res_this in res.split('\n'):
+                if res_this != '':
+                    res_list.append({
+                        'name': res_this,
+                    })
+            this_msg.data.embed = {
+                'prompt': res,
+                'fields': res_list
+            }
+            this_msg.do_api()
