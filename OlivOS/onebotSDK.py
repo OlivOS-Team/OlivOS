@@ -151,6 +151,10 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
+            if 'user_id' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+            if 'nickname' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
         elif target_event.sdk_event.json['message_type'] == 'group':
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
@@ -162,6 +166,10 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
+                if 'user_id' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+                if 'nickname' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
         elif target_event.sdk_event.json['message_type'] == 'guild':
             if target_event.sdk_event.json['sub_type'] == 'channel':
                 target_event.active = True
@@ -173,6 +181,10 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
                 target_event.data.font = None
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
+                if 'user_id' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+                if 'nickname' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
                 if 'guild_id' in target_event.sdk_event.json:
                     target_event.data.host_id = target_event.sdk_event.json['guild_id']
                     target_event.data.extend['host_group_id'] = target_event.sdk_event.json['guild_id']
@@ -333,8 +345,10 @@ class event_action(object):
                 res_data['active'] = True
                 res_data['data']['message_id'] = init_api_do_mapping_for_dict(raw_obj, ['message_id'], int)
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['real_id'], int)
-                res_data['data']['sender']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                res_data['data']['sender']['id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
                 res_data['data']['sender']['name'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
+                res_data['data']['sender']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
                 res_data['data']['time'] = init_api_do_mapping_for_dict(raw_obj, ['time'], int)
                 res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
                 res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)

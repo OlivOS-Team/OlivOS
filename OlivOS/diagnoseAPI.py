@@ -83,7 +83,7 @@ class logger(OlivOS.API.Proc_templet):
                     packet_this = self.Proc_info.rx_queue.get(block = False)
                 except:
                     continue
-                self.log_output(packet_this)
+                self.log_output(packet_this, flag_need_refresh)
             if flag_need_refresh:
                 self.save_logfile()
                 flag_need_refresh = False
