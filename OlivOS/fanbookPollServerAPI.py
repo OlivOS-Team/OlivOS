@@ -90,7 +90,9 @@ def accountFix(bot_info_dict, logger_proc):
         bot_hash = bot_info_dict_this
         if bot_info_dict[bot_hash].platform['sdk'] == 'fanbook_poll':
             this_msg = OlivOS.fanbookSDK.API.getMe(OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
+            this_msg_2 = OlivOS.fanbookSDK.API.setBotPrivacyMode(OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
             try:
+                #刷新至真实bot_id
                 this_msg_res = this_msg.do_api()
                 this_msg_res_obj = json.loads(this_msg_res)
                 if this_msg_res_obj['ok'] == True:
@@ -103,6 +105,13 @@ def accountFix(bot_info_dict, logger_proc):
                 else:
                     logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
                 res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
+                #刷新至私有模式
+                if bot_info_dict[bot_hash].platform['model'] == 'private':
+                    this_msg_2.data.owner_id = this_msg_res_obj['result']['owner_id']
+                    this_msg_2.data.bot_id = this_msg_res_obj['result']['id']
+                    this_msg_2.data.enable = True
+                    this_msg_res_2 = this_msg_2.do_api()
+                    logger_proc.log(2, '[fanbook] account [' + str(this_msg_res_obj['result']['id']) + '] set to private mode')
                 continue
             except:
                 logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')

@@ -351,3 +351,18 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.user_id = 0
+
+    class setBotPrivacyMode(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.data.bot_id = self.bot_info.id
+            self.host = fanbookAPIHost['a1']
+            self.route = fanbookAPIRoute['apiroot'] + '/setBotPrivacyMode'
+
+        class data_T(object):
+            def __init__(self):
+                self.owner_id = -1
+                self.bot_id = -1
+                self.enable = True
