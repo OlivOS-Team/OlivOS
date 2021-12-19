@@ -100,9 +100,21 @@ class logger(OlivOS.API.Proc_templet):
             file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
             file_name_unity = logfile_file_unity
             with open('%s/%s' % (logfile_dir, file_name), 'a+') as logfile_f:
-                logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+                try:
+                    logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+                except:
+                    try:
+                        logfile_f.write(self.Proc_data['data_tmp']['logfile'].encode('unicode-escape').decode())
+                    except:
+                        pass
             with open('%s/%s' % (logfile_dir, file_name_unity), 'a+') as logfile_f:
-                logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+                try:
+                    logfile_f.write(self.Proc_data['data_tmp']['logfile'])
+                except:
+                    try:
+                        logfile_f.write(self.Proc_data['data_tmp']['logfile'].encode('unicode-escape').decode())
+                    except:
+                        pass
             self.Proc_data['data_tmp']['logfile'] = ''
 
     def log_output(self, log_packet_this, flag_need_refresh_out = False):

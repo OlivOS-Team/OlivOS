@@ -25,3 +25,4 @@ OlivOS_message_mode_rx_default = 'old_string'
 OlivOS_message_mode_tx_default = 'old_string'
 OlivOS_message_mode_tx_unity = 'olivos_string'
 
+OlivOS_plugin_data_path = './plugin/data'
