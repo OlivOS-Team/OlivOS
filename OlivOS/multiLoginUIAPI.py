@@ -698,7 +698,7 @@ def checkByListEmptyOr(check_list):
 def releaseBase64Data(dir_path, file_name, base64_data):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path) 
-    with open(dir_path + '/' + file_name, 'wb+', encoding = 'utf-8') as tmp:
+    with open(dir_path + '/' + file_name, 'wb+') as tmp:
         tmp.write(base64.b64decode(base64_data))
 
 def getHash(key):
