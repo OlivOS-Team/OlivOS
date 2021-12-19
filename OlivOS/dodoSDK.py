@@ -172,6 +172,8 @@ def get_Event_from_SDK(target_event):
             target_event.data.font = None
             target_event.data.sender['user_id'] = target_event.sdk_event.json['uid']
             target_event.data.sender['nickname'] = target_event.sdk_event.json['nickName']
+            target_event.data.sender['id'] = target_event.sdk_event.json['uid']
+            target_event.data.sender['name'] = target_event.sdk_event.json['nickName']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             if target_event.sdk_event.islandId != None:
