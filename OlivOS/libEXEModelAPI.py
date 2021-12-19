@@ -144,7 +144,7 @@ class goTypeConfig(object):
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 
-        with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+') as tmp:
+        with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+', encoding = 'utf-8') as tmp:
             tmp.write(self.config_file_str)
 
 def releaseDir(dir_path):

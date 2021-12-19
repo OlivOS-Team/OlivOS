@@ -66,7 +66,7 @@ class logger(OlivOS.API.Proc_templet):
 
     def run(self):
         releaseDir(logfile_dir)
-        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w') as logfile_f:
+        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding = 'utf-8') as logfile_f:
             pass
         self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
         flag_need_refresh = False
@@ -99,22 +99,16 @@ class logger(OlivOS.API.Proc_templet):
         if self.Proc_data['data_tmp']['logfile'] != '':
             file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
             file_name_unity = logfile_file_unity
-            with open('%s/%s' % (logfile_dir, file_name), 'a+') as logfile_f:
+            with open('%s/%s' % (logfile_dir, file_name), 'a+', encoding = 'utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
                 except:
-                    try:
-                        logfile_f.write(self.Proc_data['data_tmp']['logfile'].encode('unicode-escape').decode())
-                    except:
-                        pass
-            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+') as logfile_f:
+                    pass
+            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+', encoding = 'utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
                 except:
-                    try:
-                        logfile_f.write(self.Proc_data['data_tmp']['logfile'].encode('unicode-escape').decode())
-                    except:
-                        pass
+                    pass
             self.Proc_data['data_tmp']['logfile'] = ''
 
     def log_output(self, log_packet_this, flag_need_refresh_out = False):
