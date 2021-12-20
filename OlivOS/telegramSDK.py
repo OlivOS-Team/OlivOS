@@ -407,6 +407,60 @@ class event_action(object):
     def send_group_msg(target_event, group_id, message):
         event_action.send_msg(target_event, group_id, message)
 
+    def get_login_info(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
+        raw_obj = None
+        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], int)
+        return res_data
+
+def init_api_json(raw_str):
+    res_data = None
+    tmp_obj = None
+    flag_is_active = False
+    try:
+        tmp_obj = json.loads(raw_str)
+    except:
+        tmp_obj = None
+    if type(tmp_obj) == dict:
+        if 'ok' in tmp_obj:
+            if type(tmp_obj['ok']) == bool:
+                if tmp_obj['ok'] == True:
+                    flag_is_active = True
+    if flag_is_active:
+        if 'result' in tmp_obj:
+            if type(tmp_obj['result']) == dict:
+                res_data = tmp_obj['result'].copy()
+            elif type(tmp_obj['result']) == list:
+                res_data = tmp_obj['result'].copy()
+    return res_data
+
+def init_api_do_mapping(src_type, src_data):
+    if type(src_data) == src_type:
+        return src_data
+
+def init_api_do_mapping_for_dict(src_data, path_list, src_type):
+    res_data = None
+    flag_active = True
+    tmp_src_data = src_data
+    for path_list_this in path_list:
+        if type(tmp_src_data) == dict:
+            if path_list_this in tmp_src_data:
+                tmp_src_data = tmp_src_data[path_list_this]
+            else:
+                return None
+        else:
+            return None
+    res_data = init_api_do_mapping(src_type, tmp_src_data)
+    return res_data
+
 class api_templet(object):
     def __init__(self):
         self.bot_info = None
@@ -423,6 +477,18 @@ class api_templet(object):
         return self.res
 
 class API(object):
+    class getMe(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getMe'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.default = None
+
     class getUpdates(api_templet):
         def __init__(self, bot_info = None):
             api_templet.__init__(self)

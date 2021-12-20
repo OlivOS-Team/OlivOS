@@ -910,7 +910,11 @@ class Event(object):
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            res_data = OlivOS.telegramSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'fanbook_poll':
+            res_data = OlivOS.fanbookSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'qqGuild_link':
+            res_data = OlivOS.qqGuildSDK.event_action.get_login_info(self)
 
         if res_data == None:
             return None

@@ -290,6 +290,40 @@ class event_action(object):
         if private_chat_id != None:
             event_action.send_msg(target_event, private_chat_id, message)
 
+    def get_login_info(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
+        private_chat_id = None
+        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        try:
+            tmp_res = this_msg.do_api()
+            tmp_res_obj = json.loads(tmp_res)
+            if tmp_res_obj['ok'] == True:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'username'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'id'], int)
+        except:
+            res_data['active'] = False
+        return res_data
+
+def init_api_do_mapping(src_type, src_data):
+    if type(src_data) == src_type:
+        return src_data
+
+def init_api_do_mapping_for_dict(src_data, path_list, src_type):
+    res_data = None
+    flag_active = True
+    tmp_src_data = src_data
+    for path_list_this in path_list:
+        if type(tmp_src_data) == dict:
+            if path_list_this in tmp_src_data:
+                tmp_src_data = tmp_src_data[path_list_this]
+            else:
+                return None
+        else:
+            return None
+    res_data = init_api_do_mapping(src_type, tmp_src_data)
+    return res_data
+
 class API(object):
     class getMe(api_templet):
         def __init__(self, bot_info = None):
