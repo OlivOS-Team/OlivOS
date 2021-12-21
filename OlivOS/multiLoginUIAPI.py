@@ -20,6 +20,7 @@ import os
 import hashlib
 
 from tkinter import ttk
+from tkinter import messagebox
 
 import OlivOS
 
@@ -28,9 +29,16 @@ class HostUI(object):
         self.Model_name = Model_name
         self.UIObject = {}
         self.UIData = {}
+        self.UIConfig = {}
         self.logger_proc = logger_proc
         self.UIData['Account_data'] = Account_data
         self.UIData['flag_commit'] = False
+        self.UIConfig['color_001'] = '#00A0EA'
+        self.UIConfig['color_002'] = '#BBE9FF'
+        self.UIConfig['color_003'] = '#40C3FF'
+        self.UIConfig['color_004'] = '#FFFFFF'
+        self.UIConfig['color_005'] = '#000000'
+        self.UIConfig['color_006'] = '#80D7FF'
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
 
     def log(self, log_level, log_message):
@@ -45,7 +53,7 @@ class HostUI(object):
             width = False,
             height = False
         )
-        self.UIObject['root'].configure(bg = '#00A0EA')
+        self.UIObject['root'].configure(bg = self.UIConfig['color_001'])
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
@@ -83,12 +91,14 @@ class HostUI(object):
             text = 'NEW',
             command = lambda : self.tree_edit('create'),
             bd = 0,
-            activebackground = '#BBE9FF',
-            activeforeground = '#00A0EA',
-            bg = '#40C3FF',
-            fg = '#FFFFFF',
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
             relief = 'groove'
         )
+        self.UIObject['root_Button_NEW'].bind('<Enter>', lambda x : self.buttom_action('root_Button_NEW', '<Enter>'))
+        self.UIObject['root_Button_NEW'].bind('<Leave>', lambda x : self.buttom_action('root_Button_NEW', '<Leave>'))
         self.UIObject['root_Button_NEW'].place(
             x = 10,
             y = 358,
@@ -101,12 +111,14 @@ class HostUI(object):
             text = 'EDIT',
             command = lambda : self.tree_edit('update'),
             bd = 0,
-            activebackground = '#BBE9FF',
-            activeforeground = '#00A0EA',
-            bg = '#40C3FF',
-            fg = '#FFFFFF',
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
             relief = 'groove'
         )
+        self.UIObject['root_Button_EDIT'].bind('<Enter>', lambda x : self.buttom_action('root_Button_EDIT', '<Enter>'))
+        self.UIObject['root_Button_EDIT'].bind('<Leave>', lambda x : self.buttom_action('root_Button_EDIT', '<Leave>'))
         self.UIObject['root_Button_EDIT'].place(
             x = 137,
             y = 358,
@@ -119,12 +131,14 @@ class HostUI(object):
             text = 'DEL',
             command = lambda : self.tree_edit('delete'),
             bd = 0,
-            activebackground = '#BBE9FF',
-            activeforeground = '#00A0EA',
-            bg = '#40C3FF',
-            fg = '#FFFFFF',
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
             relief = 'groove'
         )
+        self.UIObject['root_Button_DEL'].bind('<Enter>', lambda x : self.buttom_action('root_Button_DEL', '<Enter>'))
+        self.UIObject['root_Button_DEL'].bind('<Leave>', lambda x : self.buttom_action('root_Button_DEL', '<Leave>'))
         self.UIObject['root_Button_DEL'].place(
             x = 264,
             y = 358,
@@ -137,12 +151,14 @@ class HostUI(object):
             text = 'COMMIT',
             command = lambda : self.account_data_commit(),
             bd = 0,
-            activebackground = '#BBE9FF',
-            activeforeground = '#00A0EA',
-            bg = '#40C3FF',
-            fg = '#FFFFFF',
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
             relief = 'groove'
         )
+        self.UIObject['root_Button_COMMIT'].bind('<Enter>', lambda x : self.buttom_action('root_Button_COMMIT', '<Enter>'))
+        self.UIObject['root_Button_COMMIT'].bind('<Leave>', lambda x : self.buttom_action('root_Button_COMMIT', '<Leave>'))
         self.UIObject['root_Button_COMMIT'].place(
             x = 391,
             y = 358,
@@ -153,6 +169,13 @@ class HostUI(object):
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
 
         self.UIObject['root'].mainloop()
+
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg = self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg = self.UIConfig['color_003'])
 
     def tree_rightKey(self, event):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
@@ -216,6 +239,13 @@ class TreeEditUI(object):
         self.action = action
         self.edit_commit_callback = edit_commit_callback
         self.UIObject = {}
+        self.UIConfig = {}
+        self.UIConfig['color_001'] = '#00A0EA'
+        self.UIConfig['color_002'] = '#BBE9FF'
+        self.UIConfig['color_003'] = '#40C3FF'
+        self.UIConfig['color_004'] = '#FFFFFF'
+        self.UIConfig['color_005'] = '#000000'
+        self.UIConfig['color_006'] = '#80D7FF'
         self.UIData = {}
         self.UIData['Account_data'] = Account_data
         self.UIData['Edit_res'] = [
@@ -311,19 +341,21 @@ class TreeEditUI(object):
             width = False,
             height = False
         )
-        self.UIObject['edit_root'].configure(bg = '#00A0EA')
+        self.UIObject['edit_root'].configure(bg = self.UIConfig['color_001'])
 
         self.UIObject['edit_root_Button_commit'] = tkinter.Button(
             self.UIObject['edit_root'],
             text = 'SAVE',
             command = self.tree_edit_commit,
             bd = 0,
-            activebackground = '#BBE9FF',
-            activeforeground = '#00A0EA',
-            bg = '#40C3FF',
-            fg = '#FFFFFF',
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
             relief = 'groove'
         )
+        self.UIObject['edit_root_Button_commit'].bind('<Enter>', lambda x : self.buttom_action('edit_root_Button_commit', '<Enter>'))
+        self.UIObject['edit_root_Button_commit'].bind('<Leave>', lambda x : self.buttom_action('edit_root_Button_commit', '<Leave>'))
         self.UIObject['edit_root_Button_commit'].place(
             x = 310,
             y = 40,
@@ -459,14 +491,21 @@ class TreeEditUI(object):
 
         self.UIObject['edit_root'].mainloop()
 
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg = self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg = self.UIConfig['color_003'])
+
     def tree_edit_UI_Entry_init(self, obj_root, obj_name, str_name, x, y, width, height, action, title = '', mode = 'NONE'):
         self.UIObject[obj_name + '=Label'] = tkinter.Label(
             self.UIObject[obj_root],
             text = title
         )
         self.UIObject[obj_name + '=Label'].configure(
-            bg = '#00A0EA',
-            fg = '#FFFFFF'
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004']
         )
         self.UIObject[obj_name + '=Label'].place(
             x = x - 100,
@@ -479,8 +518,8 @@ class TreeEditUI(object):
             textvariable = self.UIData[str_name]
         )
         self.UIObject[obj_name].configure(
-            bg = '#FFFFFF',
-            fg = '#000000',
+            bg = self.UIConfig['color_004'],
+            fg = self.UIConfig['color_005'],
             bd = 0
         )
         if mode == 'SAFE':
@@ -500,8 +539,8 @@ class TreeEditUI(object):
             text = title
         )
         self.UIObject[obj_name + '=Label'].configure(
-            bg = '#00A0EA',
-            fg = '#FFFFFF'
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004']
         )
         self.UIObject[obj_name + '=Label'].place(
             x = x - 100,
@@ -598,6 +637,7 @@ class TreeEditUI(object):
                     self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(self.UIData['Account_data'][self.hash_key].post_info.access_token)
 
     def tree_edit_commit(self):
+        miss_key_list = None
         if self.action == 'create' or self.action == 'update':
             if self.action == 'create':
                 tmp_action = 'create'
@@ -671,6 +711,23 @@ class TreeEditUI(object):
                         platform_model = tmp_platform_model
                     )
                 ]
+            else:
+                miss_key_list = []
+                tmp_check_list = [
+                    ['ID', tmp_id],
+                    ['PASSWORD', tmp_password],
+                    ['SDK', tmp_platform_sdk],
+                    ['PLATFORM', tmp_platform_platform],
+                    ['MODEL', tmp_platform_model],
+                    ['AUTO', tmp_server_auto],
+                    ['TYPE', tmp_server_type],
+                    ['HOST', tmp_host],
+                    ['PORT', tmp_port],
+                    ['TOKEN', tmp_access_token]
+                ]
+                for tmp_check_list_this in tmp_check_list:
+                    if tmp_check_list_this[1] == '':
+                        miss_key_list.append(tmp_check_list_this[0])
         elif self.action == 'delete':
             self.UIData['Edit_res'] = [
                 'delete',
@@ -679,7 +736,12 @@ class TreeEditUI(object):
             ]
         self.edit_commit_callback(self.UIData['Edit_res'])
         if self.action == 'create' or self.action == 'update':
-            self.UIObject['edit_root'].destroy()
+            if miss_key_list != None:
+                if type(miss_key_list) == list:
+                    tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(miss_key_list)
+                    messagebox.showwarning('Warning', tmp_messagebox_str)
+            else:
+                self.UIObject['edit_root'].destroy()
 
 def get_tree_force(tree_obj):
     return tree_obj.item(tree_obj.focus())
