@@ -17,7 +17,7 @@
   <a href="https://github.com/OlivOS-Team/OlivOS/actions">
     <img src="https://github.com/OlivOS-Team/OlivOS/workflows/CI-Packing/badge.svg" alt="action">
   </a>
-  <a href="https://github.com/lunzhiPenxil/Dice/releases">
+  <a href="https://github.com/OlivOS-Team/OlivOS/releases">
     <img src="https://img.shields.io/github/downloads/OlivOS-Team/OlivOS/total.svg" alt="Downloads">
   </a>
 </div>
