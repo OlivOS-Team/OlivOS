@@ -19,6 +19,7 @@ jobs:
       with:
         files: 
           ./dist/windows/main.exe
+        args: '-9'
     - name: Ready for Packing
       run: |
         cd ./dist/windows
