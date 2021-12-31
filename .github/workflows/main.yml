@@ -14,7 +14,7 @@ jobs:
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
         path: ./
-    - name: UPX GitHub Action
+    - name: Packing by UPX
       uses: crazy-max/ghaction-upx@v1.4.0
       with:
         files: 
