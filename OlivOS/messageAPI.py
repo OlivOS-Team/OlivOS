@@ -569,7 +569,7 @@ class PARA(object):
             PARA_templet.__init__(self, 'shake', None)
 
     class poke(PARA_templet):
-        def __init__(self, type, id, name = None):
+        def __init__(self, id, type = None, name = None):
             PARA_templet.__init__(self, 'poke', self.data_T(type, id, name))
 
         class data_T(dict):
