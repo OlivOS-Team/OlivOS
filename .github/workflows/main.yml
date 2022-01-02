@@ -14,6 +14,12 @@ jobs:
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
         path: ./
+    - name: Packing by UPX
+      uses: crazy-max/ghaction-upx@v1.4.0
+      with:
+        files: 
+          ./dist/windows/main.exe
+        args: '-9'
     - name: Ready for Packing
       run: |
         cd ./dist/windows
