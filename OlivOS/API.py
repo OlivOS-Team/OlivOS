@@ -280,7 +280,7 @@ class Event(object):
                 tmp_log_message = tmp_log_message_default
             if self.log_func != None:
                 self.log_func(tmp_log_level, tmp_log_message, [
-                    (self.platform['platform'], 'default'),
+                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                     (self.plugin_info['name'], 'default'),
                     (self.plugin_info['func_type'], 'default')
                 ])
@@ -450,7 +450,7 @@ class Event(object):
                             callback_msg = 'done'
                     if event_obj.log_func != None:
                         event_obj.log_func(2, callback_msg , [
-                            (event_obj.platform['platform'], 'default'),
+                            ('%s|%s' % (event_obj.platform['platform'], str(event_obj.base_info['self_id'])), 'default'),
                             (event_obj.plugin_info['name'], 'default'),
                             (func_name, 'callback')
                         ])
@@ -460,7 +460,7 @@ class Event(object):
 
     def __errorCatchLogger(self, e):
         self.log_func(3, str(e) , [
-            (self.platform['platform'], 'default'),
+            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
             (self.plugin_info['name'], 'default'),
             ('error', 'callback')
         ])
@@ -471,7 +471,7 @@ class Event(object):
         self.blocked = enable
         if flag_log and self.log_func != None:
             self.log_func(2, str(enable) , [
-                (self.platform['platform'], 'default'),
+                ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                 (self.plugin_info['name'], 'default'),
                 ('set_block', 'callback')
             ])
@@ -572,7 +572,7 @@ class Event(object):
                 tmp_message_log = tmp_message
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + tmp_message_log, [
-                    (self.platform['platform'], 'default'),
+                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
                 ])
@@ -585,20 +585,20 @@ class Event(object):
                 ):
                     if self.data.host_id != None:
                         self.log_func(2, 'Host(' + str(self.data.host_id) + ') Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                            (self.platform['platform'], 'default'),
+                            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
                         return
                     else:
                         self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                            (self.platform['platform'], 'default'),
+                            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
                 else:
                     self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                        (self.platform['platform'], 'default'),
+                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('reply', 'callback')
                     ])
@@ -668,20 +668,20 @@ class Event(object):
                 tmp_message_log = tmp_message
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(target_id) + '): ' + tmp_message_log, [
-                    (self.platform['platform'], 'default'),
+                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
                 if host_id != None:
                     self.log_func(2, 'Host(' + str(host_id) + ') Group(' + str(target_id) + '): ' + tmp_message_log, [
-                        (self.platform['platform'], 'default'),
+                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
                 else:
                     self.log_func(2, 'Group(' + str(target_id) + '): ' + tmp_message_log, [
-                        (self.platform['platform'], 'default'),
+                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
@@ -929,13 +929,13 @@ class Event(object):
             ):
                 if res_data['active'] == True:
                     self.log_func(2, 'name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
-                        (self.platform['platform'], 'default'),
+                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
                 else:
                     self.log_func(2, 'failed' , [
-                        (self.platform['platform'], 'default'),
+                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
