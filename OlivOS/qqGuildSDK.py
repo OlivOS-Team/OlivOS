@@ -378,20 +378,15 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
             if 'member' in target_event.sdk_event.payload.data.d:
                 if 'roles' in target_event.sdk_event.payload.data.d['member']:
-                    tmp_role_now = 0
-                    for role_this in target_event.sdk_event.payload.data.d['member']['roles']:
-                        try:
-                            tmp_role_this = int(role_this)
-                            if tmp_role_this > tmp_role_now:
-                                tmp_role_now = tmp_role_this
-                        except:
-                            pass
-                    if tmp_role_now == 0:
-                        target_event.data.sender['role'] = 'member'
-                    elif tmp_role_now == 1:
-                        target_event.data.sender['role'] = 'admin'
-                    elif tmp_role_now == 2:
+                    tmp_role_now = target_event.sdk_event.payload.data.d['member']['roles']
+                    if '4' in tmp_role_now:
                         target_event.data.sender['role'] = 'owner'
+                    elif '5' in tmp_role_now:
+                        target_event.data.sender['role'] = 'sub_admin'
+                    elif '2' in tmp_role_now:
+                        target_event.data.sender['role'] = 'admin'
+                    elif '1' in tmp_role_now:
+                        target_event.data.sender['role'] = 'member'
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
 

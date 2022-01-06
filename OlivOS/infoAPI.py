@@ -17,7 +17,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.8.0'
+OlivOS_Version = '0.8.2'
+OlivOS_SVN = 81
+OlivOS_SVN_Compatible = 0
+
+OlivOS_Version_Short = '%s(%s)' % (OlivOS_Version, str(OlivOS_SVN))
 
 OlivOS_Header_UA = 'OlivOS/' + OlivOS_Version
 

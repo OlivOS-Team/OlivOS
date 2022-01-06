@@ -65,7 +65,7 @@ class logger(OlivOS.API.Proc_templet):
             self['log_segment'] = log_segment
 
     def run(self):
-        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version)
+        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
         releaseDir(logfile_dir)
         with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding = 'utf-8') as logfile_f:
             pass
