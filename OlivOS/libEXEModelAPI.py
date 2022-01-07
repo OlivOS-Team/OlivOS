@@ -138,7 +138,18 @@ class goTypeConfig(object):
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['password'] = self.bot_info_dict.password
         self.config_file_format['access-token'] = self.bot_info_dict.post_info.access_token
-        self.config_file_format['servers-host'] = self.bot_info_dict.post_info.host
+        tmp_host = self.bot_info_dict.post_info.host
+        for prefix in [
+            'http://',
+            'https://',
+            'ws://',
+            'wss://'
+        ]:
+            if len(tmp_host) > len(prefix):
+                if tmp_host[:len(prefix)] == prefix:
+                    tmp_host = tmp_host[len(prefix):]
+                    break
+        self.config_file_format['servers-host'] = tmp_host
         self.config_file_format['servers-port'] = str(self.bot_info_dict.post_info.port)
         self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
 
