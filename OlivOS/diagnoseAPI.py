@@ -44,6 +44,35 @@ class logger(OlivOS.API.Proc_templet):
             4 : 'ERROR',
             5 : 'FATAL'
         }
+        self.Proc_config['color_dict'] = {
+            'color': {
+                'BLACK' : 0,
+                'RED' : 1,
+                'GREEN' : 2,
+                'YELLOW' : 3,
+                'BLUE' : 4,
+                'MAGENTA' : 5,
+                'CYAN' : 6,
+                'WHITE' : 7
+            },
+            'type': {
+                'front': 3,
+                'background': 4
+            },
+            'shader': {
+                'default': 0,
+                'highlight': 1,
+                '-highlight': 22,
+                'underline': 4,
+                '-underline': 24,
+                'blink': 5,
+                '-blink': 25,
+                'reverse': 7,
+                '-reverse': 27,
+                'invisiable': 8,
+                '-invisiable': 28
+            }
+        }
         self.Proc_config['logger_vis_level'] = logger_vis_level
         self.Proc_config['segment_type'] = {
             'default' : ['[', ']'],
@@ -112,6 +141,31 @@ class logger(OlivOS.API.Proc_templet):
                     pass
             self.Proc_data['data_tmp']['logfile'] = ''
 
+    def log_output_shader_key(self, key = None):
+        keylist = key
+        keylist_str = None
+        keylist_new = []
+        keylist_new_this = None
+        if keylist == None:
+            keylist = [self.Proc_config['color_dict']['shader']['default']]
+        for keylist_this in keylist:
+            keylist_new_this = None
+            if type(keylist_this) == list:
+                keylist_new_this = ''
+                for keylist_this_this in keylist_this:
+                    keylist_new_this += str(keylist_this_this)
+            elif type(keylist_this) == int:
+                keylist_new_this = str(keylist_this)
+            elif type(keylist_this) == str:
+                keylist_new_this = keylist_this
+            if keylist_new_this == '':
+                keylist_new_this = None
+            if keylist_new_this != None:
+                if type(keylist_new_this) == str:
+                    keylist_new.append(keylist_new_this)
+        keylist_str = '\033[%sm' % (';'.join(keylist_new),)
+        return keylist_str
+
     def log_output(self, log_packet_this, flag_need_refresh_out = False):
         tmp_logger_mode_list = []
         flag_need_refresh = False
@@ -127,6 +181,7 @@ class logger(OlivOS.API.Proc_templet):
             for tmp_logger_mode_list_this in tmp_logger_mode_list:
                 if tmp_logger_mode_list_this in [
                     'console',
+                    'console_color',
                     'logfile'
                 ]:
                     log_output_str = ''
@@ -138,7 +193,33 @@ class logger(OlivOS.API.Proc_templet):
                         log_output_str += str(segment_this_mark)
                         log_output_str += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
                     log_output_str += log_packet_this['log_message']
-                    if tmp_logger_mode_list_this == 'console':
+                    if tmp_logger_mode_list_this == 'console_color':
+                        tmp_color = 'WHITE'
+                        tmp_color_bak = 'BLACK'
+                        tmp_shader = 'default'
+                        flag_have_color = False
+                        if log_packet_this['log_level'] >= 3:
+                            tmp_color = 'RED'
+                            tmp_shader = 'reverse'
+                            flag_have_color = True
+                        if flag_have_color:
+                            log_output_str = '%s%s%s' % (
+                                self.log_output_shader_key([
+                                    self.Proc_config['color_dict']['shader'][tmp_shader],
+                                    [
+                                        self.Proc_config['color_dict']['type']['front'],
+                                        self.Proc_config['color_dict']['color'][tmp_color]
+                                    ]
+                                ]),
+                                log_output_str,
+                                self.log_output_shader_key([
+                                    self.Proc_config['color_dict']['shader']['default']
+                                ])
+                            )
+                    if tmp_logger_mode_list_this in [
+                        'console',
+                        'console_color'
+                    ]:
                         print(log_output_str)
                     elif tmp_logger_mode_list_this == 'logfile':
                         self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
