@@ -82,26 +82,31 @@ class logger(OlivOS.API.Proc_templet):
                 '-invisiable' : 28
             },
             'color_win': {
-                'front'       : {                                         # front
-                    'BLACK'   : 0                                       , # None
-                    'BLUE'    : (1 << 3 | 1 << 0                  ) << 0, # B
-                    'GREEN'   : (1 << 3 | 1 << 1                  ) << 0, # G
-                    'RED'     : (1 << 3 | 1 << 2                  ) << 0, # R
-                    'YELLOW'  : (1 << 3 | 1 << 1 | 1 << 2         ) << 0, # G + R
-                    'MAGENTA' : (1 << 3 | 1 << 0 | 1 << 2         ) << 0, # B + R
-                    'CYAN'    : (1 << 3 | 1 << 0 | 1 << 1         ) << 0, # B + G
-                    'WHITE'   : (1 << 3 | 1 << 0 | 1 << 1 | 1 << 2) << 0  # G + B + R
-                },
-                'background'  : {                                         # background
-                    'BLACK'   : 0                                       , # None
-                    'BLUE'    : (1 << 3 | 1 << 0                  ) << 4, # B
-                    'GREEN'   : (1 << 3 | 1 << 1                  ) << 4, # G
-                    'RED'     : (1 << 3 | 1 << 2                  ) << 4, # R
-                    'YELLOW'  : (1 << 3 | 1 << 1 | 1 << 2         ) << 4, # G + R
-                    'MAGENTA' : (1 << 3 | 1 << 0 | 1 << 2         ) << 4, # B + R
-                    'CYAN'    : (1 << 3 | 1 << 0 | 1 << 1         ) << 4, # B + G
-                    'WHITE'   : (1 << 3 | 1 << 0 | 1 << 1 | 1 << 2) << 4  # G + B + R
-                }
+                'BLACK'       : 0                       , # None
+                'BLUE'        : 1 << 0                  , # B
+                'GREEN'       : 1 << 1                  , # G
+                'RED'         : 1 << 2                  , # R
+                'YELLOW'      : 1 << 1 | 1 << 2         , # G + R
+                'MAGENTA'     : 1 << 0 | 1 << 2         , # B + R
+                'CYAN'        : 1 << 0 | 1 << 1         , # B + G
+                'WHITE'       : 1 << 0 | 1 << 1 | 1 << 2  # G + B + R
+            },
+            'type_win': {
+                'front'       : 0,
+                'background'  : 4
+            },
+            'shader_win': {
+                'default'     : 0     ,
+                'highlight'   : 1 << 3,
+                '-highlight'  : 0     ,
+                'underline'   : 0     ,
+                '-underline'  : 0     ,
+                'blink'       : 0     ,
+                '-blink'      : 0     ,
+                'reverse'     : 1 << 3,
+                '-reverse'    : 0     ,
+                'invisiable'  : 0     ,
+                '-invisiable' : 0
             }
         }
         self.Proc_data['extend_data'] = {
@@ -202,12 +207,23 @@ class logger(OlivOS.API.Proc_templet):
         return keylist_str
 
     def log_output_shader_init(self):
-        if platform.system() == 'Windows':
+        tmp_logger_mode_list = []
+        if type(self.Proc_config['logger_mode']) == str:
+            tmp_logger_mode_list = [self.Proc_config['logger_mode']]
+        elif type(self.Proc_config['logger_mode']) == list:
+            tmp_logger_mode_list = self.Proc_config['logger_mode']
+        if 'console_color' in tmp_logger_mode_list and platform.system() == 'Windows':
             self.Proc_data['extend_data']['std_out_handle'] = ctypes.windll.kernel32.GetStdHandle(dict_ctype['STD_HANDLE']['STD_OUTPUT_HANDLE'])
             if self.Proc_data['extend_data']['std_out_handle'] != None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
-                    self.Proc_config['color_dict']['color_win']['front']['WHITE']
+                    self.Proc_config['color_dict']['shader_win'][
+                        'default'
+                    ] | self.Proc_config['color_dict']['color_win'][
+                        'WHITE'
+                    ] << self.Proc_config['color_dict']['type_win'][
+                        'front'
+                    ]
                 )
 
     def log_output_shader(self, log_output_str, log_packet_this):
@@ -229,13 +245,25 @@ class logger(OlivOS.API.Proc_templet):
             if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
-                    self.Proc_config['color_dict']['color_win']['front'][tmp_color]
+                    self.Proc_config['color_dict']['shader_win'][
+                        tmp_shader
+                    ] | self.Proc_config['color_dict']['color_win'][
+                        tmp_color
+                    ] << self.Proc_config['color_dict']['type_win'][
+                        'front'
+                    ]
                 )
             print(log_output_str)
             if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
-                    self.Proc_config['color_dict']['color_win']['front']['WHITE']
+                    self.Proc_config['color_dict']['shader_win'][
+                        tmp_shader
+                    ] | self.Proc_config['color_dict']['color_win'][
+                        'WHITE'
+                    ] << self.Proc_config['color_dict']['type_win'][
+                        'front'
+                    ]
                 )
         elif flag_have_color:
             log_output_str = '%s%s%s' % (
