@@ -14,7 +14,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import ctypes
 import multiprocessing
+import platform
 import time
 import datetime
 import os
@@ -25,6 +27,13 @@ logfile_dir = './logfile'
 logfile_file = 'OlivOS_logfile_%s.log'
 logfile_file_unity = 'OlivOS_logfile_unity.log'
 
+dict_ctype = {
+    'STD_HANDLE': {
+        'STD_INPUT_HANDLE'  : -10,
+        'STD_OUTPUT_HANDLE' : -11,
+        'STD_ERROR_HANDLE'  : -12
+    }
+}
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -37,41 +46,66 @@ class logger(OlivOS.API.Proc_templet):
         self.Proc_config['logger_mode'] = logger_mode
         self.Proc_config['level_dict'] = {
             -1 : 'TRACE',
-            0 : 'DEBUG',
-            1 : 'NOTE',
-            2 : 'INFO',
-            3 : 'WARN',
-            4 : 'ERROR',
-            5 : 'FATAL'
+            0  : 'DEBUG',
+            1  : 'NOTE' ,
+            2  : 'INFO' ,
+            3  : 'WARN' ,
+            4  : 'ERROR',
+            5  : 'FATAL'
         }
         self.Proc_config['color_dict'] = {
             'color': {
-                'BLACK' : 0,
-                'RED' : 1,
-                'GREEN' : 2,
-                'YELLOW' : 3,
-                'BLUE' : 4,
-                'MAGENTA' : 5,
-                'CYAN' : 6,
-                'WHITE' : 7
+                'BLACK'       : 0,
+                'RED'         : 1,
+                'GREEN'       : 2,
+                'YELLOW'      : 3,
+                'BLUE'        : 4,
+                'MAGENTA'     : 5,
+                'CYAN'        : 6,
+                'WHITE'       : 7
             },
             'type': {
-                'front': 3,
-                'background': 4
+                'front'       : 3,
+                'background'  : 4
             },
             'shader': {
-                'default': 0,
-                'highlight': 1,
-                '-highlight': 22,
-                'underline': 4,
-                '-underline': 24,
-                'blink': 5,
-                '-blink': 25,
-                'reverse': 7,
-                '-reverse': 27,
-                'invisiable': 8,
-                '-invisiable': 28
+                'default'     : 0 ,
+                'highlight'   : 1 ,
+                '-highlight'  : 22,
+                'underline'   : 4 ,
+                '-underline'  : 24,
+                'blink'       : 5 ,
+                '-blink'      : 25,
+                'reverse'     : 7 ,
+                '-reverse'    : 27,
+                'invisiable'  : 8 ,
+                '-invisiable' : 28
+            },
+            'color_win': {
+                'front'       : {                                         # front
+                    'BLACK'   : 0                                       , # None
+                    'BLUE'    : (1 << 3 | 1 << 0                  ) << 0, # B
+                    'GREEN'   : (1 << 3 | 1 << 1                  ) << 0, # G
+                    'RED'     : (1 << 3 | 1 << 2                  ) << 0, # R
+                    'YELLOW'  : (1 << 3 | 1 << 1 | 1 << 2         ) << 0, # G + R
+                    'MAGENTA' : (1 << 3 | 1 << 0 | 1 << 2         ) << 0, # B + R
+                    'CYAN'    : (1 << 3 | 1 << 0 | 1 << 1         ) << 0, # B + G
+                    'WHITE'   : (1 << 3 | 1 << 0 | 1 << 1 | 1 << 2) << 0  # G + B + R
+                },
+                'background'  : {                                         # background
+                    'BLACK'   : 0                                       , # None
+                    'BLUE'    : (1 << 3 | 1 << 0                  ) << 4, # B
+                    'GREEN'   : (1 << 3 | 1 << 1                  ) << 4, # G
+                    'RED'     : (1 << 3 | 1 << 2                  ) << 4, # R
+                    'YELLOW'  : (1 << 3 | 1 << 1 | 1 << 2         ) << 4, # G + R
+                    'MAGENTA' : (1 << 3 | 1 << 0 | 1 << 2         ) << 4, # B + R
+                    'CYAN'    : (1 << 3 | 1 << 0 | 1 << 1         ) << 4, # B + G
+                    'WHITE'   : (1 << 3 | 1 << 0 | 1 << 1 | 1 << 2) << 4  # G + B + R
+                }
             }
+        }
+        self.Proc_data['extend_data'] = {
+            'std_out_handle': None
         }
         self.Proc_config['logger_vis_level'] = logger_vis_level
         self.Proc_config['segment_type'] = {
@@ -94,8 +128,9 @@ class logger(OlivOS.API.Proc_templet):
             self['log_segment'] = log_segment
 
     def run(self):
-        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
         releaseDir(logfile_dir)
+        self.log_output_shader_init()
+        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
         with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding = 'utf-8') as logfile_f:
             pass
         self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
@@ -166,6 +201,60 @@ class logger(OlivOS.API.Proc_templet):
         keylist_str = '\033[%sm' % (';'.join(keylist_new),)
         return keylist_str
 
+    def log_output_shader_init(self):
+        if platform.system() == 'Windows':
+            self.Proc_data['extend_data']['std_out_handle'] = ctypes.windll.kernel32.GetStdHandle(dict_ctype['STD_HANDLE']['STD_OUTPUT_HANDLE'])
+            if self.Proc_data['extend_data']['std_out_handle'] != None:
+                ctypes.windll.kernel32.SetConsoleTextAttribute(
+                    self.Proc_data['extend_data']['std_out_handle'],
+                    self.Proc_config['color_dict']['color_win']['front']['WHITE']
+                )
+
+    def log_output_shader(self, log_output_str, log_packet_this):
+        tmp_color = 'WHITE'
+        tmp_color_bak = 'BLACK'
+        tmp_shader = 'default'
+        flag_have_color = False
+        if log_packet_this['log_level'] == 3:
+            tmp_color = 'YELLOW'
+            flag_have_color = True
+        elif log_packet_this['log_level'] == 4:
+            tmp_color = 'RED'
+            flag_have_color = True
+        elif log_packet_this['log_level'] == 5:
+            tmp_color = 'RED'
+            tmp_shader = 'reverse'
+            flag_have_color = True
+        if platform.system() == 'Windows':
+            if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
+                ctypes.windll.kernel32.SetConsoleTextAttribute(
+                    self.Proc_data['extend_data']['std_out_handle'],
+                    self.Proc_config['color_dict']['color_win']['front'][tmp_color]
+                )
+            print(log_output_str)
+            if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
+                ctypes.windll.kernel32.SetConsoleTextAttribute(
+                    self.Proc_data['extend_data']['std_out_handle'],
+                    self.Proc_config['color_dict']['color_win']['front']['WHITE']
+                )
+        elif flag_have_color:
+            log_output_str = '%s%s%s' % (
+                self.log_output_shader_key([
+                    self.Proc_config['color_dict']['shader'][tmp_shader],
+                    [
+                        self.Proc_config['color_dict']['type']['front'],
+                        self.Proc_config['color_dict']['color'][tmp_color]
+                    ]
+                ]),
+                log_output_str,
+                self.log_output_shader_key([
+                    self.Proc_config['color_dict']['shader']['default']
+                ])
+            )
+            print(log_output_str)
+        else:
+            print(log_output_str)
+
     def log_output(self, log_packet_this, flag_need_refresh_out = False):
         tmp_logger_mode_list = []
         flag_need_refresh = False
@@ -194,32 +283,8 @@ class logger(OlivOS.API.Proc_templet):
                         log_output_str += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
                     log_output_str += log_packet_this['log_message']
                     if tmp_logger_mode_list_this == 'console_color':
-                        tmp_color = 'WHITE'
-                        tmp_color_bak = 'BLACK'
-                        tmp_shader = 'default'
-                        flag_have_color = False
-                        if log_packet_this['log_level'] >= 3:
-                            tmp_color = 'RED'
-                            tmp_shader = 'reverse'
-                            flag_have_color = True
-                        if flag_have_color:
-                            log_output_str = '%s%s%s' % (
-                                self.log_output_shader_key([
-                                    self.Proc_config['color_dict']['shader'][tmp_shader],
-                                    [
-                                        self.Proc_config['color_dict']['type']['front'],
-                                        self.Proc_config['color_dict']['color'][tmp_color]
-                                    ]
-                                ]),
-                                log_output_str,
-                                self.log_output_shader_key([
-                                    self.Proc_config['color_dict']['shader']['default']
-                                ])
-                            )
-                    if tmp_logger_mode_list_this in [
-                        'console',
-                        'console_color'
-                    ]:
+                        self.log_output_shader(log_output_str, log_packet_this)
+                    elif tmp_logger_mode_list_this == 'console':
                         print(log_output_str)
                     elif tmp_logger_mode_list_this == 'logfile':
                         self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str

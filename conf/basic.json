@@ -75,7 +75,7 @@
             "proc_mode" : "threading",
             "rx_queue" : "OlivOS_logger_queue",
             "mode" : [
-                "console",
+                "console_color",
                 "logfile"
             ],
             "fliter" : [2, 3, 4, 5]
