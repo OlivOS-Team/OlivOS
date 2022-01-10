@@ -20,15 +20,22 @@ from contextlib import closing
 
 import OlivOS
 
+default_account_conf = {
+    'account': []
+}
 
 class Account(object):
     def load(path, logger_proc, safe_mode = False):
         account_conf = None
-        with open(path, 'r', encoding = 'utf-8') as account_conf_f:
-            account_conf = json.loads(account_conf_f.read())
+        try:
+            with open(path, 'r', encoding = 'utf-8') as account_conf_f:
+                account_conf = json.loads(account_conf_f.read())
+        except:
+            pass
         if account_conf == None:
             logger_proc.log(3, 'init account from [' + path + '] ... failed')
-            sys.exit()
+            account_conf = default_account_conf
+            logger_proc.log(2, 'init account from default ... done')
         else:
             logger_proc.log(2, 'init account from [' + path + '] ... done')
         plugin_bot_info_dict = {}

@@ -19,6 +19,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import platform
 
 import OlivOS.infoAPI
+import OlivOS.bootAPI
+import OlivOS.bootDataAPI
 import OlivOS.data
 import OlivOS.hook
 import OlivOS.contentAPI
