@@ -18,9 +18,7 @@ jobs:
       run: |
         cd ./dist/windows
         mkdir ./OlivOS-Win
-        cd ./OlivOS-Win
-        cp -rf ../../../conf ./conf
-        cp ../main.exe ./OlivOS.exe
+        cp ./main.exe ./OlivOS-Win/OlivOS.exe
     - uses: actions/upload-artifact@v2
       with:
         name: OlivOS-Win-pack
