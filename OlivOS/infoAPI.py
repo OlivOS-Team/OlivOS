@@ -17,9 +17,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.8.5'
-OlivOS_SVN = 85
-OlivOS_SVN_Compatible = 0
+OlivOS_Version = '0.9.0'
+OlivOS_SVN = 86
+
+# Compatible    <= Plugin[compatible_svn]                 : Compatible
+# OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn
+#                  Plugin[compatible_svn] < OldCompatible : NotCompatible Error & Skip
+OlivOS_SVN_Compatible = 81
+OlivOS_SVN_OldCompatible = -1
+OlivOS_compatible_svn_default = 0
 
 OlivOS_Version_Short = '%s(%s)' % (OlivOS_Version, str(OlivOS_SVN))
 

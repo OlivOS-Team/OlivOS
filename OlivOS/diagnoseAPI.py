@@ -107,6 +107,20 @@ class logger(OlivOS.API.Proc_templet):
                 '-reverse'    : 0     ,
                 'invisiable'  : 0     ,
                 '-invisiable' : 0
+            },
+            'mapping': {
+                'need': [-1, 0, 3, 4, 5],
+                'front': {
+                    -1: 'BLUE',
+                    0: 'GREEN',
+                    3: 'YELLOW',
+                    4: 'RED',
+                    5: 'RED',
+                },
+                'background': {},
+                'shader': {
+                    5: 'reverse'
+                }
             }
         }
         self.Proc_data['extend_data'] = {
@@ -231,16 +245,14 @@ class logger(OlivOS.API.Proc_templet):
         tmp_color_bak = 'BLACK'
         tmp_shader = 'default'
         flag_have_color = False
-        if log_packet_this['log_level'] == 3:
-            tmp_color = 'YELLOW'
+        if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['need']:
             flag_have_color = True
-        elif log_packet_this['log_level'] == 4:
-            tmp_color = 'RED'
-            flag_have_color = True
-        elif log_packet_this['log_level'] == 5:
-            tmp_color = 'RED'
-            tmp_shader = 'reverse'
-            flag_have_color = True
+            if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['front']:
+                tmp_color = self.Proc_config['color_dict']['mapping']['front'][log_packet_this['log_level']]
+            if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['background']:
+                tmp_color_bak = self.Proc_config['color_dict']['mapping']['background'][log_packet_this['log_level']]
+            if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['shader']:
+                tmp_shader = self.Proc_config['color_dict']['mapping']['shader'][log_packet_this['log_level']]
         if platform.system() == 'Windows':
             if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(

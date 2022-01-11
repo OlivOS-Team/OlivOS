@@ -429,7 +429,7 @@ class event_action(object):
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
-                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], int)
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], str)
         except:
             res_data['active'] = False
         return res_data

@@ -84,7 +84,7 @@ globalMetaTable = {
 
 eventLogMetaTable = {
     'fake_event' : {
-        'level' : 2,
+        'level' : 0,
         'message_key' : 'event_fake_event_log'
     },
     'private_message' : {

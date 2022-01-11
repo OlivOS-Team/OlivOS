@@ -251,6 +251,8 @@ class shallow(OlivOS.API.Proc_templet):
         #统一载入插件
         for plugin_dir_this_tmp in plugin_dir_list:
             flag_is_opk = False
+            plugin_models_app_conf = None
+            skip_result_level = None
             try:
                 plugin_dir_this = plugin_dir_this_tmp
                 if len(plugin_dir_this_tmp) > 4:
@@ -259,60 +261,84 @@ class shallow(OlivOS.API.Proc_templet):
                         plugin_dir_this = plugin_dir_this_tmp[:-4]
                 if len(plugin_dir_this) > 0:
                     if plugin_dir_this[0] not in ['.']:
-                        plugin_models_tmp = importlib.import_module(plugin_dir_this)
+                        try:
+                            if flag_is_opk:
+                                with open(plugin_path_tmp + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
+                                    plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
+                            else:
+                                with open(plugin_path + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
+                                    plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
+                        except:
+                            #traceback.print_exc()
+                            plugin_models_app_conf = None
+                        plugin_models_dict_this = {}
+                        if plugin_models_app_conf == None:
+                            skip_result = plugin_dir_this + '/app.json' + ' not found'
+                            skip_result_level = 4
+                        else:
+                            plugin_models_dict_this = {}
+                            plugin_models_dict_this['appconf'] = plugin_models_app_conf
+                            plugin_models_dict_this['priority'] = plugin_models_app_conf['priority']
+                            plugin_models_dict_this['namespace'] = plugin_dir_this
+                            plugin_models_dict_this['name'] = plugin_models_app_conf['name']
+                            plugin_models_dict_this['support'] = plugin_models_app_conf['support']
+                            if 'message_mode' in plugin_models_app_conf:
+                                plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
+                            else:
+                                plugin_models_dict_this['message_mode'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
+                            if 'author' in plugin_models_app_conf:
+                                plugin_models_dict_this['author'] = plugin_models_app_conf['author']
+                            else:
+                                plugin_models_dict_this['author'] = 'N/A'
+                            if 'svn' in plugin_models_app_conf:
+                                plugin_models_dict_this['svn'] = plugin_models_app_conf['svn']
+                            else:
+                                plugin_models_dict_this['svn'] = 0
+                            if 'compatible_svn' in plugin_models_app_conf:
+                                plugin_models_dict_this['compatible_svn'] = plugin_models_app_conf['compatible_svn']
+                            else:
+                                plugin_models_dict_this['compatible_svn'] = OlivOS.infoAPI.OlivOS_compatible_svn_default
+                            if plugin_models_dict_this['compatible_svn'] >= OlivOS.infoAPI.OlivOS_SVN_Compatible:
+                                pass
+                            elif plugin_models_dict_this['compatible_svn'] >= OlivOS.infoAPI.OlivOS_SVN_OldCompatible and plugin_models_dict_this['compatible_svn'] <= OlivOS.infoAPI.OlivOS_SVN_Compatible:
+                                self.log(3, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is support for old OlivOS version ' + str(plugin_models_dict_this['compatible_svn']))
+                            elif plugin_models_dict_this['compatible_svn'] <= OlivOS.infoAPI.OlivOS_SVN_OldCompatible:
+                                skip_result = 'is support for old OlivOS version ' + str(plugin_models_dict_this['compatible_svn'])
+                                self.log(4, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: ' + skip_result)
+                                continue
+                            plugin_models_tmp = importlib.import_module(plugin_dir_this)
+                            plugin_models_dict_this['model'] = plugin_models_tmp
+                            if hasattr(plugin_models_tmp, 'main'):
+                                if hasattr(plugin_models_tmp.main, 'Event'):
+                                    self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
+                                    if hasattr(plugin_models_tmp.main.Event, func_init_name):
+                                        plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
+                                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
+                                    total_models_count += 1
+                                    self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+                                    #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                                    continue
+                                else:
+                                    skip_result = plugin_dir_this + '.main.Event' + ' not found'
+                                    skip_result_level = 4
+                            else:
+                                skip_result = plugin_dir_this + '.main' + ' not found'
+                                skip_result_level = 4
+                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
                         doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % ('mask path',))
-                        continue
+                        skip_result = 'mask path'
                 else:
                     doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                    self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % ('name too short',))
-                    continue
+                    skip_result = 'name too short'
             except Exception as e:
                 doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                 traceback.print_exc()
-                self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % (str(e),))
-                continue
-            if hasattr(plugin_models_tmp, 'main'):
-                if hasattr(plugin_models_tmp.main, 'Event'):
-                    try:
-                        if flag_is_opk:
-                            with open(plugin_path_tmp + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
-                                plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
-                        else:
-                            with open(plugin_path + plugin_dir_this + '/app.json', 'r', encoding = 'utf-8') as plugin_models_app_conf_f:
-                                plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
-                    except:
-                        traceback.print_exc()
-                        plugin_models_app_conf = None
-                    if plugin_models_app_conf == None:
-                        skip_result = plugin_dir_this + '/app.json' + ' not found'
-                    else:
-                        plugin_models_dict_this = {}
-                        plugin_models_dict_this['model'] = plugin_models_tmp
-                        plugin_models_dict_this['appconf'] = plugin_models_app_conf
-                        plugin_models_dict_this['priority'] = plugin_models_app_conf['priority']
-                        plugin_models_dict_this['namespace'] = plugin_dir_this
-                        plugin_models_dict_this['name'] = plugin_models_app_conf['name']
-                        plugin_models_dict_this['support'] = plugin_models_app_conf['support']
-                        if 'message_mode' in plugin_models_app_conf:
-                            plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
-                        else:
-                            plugin_models_dict_this['message_mode'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
-                        self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
-                        if hasattr(plugin_models_tmp.main.Event, func_init_name):
-                            plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
-                            self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
-                        total_models_count += 1
-                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
-                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        continue
-                else:
-                    skip_result = plugin_dir_this + '.main.Event' + ' not found'
-            else:
-                skip_result = plugin_dir_this + '.main' + ' not found'
-            #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-            self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: ' + skip_result)
+                skip_result = str(e)
+                skip_result_level = 4
+            if skip_result_level == None:
+                skip_result_level = 3
+            self.log(skip_result_level, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: ' + skip_result)
         #清理opk格式插件缓存
         for opk_plugin_list_this in opk_plugin_list:
             doOpkRemove(plugin_path_tmp, opk_plugin_list_this)
