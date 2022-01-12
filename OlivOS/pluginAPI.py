@@ -167,56 +167,73 @@ class shallow(OlivOS.API.Proc_templet):
                     else:
                         plugin_event.plugin_info['message_mode_tx'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
                     plugin_event.get_Event_on_Plugin()
-                    self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'])
+                    self.plugin_event_router(plugin_event, self.plugin_models_dict[plugin_models_index_this]['model'], plugin_models_index_this)
                     self.log(0, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] done')
                 if plugin_event.blocked:
                     self.log(2, 'event [' + str(plugin_event.plugin_info['func_type']) + '] call blocked by plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + ']')
                     break
         return
 
-    def plugin_event_router(self, plugin_event, plugin_model):
+    def plugin_event_router(self, plugin_event, plugin_model, plugin_name):
         if hasattr(plugin_model.main.Event, plugin_event.plugin_info['func_type']):
-            if plugin_event.plugin_info['func_type'] == 'private_message':
-                plugin_model.main.Event.private_message(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_message':
-                plugin_model.main.Event.group_message(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_file_upload':
-                plugin_model.main.Event.group_file_upload(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_admin':
-                plugin_model.main.Event.group_admin(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_member_decrease':
-                plugin_model.main.Event.group_member_decrease(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_member_increase':
-                plugin_model.main.Event.group_member_increase(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_ban':
-                plugin_model.main.Event.group_ban(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_message_recall':
-                plugin_model.main.Event.group_message_recall(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'private_message_recall':
-                plugin_model.main.Event.private_message_recall(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'poke':
-                plugin_model.main.Event.poke(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_lucky_king':
-                plugin_model.main.Event.group_lucky_king(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_honor':
-                plugin_model.main.Event.group_honor(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'friend_add_request':
-                plugin_model.main.Event.friend_add_request(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_add_request':
-                plugin_model.main.Event.group_add_request(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'group_invite_request':
-                plugin_model.main.Event.group_invite_request(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'lifecycle':
-                plugin_model.main.Event.lifecycle(plugin_event = plugin_event, Proc = self)
-            elif plugin_event.plugin_info['func_type'] == 'heartbeat':
-                plugin_model.main.Event.heartbeat(plugin_event = plugin_event, Proc = self)
+            try:
+                if plugin_event.plugin_info['func_type'] == 'private_message':
+                    plugin_model.main.Event.private_message(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_message':
+                    plugin_model.main.Event.group_message(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_file_upload':
+                    plugin_model.main.Event.group_file_upload(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_admin':
+                    plugin_model.main.Event.group_admin(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_member_decrease':
+                    plugin_model.main.Event.group_member_decrease(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_member_increase':
+                    plugin_model.main.Event.group_member_increase(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_ban':
+                    plugin_model.main.Event.group_ban(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_message_recall':
+                    plugin_model.main.Event.group_message_recall(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'private_message_recall':
+                    plugin_model.main.Event.private_message_recall(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'poke':
+                    plugin_model.main.Event.poke(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_lucky_king':
+                    plugin_model.main.Event.group_lucky_king(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_honor':
+                    plugin_model.main.Event.group_honor(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'friend_add_request':
+                    plugin_model.main.Event.friend_add_request(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_add_request':
+                    plugin_model.main.Event.group_add_request(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'group_invite_request':
+                    plugin_model.main.Event.group_invite_request(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'lifecycle':
+                    plugin_model.main.Event.lifecycle(plugin_event = plugin_event, Proc = self)
+                elif plugin_event.plugin_info['func_type'] == 'heartbeat':
+                    plugin_model.main.Event.heartbeat(plugin_event = plugin_event, Proc = self)
+            except Exception as e:
+                #traceback.print_exc()
+                self.log(4, 'OlivOS plugin [' + plugin_name + '] call [' + plugin_event.plugin_info['func_type'] + '] failed: %s\n%s' % (
+                        str(e),
+                        traceback.format_exc()
+                    )
+                )
+                plugin_event.set_block()
         return
 
     def run_plugin_func(self, plugin_event, func_name):
         for plugin_models_index_this in self.plugin_models_call_list:
             if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name):
-                getattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name)(plugin_event = plugin_event, Proc = self)
-                self.log(2, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_name + '] done')
+                try:
+                    getattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name)(plugin_event = plugin_event, Proc = self)
+                    self.log(2, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_name + '] done')
+                except Exception as e:
+                    #traceback.print_exc()
+                    self.log(4, 'OlivOS plugin [' + self.plugin_models_dict[plugin_models_index_this]['name'] + '] call [' + func_name + '] failed: %s\n%s' % (
+                            str(e),
+                            traceback.format_exc()
+                        )
+                    )
         return
 
     def load_plugin_list(self):
@@ -245,8 +262,12 @@ class shallow(OlivOS.API.Proc_templet):
                             opkFile.extract(opkFile_list_this, plugin_path_tmp + plugin_dir_this)
             except Exception as e:
                 doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                traceback.print_exc()
-                self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s' % (str(e),))
+                #traceback.print_exc()
+                self.log(3, 'OlivOS plugin [' + plugin_dir_this + '] is skiped by OlivOS plugin shallow [' + self.Proc_name + ']: %s\n%s' % (
+                        str(e),
+                        traceback.format_exc()
+                    )
+                )
                 continue
         #统一载入插件
         for plugin_dir_this_tmp in plugin_dir_list:
@@ -312,12 +333,19 @@ class shallow(OlivOS.API.Proc_templet):
                                 if hasattr(plugin_models_tmp.main, 'Event'):
                                     self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
                                     if hasattr(plugin_models_tmp.main.Event, func_init_name):
-                                        plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
-                                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
-                                    total_models_count += 1
-                                    self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
-                                    #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                                    continue
+                                        try:
+                                            plugin_models_tmp.main.Event.init(plugin_event = None, Proc = self)
+                                            self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] done')
+                                        except Exception as e:
+                                            self.log(4, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] call [' + func_init_name + '] failed: %s\n%s' % (
+                                                    str(e),
+                                                    traceback.format_exc()
+                                                )
+                                            )
+                                        total_models_count += 1
+                                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+                                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                                        continue
                                 else:
                                     skip_result = plugin_dir_this + '.main.Event' + ' not found'
                                     skip_result_level = 4
@@ -326,15 +354,18 @@ class shallow(OlivOS.API.Proc_templet):
                                 skip_result_level = 4
                         #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
-                        doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                         skip_result = 'mask path'
                 else:
-                    doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                    #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     skip_result = 'name too short'
             except Exception as e:
-                doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                traceback.print_exc()
-                skip_result = str(e)
+                #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                #traceback.print_exc()
+                skip_result = '%s\n%s' % (
+                    str(e),
+                    traceback.format_exc()
+                )
                 skip_result_level = 4
             if skip_result_level == None:
                 skip_result_level = 3
