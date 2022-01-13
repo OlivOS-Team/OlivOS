@@ -192,7 +192,10 @@ def get_Event_from_SDK(target_event):
                     target_event.data.extend['sub_self_id'] = target_event.sdk_event.json['self_tiny_id']
                     if target_event.sdk_event.json['user_id'] == target_event.sdk_event.json['self_tiny_id']:
                         target_event.active = False
-        if target_event.data.raw_message == '':
+        if target_event.data != None:
+            if target_event.data.raw_message == '':
+                target_event.active = False
+        else:
             target_event.active = False
     elif target_event.base_info['type'] == 'notice':
         if target_event.sdk_event.json['notice_type'] == 'group_upload':
