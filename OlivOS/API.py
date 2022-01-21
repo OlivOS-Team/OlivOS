@@ -525,7 +525,10 @@ class Event(object):
                 'friend_add_request'
             ]
         ):
-            self.__send('private', self.data.user_id, tmp_message, flag_log = False)
+            if 'host_group_id' in self.data.extend:
+                self.__send('private', self.data.user_id, tmp_message, host_id = self.data.extend['host_group_id'], flag_log = False)
+            else:
+                self.__send('private', self.data.user_id, tmp_message, flag_log = False)
             flag_type = 'private'
         elif checkByListOrEqual(
             self.plugin_info['func_type'],
@@ -639,6 +642,18 @@ class Event(object):
                     OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
                 else:
                     OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
+            elif flag_type == 'private':
+                if host_id != None and not flag_log:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
+                elif 'flag_from_direct' in self.data.extend:
+                    if self.data.extend['flag_from_direct']:
+                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
+                    else:
+                        #主动私聊待实现
+                        pass
+                else:
+                    #主动私聊待实现
+                    pass
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':

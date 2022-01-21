@@ -74,7 +74,11 @@ class server(OlivOS.API.Proc_templet):
             )
             self.Proc_data['extend_data']['last_s'] = tmp_data_rx_obj.data.s
             if tmp_data_rx_obj.data.op == 0:
-                if tmp_data_rx_obj.data.t == 'MESSAGE_CREATE':
+                if tmp_data_rx_obj.data.t in [
+                    'MESSAGE_CREATE',
+                    'DIRECT_MESSAGE_CREATE',
+                    'AT_MESSAGE_CREATE'
+                ]:
                     sdk_event = OlivOS.qqGuildSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block = False)
