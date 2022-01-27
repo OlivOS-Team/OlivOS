@@ -202,10 +202,6 @@ class api_templet(object):
                 'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token)
             }
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
-
             msg_res = None
             if req_type == 'POST':
                 msg_res = req.request("POST", send_url, headers = headers, data = payload)

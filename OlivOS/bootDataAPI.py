@@ -35,7 +35,8 @@ default_Conf = {
             "OlivOS_qqGuild_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
-            "OlivOS_dodo_poll"
+            "OlivOS_dodo_poll",
+            "OlivOS_kaiheila_link"
         ],
         "control_queue" : "OlivOS_control_queue",
         "interval" : 0.2
@@ -139,6 +140,16 @@ default_Conf = {
             "interval" : 0.2,
             "dead_interval" : 1,
             "rx_queue" : None,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : False
+        },
+        "OlivOS_kaiheila_link" : {
+            "enable" : True,
+            "name" : "OlivOS_kaiheila_link",
+            "type" : "kaiheila_link",
+            "interval" : 0.2,
+            "dead_interval" : 1,
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : False

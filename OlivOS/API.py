@@ -129,6 +129,8 @@ class Event(object):
             OlivOS.dodobotEASDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.contentAPI.fake_sdk_event:
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
+        elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
+            OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
 
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
@@ -654,6 +656,11 @@ class Event(object):
                 else:
                     #主动私聊待实现
                     pass
+        elif self.platform['sdk'] == 'kaiheila_link':
+            if flag_type == 'group':
+                OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = False)
+            elif flag_type == 'private':
+                OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = True)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':
@@ -930,6 +937,8 @@ class Event(object):
             res_data = OlivOS.fanbookSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'qqGuild_link':
             res_data = OlivOS.qqGuildSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
 
         if res_data == None:
             return None

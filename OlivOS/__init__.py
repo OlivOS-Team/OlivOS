@@ -43,6 +43,8 @@ import OlivOS.dodoSDK
 import OlivOS.dodoPollServerAPI
 import OlivOS.fanbookSDK
 import OlivOS.fanbookPollServerAPI
+import OlivOS.kaiheilaSDK
+import OlivOS.kaiheilaLinkServerAPI
 if(platform.system() == 'Windows'):
     import OlivOS.multiLoginUIAPI
     import OlivOS.libEXEModelAPI

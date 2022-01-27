@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import json
 
 import OlivOS
+import traceback
 
 #platform sdk model
 dictMessageType = {
@@ -115,6 +116,10 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.OP()
+        elif get_type == 'kaiheila_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.kaiheila()
         else:
             res = str(self)
         return res
@@ -132,6 +137,8 @@ class Message_templet(object):
             self.init_from_angle_code_string()
         elif self.mode_rx == 'qqGuild_string':
             self.init_from_angle_code_string()
+        elif self.mode_rx == 'kaiheila_string':
+            self.init_from_kaiheila_code_string()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -375,6 +382,78 @@ class Message_templet(object):
                 it_data_base = it_data_this
         self.data = tmp_data
 
+    def init_from_kaiheila_code_string(self):
+        tmp_data_raw = str(self.data_raw)
+        tmp_data_raw_1 = ''
+        tmp_data_raw_2 = ''
+        tmp_data_raw_3 = ''
+        tmp_data_raw_4 = ''
+        tmp_data = []
+        it_data = range(0, len(tmp_data_raw))
+        it_data_base = 0
+        tmp_data_type = 'string'
+        for it_data_this in it_data:
+            if tmp_data_type == 'string' and tmp_data_raw[it_data_this] == '@':
+                tmp_data_raw_1 = ''
+                tmp_data_raw_2 = ''
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'code_begin'
+            elif tmp_data_type == 'string':
+                tmp_data_raw_1 += tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_raw_4 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'string'
+            elif tmp_data_type == 'code_begin' and tmp_data_raw[it_data_this] == '#':
+                tmp_data_raw_1 = ''
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'code_after'
+            elif tmp_data_type == 'code_begin':
+                tmp_data_raw_2 += tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'code_begin'
+            elif tmp_data_type == 'code_after' and tmp_data_raw[it_data_this].isdigit():
+                tmp_data_raw_1 += tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'code_after'
+            elif tmp_data_type == 'code_after':
+                if tmp_data_raw_1 != '':
+                    if tmp_data_raw_4 != '':
+                        tmp_data.append(
+                            PARA.text(tmp_data_raw_4)
+                        )
+                    tmp_data.append(
+                        PARA.at(
+                            id = tmp_data_raw_1
+                        )
+                    )
+                else:
+                    tmp_data.append(
+                        PARA.text(tmp_data_raw_3)
+                    )
+                tmp_data_raw_1 = ''
+                tmp_data_raw_2 = ''
+                tmp_data_raw_3 = ''
+                tmp_data_raw_4 = ''
+                tmp_data_raw_3 += tmp_data_raw[it_data_this]
+                tmp_data_raw_4 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'string'
+        if tmp_data_type == 'code_after' and tmp_data_raw_1 != '':
+            if tmp_data_raw_4 != '':
+                tmp_data.append(
+                    PARA.text(tmp_data_raw_4)
+                )
+            tmp_data.append(
+                PARA.at(
+                    id = tmp_data_raw_1
+                )
+            )
+        else:
+            tmp_data.append(
+                PARA.text(tmp_data_raw_3)
+            )
+        self.data = tmp_data
+
+
 class PARA_templet(object):
     def __init__(self, type = None, data = None):
         self.type = type
@@ -385,6 +464,25 @@ class PARA_templet(object):
 
     def OP(self):
         return self.get_string_by_key('OP')
+
+    def kaiheila(self):
+        code_tmp = '${'
+        if type(self) == PARA.at:
+            if self.data != None:
+                for key_this in self.data:
+                    if self.data[key_this] != None:
+                        code_tmp += '@'
+                        code_tmp += '#' + str(self.data[key_this])
+        elif type(self) == PARA.text:
+            if self.data != None:
+                if type(self.data['text']) is str:
+                    return self.data['text']
+                else:
+                    return str(self.data['text'])
+            else:
+                return ''
+        code_tmp += '}'
+        return code_tmp
 
     def fanbook(self):
         code_tmp = '${'

@@ -267,6 +267,7 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_list'] = [
             'qq',
             'qqGuild',
+            'kaiheila',
             'telegram',
             'dodo',
             'fanbook'
@@ -277,6 +278,9 @@ class TreeEditUI(object):
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qqGuild'] = [
             'qqGuild_link'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['kaiheila'] = [
+            'kaiheila_link'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['telegram'] = [
             'telegram_poll'
@@ -298,6 +302,10 @@ class TreeEditUI(object):
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild']['qqGuild_link'] = [
+            'default'
+        ]
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila']['kaiheila_link'] = [
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram'] = {}
@@ -667,6 +675,15 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
+            if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
             if tmp_platform_platform == 'fanbook' and tmp_platform_sdk == 'fanbook_poll':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
@@ -685,7 +702,6 @@ class TreeEditUI(object):
                     tmp_port = '0'
             if not checkByListEmptyOr([
                 tmp_id,
-                tmp_password,
                 tmp_server_auto,
                 tmp_server_type,
                 tmp_host,
@@ -715,7 +731,6 @@ class TreeEditUI(object):
                 miss_key_list = []
                 tmp_check_list = [
                     ['ID', tmp_id],
-                    ['PASSWORD', tmp_password],
                     ['SDK', tmp_platform_sdk],
                     ['PLATFORM', tmp_platform_platform],
                     ['MODEL', tmp_platform_model],
