@@ -20,6 +20,13 @@
   <a href="https://github.com/OlivOS-Team/OlivOS/releases">
     <img src="https://img.shields.io/github/downloads/OlivOS-Team/OlivOS/total.svg" alt="Downloads">
   </a>
+
+  <p align="center">
+    <a href="https://doc.olivos.wiki/">文档</a>
+    ·
+    <a href="https://github.com/OlivOS-Team/OlivOS/releases">下载</a>
+  </p>
+
 </div>
 
 ## 兼容
