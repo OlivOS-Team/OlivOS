@@ -40,7 +40,9 @@ class Account(object):
             logger_proc.log(2, 'init account from [' + path + '] ... done')
         plugin_bot_info_dict = {}
         for account_conf_account_this in account_conf['account']:
-            if safe_mode:
+            if safe_mode and account_conf_account_this['sdk_type'] not in [
+                'dodo_link'
+            ]:
                 tmp_password = ''
             else:
                 tmp_password = account_conf_account_this['password']

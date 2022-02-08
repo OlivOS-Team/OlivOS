@@ -286,6 +286,7 @@ class TreeEditUI(object):
             'telegram_poll'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
+            'dodo_link',
             'dodo_poll',
             'dodobot_ea'
         ]
@@ -698,6 +699,9 @@ class TreeEditUI(object):
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_link':
                 if tmp_port == '':
                     tmp_port = '0'
             if not checkByListEmptyOr([

@@ -123,6 +123,8 @@ class Event(object):
             OlivOS.telegramSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.fanbookSDK.event:
             OlivOS.fanbookSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.dodoLinkSDK.event:
+            OlivOS.dodoLinkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dodoSDK.event:
             OlivOS.dodoSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dodobotEASDK.event:
@@ -668,6 +670,12 @@ class Event(object):
                 OlivOS.fanbookSDK.event_action.send_private_msg(self, target_id, tmp_message)
             elif flag_type == 'group':
                 OlivOS.fanbookSDK.event_action.send_msg(self, target_id, tmp_message)
+        elif self.platform['sdk'] == 'dodo_link':
+            if flag_type == 'group':
+                OlivOS.dodoLinkSDK.event_action.send_msg(self, target_id, tmp_message)
+            elif flag_type == 'private':
+            	#此处缺少接口
+            	pass
         elif self.platform['sdk'] == 'dodo_poll':
             if flag_type == 'private':
                 if host_id != None:

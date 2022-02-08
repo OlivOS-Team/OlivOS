@@ -8,3 +8,4 @@ websockets
 websocket-client
 pillow
 lxml
+rsa

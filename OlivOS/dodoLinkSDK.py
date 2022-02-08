@@ -1,0 +1,367 @@
+# -*- encoding: utf-8 -*-
+'''
+_______________________    ________________
+__  __ \__  /____  _/_ |  / /_  __ \_  ___/
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
+
+@File      :   OlivOS/dodoLinkSDK.py
+@Author    :   lunzhiPenxil仑质
+@Contact   :   lunzhipenxil@gmail.com
+@License   :   AGPL
+@Copyright :   (C) 2020-2021, OlivOS-Team
+@Desc      :   None
+'''
+
+import sys
+import json
+import requests as req
+import time
+import traceback
+import rsa
+import base64
+
+import OlivOS
+
+sdkAPIHost = {
+    'default': 'https://botopen.imdodo.com/api/v1',
+    'v1': 'https://botopen.imdodo.com/api/v1',
+    'native': 'https://botopen.imdodo.com/api'
+}
+
+sdkAPIRoute = {
+    'me': '/bot/info',
+    'gateway': '/websocket/connection',
+    'channel': '/channel',
+    'member': '/member'
+}
+
+sdkAPIRouteTemp = {}
+
+sdkSubSelfInfo = {}
+sdkUserInfo = {}
+
+class bot_info_T(object):
+    def __init__(self, id = -1, password = '', host = '', access_token = None):
+        self.id = id
+        self.clientSecret = password
+        self.publicKey = host
+        self.access_token = access_token
+        self.debug_mode = False
+        self.debug_logger = None
+
+def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
+    res = bot_info_T(
+        plugin_bot_info.id,
+        plugin_bot_info.password,
+        plugin_bot_info.post_info.host,
+        plugin_bot_info.post_info.access_token
+    )
+    res.debug_mode = plugin_bot_info.debug_mode
+    return res
+
+def get_SDK_bot_info_from_Event(target_event):
+    res = bot_info_T(
+        target_event.bot_info.id,
+        target_event.bot_info.password,
+        target_event.bot_info.post_info.host,
+        target_event.bot_info.post_info.access_token
+    )
+    res.debug_mode = target_event.bot_info.debug_mode
+    return res
+
+class event(object):
+    def __init__(self, payload_obj = None, bot_info = None):
+        self.payload = payload_obj
+        self.platform = {}
+        self.platform['sdk'] = 'dodo_link'
+        self.platform['platform'] = 'dodo'
+        self.platform['model'] = 'default'
+        self.active = False
+        if self.payload != None:
+            self.active = True
+        self.base_info = {}
+        if self.active:
+            self.base_info['time'] = int(time.time())
+            self.base_info['self_id'] = bot_info.id
+            self.base_info['clientSecret'] = bot_info.password
+            self.base_info['publicKey'] = bot_info.post_info.host
+            self.base_info['token'] = bot_info.post_info.access_token
+            self.base_info['post_type'] = None
+
+'''
+对于WEBSOCKET接口的PAYLOAD实现
+'''
+class payload_template(object):
+    def __init__(self, data = None, is_rx = False):
+        self.active = True
+        self.data = self.data_T()
+        self.load(data, is_rx)
+
+    def __str__(self):
+        res = {}
+        res['active'] = self.active
+        res['data'] = str(self.data)
+        return str(res)
+
+    class data_T(object):
+        def __init__(self):
+            self.type = None
+            self.data = None
+
+        def __str__(self):
+            return str(self.__dict__)
+
+    def dump(self):
+        res_obj = {}
+        for data_this in self.data.__dict__:
+            if self.data.__dict__[data_this] != None:
+                res_obj[data_this] = self.data.__dict__[data_this]
+        res = json.dumps(obj = res_obj)
+        return res
+
+    def load(self, data, is_rx):
+        if data != None:
+            if type(data) == dict:
+                if 'type' in data:
+                    self.data.type = data['type']
+                if 'data' in data:
+                    self.data.data = data['data']
+            else:
+                self.active = False
+        return self
+
+class PAYLOAD(object):
+    class rxPacket(payload_template):
+        def __init__(self, data):
+            payload_template.__init__(self, data, True)
+
+    class sendPing(payload_template):
+        def __init__(self, last_s = None):
+            payload_template.__init__(self)
+            self.data.s = 2
+            self.data.sn = last_s
+
+'''
+对于POST接口的实现
+'''
+class api_templet(object):
+    def __init__(self):
+        self.bot_info = None
+        self.data = None
+        self.metadata = None
+        self.host = None
+        self.port = 443
+        self.route = None
+        self.res = None
+
+    def do_api(self, req_type = 'POST'):
+        try:
+            tmp_payload_dict = {}
+            tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+            if self.metadata != None:
+                tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
+            if self.data != None:
+                for data_this in self.data.__dict__:
+                    tmp_payload_dict[data_this] = self.data.__dict__[data_this]
+
+            payload = json.dumps(obj = tmp_payload_dict)
+            send_url_temp = self.host + self.route
+            send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+            tmp_timestamp = int(time.time() * 1000)
+            tmp_content = str(tmp_timestamp) + self.bot_info.clientSecret
+            tmp_key = ''
+            for tmp_key_i in range(len(self.bot_info.publicKey)):
+                if tmp_key_i != 0 and tmp_key_i % 64 == 0:
+                    tmp_key += '\n' + self.bot_info.publicKey[tmp_key_i]
+                else:
+                    tmp_key += self.bot_info.publicKey[tmp_key_i]
+            tmp_key = '-----BEGIN PUBLIC KEY-----\n' + tmp_key + '\n-----END PUBLIC KEY-----'
+            tmp_sign = str(
+                base64.b64encode(
+                    rsa.encrypt(
+                        tmp_content.encode('utf-8'),
+                        rsa.PublicKey.load_pkcs1_openssl_pem(
+                            tmp_key.encode('utf-8')
+                        )
+                    )
+                ).decode('utf-8')
+            )
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                'clientId': str(self.bot_info.id),
+                'Authorization': self.bot_info.access_token,
+                'timestamp': str(tmp_timestamp),
+                'sign': tmp_sign
+            }
+
+            msg_res = None
+            if req_type == 'POST':
+                msg_res = req.request("POST", send_url, headers = headers, data = payload)
+            elif req_type == 'GET':
+                msg_res = req.request("GET", send_url, headers = headers)
+
+            if self.bot_info.debug_mode:
+                if self.bot_info.debug_logger != None:
+                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
+
+            self.res = msg_res.text
+            return msg_res.text
+        except:
+            return None
+
+class API(object):
+    class getGateway(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['gateway']
+
+    class getMe(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['me']
+
+    class sendChannelMessage(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channel'] + '/message/send'
+
+        class data_T(object):
+            def __init__(self):
+                self.channelId = '-1'
+                self.messageType = 1
+                self.messageBody = {}
+                self.referencedMessageId = None
+
+    class getMemberInfo(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['member'] = '/info'
+
+        class data_T(object):
+            def __init__(self):
+                self.islandId = '-1'
+                self.dodoId = '-1'
+
+
+def get_Event_from_SDK(target_event):
+    global sdkSubSelfInfo
+    global sdkUserInfo
+    target_event.base_info['time'] = target_event.sdk_event.base_info['time']
+    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
+    target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
+    target_event.platform['platform'] = target_event.sdk_event.platform['platform']
+    target_event.platform['model'] = target_event.sdk_event.platform['model']
+    target_event.plugin_info['message_mode_rx'] = 'olivos_para'
+    plugin_event_bot_hash = OlivOS.API.getBotHash(
+        bot_id = target_event.base_info['self_id'],
+        platform_sdk = target_event.platform['sdk'],
+        platform_platform = target_event.platform['platform'],
+        platform_model = target_event.platform['model']
+    )
+    tmp_bot_info = bot_info_T(
+        target_event.sdk_event.base_info['self_id'],
+        target_event.sdk_event.base_info['clientSecret'],
+        target_event.sdk_event.base_info['publicKey'],
+        target_event.sdk_event.base_info['token']
+    )
+    if plugin_event_bot_hash not in sdkSubSelfInfo:
+        api_msg_obj = API.getMe(tmp_bot_info)
+        try:
+            api_msg_obj.do_api('POST')
+            api_res_json = json.loads(api_msg_obj.res)
+            if api_res_json['status'] == 0:
+                sdkSubSelfInfo[plugin_event_bot_hash] = int(api_res_json['data']['dodoId'])
+        except:
+            pass
+    try:
+        if target_event.sdk_event.payload.data.type == 0:
+            if target_event.sdk_event.payload.data.data['eventType'] == str(2001):
+                message_obj = None
+                if target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 1:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'dodo_string',
+                        target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
+                    )
+                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                    message_obj.data_raw = message_obj.data.copy()
+                elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 2:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        [
+                            OlivOS.messageAPI.PARA.image(
+                                target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
+                            )
+                        ]
+                    )
+                if message_obj != None:
+                    target_event.active = True
+                    tmp_host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
+                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    if tmp_user_id not in sdkUserInfo:
+                        api_msg_obj = API.getMemberInfo(tmp_bot_info)
+                        api_msg_obj.data.islandId = tmp_host_id
+                        api_msg_obj.data.dodoId = tmp_user_id
+                        api_msg_obj.do_api('POST')
+                        api_res_json = json.loads(api_msg_obj.res)
+                        if api_res_json['status'] == 0:
+                            sdkUserInfo[tmp_user_id] = api_res_json['data']['nickName']
+                    target_event.plugin_info['func_type'] = 'group_message'
+                    target_event.data = target_event.group_message(
+                        int(target_event.sdk_event.payload.data.data['eventBody']['channelId']),
+                        target_event.sdk_event.payload.data.data['eventBody']['dodoId'],
+                        message_obj,
+                        'group'
+                    )
+                    target_event.data.host_id = target_event.sdk_event.payload.data.data['eventBody']['islandId']
+                    target_event.data.message_sdk = message_obj
+                    target_event.data.message_id = target_event.sdk_event.payload.data.data['eventBody']['messageId']
+                    target_event.data.raw_message = message_obj
+                    target_event.data.raw_message_sdk = message_obj
+                    target_event.data.font = None
+                    target_event.data.sender['user_id'] = target_event.sdk_event.payload.data.data['eventBody']['dodoId']
+                    target_event.data.sender['id'] = target_event.sdk_event.payload.data.data['eventBody']['dodoId']
+                    target_event.data.sender['nickname'] = 'User'
+                    target_event.data.sender['name'] = 'User'
+                    if tmp_user_id in sdkUserInfo:
+                        target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]
+                        target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]
+                    target_event.data.sender['sex'] = 'unknown'
+                    target_event.data.sender['age'] = 0
+                    target_event.data.extend['host_group_id'] = target_event.sdk_event.payload.data.data['eventBody']['islandId']
+                    if plugin_event_bot_hash in sdkSubSelfInfo:
+                        target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+    except:
+        target_event.active = False
+
+
+#支持OlivOS API调用的方法实现
+class event_action(object):
+    def send_msg(target_event, chat_id, message):
+        this_msg = None
+        this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.channelId = str(chat_id)
+        for message_this in message.data:
+            this_msg.data.messageType = 1
+            this_msg.data.messageBody = {}
+            this_msg.data.messageBody['content'] = message_this.OP()
+            this_msg.do_api('POST')
