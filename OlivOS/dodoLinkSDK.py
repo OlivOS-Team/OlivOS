@@ -254,7 +254,7 @@ class API(object):
             self.data = self.data_T()
             self.metadata = None
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['member'] = '/info'
+            self.route = sdkAPIRoute['member'] + '/info'
 
         class data_T(object):
             def __init__(self):
@@ -324,7 +324,8 @@ def get_Event_from_SDK(target_event):
                         api_msg_obj.do_api('POST')
                         api_res_json = json.loads(api_msg_obj.res)
                         if api_res_json['status'] == 0:
-                            sdkUserInfo[tmp_user_id] = api_res_json['data']['nickName']
+                            sdkUserInfo[tmp_user_id] = {}
+                            sdkUserInfo[tmp_user_id] = api_res_json['data'].copy()
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
                         int(target_event.sdk_event.payload.data.data['eventBody']['channelId']),
@@ -342,11 +343,11 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender['id'] = target_event.sdk_event.payload.data.data['eventBody']['dodoId']
                     target_event.data.sender['nickname'] = 'User'
                     target_event.data.sender['name'] = 'User'
-                    if tmp_user_id in sdkUserInfo:
-                        target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]
-                        target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
+                    if tmp_user_id in sdkUserInfo:
+                        target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]['nickName']
+                        target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]['nickName']
                     target_event.data.extend['host_group_id'] = target_event.sdk_event.payload.data.data['eventBody']['islandId']
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
@@ -361,7 +362,13 @@ class event_action(object):
         this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = str(chat_id)
         for message_this in message.data:
-            this_msg.data.messageType = 1
-            this_msg.data.messageBody = {}
-            this_msg.data.messageBody['content'] = message_this.OP()
-            this_msg.do_api('POST')
+            if type(message_this) is OlivOS.messageAPI.PARA.text:
+                this_msg.data.messageType = 1
+                this_msg.data.messageBody = {}
+                this_msg.data.messageBody['content'] = message_this.data['text']
+                this_msg.do_api('POST')
+            elif type(message_this) is OlivOS.messageAPI.PARA.text:
+                this_msg.data.messageType = 2
+                this_msg.data.messageBody = {}
+                this_msg.data.messageBody['url'] = message_this.data['url']
+                this_msg.do_api('POST')
