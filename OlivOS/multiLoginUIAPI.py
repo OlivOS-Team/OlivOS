@@ -314,6 +314,9 @@ class TreeEditUI(object):
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo'] = {}
+        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodo_link'] = [
+            'default'
+        ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodo_poll'] = [
             'default'
         ]
