@@ -947,6 +947,8 @@ class Event(object):
             res_data = OlivOS.qqGuildSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'dodo_link':
+            res_data = OlivOS.dodoLinkSDK.event_action.get_login_info(self)
 
         if res_data == None:
             return None

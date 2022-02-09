@@ -313,6 +313,15 @@ def get_Event_from_SDK(target_event):
                             )
                         ]
                     )
+                elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 3:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        [
+                            OlivOS.messageAPI.PARA.video(
+                                target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
+                            )
+                        ]
+                    )
                 if message_obj != None:
                     target_event.active = True
                     tmp_host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
@@ -346,8 +355,14 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
                     if tmp_user_id in sdkUserInfo:
-                        target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]['nickName']
-                        target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]['nickName']
+                        if 'nickName' in sdkUserInfo[tmp_user_id]:
+                            target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]['nickName']
+                            target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]['nickName']
+                        if 'sex' in sdkUserInfo[tmp_user_id]:
+                            if sdkUserInfo[tmp_user_id]['sex'] == 0:
+                                target_event.data.sender['sex'] = 'female'
+                            elif sdkUserInfo[tmp_user_id]['sex'] == 1:
+                                target_event.data.sender['sex'] = 'male'
                     target_event.data.extend['host_group_id'] = target_event.sdk_event.payload.data.data['eventBody']['islandId']
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
@@ -372,3 +387,56 @@ class event_action(object):
                 this_msg.data.messageBody = {}
                 this_msg.data.messageBody['url'] = message_this.data['url']
                 this_msg.do_api('POST')
+
+    def get_login_info(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
+        raw_obj = None
+        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res != None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj != None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickName'], str)
+                    res_data['data']['id'] = int(init_api_do_mapping_for_dict(raw_obj, ['data', 'dodoId'], str))
+        except:
+            res_data['active'] = False
+        return res_data
+
+
+def init_api_json(raw_str):
+    res_data = None
+    tmp_obj = None
+    flag_is_active = False
+    try:
+        tmp_obj = json.loads(raw_str)
+    except:
+        tmp_obj = None
+    if type(tmp_obj) == dict:
+        if tmp_obj['status'] == 0:
+            flag_is_active = True
+    if flag_is_active:
+        if type(tmp_obj) == dict:
+            res_data = tmp_obj.copy()
+    return res_data
+
+def init_api_do_mapping(src_type, src_data):
+    if type(src_data) == src_type:
+        return src_data
+
+def init_api_do_mapping_for_dict(src_data, path_list, src_type):
+    res_data = None
+    flag_active = True
+    tmp_src_data = src_data
+    for path_list_this in path_list:
+        if type(tmp_src_data) == dict:
+            if path_list_this in tmp_src_data:
+                tmp_src_data = tmp_src_data[path_list_this]
+            else:
+                return None
+        else:
+            return None
+    res_data = init_api_do_mapping(src_type, tmp_src_data)
+    return res_data
