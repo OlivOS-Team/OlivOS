@@ -102,7 +102,10 @@ class server(OlivOS.API.Proc_templet):
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
-        ws.run_forever()
+        ws.run_forever(
+            ping_interval = 30,
+            ping_timeout = 5
+        )
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None

@@ -87,10 +87,6 @@ class api_templet(object):
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
-
             msg_res = req.request("POST", send_url, headers = headers, data = payload)
 
             if self.bot_info.debug_mode:
