@@ -273,6 +273,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -308,6 +309,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -345,6 +347,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -372,6 +375,50 @@ def get_Event_from_SDK(target_event):
         target_event.data.sender['age'] = 0
         if plugin_event_bot_hash in sdkSubSelfInfo:
             target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+    if checkByListAnd([
+        not target_event.active,
+        'message' in target_event.sdk_event.json,
+        checkInDictSafe('message', target_event.sdk_event.json, []),
+        checkInDictSafe('from', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'chat']),
+        checkInDictSafe('new_chat_member', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'new_chat_member'])
+    ]):
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'group_member_increase'
+        target_event.data = target_event.group_member_increase(
+            target_event.sdk_event.json['message']['chat']['id'],
+            target_event.sdk_event.json['message']['from']['id'],
+            target_event.sdk_event.json['message']['new_chat_member']['id']
+        )
+        target_event.data.action = 'invite'
+    if checkByListAnd([
+        not target_event.active,
+        'message' in target_event.sdk_event.json,
+        checkInDictSafe('message', target_event.sdk_event.json, []),
+        checkInDictSafe('from', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
+        checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'chat']),
+        checkInDictSafe('left_chat_member', target_event.sdk_event.json, ['message']),
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'left_chat_member'])
+    ]):
+        target_event.active = True
+        target_event.plugin_info['func_type'] = 'group_member_decrease'
+        target_event.data = target_event.group_member_decrease(
+            target_event.sdk_event.json['message']['chat']['id'],
+            target_event.sdk_event.json['message']['from']['id'],
+            target_event.sdk_event.json['message']['left_chat_member']['id']
+        )
+        if target_event.data.operator_id == target_event.data.user_id:
+            target_event.data.action = 'leave'
+        else:
+            if target_event.data.user_id == target_event.base_info['self_id']:
+                target_event.data.action = 'kick_me'
+            else:
+                target_event.data.action = 'kick'
     return target_event.active
 
 #支持OlivOS API调用的方法实现
