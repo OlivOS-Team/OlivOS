@@ -172,7 +172,7 @@ class api_templet(object):
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'Authorization': '%s.%s' % (
+                'Authorization': 'Bot %s.%s' % (
                     str(self.bot_info.id),
                     self.bot_info.access_token
                 )
