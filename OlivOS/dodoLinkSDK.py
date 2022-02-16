@@ -169,32 +169,13 @@ class api_templet(object):
             payload = json.dumps(obj = tmp_payload_dict)
             send_url_temp = self.host + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-            tmp_timestamp = int(time.time() * 1000)
-            tmp_content = str(tmp_timestamp) + self.bot_info.clientSecret
-            tmp_key = ''
-            for tmp_key_i in range(len(self.bot_info.publicKey)):
-                if tmp_key_i != 0 and tmp_key_i % 64 == 0:
-                    tmp_key += '\n' + self.bot_info.publicKey[tmp_key_i]
-                else:
-                    tmp_key += self.bot_info.publicKey[tmp_key_i]
-            tmp_key = '-----BEGIN PUBLIC KEY-----\n' + tmp_key + '\n-----END PUBLIC KEY-----'
-            tmp_sign = str(
-                base64.b64encode(
-                    rsa.encrypt(
-                        tmp_content.encode('utf-8'),
-                        rsa.PublicKey.load_pkcs1_openssl_pem(
-                            tmp_key.encode('utf-8')
-                        )
-                    )
-                ).decode('utf-8')
-            )
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'clientId': str(self.bot_info.id),
-                'Authorization': self.bot_info.access_token,
-                'timestamp': str(tmp_timestamp),
-                'sign': tmp_sign
+                'Authorization': '%s.%s' % (
+                    str(self.bot_info.id),
+                    self.bot_info.access_token
+                )
             }
 
             msg_res = None
