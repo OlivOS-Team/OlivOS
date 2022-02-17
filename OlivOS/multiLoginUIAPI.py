@@ -705,6 +705,10 @@ class TreeEditUI(object):
                 if tmp_port == '':
                     tmp_port = '0'
             if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_link':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
             if not checkByListEmptyOr([
