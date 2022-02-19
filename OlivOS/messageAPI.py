@@ -388,12 +388,17 @@ class Message_templet(object):
         tmp_data_raw_2 = ''
         tmp_data_raw_3 = ''
         tmp_data_raw_4 = ''
+        tmp_data_raw_list = []
         tmp_data = []
         it_data = range(0, len(tmp_data_raw))
         it_data_base = 0
         tmp_data_type = 'string'
         for it_data_this in it_data:
-            if tmp_data_type == 'string' and tmp_data_raw[it_data_this] == '@':
+            if tmp_data_type == 'string' and tmp_data_raw[it_data_this] == '[':
+                tmp_data_raw_list = []
+                tmp_data_raw_list.append('[')
+                tmp_data_type = 'emoji_begin'
+            elif tmp_data_type == 'string' and tmp_data_raw[it_data_this] == '@':
                 tmp_data_raw_1 = ''
                 tmp_data_raw_2 = ''
                 tmp_data_raw_3 += tmp_data_raw[it_data_this]
@@ -402,6 +407,42 @@ class Message_templet(object):
                 tmp_data_raw_1 += tmp_data_raw[it_data_this]
                 tmp_data_raw_3 += tmp_data_raw[it_data_this]
                 tmp_data_raw_4 += tmp_data_raw[it_data_this]
+                tmp_data_type = 'string'
+            elif tmp_data_type == 'emoji_begin' and tmp_data_raw[it_data_this] == '#':
+                tmp_data_raw_list.append(tmp_data_raw[it_data_this])
+                tmp_data_type = 'emoji_after'
+            elif tmp_data_type == 'emoji_begin':
+                tmp_data_raw_1 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_4 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_type = 'string'
+            elif tmp_data_type == 'emoji_after' and tmp_data_raw[it_data_this].isdigit():
+                tmp_data_raw_list.append(tmp_data_raw[it_data_this])
+                tmp_data_type = 'emoji_after'
+            elif tmp_data_type == 'emoji_after' and tmp_data_raw[it_data_this] == ';':
+                tmp_data_raw_list.append(tmp_data_raw[it_data_this])
+                tmp_data_type = 'emoji_after_last'
+            elif tmp_data_type == 'emoji_after':
+                tmp_data_raw_1 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_4 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_type = 'string'
+            elif tmp_data_type == 'emoji_after_last' and tmp_data_raw[it_data_this] == ']':
+                tmp_emoji = chr(
+                    int(
+                        ''.join(tmp_data_raw_list[2:-1]),
+                        10
+                    )
+                )
+                tmp_data_raw_1 += tmp_emoji
+                tmp_data_raw_3 += tmp_emoji
+                tmp_data_raw_4 += tmp_emoji
+                tmp_data_raw_list = []
+                tmp_data_type = 'string'
+            elif tmp_data_type == 'emoji_after_last':
+                tmp_data_raw_1 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_3 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
+                tmp_data_raw_4 += ''.join(tmp_data_raw_list) + tmp_data_raw[it_data_this]
                 tmp_data_type = 'string'
             elif tmp_data_type == 'code_begin' and tmp_data_raw[it_data_this] == '#':
                 tmp_data_raw_1 = ''
