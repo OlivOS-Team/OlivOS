@@ -1,0 +1,22 @@
+name: CI-Packing
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: PyPI Deployment
+      uses: casperdcl/deploy-pypi@v2.1.0
+      with:
+        user: ${{ secrets.OWNERPYPIUSERNAME }}
+        password: ${{ secrets.OWNERPYPIPASSWORD }}
+        requirements: twine wheel
+        build: setup.py
+        check: true
+        upload: true
+        dist_dir: ./dist
+        skip_existing: true
