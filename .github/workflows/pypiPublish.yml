@@ -1,9 +1,7 @@
 name: CI-Packing
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [ pypipublish ]
   workflow_dispatch:
 jobs:
   build:
