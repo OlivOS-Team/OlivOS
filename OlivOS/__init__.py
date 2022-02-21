@@ -18,35 +18,35 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-import OlivOS.infoAPI
-import OlivOS.bootAPI
-import OlivOS.bootDataAPI
-import OlivOS.data
-import OlivOS.hook
-import OlivOS.contentAPI
-import OlivOS.messageAPI
-import OlivOS.metadataAPI
-import OlivOS.API
-import OlivOS.accountAPI
-import OlivOS.diagnoseAPI
-import OlivOS.flaskServerAPI
-import OlivOS.pluginAPI
-import OlivOS.onebotSDK
-import OlivOS.qqGuildSDK
-import OlivOS.qqGuildLinkServerAPI
-import OlivOS.telegramSDK
-import OlivOS.telegramPollServerAPI
-import OlivOS.dodobotEAServerAPI
-import OlivOS.dodobotEATXAPI
-import OlivOS.dodobotEASDK
-import OlivOS.dodoSDK
-import OlivOS.dodoPollServerAPI
-import OlivOS.dodoLinkSDK
-import OlivOS.dodoLinkServerAPI
-import OlivOS.fanbookSDK
-import OlivOS.fanbookPollServerAPI
-import OlivOS.kaiheilaSDK
-import OlivOS.kaiheilaLinkServerAPI
+from . import infoAPI
+from . import bootAPI
+from . import bootDataAPI
+from . import data
+from . import hook
+from . import contentAPI
+from . import messageAPI
+from . import metadataAPI
+from . import API
+from . import accountAPI
+from . import diagnoseAPI
+from . import flaskServerAPI
+from . import pluginAPI
+from . import onebotSDK
+from . import qqGuildSDK
+from . import qqGuildLinkServerAPI
+from . import telegramSDK
+from . import telegramPollServerAPI
+from . import dodobotEAServerAPI
+from . import dodobotEATXAPI
+from . import dodobotEASDK
+from . import dodoSDK
+from . import dodoPollServerAPI
+from . import dodoLinkSDK
+from . import dodoLinkServerAPI
+from . import fanbookSDK
+from . import fanbookPollServerAPI
+from . import kaiheilaSDK
+from . import kaiheilaLinkServerAPI
 if(platform.system() == 'Windows'):
-    import OlivOS.multiLoginUIAPI
-    import OlivOS.libEXEModelAPI
+    from . import multiLoginUIAPI
+    from . import libEXEModelAPI
