@@ -18,8 +18,6 @@ import setuptools
 
 with open('README.md', 'r') as f:
   long_description = f.read()
-with open('requirements.txt', 'r') as f:
-  install_requires = f.read().split('\n')
 
 setuptools.setup(name='olivos',
     version='0.9.4',
@@ -29,7 +27,19 @@ setuptools.setup(name='olivos',
     author='OlivOS-Team',
     author_email='lunzhipenxil@gmail.com',
     url='https://github.com/OlivOS-Team/OlivOS',
-    install_requires=[],
+    install_requires=[
+        'pyinstaller==3.5',
+        'flask',
+        'gevent',
+        'psutil',
+        'requests==2.23.0',
+        'pybase64',
+        'websockets',
+        'websocket-client',
+        'pillow',
+        'lxml',
+        'rsa'
+    ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),
     classifiers=[
