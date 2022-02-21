@@ -6,15 +6,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-    - name: PyPI Deployment
-      uses: casperdcl/deploy-pypi@v2.1.0
-      with:
-        user: ${{ secrets.OWNERPYPIUSERNAME }}
-        password: ${{ secrets.OWNERPYPIPASSWORD }}
-        requirements: twine wheel
-        build: setup.py
-        check: true
-        upload: true
-        dist_dir: ./dist
-        skip_existing: true
+    steps: 
+      - uses: actions/checkout@v2
+      - name: Deploy Pypi
+        uses: remorses/pypi@v3
+        with:
+          setup_file: ./setup.py
+          username: ${{ secrets.OWNERPYPIUSERNAME }}
+          password: ${{ secrets.OWNERPYPIPASSWORD }}
