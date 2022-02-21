@@ -21,7 +21,7 @@ with open('requirements.txt', 'r') as f:
   install_requires = f.read().split('\n')
 
 setuptools.setup(name='olivos',
-    version='0.9.3-fix1',
+    version='0.9.3.fix1',
     description='OlivOS - Witness Union',
     long_description=long_description,
     long_description_content_type='text/markdown',
