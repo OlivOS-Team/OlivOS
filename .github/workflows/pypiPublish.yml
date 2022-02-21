@@ -6,7 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
+    steps: 
+      - uses: actions/checkout@v2
       - name: Deploy Pypi
         uses: remorses/pypi@v3
         with:
