@@ -13,7 +13,7 @@ jobs:
         user: ${{ secrets.OWNERPYPIUSERNAME }}
         password: ${{ secrets.OWNERPYPIPASSWORD }}
         requirements: twine wheel
-        build: setup.py
+        build: ./setup.py
         check: true
         upload: true
         dist_dir: ./dist
