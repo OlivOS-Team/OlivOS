@@ -1,11 +1,11 @@
+
 # -*- encoding: utf-8 -*-
 '''
-   ____  _   ____________  ________________
-  / __ \/ | / / ____/ __ \/  _/ ____/ ____/
- / / / /  |/ / __/ / / / // // /   / __/   
-/ /_/ / /|  / /___/ /_/ // // /___/ /___   
-\____/_/ |_/_____/_____/___/\____/_____/   
-
+_______________________    ________________
+__  __ \__  /____  _/_ |  / /_  __ \_  ___/
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
 @File      :   setup.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
@@ -13,6 +13,7 @@
 @Copyright :   (C) 2020-2021, OlivOS-Team
 @Desc      :   None
 '''
+
 import setuptools
 
 with open('README.md', 'r') as f:
@@ -21,7 +22,7 @@ with open('requirements.txt', 'r') as f:
   install_requires = f.read().split('\n')
 
 setuptools.setup(name='olivos',
-    version='0.9.3.fix1',
+    version='0.9.4',
     description='OlivOS - Witness Union',
     long_description=long_description,
     long_description_content_type='text/markdown',
