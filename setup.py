@@ -20,7 +20,7 @@ with open('README.md', 'r') as f:
   long_description = f.read()
 
 setuptools.setup(name='olivos',
-    version='0.9.5',
+    version='0.9.6',
     description='OlivOS - Witness Union',
     long_description=long_description,
     long_description_content_type='text/markdown',

@@ -34,6 +34,7 @@ sdkAPIRoute = {
     'me': '/bot/info',
     'gateway': '/websocket/connection',
     'channel': '/channel',
+    'personal': '/personal',
     'member': '/member'
 }
 
@@ -228,6 +229,21 @@ class API(object):
                 self.messageBody = {}
                 self.referencedMessageId = None
 
+    class sendPersonalMessage(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['personal'] + '/message/send'
+
+        class data_T(object):
+            def __init__(self):
+                self.dodoId = '-1'
+                self.messageType = 1
+                self.messageBody = {}
+
     class getMemberInfo(api_templet):
         def __init__(self, bot_info = None):
             api_templet.__init__(self)
@@ -363,7 +379,23 @@ class event_action(object):
                 this_msg.data.messageBody = {}
                 this_msg.data.messageBody['content'] = message_this.data['text']
                 this_msg.do_api('POST')
-            elif type(message_this) is OlivOS.messageAPI.PARA.text:
+            elif type(message_this) is OlivOS.messageAPI.PARA.image:
+                this_msg.data.messageType = 2
+                this_msg.data.messageBody = {}
+                this_msg.data.messageBody['url'] = message_this.data['url']
+                this_msg.do_api('POST')
+
+    def send_personal_msg(target_event, chat_id, message):
+        this_msg = None
+        this_msg = API.sendPersonalMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.dodoId = str(chat_id)
+        for message_this in message.data:
+            if type(message_this) is OlivOS.messageAPI.PARA.text:
+                this_msg.data.messageType = 1
+                this_msg.data.messageBody = {}
+                this_msg.data.messageBody['content'] = message_this.data['text']
+                this_msg.do_api('POST')
+            elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 this_msg.data.messageType = 2
                 this_msg.data.messageBody = {}
                 this_msg.data.messageBody['url'] = message_this.data['url']
