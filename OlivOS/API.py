@@ -674,8 +674,7 @@ class Event(object):
             if flag_type == 'group':
                 OlivOS.dodoLinkSDK.event_action.send_msg(self, target_id, tmp_message)
             elif flag_type == 'private':
-                #此处缺少接口
-                pass
+                OlivOS.dodoLinkSDK.event_action.send_personal_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'dodo_poll':
             if flag_type == 'private':
                 if host_id != None:
