@@ -883,7 +883,7 @@ class Event(object):
         if self.platform['sdk'] == 'onebot':
             OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
     def set_group_leave(self, group_id, is_dismiss = False, flag_log = True, remote = False):
         if remote:

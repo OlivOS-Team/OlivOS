@@ -468,6 +468,11 @@ class event_action(object):
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], int)
         return res_data
 
+    def set_chat_leave(target_event, chat_id, is_dismiss = False):
+        this_msg = API.leaveChat(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = chat_id
+        this_msg.do_api()
+
 def init_api_json(raw_str):
     res_data = None
     tmp_obj = None
@@ -609,3 +614,15 @@ class API(object):
             def __init__(self):
                 self.chat_id = 0
                 self.photo = ''
+
+    class leaveChat(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'leaveChat'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
