@@ -342,10 +342,10 @@ class shallow(OlivOS.API.Proc_templet):
                                                     traceback.format_exc()
                                                 )
                                             )
-                                        total_models_count += 1
-                                        self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
-                                        #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                                        continue
+                                    total_models_count += 1
+                                    self.log(2, 'OlivOS plugin [' + plugin_models_dict_this['name'] + '] is loaded by OlivOS plugin shallow [' + self.Proc_name + ']')
+                                    #doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                                    continue
                                 else:
                                     skip_result = plugin_dir_this + '.main.Event' + ' not found'
                                     skip_result_level = 4
