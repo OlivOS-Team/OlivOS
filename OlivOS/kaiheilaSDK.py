@@ -234,7 +234,7 @@ class API(object):
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
-    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -301,27 +301,27 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
-                        target_event.sdk_event.payload.data.d['target_id'],
-                        target_event.sdk_event.payload.data.d['author_id'],
+                        str(target_event.sdk_event.payload.data.d['target_id']),
+                        str(target_event.sdk_event.payload.data.d['author_id']),
                         message_obj,
                         'group'
                     )
                     target_event.data.message_sdk = message_obj
-                    target_event.data.message_id = target_event.sdk_event.payload.data.d['msg_id']
+                    target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
                     target_event.data.raw_message = message_obj
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
-                    target_event.data.sender['user_id'] = target_event.sdk_event.payload.data.d['extra']['author']['id']
+                    target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
                     target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['id'] = target_event.sdk_event.payload.data.d['extra']['author']['id']
+                    target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
                     target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
                     target_event.data.sender['role'] = 'member'
-                    target_event.data.host_id = target_event.sdk_event.payload.data.d['extra']['guild_id']
+                    target_event.data.host_id = str(target_event.sdk_event.payload.data.d['extra']['guild_id'])
                     target_event.data.extend['flag_from_direct'] = False
                     if plugin_event_bot_hash in sdkSubSelfInfo:
-                        target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+                        target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
                     if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
                         target_event.active = False
                 else:
@@ -371,24 +371,24 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'private_message'
                     target_event.data = target_event.private_message(
-                        target_event.sdk_event.payload.data.d['author_id'],
+                        str(target_event.sdk_event.payload.data.d['author_id']),
                         message_obj,
                         'friend'
                     )
                     target_event.data.message_sdk = message_obj
-                    target_event.data.message_id = target_event.sdk_event.payload.data.d['msg_id']
+                    target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
                     target_event.data.raw_message = message_obj
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
-                    target_event.data.sender['user_id'] = target_event.sdk_event.payload.data.d['extra']['author']['id']
+                    target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
                     target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['id'] = target_event.sdk_event.payload.data.d['author_id']
+                    target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
                     target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
                     target_event.data.extend['flag_from_direct'] = True
                     if plugin_event_bot_hash in sdkSubSelfInfo:
-                        target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+                        target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
                     if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
                         target_event.active = False
                 else:
@@ -405,7 +405,7 @@ class event_action(object):
             this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
         else:
             this_msg = API.creatMessage(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.target_id = chat_id
+        this_msg.data.target_id = str(chat_id)
         if this_msg == None:
             return
         flag_now_type = 'string'

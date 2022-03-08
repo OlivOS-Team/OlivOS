@@ -286,9 +286,9 @@ class TreeEditUI(object):
             'telegram_poll'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
-            'dodo_link',
-            'dodo_poll',
-            'dodobot_ea'
+            'dodo_link'
+            #'dodo_poll',
+            #'dodobot_ea'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['fanbook'] = [
             'fanbook_poll'

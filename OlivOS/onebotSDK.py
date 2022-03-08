@@ -134,7 +134,7 @@ class event(object):
 #支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
-    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -144,53 +144,67 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
-            target_event.data = target_event.private_message(target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
+            target_event.data = target_event.private_message(
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['message'],
+                target_event.sdk_event.json['sub_type']
+            )
             target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
-            target_event.data.message_id = target_event.sdk_event.json['message_id']
+            target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
             target_event.data.raw_message = target_event.sdk_event.json['raw_message']
             target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
             if 'user_id' in target_event.sdk_event.json['sender']:
-                target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+                target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
             if 'nickname' in target_event.sdk_event.json['sender']:
                 target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
         elif target_event.sdk_event.json['message_type'] == 'group':
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                target_event.data = target_event.group_message(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
+                target_event.data = target_event.group_message(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['message'],
+                    target_event.sdk_event.json['sub_type']
+                )
                 target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
-                target_event.data.message_id = target_event.sdk_event.json['message_id']
+                target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
                 target_event.data.raw_message = target_event.sdk_event.json['raw_message']
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
-                    target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+                    target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
                 if 'nickname' in target_event.sdk_event.json['sender']:
                     target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
         elif target_event.sdk_event.json['message_type'] == 'guild':
             if target_event.sdk_event.json['sub_type'] == 'channel':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                target_event.data = target_event.group_message(target_event.sdk_event.json['channel_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message'], target_event.sdk_event.json['sub_type'])
+                target_event.data = target_event.group_message(
+                    str(target_event.sdk_event.json['channel_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['message'],
+                    target_event.sdk_event.json['sub_type']
+                )
                 target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
-                target_event.data.message_id = target_event.sdk_event.json['message_id']
+                target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
                 target_event.data.raw_message = target_event.sdk_event.json['message']
                 target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
                 target_event.data.font = None
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
-                    target_event.data.sender['id'] = target_event.sdk_event.json['sender']['user_id']
+                    target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
                 if 'nickname' in target_event.sdk_event.json['sender']:
                     target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
                 if 'guild_id' in target_event.sdk_event.json:
-                    target_event.data.host_id = target_event.sdk_event.json['guild_id']
-                    target_event.data.extend['host_group_id'] = target_event.sdk_event.json['guild_id']
+                    target_event.data.host_id = str(target_event.sdk_event.json['guild_id'])
+                    target_event.data.extend['host_group_id'] = str(target_event.sdk_event.json['guild_id'])
                 if 'self_tiny_id' in target_event.sdk_event.json:
-                    target_event.data.extend['sub_self_id'] = target_event.sdk_event.json['self_tiny_id']
-                    if target_event.sdk_event.json['user_id'] == target_event.sdk_event.json['self_tiny_id']:
+                    target_event.data.extend['sub_self_id'] = str(target_event.sdk_event.json['self_tiny_id'])
+                    if str(target_event.sdk_event.json['user_id']) == str(target_event.sdk_event.json['self_tiny_id']):
                         target_event.active = False
         if target_event.data != None:
             if target_event.data.raw_message == '':
@@ -201,18 +215,28 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['notice_type'] == 'group_upload':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_file_upload'
-            target_event.data = target_event.group_file_upload(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'])
+            target_event.data = target_event.group_file_upload(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['user_id'])
+            )
             target_event.data.file.update(target_event.sdk_event.json['file'])
         elif target_event.sdk_event.json['notice_type'] == 'group_admin':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_admin'
-            target_event.data = target_event.group_admin(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'])
+            target_event.data = target_event.group_admin(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['user_id'])
+            )
             if target_event.sdk_event.json['sub_type'] == 'set':
                 target_event.data.action = 'set'
         elif target_event.sdk_event.json['notice_type'] == 'group_decrease':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_member_decrease'
-            target_event.data = target_event.group_member_decrease(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['operator_id'], target_event.sdk_event.json['user_id'])
+            target_event.data = target_event.group_member_decrease(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json['user_id'])
+            )
             if target_event.sdk_event.json['sub_type'] == 'leave':
                 target_event.data.action = 'leave'
             elif target_event.sdk_event.json['sub_type'] == 'kick':
@@ -222,7 +246,11 @@ def get_Event_from_SDK(target_event):
         elif target_event.sdk_event.json['notice_type'] == 'group_increase':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_member_increase'
-            target_event.data = target_event.group_member_increase(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['operator_id'], target_event.sdk_event.json['user_id'])
+            target_event.data = target_event.group_member_increase(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json['user_id'])
+            )
             if target_event.sdk_event.json['sub_type'] == 'approve':
                 target_event.data.action = 'approve'
             elif target_event.sdk_event.json['sub_type'] == 'invite':
@@ -230,36 +258,61 @@ def get_Event_from_SDK(target_event):
         elif target_event.sdk_event.json['notice_type'] == 'group_ban':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_ban'
-            target_event.data = target_event.group_ban(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['operator_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['duration'])
+            target_event.data = target_event.group_ban(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['duration']
+            )
             if target_event.sdk_event.json['sub_type'] == 'ban':
                 target_event.data.action = 'ban'
         elif target_event.sdk_event.json['notice_type'] == 'friend_add':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add'
-            target_event.data = target_event.friend_add(target_event.sdk_event.json['user_id'])
+            target_event.data = target_event.friend_add(
+                str(target_event.sdk_event.json['user_id'])
+            )
         elif target_event.sdk_event.json['notice_type'] == 'group_recall':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message_recall'
-            target_event.data = target_event.group_message_recall(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['operator_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message_id'])
+            target_event.data = target_event.group_message_recall(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json['user_id']),
+                str(target_event.sdk_event.json['message_id'])
+            )
         elif target_event.sdk_event.json['notice_type'] == 'friend_recall':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_recall'
-            target_event.data = target_event.private_message_recall(target_event.sdk_event.json['user_id'], target_event.sdk_event.json['message_id'])
+            target_event.data = target_event.private_message_recall(
+                str(target_event.sdk_event.json['user_id']),
+                str(target_event.sdk_event.json['message_id'])
+            )
         elif target_event.sdk_event.json['notice_type'] == 'notify':
             if target_event.sdk_event.json['sub_type'] == 'poke':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'poke'
-                target_event.data = target_event.poke(target_event.sdk_event.json['user_id'], target_event.sdk_event.json['target_id'])
+                target_event.data = target_event.poke(
+                    str(target_event.sdk_event.json['user_id']),
+                    str(target_event.sdk_event.json['target_id'])
+                )
                 if 'group_id' in target_event.sdk_event.json:
                     target_event.data.group_id = target_event.sdk_event.json['group_id']
             elif target_event.sdk_event.json['sub_type'] == 'lucky_king':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_lucky_king'
-                target_event.data = target_event.group_lucky_king(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['target_id'])
+                target_event.data = target_event.group_lucky_king(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    str(target_event.sdk_event.json['target_id'])
+                )
             elif target_event.sdk_event.json['sub_type'] == 'honor':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_honor'
-                target_event.data = target_event.group_honor(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'])
+                target_event.data = target_event.group_honor(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id'])
+                )
                 if target_event.sdk_event.json['honor_type'] == 'talkative':
                     target_event.data.type = 'talkative'
                 elif target_event.sdk_event.json['honor_type'] == 'performer':
@@ -270,18 +323,29 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['request_type'] == 'friend':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add_request'
-            target_event.data = target_event.friend_add_request(target_event.sdk_event.json['user_id'], target_event.sdk_event.json['comment'])
+            target_event.data = target_event.friend_add_request(
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['comment']
+            )
             target_event.data.flag = target_event.sdk_event.json['flag']
         elif target_event.sdk_event.json['request_type'] == 'group':
             if target_event.sdk_event.json['sub_type'] == 'add':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_add_request'
-                target_event.data = target_event.group_add_request(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['comment'])
+                target_event.data = target_event.group_add_request(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['comment']
+                )
                 target_event.data.flag = target_event.sdk_event.json['flag']
             elif target_event.sdk_event.json['sub_type'] == 'invite':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_invite_request'
-                target_event.data = target_event.group_invite_request(target_event.sdk_event.json['group_id'], target_event.sdk_event.json['user_id'], target_event.sdk_event.json['comment'])
+                target_event.data = target_event.group_invite_request(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['comment']
+                )
                 target_event.data.flag = target_event.sdk_event.json['flag']
     elif target_event.base_info['type'] == 'meta_event':
         if target_event.sdk_event.json['meta_event_type'] == 'lifecycle':
@@ -297,7 +361,9 @@ def get_Event_from_SDK(target_event):
         elif target_event.sdk_event.json['meta_event_type'] == 'heartbeat':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'heartbeat'
-            target_event.data = target_event.heartbeat(target_event.sdk_event.json['interval'])
+            target_event.data = target_event.heartbeat(
+                target_event.sdk_event.json['interval']
+            )
 
 
 #支持OlivOS API调用的方法实现
@@ -305,52 +371,52 @@ class event_action(object):
     def reply_private_msg(target_event, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
-        this_msg.data.user_id = target_event.data.user_id
+        this_msg.data.user_id = int(target_event.data.user_id)
         this_msg.data.message = message
         this_msg.do_api()
 
     def reply_group_msg(target_event, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
-        this_msg.data.group_id = target_event.data.group_id
+        this_msg.data.group_id = int(target_event.data.group_id)
         this_msg.data.message = message
         this_msg.do_api()
 
     def send_private_msg(target_event, user_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
-        this_msg.data.user_id = user_id
+        this_msg.data.user_id = int(user_id)
         this_msg.data.message = message
         this_msg.do_api()
 
     def send_group_msg(target_event, group_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = int(group_id)
         this_msg.data.message = message
         this_msg.do_api()
 
     def delete_msg(target_event, message_id):
         this_msg = api.delete_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_id = message_id
+        this_msg.data.message_id = int(message_id)
         this_msg.do_api()
 
     def get_msg(target_event, message_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_msg()
         raw_obj = None
         this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_id = message_id
+        this_msg.data.message_id = str(message_id)
         this_msg.do_api()
         if this_msg.res != None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj != None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
-                res_data['data']['message_id'] = init_api_do_mapping_for_dict(raw_obj, ['message_id'], int)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['real_id'], int)
-                res_data['data']['sender']['id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
+                res_data['data']['sender']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
                 res_data['data']['sender']['name'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
-                res_data['data']['sender']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                res_data['data']['sender']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
                 res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
                 res_data['data']['time'] = init_api_do_mapping_for_dict(raw_obj, ['time'], int)
                 res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
@@ -359,27 +425,27 @@ class event_action(object):
 
     def send_like(target_event, user_id, times = 1):
         this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.user_id = user_id
+        this_msg.data.user_id = str(user_id)
         this_msg.data.times = times
         this_msg.do_api()
 
     def set_group_kick(target_event, group_id, user_id, rehect_add_request = False):
         this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
         this_msg.data.rehect_add_request = rehect_add_request
         this_msg.do_api()
 
     def set_group_ban(target_event, group_id, user_id, duration = 1800):
         this_msg = api.set_group_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
         this_msg.data.duration = duration
         this_msg.do_api()
 
     def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration = 1800):
         this_msg = api.set_group_anonymous_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = str(group_id)
         this_msg.data.anonymous = anonymous
         this_msg.data.anonymous_flag = anonymous_flag
         this_msg.data.duration = duration
@@ -387,46 +453,46 @@ class event_action(object):
 
     def set_group_whole_ban(target_event, group_id, enable):
         this_msg = api.set_group_whole_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = str(group_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_admin(target_event, group_id, user_id, enable):
         this_msg = api.set_group_admin(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_anonymous(target_event, group_id, enable):
         this_msg = api.set_group_anonymous(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = str(group_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_card(target_event, group_id, user_id, card):
         this_msg = api.set_group_card(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
         this_msg.data.enable = card
         this_msg.do_api()
 
     def set_group_name(target_event, group_id, group_name):
         this_msg = api.set_group_name(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = str(group_id)
         this_msg.data.group_name = group_name
         this_msg.do_api()
 
     def set_group_leave(target_event, group_id, is_dismiss = False):
         this_msg = api.set_group_leave(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = str(group_id)
         this_msg.data.is_dismiss = is_dismiss
         this_msg.do_api()
 
     def set_group_special_title(target_event, group_id, user_id, special_title, duration):
         this_msg = api.set_group_special_title(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
         this_msg.data.special_title = special_title
         this_msg.data.duration = duration
         this_msg.do_api()
@@ -457,7 +523,7 @@ class event_action(object):
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
         return res_data
 
     def get_stranger_info(target_event, user_id, no_cache = False):
@@ -473,7 +539,7 @@ class event_action(object):
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
         return res_data
 
     def get_friend_list(target_event):
@@ -489,7 +555,7 @@ class event_action(object):
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
-                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
+                    tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
@@ -497,7 +563,7 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
         this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = int(group_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
         if this_msg.res != None:
@@ -506,7 +572,7 @@ class event_action(object):
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['group_id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
                 res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['group_memo'], str)
                 res_data['data']['max_member_count'] = init_api_do_mapping_for_dict(raw_obj, ['max_member_count'], int)
         return res_data
@@ -524,7 +590,7 @@ class event_action(object):
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
-                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
+                    tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
                     tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['max_member_count'], int)
                     res_data['data'].append(tmp_res_data_this)
@@ -534,8 +600,8 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
         this_msg = api.get_group_member_info(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
-        this_msg.data.user_id = user_id
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
         if this_msg.res != None:
@@ -544,9 +610,9 @@ class event_action(object):
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
-                res_data['data']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], int)
-                res_data['data']['group_id'] = init_api_do_mapping_for_dict(raw_obj, ['group_id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
+                res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
+                res_data['data']['group_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
                 res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['join_time'], int)
                 res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj, ['last_sent_time'], int)
                 res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj, ['shut_up_timestamp'], int)
@@ -559,7 +625,7 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
         raw_obj = None
         this_msg = api.get_group_member_list(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = group_id
+        this_msg.data.group_id = int(group_id)
         this_msg.do_api()
         if this_msg.res != None:
             raw_obj = init_api_json(this_msg.res.text)
@@ -569,9 +635,9 @@ class event_action(object):
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
-                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
-                    tmp_res_data_this['user_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int)
-                    tmp_res_data_this['group_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
+                    tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
+                    tmp_res_data_this['user_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
+                    tmp_res_data_this['group_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['join_time'], int)
                     tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['last_sent_time'], int)
                     tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj_this, ['shut_up_timestamp'], int)
@@ -649,8 +715,8 @@ class event_action(object):
 
     def send_guild_channel_msg(target_event, guild_id, channel_id, message):
         this_msg = api.send_guild_channel_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.guild_id = guild_id
-        this_msg.data.channel_id = channel_id
+        this_msg.data.guild_id = int(guild_id)
+        this_msg.data.channel_id = int(channel_id)
         this_msg.data.message = message
         this_msg.do_api()
 
