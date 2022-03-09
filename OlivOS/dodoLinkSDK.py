@@ -17,10 +17,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import sys
 import json
 import requests as req
+from requests_toolbelt import MultipartEncoder
 import time
 import traceback
 import rsa
 import base64
+import uuid
 
 import OlivOS
 
@@ -275,17 +277,17 @@ class API(object):
         def do_api(self, req_type = 'POST'):
             try:
                 tmp_payload_dict = {}
-                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-                tmp_payload_dict['file'] = base64.b64encode(
-                    self.data.file
-                ).decode('utf-8')
+                tmp_payload_dict['file'] = (str(uuid.uuid4()) + '.png', self.data.file, 'image/png')
+                payload = MultipartEncoder(
+                    fields = tmp_payload_dict
+                )
 
-                payload = tmp_payload_dict
+                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
                 send_url_temp = self.host + self.route
                 send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
                 headers = {
-                    'Content-Type': 'multipart/form-data; boundary=ABCD',
-                    'Content-Length': str(len(payload['file'])),
+                    'Content-Type': payload.content_type,
+                    'Content-Length': str(len(self.data.file)),
                     'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
                     'Authorization': 'Bot %s.%s' % (
                         str(self.bot_info.id),
@@ -424,10 +426,9 @@ class event_action(object):
                 this_msg.do_api('POST')
             elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 this_msg.data.messageType = 2
-                this_msg.data.messageBody = {}
-                #this_msg.data.messageBody['url'] = event_action.setImageUploadFast(target_event, message_this.data['file'])
-                this_msg.data.messageBody['url'] = target_event, message_this.data['file']
-                if this_msg.data.messageBody['url'] != None:
+                this_msg.data.messageBody = None
+                this_msg.data.messageBody = event_action.setImageUploadFast(target_event, message_this.data['file'])
+                if this_msg.data.messageBody != None:
                     this_msg.do_api('POST')
 
     def send_personal_msg(target_event, chat_id, message):
@@ -443,10 +444,9 @@ class event_action(object):
             elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 tmp_image_url = message_this.data['url']
                 this_msg.data.messageType = 2
-                this_msg.data.messageBody = {}
-                #this_msg.data.messageBody['url'] = event_action.setImageUploadFast(target_event, message_this.data['file'])
-                this_msg.data.messageBody['url'] = target_event, message_this.data['file']
-                if this_msg.data.messageBody['url'] != None:
+                this_msg.data.messageBody = None
+                this_msg.data.messageBody = event_action.setImageUploadFast(target_event, message_this.data['file'])
+                if this_msg.data.messageBody != None:
                     this_msg.do_api('POST')
 
     def get_login_info(target_event):
@@ -479,6 +479,10 @@ class event_action(object):
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
             msg_upload_api.data.file = msg_res.content
             msg_upload_api.do_api()
+            if msg_upload_api.res != None:
+                msg_upload_api_obj = json.loads(msg_upload_api.res)
+                if msg_upload_api_obj['status'] == 0:
+                    res = msg_upload_api_obj['data']
         except:
             res = None
         return res
