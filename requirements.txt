@@ -9,3 +9,4 @@ websocket-client
 pillow
 lxml
 rsa
+requests_toolbelt
