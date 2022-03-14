@@ -139,14 +139,12 @@ class Event(object):
             'private_message',
             'group_message'
         ]:
-            if self.data.message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
-                self.data.message = self.data.message_sdk.data_raw
-            else:
+            if self.plugin_info['message_mode_tx'] == 'olivos_para' or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
                 self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
-            if self.data.raw_message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
-                self.data.raw_message = self.data.raw_message_sdk.data_raw
-            else:
                 self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
+            else:
+                self.data.message = self.data.message_sdk.data_raw
+                self.data.raw_message = self.data.raw_message_sdk.data_raw
 
     def do_init_log(self):
         if self.active:
