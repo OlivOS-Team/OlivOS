@@ -574,6 +574,7 @@ class event_action(object):
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
                 res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['group_memo'], str)
+                res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj, ['member_count'], int)
                 res_data['data']['max_member_count'] = init_api_do_mapping_for_dict(raw_obj, ['max_member_count'], int)
         return res_data
 
@@ -592,6 +593,7 @@ class event_action(object):
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
+                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['member_count'], int)
                     tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['max_member_count'], int)
                     res_data['data'].append(tmp_res_data_this)
         return res_data
