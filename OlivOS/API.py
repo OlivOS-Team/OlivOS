@@ -87,7 +87,7 @@ def getBotHash(bot_id = None, platform_sdk = None, platform_platform = None, pla
 
 
 class Event(object):
-    def __init__(self, sdk_event = None, log_func = None):
+    def __init__(self, sdk_event = None, log_func = None, plugin_name = 'unity'):
         self.bot_info = None
         self.platform = {}
         self.platform['sdk'] = None
@@ -105,7 +105,7 @@ class Event(object):
         self.plugin_info['func_type'] = None
         self.plugin_info['message_mode_rx'] = OlivOS.infoAPI.OlivOS_message_mode_rx_default
         self.plugin_info['message_mode_tx'] = OlivOS.infoAPI.OlivOS_message_mode_tx_unity
-        self.plugin_info['name'] = 'unity'
+        self.plugin_info['name'] = plugin_name
         self.plugin_info['namespace'] = 'unity'
         self.plugin_info['tx_queue'] = []
         self.sdk_event = sdk_event
