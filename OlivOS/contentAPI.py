@@ -203,6 +203,7 @@ def get_Event_from_fake_SDK(target_event):
         if target_event.platform['sdk'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']]:
             if target_event.platform['model'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']]:
                 target_event.plugin_info['message_mode_rx'] = OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']][target_event.platform['model']]
+    target_event.plugin_info['name'] = target_event.sdk_event.fakename
     if True:
         if target_event.sdk_event.data['type'] == 'fake_event':
             target_event.active = True
@@ -210,7 +211,8 @@ def get_Event_from_fake_SDK(target_event):
             target_event.data = target_event.fake_event()
 
 class fake_sdk_event(object):
-    def __init__(self, bot_info, data = None, platform = None):
+    def __init__(self, bot_info, data = None, platform = None, fakename = 'unity'):
+        self.fakename = fakename
         tmp_platform = {
             'sdk': 'fake',
             'platform': 'fake',
