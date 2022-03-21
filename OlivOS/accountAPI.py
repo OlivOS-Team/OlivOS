@@ -60,7 +60,7 @@ class Account(object):
             )
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
-            logger_proc.log(2, 'generate [' + str(account_conf_account_this['platform_type']) + '] account [' + str(account_conf_account_this['id']) + '] ... done')
+            logger_proc.log(2, 'generate [' + str(account_conf_account_this['platform_type']) + '] account [' + str(account_conf_account_this['id']) + '] as [' + bot_info_tmp.hash + '] ... done')
         logger_proc.log(2, 'generate account ... all done')
         return plugin_bot_info_dict
 
