@@ -29,15 +29,24 @@ dictMessageType = {
     },
     'telegram': {
         'telegram_poll': {
-            'default': 'old_string'
+            'default': 'olivos_para'
         }
     },
     'fanbook': {
         'fanbook_poll': {
-            'default': 'fanbook_string'
+            'default': 'olivos_para',
+            'private': 'olivos_para'
+        }
+    },
+    'kaiheila': {
+        'kaiheila_link': {
+            'default': 'olivos_para'
         }
     },
     'dodo': {
+        'dodo_link': {
+            'default': 'olivos_para'
+        },
         'dodo_poll': {
             'default': 'olivos_para'
         },
