@@ -474,7 +474,7 @@ class event_action(object):
         this_msg = api.set_group_card(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
-        this_msg.data.enable = card
+        this_msg.data.card = card
         this_msg.do_api()
 
     def set_group_name(target_event, group_id, group_name):
