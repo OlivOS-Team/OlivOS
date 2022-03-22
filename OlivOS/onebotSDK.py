@@ -425,27 +425,27 @@ class event_action(object):
 
     def send_like(target_event, user_id, times = 1):
         this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.times = times
         this_msg.do_api()
 
     def set_group_kick(target_event, group_id, user_id, rehect_add_request = False):
         this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.rehect_add_request = rehect_add_request
         this_msg.do_api()
 
     def set_group_ban(target_event, group_id, user_id, duration = 1800):
         this_msg = api.set_group_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.duration = duration
         this_msg.do_api()
 
     def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration = 1800):
         this_msg = api.set_group_anonymous_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
+        this_msg.data.group_id = int(group_id)
         this_msg.data.anonymous = anonymous
         this_msg.data.anonymous_flag = anonymous_flag
         this_msg.data.duration = duration
@@ -453,46 +453,46 @@ class event_action(object):
 
     def set_group_whole_ban(target_event, group_id, enable):
         this_msg = api.set_group_whole_ban(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
+        this_msg.data.group_id = int(group_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_admin(target_event, group_id, user_id, enable):
         this_msg = api.set_group_admin(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_anonymous(target_event, group_id, enable):
         this_msg = api.set_group_anonymous(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
+        this_msg.data.group_id = int(group_id)
         this_msg.data.enable = enable
         this_msg.do_api()
 
     def set_group_card(target_event, group_id, user_id, card):
         this_msg = api.set_group_card(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.enable = card
         this_msg.do_api()
 
     def set_group_name(target_event, group_id, group_name):
         this_msg = api.set_group_name(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
+        this_msg.data.group_id = int(group_id)
         this_msg.data.group_name = group_name
         this_msg.do_api()
 
     def set_group_leave(target_event, group_id, is_dismiss = False):
         this_msg = api.set_group_leave(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
+        this_msg.data.group_id = int(group_id)
         this_msg.data.is_dismiss = is_dismiss
         this_msg.do_api()
 
     def set_group_special_title(target_event, group_id, user_id, special_title, duration):
         this_msg = api.set_group_special_title(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.group_id = str(group_id)
-        this_msg.data.user_id = str(user_id)
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.user_id = int(user_id)
         this_msg.data.special_title = special_title
         this_msg.data.duration = duration
         this_msg.do_api()
@@ -530,7 +530,7 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
         this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.user_id = user_id
+        this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
         if this_msg.res != None:
