@@ -468,10 +468,74 @@ class event_action(object):
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
         return res_data
 
+    def get_login_info(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
+        raw_obj = None
+        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
+        return res_data
+
     def set_chat_leave(target_event, chat_id, is_dismiss = False):
         this_msg = API.leaveChat(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = str(chat_id)
         this_msg.do_api()
+
+    def get_group_info(target_event, chat_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        raw_obj = None
+        this_msg = API.getChat(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = str(chat_id)
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
+                res_data['data']['id'] = str(chat_id)
+                if 'description' in raw_obj:
+                    res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['description'], str)
+                #res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj, ['member_count'], int)
+                #res_data['data']['max_member_count'] = init_api_do_mapping_for_dict(raw_obj, ['max_member_count'], int)
+        return res_data
+
+    def get_group_member_info(target_event, chat_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = API.getChatMember(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = str(chat_id)
+        this_msg.data.user_id = str(user_id)
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user', 'id'], int))
+                res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user', 'id'], int))
+                res_data['data']['group_id'] = str(chat_id)
+                res_data['data']['times']['join_time'] = -1
+                res_data['data']['times']['last_sent_time'] = -1
+                res_data['data']['times']['shut_up_timestamp'] = -1
+                res_data['data']['role'] = 'member'
+                tmp_role = init_api_do_mapping_for_dict(raw_obj, ['status', 'role'], str)
+                if tmp_role == 'creator':
+                    res_data['data']['role'] = 'owner'
+                elif tmp_role == 'administrator':
+                    res_data['data']['role'] = 'admin'
+                res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
+                res_data['data']['title'] = ''
+        return res_data
+
+    
 
 def init_api_json(raw_str):
     res_data = None
@@ -621,6 +685,43 @@ class API(object):
             self.bot_info = bot_info
             self.data = self.data_T()
             self.node_ext = 'leaveChat'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+
+    class getChat(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChat'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+
+    class getChatMember(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChatMember'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.user_id = 0
+
+    class getChatMemberCount(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChatMemberCount'
             self.res = None
 
         class data_T(object):
