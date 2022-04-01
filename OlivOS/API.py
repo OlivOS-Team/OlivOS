@@ -1023,7 +1023,7 @@ class Event(object):
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
         return res_data
 
     def get_group_info(self, group_id, no_cache = False, flag_log = True, remote = False):
@@ -1059,7 +1059,7 @@ class Event(object):
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
         return res_data
 
     def get_group_member_info(self, group_id, user_id, no_cache = False, flag_log = True, remote = False):
