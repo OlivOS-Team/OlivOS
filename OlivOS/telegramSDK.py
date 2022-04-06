@@ -490,20 +490,26 @@ class event_action(object):
     def get_group_info(target_event, chat_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
+        raw_obj_2 = None
         this_msg = API.getChat(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = str(chat_id)
         this_msg.do_api()
+        this_msg_2 = API.getChatMemberCount(get_SDK_bot_info_from_Event(target_event))
+        this_msg_2.data.chat_id = str(chat_id)
+        this_msg_2.do_api()
         if this_msg.res != None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if this_msg_2.res != None:
+            raw_obj_2 = init_api_json(this_msg_2.res.text)
+        if raw_obj != None and raw_obj_2 != None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
                 res_data['data']['id'] = str(chat_id)
                 if 'description' in raw_obj:
                     res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['description'], str)
-                #res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj, ['member_count'], int)
-                #res_data['data']['max_member_count'] = init_api_do_mapping_for_dict(raw_obj, ['max_member_count'], int)
+                res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj_2, [], int)
+                res_data['data']['max_member_count'] = 50000
         return res_data
 
     def get_group_member_info(target_event, chat_id, user_id):
@@ -556,6 +562,8 @@ def init_api_json(raw_str):
                 res_data = tmp_obj['result'].copy()
             elif type(tmp_obj['result']) == list:
                 res_data = tmp_obj['result'].copy()
+            else:
+                res_data = tmp_obj['result']
     return res_data
 
 def init_api_do_mapping(src_type, src_data):
@@ -566,6 +574,8 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
     flag_active = True
     tmp_src_data = src_data
+    if type(src_data) == src_type:
+        return src_data
     for path_list_this in path_list:
         if type(tmp_src_data) == dict:
             if path_list_this in tmp_src_data:
