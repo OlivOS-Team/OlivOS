@@ -18,6 +18,7 @@ import multiprocessing
 import threading
 import time
 import json
+import traceback
 
 import OlivOS
 
@@ -60,8 +61,15 @@ class server(OlivOS.API.Proc_templet):
                 sdk_api_res = None
                 try:
                     sdk_api_res = sdk_api_tmp.do_api()
-                except:
+                except Exception as e:
                     flag_not_attach = True
+                    skip_result = '%s\n%s' % (
+                        str(e),
+                        traceback.format_exc()
+                    )
+                    self.log(3, skip_result, [
+                        ('fanbookPollServer', 'default')
+                    ])
                 if not flag_not_attach and not flag_first:
                     if bot_info_this in self.Proc_data['bot_info_first']:
                         try:
@@ -76,8 +84,14 @@ class server(OlivOS.API.Proc_templet):
                                     continue
                             else:
                                 continue
-                        except:
-                            continue
+                        except Exception as e:
+                            skip_result = '%s\n%s' % (
+                                str(e),
+                                traceback.format_exc()
+                            )
+                            self.log(3, skip_result, [
+                                ('fanbookPollServer', 'default')
+                            ])
                     else:
                         self.Proc_data['bot_info_first'][bot_info_this] = True
 
