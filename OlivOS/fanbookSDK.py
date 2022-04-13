@@ -68,7 +68,7 @@ class api_templet(object):
         self.res = None
 
     def do_api(self):
-        try:
+        if True:
             tmp_payload_dict = {}
             tmp_fanbookAPIRouteTemp = fanbookAPIRouteTemp.copy()
             tmp_fanbookAPIRouteTemp.update({
@@ -89,14 +89,8 @@ class api_templet(object):
 
             msg_res = req.request("POST", send_url, headers = headers, data = payload)
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
-
             self.res = msg_res.text
             return msg_res.text
-        except:
-            return None
 
 class event(object):
     def __init__(self, json_obj = None, bot_info = None):
