@@ -509,7 +509,12 @@ class event_action(object):
                 if 'description' in raw_obj:
                     res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['description'], str)
                 res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj_2, [], int)
-                res_data['data']['max_member_count'] = 50000
+                res_data['data']['max_member_count'] = 200
+                tmp_group_type = init_api_do_mapping_for_dict(raw_obj, ['type'], str)
+                if tmp_group_type == 'group':
+                    res_data['data']['max_member_count'] = 200
+                if tmp_group_type == 'supergroup':
+                    res_data['data']['max_member_count'] = 200000
         return res_data
 
     def get_group_member_info(target_event, chat_id, user_id):

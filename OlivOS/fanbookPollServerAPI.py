@@ -85,9 +85,10 @@ class server(OlivOS.API.Proc_templet):
                             else:
                                 continue
                         except Exception as e:
-                            skip_result = '%s\n%s' % (
+                            skip_result = '%s\n%s\n[data]\n%s' % (
                                 str(e),
-                                traceback.format_exc()
+                                traceback.format_exc(),
+                                str(sdk_api_res)
                             )
                             self.log(3, skip_result, [
                                 ('fanbookPollServer', 'default')

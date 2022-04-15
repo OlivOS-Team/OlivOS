@@ -722,6 +722,29 @@ class event_action(object):
         this_msg.data.message = message
         this_msg.do_api()
 
+    def get_guild_member_profile(target_event, guild_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = api.get_guild_member_profile(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = int(guild_id)
+        this_msg.data.user_id = int(user_id)
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['tiny_id'], str))
+                res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['tiny_id'], str))
+                res_data['data']['group_id'] = str(guild_id)
+                res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['join_time'], int)
+                res_data['data']['times']['last_sent_time'] = 0
+                res_data['data']['times']['shut_up_timestamp'] = 0
+                res_data['data']['role'] = 'admin'
+                res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                res_data['data']['title'] = ''
+        return res_data
 
 def init_api_json(raw_str):
     res_data = None
@@ -1328,3 +1351,16 @@ class api(object):
                 self.guild_id = -1
                 self.channel_id = -1
                 self.message = ''
+
+    class get_guild_member_profile(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_guild_member_profile'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = -1
+                self.user_id = -1
