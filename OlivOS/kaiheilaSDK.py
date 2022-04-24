@@ -230,6 +230,20 @@ class API(object):
                 self.quote = None
                 self.nonce = None
 
+    class getUserView(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['user'] + '/view'
+
+        class data_T(object):
+            def __init__(self):
+                self.user_id = -1
+                self.guild_id = None
+
 
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
@@ -438,6 +452,52 @@ class event_action(object):
             res_data['active'] = False
         return res_data
 
+    def get_stranger_info(target_event, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
+        raw_obj = None
+        this_msg = API.getUserView(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = str(user_id)
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res != None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj != None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_group_member_info(target_event, host_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = API.getUserView(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.guild_id = str(host_id)
+        this_msg.do_api()
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res != None:
+                print(this_msg.res)
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj != None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
+                    res_data['data']['id'] = str(user_id)
+                    res_data['data']['user_id'] = str(user_id)
+                    res_data['data']['group_id'] = str(host_id)
+                    res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['joined_at'], int)
+                    res_data['data']['times']['last_sent_time'] = 0
+                    res_data['data']['times']['shut_up_timestamp'] = 0
+                    res_data['data']['role'] = 'member'
+                    res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
+                    res_data['data']['title'] = ''
+        except:
+            res_data['active'] = False
+        return res_data
 
 def init_api_json(raw_str):
     res_data = None
