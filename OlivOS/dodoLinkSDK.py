@@ -459,6 +459,7 @@ def get_Event_from_SDK(target_event):
                     if tmp_user_info:
                         if 'nickName' in tmp_user_info:
                             target_event.data.sender['nickname'] = tmp_user_info['nickName']
+                            target_event.data.sender['name'] = tmp_user_info['nickName']
                         if 'sex' in tmp_user_info:
                             if tmp_user_info["sex"] == 0:
                                 target_event.data.sender['sex'] = 'female'
