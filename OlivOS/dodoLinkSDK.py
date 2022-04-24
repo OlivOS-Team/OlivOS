@@ -44,7 +44,7 @@ sdkAPIRoute = {
 sdkAPIRouteTemp = {}
 
 sdkSubSelfInfo = {}
-sdkUserInfo = {}
+sdkUserInfo = {}            # BUG: 不同群组群昵称改变后 群聊消息事件 用户群昵称会有 bug
 
 class bot_info_T(object):
     def __init__(self, id = -1, password = '', host = '', access_token = None):
@@ -406,6 +406,65 @@ def get_Event_from_SDK(target_event):
                             elif sdkUserInfo[tmp_user_id]['sex'] == 1:
                                 target_event.data.sender['sex'] = 'male'
                     target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
+                    if plugin_event_bot_hash in sdkSubSelfInfo:
+                        target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+            elif target_event.sdk_event.payload.data.data['eventType'] == str(1001):
+                message_obj = None
+                if target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 1:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'dodo_string',
+                        target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
+                    )
+                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                    message_obj.data_raw = message_obj.data.copy()
+                elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 2:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        [
+                            OlivOS.messageAPI.PARA.image(
+                                target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
+                            )
+                        ]
+                    )
+                elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 3:
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        [
+                            OlivOS.messageAPI.PARA.video(
+                                target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
+                            )
+                        ]
+                    )
+                if message_obj != None:
+                    target_event.active = True
+                    tmp_user_info = target_event.sdk_event.payload.data.data['eventBody']['personal']       # use personal info from remote instead of local
+                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    target_event.plugin_info['func_type'] = 'private_message'
+                    target_event.data = target_event.private_message(
+                        str(target_event.sdk_event.payload.data.data['eventBody']['dodoId']),
+                        message_obj,
+                        'private'
+                    )
+                    target_event.data.message_sdk = message_obj
+                    target_event.data.message_id = str(target_event.sdk_event.payload.data.data['eventBody']['messageId'])
+                    target_event.data.raw_message = message_obj
+                    target_event.data.raw_message_sdk = message_obj
+                    target_event.data.font = None
+                    target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    target_event.data.sender['nickname'] = 'User'
+                    target_event.data.sender['name'] = 'User'
+                    target_event.data.sender['sex'] = 'unknown'
+                    target_event.data.sender['age'] = 0
+                    if tmp_user_info:
+                        if 'nickName' in tmp_user_info:
+                            target_event.data.sender['nickname'] = tmp_user_info['nickName']
+                        if 'sex' in tmp_user_info:
+                            if tmp_user_info["sex"] == 0:
+                                target_event.data.sender['sex'] = 'female'
+                            elif tmp_user_info['sex'] == 1:
+                                target_event.data.sender['sex'] = 'male'
+                    # target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     except:
