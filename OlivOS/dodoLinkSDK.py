@@ -44,7 +44,7 @@ sdkAPIRoute = {
 sdkAPIRouteTemp = {}
 
 sdkSubSelfInfo = {}
-sdkUserInfo = {}            # BUG: 不同群组群昵称改变后 群聊消息事件 用户群昵称会有 bug
+sdkUserInfo = {}
 
 class bot_info_T(object):
     def __init__(self, id = -1, password = '', host = '', access_token = None):
@@ -368,15 +368,17 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     tmp_host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
                     tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
-                    if tmp_user_id not in sdkUserInfo:
+                    if tmp_host_id not in sdkUserInfo:
+                        sdkUserInfo[tmp_host_id] = {}
+                    if tmp_user_id not in sdkUserInfo[tmp_host_id]:
                         api_msg_obj = API.getMemberInfo(tmp_bot_info)
                         api_msg_obj.data.islandId = tmp_host_id
                         api_msg_obj.data.dodoId = tmp_user_id
                         api_msg_obj.do_api('POST')
                         api_res_json = json.loads(api_msg_obj.res)
                         if api_res_json['status'] == 0:
-                            sdkUserInfo[tmp_user_id] = {}
-                            sdkUserInfo[tmp_user_id] = api_res_json['data'].copy()
+                            sdkUserInfo[tmp_host_id][tmp_user_id] = {}
+                            sdkUserInfo[tmp_host_id][tmp_user_id] = api_res_json['data'].copy()
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
                         str(target_event.sdk_event.payload.data.data['eventBody']['channelId']),
@@ -396,14 +398,14 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender['name'] = 'User'
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
-                    if tmp_user_id in sdkUserInfo:
-                        if 'nickName' in sdkUserInfo[tmp_user_id]:
-                            target_event.data.sender['nickname'] = sdkUserInfo[tmp_user_id]['nickName']
-                            target_event.data.sender['name'] = sdkUserInfo[tmp_user_id]['nickName']
-                        if 'sex' in sdkUserInfo[tmp_user_id]:
-                            if sdkUserInfo[tmp_user_id]['sex'] == 0:
+                    if tmp_user_id in sdkUserInfo[tmp_host_id]:
+                        if 'nickName' in sdkUserInfo[tmp_host_id][tmp_user_id]:
+                            target_event.data.sender['nickname'] = sdkUserInfo[tmp_host_id][tmp_user_id]['nickName']
+                            target_event.data.sender['name'] = sdkUserInfo[tmp_host_id][tmp_user_id]['nickName']
+                        if 'sex' in sdkUserInfo[tmp_host_id][tmp_user_id]:
+                            if sdkUserInfo[tmp_host_id][tmp_user_id]['sex'] == 0:
                                 target_event.data.sender['sex'] = 'female'
-                            elif sdkUserInfo[tmp_user_id]['sex'] == 1:
+                            elif sdkUserInfo[tmp_host_id][tmp_user_id]['sex'] == 1:
                                 target_event.data.sender['sex'] = 'male'
                     target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
                     if plugin_event_bot_hash in sdkSubSelfInfo:
