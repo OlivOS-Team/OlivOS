@@ -50,7 +50,7 @@
 技术路线上，基于Python、采用模块化框架、进程分离、消息队列通信、前后端分离、响应式布局、渐进式渲染的基本思路，实现一个高并发性、高可靠性、高适应性的整体方案。
 
 ## 插件
-请参考插件默认模板[OlivOSPluginTemplate](https://github.com/OlivOS-Team/OlivOSPluginTemplate)进行插件开发
+请参考插件默认模板[OlivOSPluginTemplate](https://github.com/OlivOS-Team/OlivOSPluginTemplate)和[官方文档](https://doc.olivos.wiki)进行插件开发。
 
 ## 开始使用
 请参考[启程手册](https://wiki.dice.center/OlivOS_Login.html)进行OlivOS的首次使用
