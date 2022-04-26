@@ -166,10 +166,6 @@ class api_templet(object):
             elif req_type == 'GET':
                 msg_res = req.request("GET", send_url, headers = headers)
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
-
             self.res = msg_res.text
             return msg_res.text
         except:
@@ -230,6 +226,33 @@ class API(object):
                 self.quote = None
                 self.nonce = None
 
+    class getUserViewStranger(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['user'] + '/view?user_id={user_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.user_id = '-1'
+
+    class getUserView(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['user'] + '/view?user_id={user_id}&guild_id={guild_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.user_id = '-1'
+                self.guild_id = None
+
 
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
@@ -258,143 +281,174 @@ def get_Event_from_SDK(target_event):
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['data']['id']
         except:
             pass
-    if target_event.sdk_event.payload.data.d['channel_type'] == 'GROUP':
-        message_obj = None
-        flag_have_image = False
-        if 'extra' in target_event.sdk_event.payload.data.d:
-            if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
-                if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
-                    attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
-                    if 'type' in attachments_this:
-                        if attachments_this['type'].startswith('image'):
-                            flag_have_image = True
+    if 'channel_type' in target_event.sdk_event.payload.data.d:
+        if target_event.sdk_event.payload.data.d['channel_type'] == 'GROUP':
+            message_obj = None
+            flag_have_image = False
+            if 'extra' in target_event.sdk_event.payload.data.d:
+                if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
+                    if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
+                        attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
+                        if 'type' in attachments_this:
+                            if attachments_this['type'].startswith('image'):
+                                flag_have_image = True
+                                message_obj = OlivOS.messageAPI.Message_templet(
+                                    'olivos_para',
+                                    []
+                                )
+                                message_obj.data_raw.append(
+                                    OlivOS.messageAPI.PARA.image(
+                                        '%s' % attachments_this['url']
+                                    )
+                                )
+                elif 'kmarkdown' in target_event.sdk_event.payload.data.d['extra']:
+                    if type(target_event.sdk_event.payload.data.d['extra']['kmarkdown']) == dict:
+                        attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
+                        if attachments_this['raw_content'] != '':
+                            message_obj = OlivOS.messageAPI.Message_templet(
+                                'kaiheila_string',
+                                attachments_this['raw_content']
+                            )
+                            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                            message_obj.data_raw = message_obj.data.copy()
+                        else:
                             message_obj = OlivOS.messageAPI.Message_templet(
                                 'olivos_para',
                                 []
                             )
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    '%s' % attachments_this['url']
-                                )
-                            )
-        if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
-            if target_event.sdk_event.payload.data.d['content'] != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'kaiheila_string',
-                    target_event.sdk_event.payload.data.d['content']
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        try:
-            message_obj.init_data()
-        except:
-            message_obj.active = False
-            message_obj.data = []
-        if message_obj.active:
-            try:
-                if target_event.sdk_event.payload.data.d['extra']['type'] == 1:
-                    target_event.active = True
-                    target_event.plugin_info['func_type'] = 'group_message'
-                    target_event.data = target_event.group_message(
-                        str(target_event.sdk_event.payload.data.d['target_id']),
-                        str(target_event.sdk_event.payload.data.d['author_id']),
-                        message_obj,
-                        'group'
+            if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
+                if target_event.sdk_event.payload.data.d['content'] != '':
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'kaiheila_string',
+                        target_event.sdk_event.payload.data.d['content']
                     )
-                    target_event.data.message_sdk = message_obj
-                    target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
-                    target_event.data.raw_message = message_obj
-                    target_event.data.raw_message_sdk = message_obj
-                    target_event.data.font = None
-                    target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                    target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                    target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['sex'] = 'unknown'
-                    target_event.data.sender['age'] = 0
-                    target_event.data.sender['role'] = 'member'
-                    target_event.data.host_id = str(target_event.sdk_event.payload.data.d['extra']['guild_id'])
-                    target_event.data.extend['flag_from_direct'] = False
-                    if plugin_event_bot_hash in sdkSubSelfInfo:
-                        target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                    if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
-                        target_event.active = False
+                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                    message_obj.data_raw = message_obj.data.copy()
                 else:
-                    target_event.active = False
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        []
+                    )
+            try:
+                message_obj.init_data()
             except:
-                target_event.active = False
-    elif target_event.sdk_event.payload.data.d['channel_type'] == 'PERSON':
-        message_obj = None
-        flag_have_image = False
-        if 'extra' in target_event.sdk_event.payload.data.d:
-            if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
-                if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
-                    attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
-                    if 'type' in attachments_this:
-                        if attachments_this['type'].startswith('image'):
-                            flag_have_image = True
+                message_obj.active = False
+                message_obj.data = []
+            if message_obj.active:
+                try:
+                    if target_event.sdk_event.payload.data.d['extra']['type'] in [1, 9]:
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'group_message'
+                        target_event.data = target_event.group_message(
+                            str(target_event.sdk_event.payload.data.d['target_id']),
+                            str(target_event.sdk_event.payload.data.d['author_id']),
+                            message_obj,
+                            'group'
+                        )
+                        target_event.data.message_sdk = message_obj
+                        target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
+                        target_event.data.raw_message = message_obj
+                        target_event.data.raw_message_sdk = message_obj
+                        target_event.data.font = None
+                        target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['sex'] = 'unknown'
+                        target_event.data.sender['age'] = 0
+                        target_event.data.sender['role'] = 'member'
+                        target_event.data.host_id = str(target_event.sdk_event.payload.data.d['extra']['guild_id'])
+                        target_event.data.extend['flag_from_direct'] = False
+                        if plugin_event_bot_hash in sdkSubSelfInfo:
+                            target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+                        if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
+                            target_event.active = False
+                    else:
+                        target_event.active = False
+                except:
+                    target_event.active = False
+        elif target_event.sdk_event.payload.data.d['channel_type'] == 'PERSON':
+            message_obj = None
+            flag_have_image = False
+            if 'extra' in target_event.sdk_event.payload.data.d:
+                if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
+                    if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
+                        attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
+                        if 'type' in attachments_this:
+                            if attachments_this['type'].startswith('image'):
+                                flag_have_image = True
+                                message_obj = OlivOS.messageAPI.Message_templet(
+                                    'olivos_para',
+                                    []
+                                )
+                                message_obj.data_raw.append(
+                                    OlivOS.messageAPI.PARA.image(
+                                        '%s' % attachments_this['url']
+                                    )
+                                )
+                elif 'kmarkdown' in target_event.sdk_event.payload.data.d['extra']:
+                    if type(target_event.sdk_event.payload.data.d['extra']['kmarkdown']) == dict:
+                        attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
+                        if attachments_this['raw_content'] != '':
+                            message_obj = OlivOS.messageAPI.Message_templet(
+                                'kaiheila_string',
+                                attachments_this['raw_content']
+                            )
+                            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                            message_obj.data_raw = message_obj.data.copy()
+                        else:
                             message_obj = OlivOS.messageAPI.Message_templet(
                                 'olivos_para',
                                 []
                             )
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    '%s' % attachments_this['url']
-                                )
-                            )
-        if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
-            if target_event.sdk_event.payload.data.d['content'] != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_string',
-                    target_event.sdk_event.payload.data.d['content']
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        try:
-            message_obj.init_data()
-        except:
-            message_obj.active = False
-            message_obj.data = []
-        if message_obj.active:
-            try:
-                if target_event.sdk_event.payload.data.d['extra']['type'] == 1:
-                    target_event.active = True
-                    target_event.plugin_info['func_type'] = 'private_message'
-                    target_event.data = target_event.private_message(
-                        str(target_event.sdk_event.payload.data.d['author_id']),
-                        message_obj,
-                        'friend'
+            if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
+                if target_event.sdk_event.payload.data.d['content'] != '':
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_string',
+                        target_event.sdk_event.payload.data.d['content']
                     )
-                    target_event.data.message_sdk = message_obj
-                    target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
-                    target_event.data.raw_message = message_obj
-                    target_event.data.raw_message_sdk = message_obj
-                    target_event.data.font = None
-                    target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                    target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                    target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                    target_event.data.sender['sex'] = 'unknown'
-                    target_event.data.sender['age'] = 0
-                    target_event.data.extend['flag_from_direct'] = True
-                    if plugin_event_bot_hash in sdkSubSelfInfo:
-                        target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                    if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
-                        target_event.active = False
+                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                    message_obj.data_raw = message_obj.data.copy()
                 else:
-                    target_event.active = False
+                    message_obj = OlivOS.messageAPI.Message_templet(
+                        'olivos_para',
+                        []
+                    )
+            try:
+                message_obj.init_data()
             except:
-                target_event.active = False
+                message_obj.active = False
+                message_obj.data = []
+            if message_obj.active:
+                try:
+                    if target_event.sdk_event.payload.data.d['extra']['type'] in [1, 9]:
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'private_message'
+                        target_event.data = target_event.private_message(
+                            str(target_event.sdk_event.payload.data.d['author_id']),
+                            message_obj,
+                            'friend'
+                        )
+                        target_event.data.message_sdk = message_obj
+                        target_event.data.message_id = str(target_event.sdk_event.payload.data.d['msg_id'])
+                        target_event.data.raw_message = message_obj
+                        target_event.data.raw_message_sdk = message_obj
+                        target_event.data.font = None
+                        target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['sex'] = 'unknown'
+                        target_event.data.sender['age'] = 0
+                        target_event.data.extend['flag_from_direct'] = True
+                        if plugin_event_bot_hash in sdkSubSelfInfo:
+                            target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+                        if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
+                            target_event.active = False
+                    else:
+                        target_event.active = False
+                except:
+                    target_event.active = False
 
 
 #支持OlivOS API调用的方法实现
@@ -438,6 +492,51 @@ class event_action(object):
             res_data['active'] = False
         return res_data
 
+    def get_stranger_info(target_event, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
+        raw_obj = None
+        this_msg = API.getUserViewStranger(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.user_id = str(user_id)
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res != None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj != None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_group_member_info(target_event, host_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = API.getUserView(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.user_id = str(user_id)
+        this_msg.metadata.guild_id = str(host_id)
+        this_msg.do_api()
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res != None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj != None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
+                    res_data['data']['id'] = str(user_id)
+                    res_data['data']['user_id'] = str(user_id)
+                    res_data['data']['group_id'] = str(host_id)
+                    res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'joined_at'], int)
+                    res_data['data']['times']['last_sent_time'] = 0
+                    res_data['data']['times']['shut_up_timestamp'] = 0
+                    res_data['data']['role'] = 'member'
+                    res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickname'], str)
+                    res_data['data']['title'] = ''
+        except:
+            res_data['active'] = False
+        return res_data
 
 def init_api_json(raw_str):
     res_data = None

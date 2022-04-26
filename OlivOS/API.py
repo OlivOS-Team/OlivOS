@@ -1010,6 +1010,8 @@ class Event(object):
             res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_stranger_info(self, user_id)
         return res_data
 
     def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):
@@ -1086,6 +1088,8 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, host_id, user_id)
         return res_data
 
     def get_group_member_info(self, group_id, user_id, host_id = None, no_cache = False, flag_log = True, remote = False):
