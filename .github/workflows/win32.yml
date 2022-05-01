@@ -12,4 +12,4 @@ jobs:
       with:
         python-version: 3.7.5
         cache: pip
-        architecture: x64
+        architecture: x86
