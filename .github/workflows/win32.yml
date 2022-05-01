@@ -1,1 +1,14 @@
-
+name: CI-Packing-win32
+on:
+  push:
+    branches: [ 32bitDev ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Python
+      uses: actions/setup-python@v3.1.2
+      with:
+        python-version: 3.7.5
+        cache: pip
+        architecture: x86
