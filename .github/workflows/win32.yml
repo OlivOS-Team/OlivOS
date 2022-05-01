@@ -32,7 +32,7 @@ jobs:
     - name: Ready for Packing
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v2
       with:
