@@ -19,4 +19,4 @@ jobs:
         python -m pip install -r .\requirements.txt
     - name: Run packing
       run: |
-        python -m pyinstaller .\main.spec
+        pyinstaller .\main.spec
