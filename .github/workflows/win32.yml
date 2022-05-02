@@ -1,0 +1,40 @@
+name: CI-Packing-win32
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Python
+      uses: actions/setup-python@v3.1.2
+      with:
+        python-version: 3.7.5
+        cache: pip
+        architecture: x86
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./requirements.txt
+    - name: Run packing
+      run: |
+        pyinstaller ./main.spec
+    - name: Run artifact
+      run: |
+        mkdir OlivOS-Win
+        cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
+    - name: Packing OlivOS-Win
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32
+        path: ./OlivOS-Win
+    - name: Ready for Packing
+      run: |
+        mkdir ./OlivOS-Win/lib
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+    - name: Packing OlivOS-Win-with-lib
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32-with-lib
+        path: ./OlivOS-Win

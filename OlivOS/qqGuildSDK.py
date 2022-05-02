@@ -315,7 +315,7 @@ def checkByListAnd(check_list):
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
-    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -374,8 +374,8 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
             target_event.data = target_event.group_message(
-                target_event.sdk_event.payload.data.d['channel_id'],
-                target_event.sdk_event.payload.data.d['author']['id'],
+                str(target_event.sdk_event.payload.data.d['channel_id']),
+                str(target_event.sdk_event.payload.data.d['author']['id']),
                 message_obj,
                 'group'
             )
@@ -384,16 +384,16 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message = message_obj
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
-            target_event.data.sender['user_id'] = target_event.sdk_event.payload.data.d['author']['id']
+            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
             target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
-            target_event.data.sender['id'] = target_event.sdk_event.payload.data.d['author']['id']
+            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
             target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             target_event.data.sender['role'] = 'member'
             target_event.data.host_id = target_event.sdk_event.payload.data.d['guild_id']
-            target_event.data.extend['group_id'] = target_event.sdk_event.payload.data.d['channel_id']
-            target_event.data.extend['host_group_id'] = target_event.sdk_event.payload.data.d['guild_id']
+            target_event.data.extend['group_id'] = str(target_event.sdk_event.payload.data.d['channel_id'])
+            target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.d['guild_id'])
             target_event.data.extend['flag_from_direct'] = False
             target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
             if 'member' in target_event.sdk_event.payload.data.d:
@@ -408,7 +408,7 @@ def get_Event_from_SDK(target_event):
                     elif '1' in tmp_role_now:
                         target_event.data.sender['role'] = 'member'
             if plugin_event_bot_hash in sdkSubSelfInfo:
-                target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         message_obj = None
         message_para_list = []
@@ -444,27 +444,27 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
-                target_event.sdk_event.payload.data.d['author']['id'],
+                str(target_event.sdk_event.payload.data.d['author']['id']),
                 message_obj,
                 'friend'
             )
             target_event.data.message_sdk = message_obj
-            target_event.data.message_id = target_event.sdk_event.payload.data.d['id']
+            target_event.data.message_id = str(target_event.sdk_event.payload.data.d['id'])
             target_event.data.raw_message = message_obj
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
-            target_event.data.sender['user_id'] = target_event.sdk_event.payload.data.d['author']['id']
+            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
             target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
-            target_event.data.sender['id'] = target_event.sdk_event.payload.data.d['author']['id']
+            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
             target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
-            target_event.data.extend['group_id'] = target_event.sdk_event.payload.data.d['channel_id']
-            target_event.data.extend['host_group_id'] = target_event.sdk_event.payload.data.d['guild_id']
+            target_event.data.extend['group_id'] = str(target_event.sdk_event.payload.data.d['channel_id'])
+            target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.d['guild_id'])
             target_event.data.extend['flag_from_direct'] = True
             target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
             if plugin_event_bot_hash in sdkSubSelfInfo:
-                target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
@@ -472,10 +472,10 @@ class event_action(object):
         this_msg = None
         if flag_direct:
             this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.guild_id = chat_id
+            this_msg.metadata.guild_id = int(chat_id)
         else:
             this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.channel_id = chat_id
+            this_msg.metadata.channel_id = int(chat_id)
         if this_msg == None:
             return
         this_msg.data.msg_id = reply_msg_id
@@ -512,7 +512,7 @@ class event_action(object):
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
-                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], str)
+                    res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
         except:
             res_data['active'] = False
         return res_data

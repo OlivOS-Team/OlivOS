@@ -16,11 +16,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import setuptools
 
-with open('README.md', 'r') as f:
+with open('README.md', 'r', encoding = 'utf-8') as f:
   long_description = f.read()
 
 setuptools.setup(name='olivos',
-    version='0.9.6',
+    version='0.9.8',
     description='OlivOS - Witness Union',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -38,7 +38,8 @@ setuptools.setup(name='olivos',
         'websocket-client',
         'pillow',
         'lxml',
-        'rsa'
+        'rsa',
+        'requests_toolbelt'
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),

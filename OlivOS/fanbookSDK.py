@@ -68,7 +68,7 @@ class api_templet(object):
         self.res = None
 
     def do_api(self):
-        try:
+        if True:
             tmp_payload_dict = {}
             tmp_fanbookAPIRouteTemp = fanbookAPIRouteTemp.copy()
             tmp_fanbookAPIRouteTemp.update({
@@ -89,14 +89,8 @@ class api_templet(object):
 
             msg_res = req.request("POST", send_url, headers = headers, data = payload)
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
-
             self.res = msg_res.text
             return msg_res.text
-        except:
-            return None
 
 class event(object):
     def __init__(self, json_obj = None, bot_info = None):
@@ -156,7 +150,7 @@ def checkByListAnd(check_list):
 
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
-    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -183,24 +177,24 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
-            target_event.sdk_event.json['channel_post']['chat']['id'],
-            target_event.sdk_event.json['channel_post']['from']['id'],
+            str(target_event.sdk_event.json['channel_post']['chat']['id']),
+            str(target_event.sdk_event.json['channel_post']['from']['id']),
             message_obj,
             'group'
         )
         target_event.data.message_sdk = message_obj
-        target_event.data.message_id = target_event.sdk_event.json['channel_post']['message_id']
+        target_event.data.message_id = str(target_event.sdk_event.json['channel_post']['message_id'])
         target_event.data.raw_message = message_obj
         target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['channel_post']['from']['id']
+        target_event.data.sender['user_id'] = str(target_event.sdk_event.json['channel_post']['from']['id'])
         target_event.data.sender['nickname'] = target_event.sdk_event.json['channel_post']['from']['first_name']
-        target_event.data.sender['id'] = target_event.sdk_event.json['channel_post']['from']['id']
+        target_event.data.sender['id'] = str(target_event.sdk_event.json['channel_post']['from']['id'])
         target_event.data.sender['name'] = target_event.sdk_event.json['channel_post']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
-        target_event.data.host_id = target_event.sdk_event.json['channel_post']['chat']['guild_id']
-        target_event.data.extend['host_group_id'] = target_event.sdk_event.json['channel_post']['chat']['guild_id']
+        target_event.data.host_id = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
+        target_event.data.extend['host_group_id'] = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
     elif checkByListAnd([
         not target_event.active,
         checkInDictSafe('channel_post', target_event.sdk_event.json, []),
@@ -225,24 +219,24 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
-            target_event.sdk_event.json['channel_post']['chat']['id'],
-            target_event.sdk_event.json['channel_post']['from']['id'],
+            str(target_event.sdk_event.json['channel_post']['chat']['id']),
+            str(target_event.sdk_event.json['channel_post']['from']['id']),
             message_obj,
             'group'
         )
         target_event.data.message_sdk = message_obj
-        target_event.data.message_id = target_event.sdk_event.json['channel_post']['message_id']
+        target_event.data.message_id = str(target_event.sdk_event.json['channel_post']['message_id'])
         target_event.data.raw_message = message_obj
         target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['channel_post']['from']['id']
+        target_event.data.sender['user_id'] = str(target_event.sdk_event.json['channel_post']['from']['id'])
         target_event.data.sender['nickname'] = target_event.sdk_event.json['channel_post']['from']['first_name']
-        target_event.data.sender['id'] = target_event.sdk_event.json['channel_post']['from']['id']
+        target_event.data.sender['id'] = str(target_event.sdk_event.json['channel_post']['from']['id'])
         target_event.data.sender['name'] = target_event.sdk_event.json['channel_post']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
-        target_event.data.host_id = target_event.sdk_event.json['channel_post']['chat']['guild_id']
-        target_event.data.extend['host_group_id'] = target_event.sdk_event.json['channel_post']['chat']['guild_id']
+        target_event.data.host_id = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
+        target_event.data.extend['host_group_id'] = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
@@ -250,8 +244,8 @@ class event_action(object):
         flag_now_type = 'string'
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg_image = API.sendPhoto(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.chat_id = chat_id
-        this_msg_image.data.chat_id = chat_id
+        this_msg.data.chat_id = int(chat_id)
+        this_msg_image.data.chat_id = int(chat_id)
         this_msg.data.text = ''
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.image:
@@ -275,7 +269,7 @@ class event_action(object):
     def send_private_msg(target_event, chat_id, message):
         private_chat_id = None
         this_msg = API.getPrivateChat(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.user_id = chat_id
+        this_msg.data.user_id = int(chat_id)
         try:
             tmp_res = this_msg.do_api()
             tmp_res_obj = json.loads(tmp_res)
@@ -296,7 +290,7 @@ class event_action(object):
             if tmp_res_obj['ok'] == True:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'username'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'id'], int))
         except:
             res_data['active'] = False
         return res_data

@@ -139,14 +139,12 @@ class Event(object):
             'private_message',
             'group_message'
         ]:
-            if self.data.message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
-                self.data.message = self.data.message_sdk.data_raw
-            else:
+            if self.plugin_info['message_mode_tx'] == 'olivos_para' or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
                 self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
-            if self.data.raw_message_sdk.mode_rx == self.plugin_info['message_mode_tx']:
-                self.data.raw_message = self.data.raw_message_sdk.data_raw
-            else:
                 self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
+            else:
+                self.data.message = self.data.message_sdk.data_raw
+                self.data.raw_message = self.data.raw_message_sdk.data_raw
 
     def do_init_log(self):
         if self.active:
@@ -429,7 +427,7 @@ class Event(object):
             self.interval = interval
 
 
-    def callbackLogger(func_name = None):
+    def callbackLogger(func_name = None, val_list = None):
         def callbackLoggerDecorator(func):
             @wraps(func)
             def funcWarpped(*args, **kwargs):
@@ -447,7 +445,19 @@ class Event(object):
                     elif warppedRes.__class__.__base__ == dict:
                         if 'active' in warppedRes:
                             if warppedRes['active'] == True:
-                                callback_msg = 'succeed'
+                                if type(val_list) == list and 'data' in warppedRes:
+                                    callback_msg_list = []
+                                    for val_list_this in val_list:
+                                        if val_list_this in warppedRes['data']:
+                                            callback_msg_list.append(
+                                                '%s(%s)' % (
+                                                    val_list_this,
+                                                    warppedRes['data'][val_list_this]
+                                                )
+                                            )
+                                    callback_msg = ' '.join(callback_msg_list)
+                                else:
+                                    callback_msg = 'succeed'
                             else:
                                 callback_msg = 'failed'
                         else:
@@ -767,143 +777,153 @@ class Event(object):
 
 
     @callbackLogger('set_group_kick')
-    def __set_group_kick(self, group_id, user_id, rehect_add_request, flag_log = True):
+    def __set_group_kick(self, group_id, user_id, host_id, rehect_add_request, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_kick(self, group_id, user_id, rehect_add_request = False, flag_log = True, remote = False):
+    def set_group_kick(self, group_id, user_id, host_id = None, rehect_add_request = False, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_kick(group_id, user_id, rehect_add_request, flag_log = True)
+            self.__set_group_kick(group_id, user_id, host_id, rehect_add_request, flag_log = True)
 
 
     @callbackLogger('set_group_ban')
-    def __set_group_ban(self, group_id, user_id, duration, flag_log = True):
+    def __set_group_ban(self, group_id, user_id, host_id, duration, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_ban(self, group_id, user_id, duration = 1800, flag_log = True, remote = False):
+    def set_group_ban(self, group_id, user_id, host_id = None, duration = 1800, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_ban(group_id, user_id, duration, flag_log = True)
+            self.__set_group_ban(group_id, user_id, host_id, duration, flag_log = True)
 
 
     @callbackLogger('set_group_anonymous_ban')
-    def __set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration, flag_log = True):
+    def __set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, host_id, duration, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, duration = 1800, flag_log = True, remote = False):
+    def set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, host_id = None, duration = 1800, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_anonymous_ban(group_id, anonymous, anonymous_flag, duration, flag_log = True)
+            self.__set_group_anonymous_ban(group_id, anonymous, anonymous_flag, host_id, duration, flag_log = True)
 
 
     @callbackLogger('set_group_whole_ban')
-    def __set_group_whole_ban(self, group_id, enable, flag_log = True):
+    def __set_group_whole_ban(self, group_id, enable, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_whole_ban(self, group_id, enable, flag_log = True, remote = False):
+    def set_group_whole_ban(self, group_id, enable, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_whole_ban(group_id, enable, flag_log = True)
+            self.__set_group_whole_ban(group_id, enable, host_id, flag_log = True)
 
 
     @callbackLogger('set_group_admin')
-    def __set_group_admin(self, group_id, user_id, enable, flag_log = True):
+    def __set_group_admin(self, group_id, user_id, enable, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_admin(self, group_id, user_id, enable, flag_log = True, remote = False):
+    def set_group_admin(self, group_id, user_id, enable, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_admin(group_id, user_id, enable, flag_log = True)
+            self.__set_group_admin(group_id, user_id, enable, host_id, flag_log = True)
 
 
     @callbackLogger('set_group_anonymous')
-    def __set_group_anonymous(self, group_id, enable, flag_log = True):
+    def __set_group_anonymous(self, group_id, enable, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_anonymous(self, group_id, enable, flag_log = True, remote = False):
+    def set_group_anonymous(self, group_id, enable, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_anonymous(group_id, enable, flag_log = True)
+            self.__set_group_anonymous(group_id, enable, host_id, flag_log = True)
 
 
     @callbackLogger('set_group_card')
-    def __set_group_card(self, group_id, user_id, card, flag_log = True):
+    def __set_group_card(self, group_id, user_id, card, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_card(self, group_id, user_id, card, flag_log = True, remote = False):
+    def set_group_card(self, group_id, user_id, card, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_card(group_id, user_id, card, flag_log = True)
+            self.__set_group_card(group_id, user_id, card, host_id, flag_log = True)
 
 
     @callbackLogger('set_group_name')
-    def __set_group_name(self, group_id, group_name, flag_log = True):
+    def __set_group_name(self, group_id, group_name, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_name(self, group_id, group_name, flag_log = True, remote = False):
+    def set_group_name(self, group_id, group_name, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_name(group_id, group_name, flag_log = True)
+            self.__set_group_name(group_id, group_name, host_id, flag_log = True)
 
 
     @callbackLogger('set_group_leave')
-    def __set_group_leave(self, group_id, is_dismiss, flag_log = True):
+    def __set_group_leave(self, group_id, host_id, is_dismiss, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
-    def set_group_leave(self, group_id, is_dismiss = False, flag_log = True, remote = False):
+    def set_group_leave(self, group_id, host_id = None, is_dismiss = False, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_leave(group_id, is_dismiss, flag_log = True)
+            self.__set_group_leave(group_id, host_id, is_dismiss, flag_log = True)
 
 
     @callbackLogger('set_group_special_title')
-    def __set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True):
+    def __set_group_special_title(self, group_id, user_id, special_title, duration, host_id, flag_log = True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
+            if host_id == None:
+                OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_special_title(self, group_id, user_id, special_title, duration, flag_log = True, remote = False):
+    def set_group_special_title(self, group_id, user_id, special_title, duration, host_id = None, flag_log = True, remote = False):
         if remote:
             pass
         else:
-            self.__set_group_special_title(group_id, user_id, special_title, duration, flag_log = True)
+            self.__set_group_special_title(group_id, user_id, special_title, duration, host_id, flag_log = True)
 
 
     @callbackLogger('set_friend_add_request')
@@ -983,13 +1003,15 @@ class Event(object):
         return res_data
 
 
-    @callbackLogger('get_stranger_info')
+    @callbackLogger('get_stranger_info', ['name', 'id'])
     def __get_stranger_info(self, user_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
             res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_stranger_info(self, user_id)
         return res_data
 
     def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):
@@ -1019,21 +1041,22 @@ class Event(object):
         return res_data
 
 
-    @callbackLogger('get_group_info')
-    def __get_group_info(self, group_id, no_cache, flag_log = True):
+    @callbackLogger('get_group_info', ['name', 'id'])
+    def __get_group_info(self, group_id, host_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
+            if host_id == None:
+                res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
         return res_data
 
-    def get_group_info(self, group_id, no_cache = False, flag_log = True, remote = False):
+    def get_group_info(self, group_id, host_id = None, no_cache = False, flag_log = True, remote = False):
         res_data = None
         if remote:
             pass
         else:
-            res_data = self.__get_group_info(group_id, no_cache, flag_log = True)
+            res_data = self.__get_group_info(group_id, host_id, no_cache, flag_log = True)
         return res_data
 
 
@@ -1055,39 +1078,45 @@ class Event(object):
         return res_data
 
 
-    @callbackLogger('get_group_member_info')
-    def __get_group_member_info(self, group_id, user_id, no_cache, flag_log = True):
+    @callbackLogger('get_group_member_info', ['name', 'id', 'group_id'])
+    def __get_group_member_info(self, group_id, user_id, host_id, no_cache, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+            if host_id == None:
+                res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+            else:
+                res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
-            pass
+            res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, host_id, user_id)
         return res_data
 
-    def get_group_member_info(self, group_id, user_id, no_cache = False, flag_log = True, remote = False):
+    def get_group_member_info(self, group_id, user_id, host_id = None, no_cache = False, flag_log = True, remote = False):
         res_data = None
         if remote:
             pass
         else:
-            res_data = self.__get_group_member_info(group_id, user_id, no_cache, flag_log = True)
+            res_data = self.__get_group_member_info(group_id, user_id, host_id, no_cache, flag_log = True)
         return res_data
 
 
     @callbackLogger('get_group_member_list')
-    def __get_group_member_list(self, group_id, flag_log = True):
+    def __get_group_member_list(self, group_id, host_id, flag_log = True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+            if host_id == None:
+                res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
 
-    def get_group_member_list(self, group_id, flag_log = True, remote = False):
+    def get_group_member_list(self, group_id, host_id = None, flag_log = True, remote = False):
         res_data = None
         if remote:
             pass
         else:
-            res_data = self.__get_group_member_list(group_id, flag_log = True)
+            res_data = self.__get_group_member_list(group_id, host_id, flag_log = True)
         return res_data
 
 

@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import re
 
 import OlivOS
 import traceback
@@ -29,15 +30,24 @@ dictMessageType = {
     },
     'telegram': {
         'telegram_poll': {
-            'default': 'old_string'
+            'default': 'olivos_para'
         }
     },
     'fanbook': {
         'fanbook_poll': {
-            'default': 'fanbook_string'
+            'default': 'olivos_para',
+            'private': 'olivos_para'
+        }
+    },
+    'kaiheila': {
+        'kaiheila_link': {
+            'default': 'olivos_para'
         }
     },
     'dodo': {
+        'dodo_link': {
+            'default': 'olivos_para'
+        },
         'dodo_poll': {
             'default': 'olivos_para'
         },
@@ -384,6 +394,7 @@ class Message_templet(object):
 
     def init_from_kaiheila_code_string(self):
         tmp_data_raw = str(self.data_raw)
+        tmp_data_raw = re.sub("\\(met\\)(\\d+)\\(met\\)", "@User#\\1 ", tmp_data_raw)
         tmp_data_raw_1 = ''
         tmp_data_raw_2 = ''
         tmp_data_raw_3 = ''

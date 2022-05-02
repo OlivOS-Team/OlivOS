@@ -238,7 +238,7 @@ def get_message_obj_from_SDK(target_event):
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
-    target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -282,23 +282,23 @@ def get_Event_from_SDK(target_event):
             return target_event.active
         target_event.plugin_info['func_type'] = 'private_message'
         target_event.data = target_event.private_message(
-            target_event.sdk_event.json['message']['from']['id'],
+            str(target_event.sdk_event.json['message']['from']['id']),
             message_obj,
             'friend'
         )
         target_event.data.message_sdk = message_obj
-        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
+        target_event.data.message_id = str(target_event.sdk_event.json['message']['message_id'])
         target_event.data.raw_message = message_obj
         target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['user_id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
-        target_event.data.sender['id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['name'] = target_event.sdk_event.json['message']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
         if plugin_event_bot_hash in sdkSubSelfInfo:
-            target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+            target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     if checkByListAnd([
         not target_event.active,
         'message' in target_event.sdk_event.json,
@@ -319,24 +319,24 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
-            target_event.sdk_event.json['message']['chat']['id'],
-            target_event.sdk_event.json['message']['from']['id'],
+            str(target_event.sdk_event.json['message']['chat']['id']),
+            str(target_event.sdk_event.json['message']['from']['id']),
             message_obj,
             'group'
         )
         target_event.data.message_sdk = message_obj
-        target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
+        target_event.data.message_id = str(target_event.sdk_event.json['message']['message_id'])
         target_event.data.raw_message = message_obj
         target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['user_id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
-        target_event.data.sender['id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['name'] = target_event.sdk_event.json['message']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
         if plugin_event_bot_hash in sdkSubSelfInfo:
-            target_event.data.extend['sub_self_id'] = sdkSubSelfInfo[plugin_event_bot_hash]
+            target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     if checkByListAnd([
         not target_event.active,
         'message' in target_event.sdk_event.json,
@@ -357,8 +357,8 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
-            target_event.sdk_event.json['message']['chat']['id'],
-            target_event.sdk_event.json['message']['from']['id'],
+            str(target_event.sdk_event.json['message']['chat']['id']),
+            str(target_event.sdk_event.json['message']['from']['id']),
             message_obj,
             'group'
         )
@@ -367,9 +367,9 @@ def get_Event_from_SDK(target_event):
         target_event.data.raw_message = message_obj
         target_event.data.raw_message_sdk = message_obj
         target_event.data.font = None
-        target_event.data.sender['user_id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['user_id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['nickname'] = target_event.sdk_event.json['message']['from']['first_name']
-        target_event.data.sender['id'] = target_event.sdk_event.json['message']['from']['id']
+        target_event.data.sender['id'] = str(target_event.sdk_event.json['message']['from']['id'])
         target_event.data.sender['name'] = target_event.sdk_event.json['message']['from']['first_name']
         target_event.data.sender['sex'] = 'unknown'
         target_event.data.sender['age'] = 0
@@ -389,8 +389,8 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_member_increase'
         target_event.data = target_event.group_member_increase(
-            target_event.sdk_event.json['message']['chat']['id'],
-            target_event.sdk_event.json['message']['from']['id'],
+            str(target_event.sdk_event.json['message']['chat']['id']),
+            str(target_event.sdk_event.json['message']['from']['id']),
             target_event.sdk_event.json['message']['new_chat_member']['id']
         )
         target_event.data.action = 'invite'
@@ -408,8 +408,8 @@ def get_Event_from_SDK(target_event):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_member_decrease'
         target_event.data = target_event.group_member_decrease(
-            target_event.sdk_event.json['message']['chat']['id'],
-            target_event.sdk_event.json['message']['from']['id'],
+            str(target_event.sdk_event.json['message']['chat']['id']),
+            str(target_event.sdk_event.json['message']['from']['id']),
             target_event.sdk_event.json['message']['left_chat_member']['id']
         )
         if target_event.data.operator_id == target_event.data.user_id:
@@ -426,8 +426,8 @@ class event_action(object):
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg_image = API.sendPhoto(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.chat_id = chat_id
-        this_msg_image.data.chat_id = chat_id
+        this_msg.data.chat_id = str(chat_id)
+        this_msg_image.data.chat_id = str(chat_id)
         this_msg.data.text = ''
         flag_now_type = 'string'
         if message != None:
@@ -465,8 +465,88 @@ class event_action(object):
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
-                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['id'], int)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
         return res_data
+
+    def get_login_info(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
+        raw_obj = None
+        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
+        return res_data
+
+    def set_chat_leave(target_event, chat_id, is_dismiss = False):
+        this_msg = API.leaveChat(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = str(chat_id)
+        this_msg.do_api()
+
+    def get_group_info(target_event, chat_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        raw_obj = None
+        raw_obj_2 = None
+        this_msg = API.getChat(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = str(chat_id)
+        this_msg.do_api()
+        this_msg_2 = API.getChatMemberCount(get_SDK_bot_info_from_Event(target_event))
+        this_msg_2.data.chat_id = str(chat_id)
+        this_msg_2.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if this_msg_2.res != None:
+            raw_obj_2 = init_api_json(this_msg_2.res.text)
+        if raw_obj != None and raw_obj_2 != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
+                res_data['data']['id'] = str(chat_id)
+                if 'description' in raw_obj:
+                    res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['description'], str)
+                res_data['data']['member_count'] = init_api_do_mapping_for_dict(raw_obj_2, [], int)
+                res_data['data']['max_member_count'] = 200
+                tmp_group_type = init_api_do_mapping_for_dict(raw_obj, ['type'], str)
+                if tmp_group_type == 'group':
+                    res_data['data']['max_member_count'] = 200
+                if tmp_group_type == 'supergroup':
+                    res_data['data']['max_member_count'] = 200000
+        return res_data
+
+    def get_group_member_info(target_event, chat_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        this_msg = API.getChatMember(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.chat_id = str(chat_id)
+        this_msg.data.user_id = str(user_id)
+        this_msg.do_api()
+        if this_msg.res != None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj != None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
+                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user', 'id'], int))
+                res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user', 'id'], int))
+                res_data['data']['group_id'] = str(chat_id)
+                res_data['data']['times']['join_time'] = -1
+                res_data['data']['times']['last_sent_time'] = -1
+                res_data['data']['times']['shut_up_timestamp'] = -1
+                res_data['data']['role'] = 'member'
+                tmp_role = init_api_do_mapping_for_dict(raw_obj, ['status', 'role'], str)
+                if tmp_role == 'creator':
+                    res_data['data']['role'] = 'owner'
+                elif tmp_role == 'administrator':
+                    res_data['data']['role'] = 'admin'
+                res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
+                res_data['data']['title'] = ''
+        return res_data
+
+    
 
 def init_api_json(raw_str):
     res_data = None
@@ -487,6 +567,8 @@ def init_api_json(raw_str):
                 res_data = tmp_obj['result'].copy()
             elif type(tmp_obj['result']) == list:
                 res_data = tmp_obj['result'].copy()
+            else:
+                res_data = tmp_obj['result']
     return res_data
 
 def init_api_do_mapping(src_type, src_data):
@@ -497,6 +579,8 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
     flag_active = True
     tmp_src_data = src_data
+    if type(src_data) == src_type:
+        return src_data
     for path_list_this in path_list:
         if type(tmp_src_data) == dict:
             if path_list_this in tmp_src_data:
@@ -609,3 +693,52 @@ class API(object):
             def __init__(self):
                 self.chat_id = 0
                 self.photo = ''
+
+    class leaveChat(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'leaveChat'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+
+    class getChat(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChat'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+
+    class getChatMember(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChatMember'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
+                self.user_id = 0
+
+    class getChatMemberCount(api_templet):
+        def __init__(self, bot_info = None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'getChatMemberCount'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.chat_id = 0
