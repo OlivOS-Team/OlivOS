@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import re
 
 import OlivOS
 import traceback
@@ -393,6 +394,7 @@ class Message_templet(object):
 
     def init_from_kaiheila_code_string(self):
         tmp_data_raw = str(self.data_raw)
+        tmp_data_raw = re.sub("\\(met\\)(\\d+)\\(met\\)", "@User#\\1 ", tmp_data_raw)
         tmp_data_raw_1 = ''
         tmp_data_raw_2 = ''
         tmp_data_raw_3 = ''
