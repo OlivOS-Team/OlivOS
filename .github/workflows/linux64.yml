@@ -23,7 +23,7 @@ jobs:
     - name: Run artifact
       run: |
         mkdir OlivOS-PKG
-        cp ./dist/* ./OlivOS-PKG/
+        cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
       uses: actions/upload-artifact@v2
       with:
