@@ -355,6 +355,11 @@ def get_Event_from_SDK(target_event):
                     'olivos_para',
                     []
                 )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) == list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
@@ -425,6 +430,11 @@ def get_Event_from_SDK(target_event):
                     'olivos_para',
                     []
                 )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) == list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
