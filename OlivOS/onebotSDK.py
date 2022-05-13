@@ -297,7 +297,9 @@ def get_Event_from_SDK(target_event):
                     str(target_event.sdk_event.json['target_id'])
                 )
                 if 'group_id' in target_event.sdk_event.json:
-                    target_event.data.group_id = target_event.sdk_event.json['group_id']
+                    target_event.data.group_id = str(target_event.sdk_event.json['group_id'])
+                if target_event.data.group_id == '-1':
+                    target_event.data.group_id = None
             elif target_event.sdk_event.json['sub_type'] == 'lucky_king':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_lucky_king'
