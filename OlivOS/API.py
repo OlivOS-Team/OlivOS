@@ -490,7 +490,7 @@ class Event(object):
                 ('set_block', 'callback')
             ])
 
-    def set_block(self, enable = True, flag_log = True, remote = False):
+    def set_block(self, enable: bool = True, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -620,7 +620,7 @@ class Event(object):
                         ('reply', 'callback')
                     ])
 
-    def reply(self, message, flag_log = True, remote = False):
+    def reply(self, message, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -725,7 +725,7 @@ class Event(object):
                         ('send', 'callback')
                     ])
 
-    def send(self, send_type, target_id, message, host_id = None, flag_log = True, remote = False):
+    def send(self, send_type: str, target_id: 'str|int', message, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -738,7 +738,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def delete_msg(self, message_id, flag_log = True, remote = False):
+    def delete_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -753,7 +753,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_msg(self, message_id, flag_log = True, remote = False):
+    def get_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -769,7 +769,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def send_like(self, user_id, times = 1, flag_log = True, remote = False):
+    def send_like(self, user_id: 'str|int', times: int = 1, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -784,7 +784,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_kick(self, group_id, user_id, host_id = None, rehect_add_request = False, flag_log = True, remote = False):
+    def set_group_kick(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None, rehect_add_request: bool = False, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -799,7 +799,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_ban(self, group_id, user_id, host_id = None, duration = 1800, flag_log = True, remote = False):
+    def set_group_ban(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None, duration: int = 1800, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -814,7 +814,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, host_id = None, duration = 1800, flag_log = True, remote = False):
+    def set_group_anonymous_ban(self, group_id: 'str|int', anonymous, anonymous_flag: str, host_id: 'str|int|None' = None, duration: int = 1800, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -829,7 +829,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_whole_ban(self, group_id, enable, host_id = None, flag_log = True, remote = False):
+    def set_group_whole_ban(self, group_id: 'str|int', enable: bool, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -844,7 +844,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_admin(self, group_id, user_id, enable, host_id = None, flag_log = True, remote = False):
+    def set_group_admin(self, group_id: 'str|int', user_id: 'str|int', enable: bool, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -859,7 +859,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_anonymous(self, group_id, enable, host_id = None, flag_log = True, remote = False):
+    def set_group_anonymous(self, group_id: 'str|int', enable: bool, host_id: 'str|int' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -874,7 +874,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_card(self, group_id, user_id, card, host_id = None, flag_log = True, remote = False):
+    def set_group_card(self, group_id: 'str|int', user_id: 'str|int', card, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -889,7 +889,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_name(self, group_id, group_name, host_id = None, flag_log = True, remote = False):
+    def set_group_name(self, group_id: 'str|int', group_name: str, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -904,7 +904,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
-    def set_group_leave(self, group_id, host_id = None, is_dismiss = False, flag_log = True, remote = False):
+    def set_group_leave(self, group_id: 'str|int', host_id: 'str|int|None' = None, is_dismiss: bool = False, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -919,7 +919,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_special_title(self, group_id, user_id, special_title, duration, host_id = None, flag_log = True, remote = False):
+    def set_group_special_title(self, group_id: 'str|int', user_id: 'str|int', special_title: str, duration: int, host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -933,7 +933,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_friend_add_request(self, flag, approve, remark, flag_log = True, remote = False):
+    def set_friend_add_request(self, flag: str, approve: bool, remark: str, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -947,7 +947,7 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
-    def set_group_add_request(self, flag, sub_type, approve, reason, flag_log = True, remote = False):
+    def set_group_add_request(self, flag: str, sub_type: str, approve: bool, reason: str, flag_log: bool = True, remote: bool = False):
         if remote:
             pass
         else:
@@ -994,7 +994,7 @@ class Event(object):
                     ])
         return res_data
 
-    def get_login_info(self, flag_log = True, remote = False):
+    def get_login_info(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1014,7 +1014,7 @@ class Event(object):
             res_data = OlivOS.kaiheilaSDK.event_action.get_stranger_info(self, user_id)
         return res_data
 
-    def get_stranger_info(self, user_id, no_cache = False, flag_log = True, remote = False):
+    def get_stranger_info(self, user_id: 'str|int', no_cache: bool = False, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1032,7 +1032,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_friend_list(self, flag_log = True, remote = False):
+    def get_friend_list(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1051,7 +1051,7 @@ class Event(object):
             res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
         return res_data
 
-    def get_group_info(self, group_id, host_id = None, no_cache = False, flag_log = True, remote = False):
+    def get_group_info(self, group_id: 'str|int', host_id: 'str|int|None' = None, no_cache: bool = False, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1069,7 +1069,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_group_list(self, flag_log = True, remote = False):
+    def get_group_list(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1092,7 +1092,7 @@ class Event(object):
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, host_id, user_id)
         return res_data
 
-    def get_group_member_info(self, group_id, user_id, host_id = None, no_cache = False, flag_log = True, remote = False):
+    def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None, no_cache: bool = False, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1111,7 +1111,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_group_member_list(self, group_id, host_id = None, flag_log = True, remote = False):
+    def get_group_member_list(self, group_id: 'str|int', host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1129,7 +1129,7 @@ class Event(object):
             pass
         return res_data
 
-    def can_send_image(self, flag_log = True, remote = False):
+    def can_send_image(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1147,7 +1147,7 @@ class Event(object):
             pass
         return res_data
 
-    def can_send_record(self, flag_log = True, remote = False):
+    def can_send_record(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1165,7 +1165,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_status(self, flag_log = True, remote = False):
+    def get_status(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1183,7 +1183,7 @@ class Event(object):
             pass
         return res_data
 
-    def get_version_info(self, flag_log = True, remote = False):
+    def get_version_info(self, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
