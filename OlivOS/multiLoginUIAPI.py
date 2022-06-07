@@ -303,6 +303,8 @@ class TreeEditUI(object):
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild']['qqGuild_link'] = [
+            'private',
+            'public',
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila'] = {}
