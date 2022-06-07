@@ -339,7 +339,10 @@ def get_Event_from_SDK(target_event):
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
         except:
             pass
-    if target_event.sdk_event.payload.data.t == 'MESSAGE_CREATE':
+    if target_event.sdk_event.payload.data.t in [
+        'MESSAGE_CREATE',
+        'AT_MESSAGE_CREATE'
+    ]:
         message_obj = None
         message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
