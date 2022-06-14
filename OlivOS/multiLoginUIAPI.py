@@ -296,13 +296,15 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq']['onebot'] = [
-            'default',
             #'gocqhttp',
             #'gocqhttp_hide',
-            'gocqhttp_show'
+            'gocqhttp_show',
+            'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild'] = {}
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild']['qqGuild_link'] = [
+            'private',
+            'public',
             'default'
         ]
         self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila'] = {}
@@ -330,8 +332,8 @@ class TreeEditUI(object):
         ]
 
         self.UIData['edit_root_Combobox_Server_auto_list'] = [
-            'False',
-            'True'
+            'True',
+            'False'
         ]
 
         self.UIData['edit_root_Combobox_Server_type_list'] = [

@@ -43,9 +43,10 @@ sdkAPIRouteTemp = {
 sdkSubSelfInfo = {}
 
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None):
+    def __init__(self, id = -1, access_token = None, model = 'private'):
         self.id = id
         self.access_token = access_token
+        self.model = model
         self.debug_mode = False
         self.debug_logger = None
 
@@ -55,6 +56,8 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         plugin_bot_info.post_info.access_token
     )
     res.debug_mode = plugin_bot_info.debug_mode
+    if plugin_bot_info.platform['model'] == 'public':
+        res.model = 'public'
     return res
 
 def get_SDK_bot_info_from_Event(target_event):
@@ -140,13 +143,16 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info, intents = (1 << 0 | 1 << 9 | 1 << 12 | 1 << 30)):
+        def __init__(self, bot_info, intents = (1 << 0 | 1 << 12 | 1 << 30)):
+            tmp_intents = intents
+            if bot_info.model == 'private':
+                tmp_intents |= (1 << 9)
             payload_template.__init__(self)
             self.data.op = 2
             try:
                 self.data.d = {
                     'token': 'Bot %s.%s' % (str(bot_info.id), bot_info.access_token),
-                    'intents': intents,
+                    'intents': tmp_intents,
                     'shard': [0,1],
                     'properties': {
                         'os': OlivOS.infoAPI.OlivOS_Header_UA
@@ -339,7 +345,10 @@ def get_Event_from_SDK(target_event):
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
         except:
             pass
-    if target_event.sdk_event.payload.data.t == 'MESSAGE_CREATE':
+    if target_event.sdk_event.payload.data.t in [
+        'MESSAGE_CREATE',
+        'AT_MESSAGE_CREATE'
+    ]:
         message_obj = None
         message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
@@ -355,6 +364,11 @@ def get_Event_from_SDK(target_event):
                     'olivos_para',
                     []
                 )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) == list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
@@ -425,6 +439,11 @@ def get_Event_from_SDK(target_event):
                     'olivos_para',
                     []
                 )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) == list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
