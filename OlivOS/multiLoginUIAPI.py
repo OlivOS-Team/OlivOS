@@ -86,80 +86,40 @@ class HostUI(object):
             yscrollcommand = self.UIObject['tree_yscroll'].set
         )
 
-        self.UIObject['root_Button_NEW'] = tkinter.Button(
-            self.UIObject['root'],
+        self.tree_UI_Button_init(
+            name = 'root_Button_NEW',
             text = 'NEW',
             command = lambda : self.tree_edit('create'),
-            bd = 0,
-            activebackground = self.UIConfig['color_002'],
-            activeforeground = self.UIConfig['color_001'],
-            bg = self.UIConfig['color_003'],
-            fg = self.UIConfig['color_004'],
-            relief = 'groove'
-        )
-        self.UIObject['root_Button_NEW'].bind('<Enter>', lambda x : self.buttom_action('root_Button_NEW', '<Enter>'))
-        self.UIObject['root_Button_NEW'].bind('<Leave>', lambda x : self.buttom_action('root_Button_NEW', '<Leave>'))
-        self.UIObject['root_Button_NEW'].place(
             x = 10,
             y = 358,
             width = 117,
             height = 34
         )
 
-        self.UIObject['root_Button_EDIT'] = tkinter.Button(
-            self.UIObject['root'],
+        self.tree_UI_Button_init(
+            name = 'root_Button_EDIT',
             text = 'EDIT',
             command = lambda : self.tree_edit('update'),
-            bd = 0,
-            activebackground = self.UIConfig['color_002'],
-            activeforeground = self.UIConfig['color_001'],
-            bg = self.UIConfig['color_003'],
-            fg = self.UIConfig['color_004'],
-            relief = 'groove'
-        )
-        self.UIObject['root_Button_EDIT'].bind('<Enter>', lambda x : self.buttom_action('root_Button_EDIT', '<Enter>'))
-        self.UIObject['root_Button_EDIT'].bind('<Leave>', lambda x : self.buttom_action('root_Button_EDIT', '<Leave>'))
-        self.UIObject['root_Button_EDIT'].place(
             x = 137,
             y = 358,
             width = 117,
             height = 34
         )
 
-        self.UIObject['root_Button_DEL'] = tkinter.Button(
-            self.UIObject['root'],
+        self.tree_UI_Button_init(
+            name = 'root_Button_DEL',
             text = 'DEL',
             command = lambda : self.tree_edit('delete'),
-            bd = 0,
-            activebackground = self.UIConfig['color_002'],
-            activeforeground = self.UIConfig['color_001'],
-            bg = self.UIConfig['color_003'],
-            fg = self.UIConfig['color_004'],
-            relief = 'groove'
-        )
-        self.UIObject['root_Button_DEL'].bind('<Enter>', lambda x : self.buttom_action('root_Button_DEL', '<Enter>'))
-        self.UIObject['root_Button_DEL'].bind('<Leave>', lambda x : self.buttom_action('root_Button_DEL', '<Leave>'))
-        self.UIObject['root_Button_DEL'].place(
             x = 264,
             y = 358,
             width = 117,
             height = 34
         )
 
-        self.UIObject['root_Button_COMMIT'] = tkinter.Button(
-            self.UIObject['root'],
+        self.tree_UI_Button_init(
+            name = 'root_Button_COMMIT',
             text = 'COMMIT',
             command = lambda : self.account_data_commit(),
-            bd = 0,
-            activebackground = self.UIConfig['color_002'],
-            activeforeground = self.UIConfig['color_001'],
-            bg = self.UIConfig['color_003'],
-            fg = self.UIConfig['color_004'],
-            relief = 'groove'
-        )
-        self.UIObject['root_Button_COMMIT'].bind('<Enter>', lambda x : self.buttom_action('root_Button_COMMIT', '<Enter>'))
-        self.UIObject['root_Button_COMMIT'].bind('<Leave>', lambda x : self.buttom_action('root_Button_COMMIT', '<Leave>'))
-        self.UIObject['root_Button_COMMIT'].place(
             x = 391,
             y = 358,
             width = 117,
@@ -176,6 +136,27 @@ class HostUI(object):
                 self.UIObject[name].configure(bg = self.UIConfig['color_006'])
             if action == '<Leave>':
                 self.UIObject[name].configure(bg = self.UIConfig['color_003'])
+
+    def tree_UI_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text = text,
+            command = command,
+            bd = 0,
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
+            relief = 'groove'
+        )
+        self.UIObject[name].bind('<Enter>', lambda x : self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x : self.buttom_action(name, '<Leave>'))
+        self.UIObject[name].place(
+            x = x,
+            y = y,
+            width = width,
+            height = height
+        )
 
     def tree_rightKey(self, event):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
@@ -263,73 +244,82 @@ class TreeEditUI(object):
         self.UIData['edit_root_Entry_Server_host_StringVar'] = tkinter.StringVar()
         self.UIData['edit_root_Entry_Server_port_StringVar'] = tkinter.StringVar()
         self.UIData['edit_root_Entry_Server_access_token_StringVar'] = tkinter.StringVar()
-        self.UIData['edit_root_Combobox_dict'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_list'] = [
-            'qq',
-            'qqGuild',
-            'kaiheila',
-            'telegram',
-            'dodo',
-            'fanbook'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qq'] = [
-            'onebot'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['qqGuild'] = [
-            'qqGuild_link'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['kaiheila'] = [
-            'kaiheila_link'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['telegram'] = [
-            'telegram_poll'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['dodo'] = [
-            'dodo_link'
-            #'dodo_poll',
-            #'dodobot_ea'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_list']['fanbook'] = [
-            'fanbook_poll'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qq']['onebot'] = [
-            #'gocqhttp',
-            #'gocqhttp_hide',
-            'gocqhttp_show',
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['qqGuild']['qqGuild_link'] = [
-            'private',
-            'public',
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['kaiheila']['kaiheila_link'] = [
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['telegram']['telegram_poll'] = [
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodo_link'] = [
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodo_poll'] = [
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['dodo']['dodobot_ea'] = [
-            'default'
-        ]
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook'] = {}
-        self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list']['fanbook']['fanbook_poll'] = [
-            'default',
-            'private'
-        ]
+        self.UIData['edit_root_Combobox_dict'] = {
+            'platform_list': [
+                'qq',
+                'qqGuild',
+                'kaiheila',
+                'telegram',
+                'dodo',
+                'fanbook'
+            ],
+            'platform_sdk_list': {
+                'qq': [
+                    'onebot'
+                ],
+                'qqGuild': [
+                    'qqGuild_link'
+                ],
+                'kaiheila': [
+                    'kaiheila_link'
+                ],
+                'telegram': [
+                    'telegram_poll'
+                ],
+                'dodo': [
+                    'dodo_link'
+                    #'dodo_poll',
+                    #'dodobot_ea'
+                ],
+                'fanbook': [
+                    'fanbook_poll'
+                ]
+            },
+            'platform_sdk_model_list': {
+                'qq': {
+                    'onebot': [
+                        #'gocqhttp',
+                        #'gocqhttp_hide',
+                        'gocqhttp_show',
+                        'default'
+                    ]
+                },
+                'qqGuild': {
+                    'qqGuild_link': [
+                        'private',
+                        'public',
+                        'default'
+                    ]
+                },
+                'kaiheila': {
+                    'kaiheila_link': [
+                        'default'
+                    ]
+                },
+                'telegram': {
+                    'telegram_poll': [
+                        'default'
+                    ]
+                },
+                'dodo': {
+                    'dodo_link': [
+                        'default'
+                    ],
+                    'dodo_poll': [
+                        'default'
+                    ],
+                    'dodobot_ea': [
+                        'default'
+                    ]
+                },
+                'fanbook': {
+                    'fanbook_poll': [
+                        'default',
+                        'private'
+                    ]
+                }
+            }
+        }
 
         self.UIData['edit_root_Combobox_Server_auto_list'] = [
             'True',
@@ -371,6 +361,15 @@ class TreeEditUI(object):
         self.UIObject['edit_root_Button_commit'].bind('<Enter>', lambda x : self.buttom_action('edit_root_Button_commit', '<Enter>'))
         self.UIObject['edit_root_Button_commit'].bind('<Leave>', lambda x : self.buttom_action('edit_root_Button_commit', '<Leave>'))
         self.UIObject['edit_root_Button_commit'].place(
+            x = 310,
+            y = 40,
+            width = 70,
+            height = 54
+        )
+        self.tree_UI_Button_init(
+            name = 'edit_root_Button_commit',
+            text = 'SAVE',
+            command = self.tree_edit_commit,
             x = 310,
             y = 40,
             width = 70,
@@ -511,6 +510,27 @@ class TreeEditUI(object):
                 self.UIObject[name].configure(bg = self.UIConfig['color_006'])
             if action == '<Leave>':
                 self.UIObject[name].configure(bg = self.UIConfig['color_003'])
+
+    def tree_UI_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['edit_root'],
+            text = text,
+            command = command,
+            bd = 0,
+            activebackground = self.UIConfig['color_002'],
+            activeforeground = self.UIConfig['color_001'],
+            bg = self.UIConfig['color_003'],
+            fg = self.UIConfig['color_004'],
+            relief = 'groove'
+        )
+        self.UIObject[name].bind('<Enter>', lambda x : self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x : self.buttom_action(name, '<Leave>'))
+        self.UIObject[name].place(
+            x = x,
+            y = y,
+            width = width,
+            height = height
+        )
 
     def tree_edit_UI_Entry_init(self, obj_root, obj_name, str_name, x, y, width, height, action, title = '', mode = 'NONE'):
         self.UIObject[obj_name + '=Label'] = tkinter.Label(
