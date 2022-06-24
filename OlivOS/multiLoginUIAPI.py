@@ -347,25 +347,6 @@ class TreeEditUI(object):
         )
         self.UIObject['edit_root'].configure(bg = self.UIConfig['color_001'])
 
-        self.UIObject['edit_root_Button_commit'] = tkinter.Button(
-            self.UIObject['edit_root'],
-            text = 'SAVE',
-            command = self.tree_edit_commit,
-            bd = 0,
-            activebackground = self.UIConfig['color_002'],
-            activeforeground = self.UIConfig['color_001'],
-            bg = self.UIConfig['color_003'],
-            fg = self.UIConfig['color_004'],
-            relief = 'groove'
-        )
-        self.UIObject['edit_root_Button_commit'].bind('<Enter>', lambda x : self.buttom_action('edit_root_Button_commit', '<Enter>'))
-        self.UIObject['edit_root_Button_commit'].bind('<Leave>', lambda x : self.buttom_action('edit_root_Button_commit', '<Leave>'))
-        self.UIObject['edit_root_Button_commit'].place(
-            x = 310,
-            y = 40,
-            width = 70,
-            height = 54
-        )
         self.tree_UI_Button_init(
             name = 'edit_root_Button_commit',
             text = 'SAVE',
