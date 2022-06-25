@@ -405,7 +405,7 @@ class TreeEditUI(object):
 
         self.tree_UI_Button_init(
             name = 'edit_root_Button_commit',
-            text = 'SAVE',
+            text = '保存',
             command = self.tree_edit_commit,
             x = 310,
             y = 40,
@@ -954,7 +954,7 @@ class TreeEditUI_old(object):
 
         self.tree_UI_Button_init(
             name = 'edit_root_Button_commit',
-            text = '确认',
+            text = 'SAVE',
             command = self.tree_edit_commit,
             x = 310,
             y = 40,
