@@ -526,6 +526,12 @@ class TreeEditUI(object):
     def tree_edit_UI_Combobox_ComboboxSelected(self, action, event, target):
         if target == 'edit_root_Combobox_Account_type':
             self.tree_edit_UI_Combobox_update(action, 'type')
+        elif target == 'edit_root_Combobox_platform':
+            self.tree_edit_UI_Combobox_update(action, 'platform')
+        elif target == 'edit_root_Combobox_sdk':
+            self.tree_edit_UI_Combobox_update(action, 'sdk')
+        elif target == 'edit_root_Combobox_model':
+            self.tree_edit_UI_Combobox_update(action, 'model')
 
     def tree_edit_UI_Combobox_update(self, action, con_action):
         for item_this in [
@@ -582,7 +588,7 @@ class TreeEditUI(object):
                         self.UIData['edit_root_Combobox_dict']['type_list'].index('自定义')
                     )
         tmp_type = self.UIObject['edit_root_Combobox_Account_type'].get()
-        if con_action in ['init', 'type']:
+        if con_action in ['init', 'type', 'platform', 'sdk', 'model']:
             if tmp_type in self.UIData['edit_root_Combobox_dict']['type_mapping_list']:
                 count = 1
                 if tmp_type != '自定义':
