@@ -24,6 +24,15 @@ from tkinter import messagebox
 
 import OlivOS
 
+dictColorContext = {
+    'color_001': '#00A0EA',
+    'color_002': '#BBE9FF',
+    'color_003': '#40C3FF',
+    'color_004': '#FFFFFF',
+    'color_005': '#000000',
+    'color_006': '#80D7FF'
+}
+
 class HostUI(object):
     def __init__(self, Model_name, Account_data, logger_proc = None):
         self.Model_name = Model_name
@@ -33,12 +42,7 @@ class HostUI(object):
         self.logger_proc = logger_proc
         self.UIData['Account_data'] = Account_data
         self.UIData['flag_commit'] = False
-        self.UIConfig['color_001'] = '#00A0EA'
-        self.UIConfig['color_002'] = '#BBE9FF'
-        self.UIConfig['color_003'] = '#40C3FF'
-        self.UIConfig['color_004'] = '#FFFFFF'
-        self.UIConfig['color_005'] = '#000000'
-        self.UIConfig['color_006'] = '#80D7FF'
+        self.UIConfig.update(dictColorContext)
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
 
     def log(self, log_level, log_message):
@@ -66,6 +70,7 @@ class HostUI(object):
         self.UIObject['tree'].heading('PLATFORM', text = 'PLATFORM')
         self.UIObject['tree'].heading('SDK', text = 'SDK')
         self.UIObject['tree'].heading('MODEL', text = 'MODEL')
+        self.UIObject['tree']['selectmode'] = 'browse'
         self.tree_load()
         self.UIObject['tree'].place(x = 0, y = 0, width = 500, height = 350)
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
@@ -221,12 +226,7 @@ class TreeEditUI(object):
         self.edit_commit_callback = edit_commit_callback
         self.UIObject = {}
         self.UIConfig = {}
-        self.UIConfig['color_001'] = '#00A0EA'
-        self.UIConfig['color_002'] = '#BBE9FF'
-        self.UIConfig['color_003'] = '#40C3FF'
-        self.UIConfig['color_004'] = '#FFFFFF'
-        self.UIConfig['color_005'] = '#000000'
-        self.UIConfig['color_006'] = '#80D7FF'
+        self.UIConfig.update(dictColorContext)
         self.UIData = {}
         self.UIData['Account_data'] = Account_data
         self.UIData['Edit_res'] = [
@@ -248,7 +248,7 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict'] = {
             'type_list': [
                 '传统QQ',
-                '开黑啦',
+                '开黑啦 - KOOK',
                 'QQ频道 - 公域',
                 'QQ频道 - 私域',
                 '渡渡语音 - Dodo',
@@ -262,7 +262,7 @@ class TreeEditUI(object):
                         '密码': 'edit_root_Entry_Password',
                     }
                 ],
-                '开黑啦': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
+                '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
                         'Token': 'edit_root_Entry_Server_access_token'
                     }
                 ],

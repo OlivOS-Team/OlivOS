@@ -37,22 +37,38 @@ default_Conf = {
             "OlivOS_fanbook_poll",
             "OlivOS_dodo_poll",
             "OlivOS_kaiheila_link",
-            "OlivOS_dodo_link"
+            "OlivOS_dodo_link",
+            "OlivOS_nativeWinUIAPI"
         ],
         "control_queue" : "OlivOS_control_queue",
-        "interval" : 0.2
+        "interval" : 0.2,
+        "proc_mode" : "threading"
     },
     "queue" : [
         "OlivOS_control_queue",
         "OlivOS_rx_queue",
         "OlivOS_logger_queue",
-        "OlivOS_dodobot_rx_queue"
+        "OlivOS_dodobot_rx_queue",
+        "OlivOS_nativeUI_rx_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
             "enable" : True,
             "name" : "OlivOS_multiLoginUI",
             "type" : "multiLoginUI",
+            "logger_proc" : "OlivOS_logger"
+        },
+        "OlivOS_nativeWinUIAPI" : {
+            "enable" : True,
+            "name" : "OlivOS_nativeWinUIAPI",
+            "type" : "nativeWinUI",
+            "interval" : 0.002,
+            "dead_interval" : 1,
+            "rx_queue" : "OlivOS_nativeUI_rx_queue",
+            "tx_queue" : [
+                "OlivOS_rx_queue"
+            ],
+            "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger"
         },
         "OlivOS_account_config_save" : {

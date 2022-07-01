@@ -22,6 +22,8 @@ import time
 import json
 import multiprocessing
 import platform
+import signal
+import psutil
 
 import OlivOS
 
@@ -107,6 +109,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 #兼容Win平台多进程，避免形成fork-bomb
                 multiprocessing.freeze_support()
                 basic_conf_models_this = basic_conf_models[rx_packet_data.key]
+                tmp_proc_mode = 'threading'
+                if 'proc_mode' in basic_conf['system']:
+                    tmp_proc_mode = basic_conf['system']['proc_mode']
+                if 'proc_mode' in basic_conf_models_this:
+                    tmp_proc_mode = basic_conf_models_this['proc_mode']
                 if basic_conf_models_this['enable'] == True:
                     if basic_conf_models_this['type'] == 'logger':
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.diagnoseAPI.logger(
@@ -117,22 +124,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             logger_mode = basic_conf_models_this['mode'],
                             logger_vis_level = basic_conf_models_this['fliter']
                         )
-                        tmp_proc_mode = 'processing'
-                        if 'proc_mode' in basic_conf_models_this:
-                            tmp_proc_mode = basic_conf_models_this['proc_mode']
-                        #不完全轻量模式原本就是是为了解决Linux下日志挂载问题设计的
-                        #不完全轻量模式在Win下存在问题，强制全量模式
-                        if platform.system() == 'Windows':
-                            tmp_proc_mode = 'processing'
-                        if tmp_proc_mode == 'processing':
-                            Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
-                        elif tmp_proc_mode == 'threading':
-                            Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_lite()
-                        else:
-                            Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                         for this_bot_info in  plugin_bot_info_dict:
                             plugin_bot_info_dict[this_bot_info].debug_logger = Proc_dict[basic_conf_models_this['name']]
-                        Proc_logger_name = basic_conf_models_this['name']
                     elif basic_conf_models_this['type'] == 'plugin':
                         proc_plugin_func_dict = {}
                         tmp_tx_queue_list = []
@@ -153,7 +147,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             restart_gate = basic_conf_models_this['restart_gate'],
                             enable_auto_restart = basic_conf_models_this['enable_auto_restart']
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        #Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_lite()
                     elif basic_conf_models_this['type'] == 'post':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -173,7 +168,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             debug_mode = basic_conf_models_this['debug'],
                             logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config':
                         plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
                             path = basic_conf_models_this['data']['path'],
@@ -258,7 +253,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             debug_mode = False
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'fanbook_poll':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -276,7 +271,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             debug_mode = False
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodo_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -315,7 +310,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             debug_mode = False
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodobot_ea':
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.dodobotEAServerAPI.server(
                             Proc_name = basic_conf_models_this['name'],
@@ -327,7 +322,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             debug_mode = False
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodobot_ea_tx':
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.dodobotEATXAPI.server(
                             Proc_name = basic_conf_models_this['name'],
@@ -339,7 +334,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             debug_mode = False
                         )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[basic_conf_models_this['name']])
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'multiLoginUI':
                         if(platform.system() == 'Windows'):
                             Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
@@ -350,6 +345,20 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             Proc_dict[basic_conf_models_this['name']].start()
                             if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
                                 plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
+                    elif basic_conf_models_this['type'] == 'nativeWinUI':
+                        if(platform.system() == 'Windows'):
+                            if basic_conf_models_this['name'] not in Proc_dict:
+                                Proc_dict[basic_conf_models_this['name']] = OlivOS.nativeWinUIAPI.dock(
+                                    Proc_name = basic_conf_models_this['name'],
+                                    scan_interval = basic_conf_models_this['interval'],
+                                    dead_interval = basic_conf_models_this['dead_interval'],
+                                    rx_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
+                                    tx_queue = None,
+                                    control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
+                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                                )
+                            if basic_conf_models_this['name'] not in Proc_Proc_dict:
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config_save':
                         OlivOS.accountAPI.Account.save(
                             path = basic_conf_models_this['data']['path'],
@@ -377,3 +386,57 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
                 Proc_Proc_dict[rx_packet_data.key].join()
+            elif rx_packet_data.action == 'restart_send':
+                for tmp_Proc_name in basic_conf_models:
+                    basic_conf_models_this = basic_conf_models[tmp_Proc_name]
+                    if basic_conf_models_this['type'] == rx_packet_data.key:
+                        if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue != None:
+                            Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
+                                OlivOS.API.Control.packet('restart_do', basic_conf_models_this['name']),
+                                block = False
+                            )
+            elif rx_packet_data.action == 'send':
+                if type(rx_packet_data.key) == dict:
+                    if 'target' in rx_packet_data.key:
+                        if 'type' in rx_packet_data.key['target']:
+                            for tmp_Proc_name in basic_conf_models:
+                                basic_conf_models_this = basic_conf_models[tmp_Proc_name]
+                                if basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
+                                    if basic_conf_models_this['name'] in Proc_dict:
+                                        if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue != None:
+                                            Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
+                                                rx_packet_data,
+                                                block = False
+                                            )
+            elif rx_packet_data.action == 'exit_total':
+                killMain()
+
+def killMain():
+    parent = psutil.Process(os.getpid())
+    kill_process_and_its_children(parent)
+
+def kill_process(p):
+    try:
+        p.terminate()
+        _, alive = psutil.wait_procs([p, ], timeout = 0.1)
+        if len(alive):
+            _, alive = psutil.wait_procs(alive, timeout = 3.0)
+            if len(alive):
+                for p in alive:
+                    p.kill()
+    except Exception as e:
+        print(e) 
+
+def kill_process_and_its_children(p):
+    p = psutil.Process(p.pid)
+    kill_process_children(p)
+    kill_process(p)
+
+def kill_process_children(p):
+    p = psutil.Process(p.pid)
+    if len(p.children()) > 0:
+        for child in p.children():
+            if hasattr(child, 'children') and len(child.children()) > 0:
+                kill_process_and_its_children(child)
+            else:
+                kill_process(child)
