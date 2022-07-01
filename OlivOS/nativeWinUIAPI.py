@@ -308,6 +308,21 @@ class pluginManageUI(object):
         self.UIObject['root'].configure(bg = self.UIConfig['color_001'])
 
         self.tree_init()
+        
+        self.UIObject['tree_yscroll'] = ttk.Scrollbar(
+            self.UIObject['root'],
+            orient = "vertical",
+            command = self.UIObject['tree'].yview
+        )
+        self.UIObject['tree_yscroll'].place(
+            x = 15 + 350 - 18,
+            y = 15,
+            width = 18,
+            height = 370 - 1
+        )
+        self.UIObject['tree'].configure(
+            yscrollcommand = self.UIObject['tree_yscroll'].set
+        )
 
         self.tree_UI_Label_init(
             name = 'root_Label_INFO_title',
@@ -360,7 +375,7 @@ class pluginManageUI(object):
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
         self.UIObject['tree']['columns'] = ('NAME', 'VERSION', 'AUTHOR')
-        self.UIObject['tree'].column('NAME', width = 150)
+        self.UIObject['tree'].column('NAME', width = 150 - 18)
         self.UIObject['tree'].column('VERSION', width = 100)
         self.UIObject['tree'].column('AUTHOR', width = 95)
         self.UIObject['tree'].heading('NAME', text = '插件')
@@ -370,7 +385,7 @@ class pluginManageUI(object):
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
         self.UIObject['tree'].bind('<<TreeviewSelect>>', lambda x : self.treeSelect('tree', x))
         self.tree_load()
-        self.UIObject['tree'].place(x = 15, y = 15, width = 350 , height = 370)
+        self.UIObject['tree'].place(x = 15, y = 15, width = 350 - 18 , height = 370)
 
     def tree_load(self):
         tmp_tree_item_children = self.UIObject['tree'].get_children()
