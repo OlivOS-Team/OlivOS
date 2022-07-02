@@ -42,7 +42,7 @@ default_Conf = {
         ],
         "control_queue" : "OlivOS_control_queue",
         "interval" : 0.2,
-        "proc_mode" : "threading"
+        "proc_mode" : "auto"
     },
     "queue" : [
         "OlivOS_control_queue",
@@ -110,7 +110,7 @@ default_Conf = {
             "type" : "logger",
             "interval" : 0.002,
             "dead_interval" : 1,
-            "proc_mode" : "threading",
+            "proc_mode" : "auto",
             "rx_queue" : "OlivOS_logger_queue",
             "mode" : [
                 "console_color",
