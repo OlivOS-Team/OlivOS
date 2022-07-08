@@ -1,7 +1,7 @@
 name: CI-Packing-win32
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
 jobs:
   build:
     runs-on: windows-2019

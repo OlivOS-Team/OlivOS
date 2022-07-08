@@ -19,6 +19,7 @@ import json
 import multiprocessing
 import threading
 import hashlib
+import time
 import traceback
 
 from functools import wraps
@@ -85,6 +86,27 @@ def getBotHash(bot_id = None, platform_sdk = None, platform_platform = None, pla
     return hash_tmp.hexdigest()
 
 
+def getMenuEvent(target_event):
+    target_event.base_info['time'] = int(time.time())
+    target_event.base_info['self_id'] = None
+    target_event.base_info['type'] = None
+    target_event.platform['sdk'] = 'all'
+    target_event.platform['platform'] = 'all'
+    target_event.platform['model'] = 'all'
+    target_event.plugin_info['message_mode_rx'] = 'olivos_para'
+    if target_event.sdk_event.action == 'send':
+        if type(target_event.sdk_event.key) == dict:
+            if 'data' in target_event.sdk_event.key:
+                if 'action' in target_event.sdk_event.key['data']:
+                    if 'plugin_menu' == target_event.sdk_event.key['data']['action']:
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'menu'
+                        target_event.data = target_event.menu(
+                            namespace = target_event.sdk_event.key['data']['namespace'],
+                            event = target_event.sdk_event.key['data']['event']
+                        )
+    pass
+
 
 class Event(object):
     def __init__(self, sdk_event = None, log_func = None):
@@ -133,6 +155,8 @@ class Event(object):
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
         elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.API.Control.packet:
+            getMenuEvent(self)
 
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
@@ -269,6 +293,11 @@ class Event(object):
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['interval', self.data.interval]
                 ])
+            elif self.plugin_info['func_type'] == 'menu':
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['namespace', self.data.namespace],
+                    ['event', self.data.event]
+                ])
             if self.plugin_info['func_type'] in OlivOS.metadataAPI.eventLogMetaTable:
                 tmp_log_level = OlivOS.metadataAPI.eventLogMetaTable[self.plugin_info['func_type']]['level']
                 tmp_log_message = OlivOS.metadataAPI.getTextByMetaTableFormat(
@@ -282,7 +311,7 @@ class Event(object):
                 tmp_log_message = tmp_log_message_default
             if self.log_func != None:
                 self.log_func(tmp_log_level, tmp_log_message, [
-                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                    (self.getBotIDStr(), 'default'),
                     (self.plugin_info['name'], 'default'),
                     (self.plugin_info['func_type'], 'default')
                 ])
@@ -290,6 +319,11 @@ class Event(object):
     class fake_event(object):
         def __init__(self):
             self.default = None
+
+    class menu(object):
+        def __init__(self, namespace, event):
+            self.namespace = namespace
+            self.event = event
 
     class private_message(object):
         def __init__(self, user_id, message, sub_type, flag_lazy = True):
@@ -427,6 +461,12 @@ class Event(object):
             self.interval = interval
 
 
+    def getBotIDStr(self):
+        tmp_self_data = self.platform['platform']
+        if self.base_info['self_id'] != None:
+            tmp_self_data = '%s|%s' % (self.platform['platform'], str(self.base_info['self_id']))
+        return tmp_self_data
+
     def callbackLogger(func_name = None, val_list = None):
         def callbackLoggerDecorator(func):
             @wraps(func)
@@ -464,7 +504,7 @@ class Event(object):
                             callback_msg = 'done'
                     if event_obj.log_func != None:
                         event_obj.log_func(2, callback_msg , [
-                            ('%s|%s' % (event_obj.platform['platform'], str(event_obj.base_info['self_id'])), 'default'),
+                            (event_obj.getBotIDStr(), 'default'),
                             (event_obj.plugin_info['name'], 'default'),
                             (func_name, 'callback')
                         ])
@@ -474,7 +514,7 @@ class Event(object):
 
     def __errorCatchLogger(self, e):
         self.log_func(3, str(e) , [
-            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+            (self.getBotIDStr(), 'default'),
             (self.plugin_info['name'], 'default'),
             ('error', 'callback')
         ])
@@ -485,7 +525,7 @@ class Event(object):
         self.blocked = enable
         if flag_log and self.log_func != None:
             self.log_func(2, str(enable) , [
-                ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                (self.getBotIDStr(), 'default'),
                 (self.plugin_info['name'], 'default'),
                 ('set_block', 'callback')
             ])
@@ -589,7 +629,7 @@ class Event(object):
                 tmp_message_log = tmp_message
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(self.data.user_id) + '): ' + tmp_message_log, [
-                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                    (self.getBotIDStr(), 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('reply', 'callback')
                 ])
@@ -602,20 +642,20 @@ class Event(object):
                 ):
                     if self.data.host_id != None:
                         self.log_func(2, 'Host(' + str(self.data.host_id) + ') Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                            (self.getBotIDStr(), 'default'),
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
                         return
                     else:
                         self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                            ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                            (self.getBotIDStr(), 'default'),
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
                 else:
                     self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
-                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                        (self.getBotIDStr(), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('reply', 'callback')
                     ])
@@ -707,20 +747,20 @@ class Event(object):
                 tmp_message_log = tmp_message
             if flag_type == 'private':
                 self.log_func(2, 'User(' + str(target_id) + '): ' + tmp_message_log, [
-                    ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                    (self.getBotIDStr(), 'default'),
                     (self.plugin_info['name'], 'default'),
                     ('send', 'callback')
                 ])
             elif flag_type == 'group':
                 if host_id != None:
                     self.log_func(2, 'Host(' + str(host_id) + ') Group(' + str(target_id) + '): ' + tmp_message_log, [
-                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                        (self.getBotIDStr(), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
                 else:
                     self.log_func(2, 'Group(' + str(target_id) + '): ' + tmp_message_log, [
-                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                        (self.getBotIDStr(), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
@@ -982,13 +1022,13 @@ class Event(object):
             ):
                 if res_data['active'] == True:
                     self.log_func(2, 'name(' + res_data['data']['name'] + ') id(' + str(res_data['data']['id']) + ')' , [
-                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                        (self.getBotIDStr(), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
                 else:
                     self.log_func(2, 'failed' , [
-                        ('%s|%s' % (self.platform['platform'], str(self.base_info['self_id'])), 'default'),
+                        (self.getBotIDStr(), 'default'),
                         (self.plugin_info['name'], 'default'),
                         ('get_login_info', 'callback')
                     ])
@@ -1191,6 +1231,23 @@ class Event(object):
             res_data = self.__get_version_info(flag_log = True)
         return res_data
 
+class StoppableThread(threading.Thread):
+    def __init__(self,  *args, **kwargs):
+        super(StoppableThread, self).__init__(*args, **kwargs)
+        self._stop_event = threading.Event()
+
+    def terminate(self):
+        self._stop_event.set()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def join(self):
+        pass
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
 class Proc_templet(object):
     def __init__(self, Proc_name = 'native_plugin', Proc_type = 'default', scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None):
         self.deamon = True
@@ -1224,14 +1281,22 @@ class Proc_templet(object):
         proc_this = multiprocessing.Process(name = self.Proc_name, target = self.run, args = ())
         proc_this.daemon = self.deamon
         proc_this.start()
-        self.Proc = proc_this
-        return self.Proc
+        #self.Proc = proc_this
+        return proc_this
 
     def start_lite(self):
-        proc_this = threading.Thread(name = self.Proc_name, target = self.run, args = ())
+        proc_this = StoppableThread(name = self.Proc_name, target = self.run, args = ())
         proc_this.start()
-        self.Proc = proc_this
-        return self.Proc
+        #self.Proc = proc_this
+        return proc_this
+    
+    def start_unity(self, mode = 'threading'):
+        proc_this = None
+        if mode == 'processing':
+            proc_this = self.start()
+        elif mode == 'threading':
+            proc_this = self.start_lite()
+        return proc_this
 
     def log(self, log_level, log_message, log_segment = []):
         if self.Proc_info.logger_proc != None:

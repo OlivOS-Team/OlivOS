@@ -14,12 +14,26 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+from enum import IntEnum
 import sys
 import json
 import requests as req
 import time
 
 import OlivOS
+
+class intents_T(IntEnum):
+    GUILDS = (1 << 0)                   #频道变更
+    GUILD_MEMBERS = (1 << 1)            #频道成员变更
+    GUILD_MESSAGES = (1 << 9)           #消息事件，仅 *私域* 机器人能够设置此 intents。
+    GUILD_MESSAGE_REACTIONS = (1 << 10) #戳表情
+    DIRECT_MESSAGE = (1 << 12)          #私聊消息
+    INTERACTION = (1 << 26)             #互动事件变更
+    MESSAGE_AUDIT = (1 << 27)           #消息审核变更
+    FORUMS_EVENT = (1 << 28)            #论坛事件，仅 *私域* 机器人能够设置此 intents。
+    AUDIO_ACTION = (1 << 29)            #语音消息
+    PUBLIC_GUILD_MESSAGES = (1 << 30) # 消息事件，此为公域的消息事件
+
 
 sdkAPIHost = {
     'default': 'https://api.sgroup.qq.com',
@@ -61,11 +75,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     return res
 
 def get_SDK_bot_info_from_Event(target_event):
-    res = bot_info_T(
-        target_event.bot_info.id,
-        target_event.bot_info.post_info.access_token
-    )
-    res.debug_mode = target_event.bot_info.debug_mode
+    res = get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
     return res
 
 class event(object):
@@ -143,10 +153,12 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info, intents = (1 << 0 | 1 << 12 | 1 << 30)):
+        def __init__(self, bot_info, intents = (int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
             tmp_intents = intents
             if bot_info.model == 'private':
-                tmp_intents |= (1 << 9)
+                tmp_intents |= int(intents_T.GUILD_MESSAGES)
+            elif bot_info.model == 'public':
+                tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             payload_template.__init__(self)
             self.data.op = 2
             try:

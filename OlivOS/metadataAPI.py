@@ -57,7 +57,9 @@ globalMetaTableTemp = {
     'type': 'N/A',
     'flag': 'N/A',
     'comment': 'N/A',
-    'interval': 'N/A'
+    'interval': 'N/A',
+    'namespace': 'N/A',
+    'event': 'N/A'
 }
 
 globalMetaTable = {
@@ -79,7 +81,8 @@ globalMetaTable = {
     'event_group_add_request_log': 'Group({group_id}) User({user_id}) Flag({flag}) : {comment}',
     'event_group_invite_request_log': 'Group({group_id}) User({user_id}) Flag({flag}) : {comment}',
     'event_lifecycle_log': 'Action({action})',
-    'event_heartbeat_log': 'Interval({interval})'
+    'event_heartbeat_log': 'Interval({interval})',
+    'event_menu_log': 'Namespace({namespace}) Event({event})'
 }
 
 eventLogMetaTable = {
@@ -158,6 +161,10 @@ eventLogMetaTable = {
     'heartbeat' : {
         'level' : 1,
         'message_key' : 'event_heartbeat_log'
+    },
+    'menu' : {
+        'level' : 2,
+        'message_key' : 'event_menu_log'
     }
 }
 
