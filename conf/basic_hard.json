@@ -22,7 +22,7 @@
         ],
         "control_queue" : "OlivOS_control_queue",
         "interval" : 0.2,
-        "proc_mode" : "auto"
+        "proc_mode" : "processing"
     },
     "queue" : [
         "OlivOS_control_queue",

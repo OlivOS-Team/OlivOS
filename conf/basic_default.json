@@ -17,22 +17,38 @@
             "OlivOS_fanbook_poll",
             "OlivOS_dodo_poll",
             "OlivOS_kaiheila_link",
-            "OlivOS_dodo_link"
+            "OlivOS_dodo_link",
+            "OlivOS_nativeWinUIAPI"
         ],
         "control_queue" : "OlivOS_control_queue",
-        "interval" : 0.2
+        "interval" : 0.2,
+        "proc_mode" : "auto"
     },
     "queue" : [
         "OlivOS_control_queue",
         "OlivOS_rx_queue",
         "OlivOS_logger_queue",
-        "OlivOS_dodobot_rx_queue"
+        "OlivOS_dodobot_rx_queue",
+        "OlivOS_nativeUI_rx_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
             "enable" : true,
             "name" : "OlivOS_multiLoginUI",
             "type" : "multiLoginUI",
+            "logger_proc" : "OlivOS_logger"
+        },
+        "OlivOS_nativeWinUIAPI" : {
+            "enable" : true,
+            "name" : "OlivOS_nativeWinUIAPI",
+            "type" : "nativeWinUI",
+            "interval" : 0.002,
+            "dead_interval" : 1,
+            "rx_queue" : "OlivOS_nativeUI_rx_queue",
+            "tx_queue" : [
+                "OlivOS_rx_queue"
+            ],
+            "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger"
         },
         "OlivOS_account_config_save" : {
@@ -74,10 +90,10 @@
             "type" : "logger",
             "interval" : 0.002,
             "dead_interval" : 1,
-            "proc_mode" : "processing",
+            "proc_mode" : "auto",
             "rx_queue" : "OlivOS_logger_queue",
             "mode" : [
-                "console",
+                "console_color",
                 "logfile"
             ],
             "fliter" : [2, 3, 4, 5]
@@ -95,7 +111,7 @@
             "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger",
             "treading_mode" : "full",
-            "restart_gate" : 1000,
+            "restart_gate" : 50000,
             "enable_auto_restart" : true,
             "debug" : false
         },

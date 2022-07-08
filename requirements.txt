@@ -10,3 +10,4 @@ pillow
 lxml
 rsa
 requests_toolbelt
+pystray

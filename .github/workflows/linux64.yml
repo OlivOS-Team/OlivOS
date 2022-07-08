@@ -1,7 +1,7 @@
 name: CI-Packing-linux64
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
 jobs:
   build:
     runs-on: ubuntu-latest
