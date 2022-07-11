@@ -102,7 +102,7 @@ class dock(OlivOS.API.Proc_templet):
         if not self.UIObject['root_plugin_edit_enable']:
             self.UIObject['root_plugin_edit_enable'] = True
             count_str = str(self.UIObject['root_plugin_edit_count'])
-            self.UIObject['root_plugin_edit_count'] += 1
+            #self.UIObject['root_plugin_edit_count'] += 1
             self.UIObject['root_plugin_edit'][count_str] = {}
             self.UIObject['root_plugin_edit'][count_str]['obj'] = pluginManageUI(
                 Model_name = 'shallow_menu_plugin_manage',
@@ -115,6 +115,9 @@ class dock(OlivOS.API.Proc_templet):
                 args = ()
             )
             self.UIObject['root_plugin_edit'][count_str]['treading'].start()
+        else:
+            count_str = str(self.UIObject['root_plugin_edit_count'])
+            self.UIObject['root_plugin_edit'][count_str]['obj'].lift()
 
     def updatePluginEdit(self):
         try:
@@ -370,6 +373,9 @@ class pluginManageUI(object):
 
         self.root.UIObject['root_plugin_edit'].pop(self.key)
         self.root.UIObject['root_plugin_edit_enable'] = False
+
+    def lift(self):
+        self.UIObject['root'].lift()
 
     def tree_init(self):
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
