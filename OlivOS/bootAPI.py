@@ -219,7 +219,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'kaiheila_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -240,7 +240,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'telegram_poll':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -297,7 +297,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodo_poll':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -386,7 +386,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         target_proc = basic_conf_models[basic_conf_models_this['target_proc']],
                                         debug_mode = False
                                     )
-                                    Proc_Proc_dict[tmp_Proc_name] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
             elif rx_packet_data.action == 'restart_do':
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
