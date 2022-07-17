@@ -109,7 +109,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 #兼容Win平台多进程，避免形成fork-bomb
                 multiprocessing.freeze_support()
                 basic_conf_models_this = basic_conf_models[rx_packet_data.key]
-                tmp_proc_mode_raw = 'threading'
+                tmp_proc_mode_raw = 'auto'
                 tmp_proc_mode = 'threading'
                 if 'proc_mode' in basic_conf['system']:
                     tmp_proc_mode_raw = basic_conf['system']['proc_mode']
@@ -151,7 +151,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             restart_gate = basic_conf_models_this['restart_gate'],
                             enable_auto_restart = basic_conf_models_this['enable_auto_restart']
                         )
-                        if 'auto' == tmp_proc_mode_raw:
+                        if True or 'auto' == tmp_proc_mode_raw:
                             tmp_proc_mode = 'processing'
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'post':
