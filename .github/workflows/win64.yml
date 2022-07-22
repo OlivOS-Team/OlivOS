@@ -3,7 +3,7 @@ on:
   push:
     branches: [ main, dev ]
 jobs:
-  build_release:
+  build_win64_release:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
       with:
         name: OlivOS-Win-with-lib
         path: ./dist/windows/OlivOS-Win
-  build_debug:
+  build_win64_debug:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -47,7 +47,7 @@ jobs:
     - name: Packing OlivOS-Win
       uses: actions/upload-artifact@v2
       with:
-        name: OlivOS-Win
+        name: OlivOS-Win-debug
         path: ./dist/windows/OlivOS-Win
     - name: Ready for Packing
       run: |
@@ -56,5 +56,5 @@ jobs:
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v2
       with:
-        name: OlivOS-Win-with-lib
+        name: OlivOS-Win-with-lib-debug
         path: ./dist/windows/OlivOS-Win
