@@ -1,4 +1,4 @@
-name: CI-Packing-win64
+name: CI-Packing-all
 on:
   push:
     branches: [ main, dev ]
