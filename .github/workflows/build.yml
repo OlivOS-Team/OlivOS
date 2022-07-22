@@ -3,7 +3,7 @@ on:
   push:
     branches: [ main, dev ]
 jobs:
-  build_win64_release:
+  build-win64-release:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -32,7 +32,7 @@ jobs:
         name: OlivOS-Win-with-lib
         path: ./dist/windows/OlivOS-Win
 
-  build_win64_debug:
+  build-win64-debug:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -61,7 +61,7 @@ jobs:
         name: OlivOS-Win-with-lib-debug
         path: ./dist/windows/OlivOS-Win
 
-  build_win32_release:
+  build-win32-release:
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v2
@@ -97,7 +97,7 @@ jobs:
         name: OlivOS-Win-32-with-lib
         path: ./OlivOS-Win
 
-  build_win32_debug:
+  build-win32-debug:
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v2
