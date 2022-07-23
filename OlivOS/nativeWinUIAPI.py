@@ -783,9 +783,9 @@ class OlivOSTerminalUI(object):
         this_level = data_raw['log_level']
         if select_level <= this_level:
             data_str = data['str']
-            data_str = data_str.encode(encoding = 'gb2312', errors = 'replace').decode(encoding = 'gb2312', errors = 'replace')
+            data_str = data_str.encode(encoding = 'gbk', errors = 'replace').decode(encoding = 'gbk', errors = 'replace')
             res_data = data_raw['log_message']
-            res_data = res_data.encode(encoding = 'gb2312', errors = 'replace').decode(encoding = 'gb2312', errors = 'replace')
+            res_data = res_data.encode(encoding = 'gbk', errors = 'replace').decode(encoding = 'gbk', errors = 'replace')
             sig_list = data_raw['log_segment']
             sig_01 = ''
             sig_02 = ''
