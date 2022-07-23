@@ -793,12 +793,9 @@ class OlivOSTerminalUI(object):
             if len(sig_list) >= 1:
                 sig_03 = sig_list[0][0]
             if len(sig_list) >= 2:
-                sig_02 = sig_03
-                sig_03 = sig_list[1][0]
+                sig_02, sig_03 = sig_03, sig_list[1][0]
             if len(sig_list) >= 3:
-                sig_01 = sig_02
-                sig_02 = sig_03
-                sig_03 = sig_list[2][0]
+                sig_01, sig_02, sig_03 = sig_02, sig_03, sig_list[2][0]
             log_level = OlivOS.diagnoseAPI.level_dict[data_raw['log_level']]
             if len(res_data) > 0:
                 try:
