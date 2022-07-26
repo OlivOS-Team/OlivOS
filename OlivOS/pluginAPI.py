@@ -84,6 +84,7 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib')
         releaseDir('./lib/Lib')
         releaseDir('./lib/DLLs')
+        self.sendPluginList()
         self.load_plugin_list()
         self.run_plugin_func(None, 'init_after')
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] is running')
