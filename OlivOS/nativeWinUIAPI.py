@@ -447,9 +447,15 @@ class gocqhttpTerminalUI(object):
         self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('GoCqhttp 终端 - %s' % str(self.bot.id))
         self.UIObject['root'].geometry('800x600')
+        self.UIObject['root'].minsize(800, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight = 15)
+        self.UIObject['root'].grid_rowconfigure(1, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(0, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(1, weight = 2)
+        self.UIObject['root'].grid_columnconfigure(2, weight = 0)
         self.UIObject['root'].resizable(
-            width = False,
-            height = False
+            width = True,
+            height = True
         )
         self.UIObject['root'].configure(bg = self.UIConfig['color_001'])
 
@@ -464,17 +470,39 @@ class gocqhttpTerminalUI(object):
         self.UIObject['tree']['selectmode'] = 'browse'
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
         #self.tree_load()
-        self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        #self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        self.UIObject['tree'].grid(
+            row = 0,
+            column = 0,
+            sticky = "nsew",
+            rowspan = 1,
+            columnspan = 2,
+            padx = (15, 0),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
+        )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
             self.UIObject['root'],
             orient = "vertical",
             command = self.UIObject['tree'].yview
         )
-        self.UIObject['tree_yscroll'].place(
-            x = 800 - 15 - 18,
-            y = 15,
-            width = 18,
-            height = 600 - 15 * 2 - 24 - 8
+        #self.UIObject['tree_yscroll'].place(
+        #    x = 800 - 15 - 18,
+        #    y = 15,
+        #    width = 18,
+        #    height = 600 - 15 * 2 - 24 - 8
+        #)
+        self.UIObject['tree_yscroll'].grid(
+            row = 0,
+            column = 2,
+            sticky = "nsw",
+            rowspan = 1,
+            columnspan = 1,
+            padx = (0, 15),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
         )
         self.UIObject['tree'].configure(
             yscrollcommand = self.UIObject['tree_yscroll'].set
@@ -493,7 +521,17 @@ class gocqhttpTerminalUI(object):
             title = '输入'
         )
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
-
+        self.UIObject['root_input'].grid(
+            row = 1,
+            column = 1,
+            sticky = "s",
+            rowspan = 1,
+            columnspan = 3,
+            padx = (15, 15),
+            pady = (8, 15),
+            ipadx = 0,
+            ipady = 0
+        )
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -524,12 +562,12 @@ class gocqhttpTerminalUI(object):
             bg = self.UIConfig['color_001'],
             fg = self.UIConfig['color_004']
         )
-        self.UIObject[obj_name + '=Label'].place(
-            x = x - width_t,
-            y = y,
-            width = width_t,
-            height = height
-        )
+        #self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        #)
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
@@ -544,12 +582,15 @@ class gocqhttpTerminalUI(object):
             self.UIObject[obj_name].configure(
                 show = '●'
             )
-        self.UIObject[obj_name].place(
-            x = x,
-            y = y,
-            width = width,
-            height = height
+        self.UIObject[obj_name].configure(
+            width = width
         )
+        #self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        #)
 
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_gocqhttp_terminal_data']:
@@ -598,11 +639,18 @@ class OlivOSTerminalUI(object):
         self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('OlivOS 终端')
         self.UIObject['root'].geometry('900x600')
+        self.UIObject['root'].minsize(900, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight = 15)
+        self.UIObject['root'].grid_rowconfigure(1, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(0, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(1, weight = 2)
+        self.UIObject['root'].grid_columnconfigure(2, weight = 0)
         self.UIObject['root'].resizable(
-            width = False,
-            height = False
+            width = True,
+            height = True
         )
         self.UIObject['root'].configure(bg = self.UIConfig['color_001'])
+        self.UIObject['root'].bind('<Configure>', self.root_resize)
 
         self.UIObject['style'] = ttk.Style()
         fix_Treeview_color(self.UIObject['style'])
@@ -634,17 +682,33 @@ class OlivOSTerminalUI(object):
         self.UIObject['tree']['selectmode'] = 'browse'
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
         #self.tree_load()
-        self.UIObject['tree'].place(x = 15, y = 15, width = 900 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        #self.UIObject['tree'].place(x = 15, y = 15, width = 900 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        self.UIObject['tree'].grid(
+            row = 0,
+            column = 0,
+            sticky = "nsew",
+            rowspan = 1,
+            columnspan = 2,
+            padx = (15, 0),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
+        )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
             self.UIObject['root'],
             orient = "vertical",
             command = self.UIObject['tree'].yview
         )
-        self.UIObject['tree_yscroll'].place(
-            x = 900 - 15 - 18,
-            y = 15,
-            width = 18,
-            height = 600 - 15 * 2 - 24 - 8
+        self.UIObject['tree_yscroll'].grid(
+            row = 0,
+            column = 2,
+            sticky = "nsw",
+            rowspan = 1,
+            columnspan = 1,
+            padx = (0, 15),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
         )
         self.UIObject['tree'].configure(
             yscrollcommand = self.UIObject['tree_yscroll'].set
@@ -657,10 +721,21 @@ class OlivOSTerminalUI(object):
             x = 15,
             y = 600 - 15 * 1 - 24,
             width_t = 0,
-            width = 70,
+            width = 50,
             height = 24,
             action = None,
             title = '等级'
+        )
+        self.UIObject['root_level'].grid(
+            row = 1,
+            column = 0,
+            sticky = "ns",
+            rowspan = 1,
+            columnspan = 1,
+            padx = (15, 8),
+            pady = (9, 15),
+            ipadx = 0,
+            ipady = 0
         )
         self.UIData['level_list'] = []
         self.UIData['level_find'] = {}
@@ -678,12 +753,23 @@ class OlivOSTerminalUI(object):
             x = 15 + 70 + 8,
             y = 600 - 15 * 1 - 24,
             width_t = 0,
-            width = 900 - 15 * 2 - 70 - 8,
+            width = 900,
             height = 24,
             action = None,
             title = '输入'
         )
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].grid(
+            row = 1,
+            column = 1,
+            sticky = "s",
+            rowspan = 1,
+            columnspan = 2,
+            padx = (0, 15),
+            pady = (8, 15),
+            ipadx = 0,
+            ipady = 0
+        )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
@@ -693,6 +779,9 @@ class OlivOSTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def root_resize(self, event = None):
+        pass
 
     def root_Entry_enter_Func(self, name):
         def resFunc(event):
@@ -716,12 +805,12 @@ class OlivOSTerminalUI(object):
             bg = self.UIConfig['color_001'],
             fg = self.UIConfig['color_004']
         )
-        self.UIObject[obj_name + '=Label'].place(
-            x = x - width_t,
-            y = y,
-            width = width_t,
-            height = height
-        )
+        #self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        #)
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
@@ -736,12 +825,15 @@ class OlivOSTerminalUI(object):
             self.UIObject[obj_name].configure(
                 show = '●'
             )
-        self.UIObject[obj_name].place(
-            x = x,
-            y = y,
-            width = width,
-            height = height
+        self.UIObject[obj_name].configure(
+            width = width
         )
+        #self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        #)
 
     def tree_edit_UI_Combobox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title = ''):
         self.UIObject[obj_name + '=Label'] = tkinter.Label(
@@ -752,23 +844,23 @@ class OlivOSTerminalUI(object):
             bg = self.UIConfig['color_001'],
             fg = self.UIConfig['color_004']
         )
-        self.UIObject[obj_name + '=Label'].place(
-            x = x - width_t,
-            y = y,
-            width = width_t,
-            height = height
-        )
+        #self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        #)
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = ttk.Combobox(
             self.UIObject[obj_root],
             textvariable = self.UIData[str_name]
         )
-        self.UIObject[obj_name].place(
-            x = x,
-            y = y,
-            width = width,
-            height = height
-        )
+        #self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        #)
         self.UIObject[obj_name].configure(state='readonly')
         #self.UIObject[obj_name].bind('<<ComboboxSelected>>', lambda x : self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name))
 
