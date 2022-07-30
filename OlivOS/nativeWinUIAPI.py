@@ -108,11 +108,12 @@ class dock(OlivOS.API.Proc_templet):
     def run(self):
         self.UIObject['main_tk'] = tkinter.Tk()
         self.UIObject['main_tk'].withdraw()
+        self.UIObject['main_tk'].iconbitmap('./resource/tmp_favoricon.ico')
         self.process_msg()
         self.UIObject['main_tk'].mainloop()
 
     def process_msg(self):
-        self.UIObject['main_tk'].after(20,self.process_msg)
+        self.UIObject['main_tk'].after(50,self.process_msg)
         self.mainrun()
 
     def mainrun(self):
@@ -469,6 +470,7 @@ class gocqhttpTerminalUI(object):
         self.UIObject['tree'].heading('DATA', text = '日志')
         self.UIObject['tree']['selectmode'] = 'browse'
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x : self.tree_rightKey(x))
         #self.tree_load()
         #self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
@@ -541,6 +543,28 @@ class gocqhttpTerminalUI(object):
 
         self.exit()
 
+    def tree_rightKey(self, event):
+        #右键设置的选择在后续流程中未生效，不知为何，等后续解决
+        #iid = self.UIObject['tree'].identify_row(event.y)
+        #self.UIObject['tree'].selection_set(iid)
+        #self.UIObject['tree'].update()
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label = '查看', command = lambda : self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label = '复制', command = lambda : self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action:str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
     def root_Entry_enter_Func(self, name):
         def resFunc(event):
             self.root_Entry_enter(name, event)
@@ -549,7 +573,7 @@ class gocqhttpTerminalUI(object):
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) > 0:
+            if len(input) > 0 and len(input) < 1000:
                 self.root.setGoCqhttpModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
@@ -599,14 +623,15 @@ class gocqhttpTerminalUI(object):
 
     def tree_add_line(self, data):
         res_data = re.sub('\033\[[\d;]*m?', '', data)
-        res_data = res_data.replace(' ', '\ ')
         res_data = res_data.encode(encoding = 'gb2312', errors = 'replace').decode(encoding = 'gb2312', errors = 'replace')
+        res_data_1 = res_data
+        res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
                     tkinter.END,
-                    text = res_data,
+                    text = res_data_1,
                     values=(
                         res_data
                     )
@@ -681,6 +706,7 @@ class OlivOSTerminalUI(object):
         self.UIObject['tree'].heading('DATA', text = '日志')
         self.UIObject['tree']['selectmode'] = 'browse'
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x : self.tree_rightKey(x))
         #self.tree_load()
         #self.UIObject['tree'].place(x = 15, y = 15, width = 900 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
@@ -780,6 +806,28 @@ class OlivOSTerminalUI(object):
 
         self.exit()
 
+    def tree_rightKey(self, event):
+        #右键设置的选择在后续流程中未生效，不知为何，等后续解决
+        #iid = self.UIObject['tree'].identify_row(event.y)
+        #self.UIObject['tree'].selection_set(iid)
+        #self.UIObject['tree'].update()
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label = '查看', command = lambda : self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label = '复制', command = lambda : self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action:str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
     def root_resize(self, event = None):
         pass
 
@@ -876,10 +924,9 @@ class OlivOSTerminalUI(object):
         if select_level <= this_level:
             data_str = data['str']
             data_str = data_str.encode(encoding = 'gbk', errors = 'replace').decode(encoding = 'gbk', errors = 'replace')
+            res_data = data_str
             data_str = data_str.replace('\r', '\\r')
             data_str = data_str.replace('\n', '\\n')
-            res_data = data_raw['log_message']
-            res_data = res_data.encode(encoding = 'gbk', errors = 'replace').decode(encoding = 'gbk', errors = 'replace')
             sig_list = data_raw['log_segment']
             sig_01 = ''
             sig_02 = ''

@@ -17,7 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.9.10'
+OlivOS_Version = '0.10.0'
 OlivOS_SVN = 100
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
