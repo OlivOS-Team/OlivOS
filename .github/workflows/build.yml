@@ -1,0 +1,161 @@
+name: CI-Packing-all
+on:
+  push:
+    branches: [ main, dev ]
+jobs:
+  build-win64-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Packing by PyInstaller Windows
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: ./
+        spec: main.spec
+    - name: Ready for Packing
+      run: |
+        cd ./dist/windows
+        mkdir ./OlivOS-Win
+        cp ./main.exe ./OlivOS-Win/OlivOS.exe
+    - name: Packing OlivOS-Win
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win
+        path: ./dist/windows/OlivOS-Win
+    - name: Ready for Packing
+      run: |
+        mkdir ./dist/windows/OlivOS-Win/lib
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./dist/windows/OlivOS-Win/lib/go-cqhttp.exe
+    - name: Packing OlivOS-Win-with-lib
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-with-lib
+        path: ./dist/windows/OlivOS-Win
+
+  build-win64-debug:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Packing by PyInstaller Windows
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: ./
+        spec: main_debug.spec
+    - name: Ready for Packing
+      run: |
+        cd ./dist/windows
+        mkdir ./OlivOS-Win
+        cp ./main.exe ./OlivOS-Win/OlivOS_debug.exe
+    - name: Packing OlivOS-Win
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-debug
+        path: ./dist/windows/OlivOS-Win
+    - name: Ready for Packing
+      run: |
+        mkdir ./dist/windows/OlivOS-Win/lib
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./dist/windows/OlivOS-Win/lib/go-cqhttp.exe
+    - name: Packing OlivOS-Win-with-lib
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-with-lib-debug
+        path: ./dist/windows/OlivOS-Win
+
+  build-win32-release:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Python
+      uses: actions/setup-python@v3.1.2
+      with:
+        python-version: 3.7.5
+        cache: pip
+        architecture: x86
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./requirements.txt
+    - name: Run packing
+      run: |
+        pyinstaller ./main.spec
+    - name: Run artifact
+      run: |
+        mkdir OlivOS-Win
+        cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
+    - name: Packing OlivOS-Win
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32
+        path: ./OlivOS-Win
+    - name: Ready for Packing
+      run: |
+        mkdir ./OlivOS-Win/lib
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+    - name: Packing OlivOS-Win-with-lib
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32-with-lib
+        path: ./OlivOS-Win
+
+  build-win32-debug:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Python
+      uses: actions/setup-python@v3.1.2
+      with:
+        python-version: 3.7.5
+        cache: pip
+        architecture: x86
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./requirements.txt
+    - name: Run packing
+      run: |
+        pyinstaller ./main_debug.spec
+    - name: Run artifact
+      run: |
+        mkdir OlivOS-Win
+        cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
+    - name: Packing OlivOS-Win
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32-debug
+        path: ./OlivOS-Win
+    - name: Ready for Packing
+      run: |
+        mkdir ./OlivOS-Win/lib
+        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+    - name: Packing OlivOS-Win-with-lib
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Win-32-with-lib-debug
+        path: ./OlivOS-Win
+
+  build-linux-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Python
+      uses: actions/setup-python@v3.1.2
+      with:
+        python-version: 3.7.5
+        cache: pip
+        architecture: x64
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./requirements.txt
+    - name: Run packing
+      run: |
+        pyinstaller ./main_debug.spec
+    - name: Run artifact
+      run: |
+        mkdir OlivOS-PKG
+        cp ./dist/main ./OlivOS-PKG/OlivOS
+    - name: Packing OlivOS-PKG
+      uses: actions/upload-artifact@v2
+      with:
+        name: OlivOS-Linux-64
+        path: ./OlivOS-PKG
