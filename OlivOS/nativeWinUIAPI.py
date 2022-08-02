@@ -206,6 +206,7 @@ class dock(OlivOS.API.Proc_templet):
                                             self.startOlivOSTerminalUI()
 
     def updateShallowMenuList(self):
+        tmp_new = []
         self.UIData['shallow_menu_list'] = [
             ['账号管理', False],
             ['打开终端', self.startOlivOSTerminalUISend],
@@ -215,6 +216,13 @@ class dock(OlivOS.API.Proc_templet):
             ['重载插件', self.sendPluginRestart],
             ['退出OlivOS', self.setOlivOSExit]
         ]
+        for data_this in self.UIData['shallow_menu_list']:
+            if data_this[0] == 'gocqhttp管理':
+                if data_this[1] != None:
+                    tmp_new.append(data_this)
+            else:
+                tmp_new.append(data_this)
+        self.UIData['shallow_menu_list'] = tmp_new
 
     def startGoCqhttpTerminalUISendFunc(self, hash):
         def resFunc():
