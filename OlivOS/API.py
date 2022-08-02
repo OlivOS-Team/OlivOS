@@ -1286,6 +1286,7 @@ class Proc_templet(object):
 
     def start_lite(self):
         proc_this = StoppableThread(name = self.Proc_name, target = self.run, args = ())
+        proc_this.daemon = self.deamon
         proc_this.start()
         #self.Proc = proc_this
         return proc_this

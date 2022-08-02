@@ -24,6 +24,7 @@ import multiprocessing
 import platform
 import signal
 import psutil
+import atexit
 
 import OlivOS
 
@@ -41,6 +42,7 @@ class Entity(object):
     def start(self):
         #兼容Win平台多进程，避免形成fork-bomb
         multiprocessing.freeze_support()
+        atexit.register(killMain)
         basic_conf_path = self.Config['basic_conf_path']
         basic_conf = None
         basic_conf_models = None
@@ -109,7 +111,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 #兼容Win平台多进程，避免形成fork-bomb
                 multiprocessing.freeze_support()
                 basic_conf_models_this = basic_conf_models[rx_packet_data.key]
-                tmp_proc_mode_raw = 'threading'
+                tmp_proc_mode_raw = 'auto'
                 tmp_proc_mode = 'threading'
                 if 'proc_mode' in basic_conf['system']:
                     tmp_proc_mode_raw = basic_conf['system']['proc_mode']
@@ -126,7 +128,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             dead_interval = basic_conf_models_this['dead_interval'],
                             logger_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
                             logger_mode = basic_conf_models_this['mode'],
-                            logger_vis_level = basic_conf_models_this['fliter']
+                            logger_vis_level = basic_conf_models_this['fliter'],
+                            control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']]
                         )
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                         for this_bot_info in  plugin_bot_info_dict:
@@ -151,7 +154,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             restart_gate = basic_conf_models_this['restart_gate'],
                             enable_auto_restart = basic_conf_models_this['enable_auto_restart']
                         )
-                        if 'auto' == tmp_proc_mode_raw:
+                        if True or 'auto' == tmp_proc_mode_raw:
                             tmp_proc_mode = 'processing'
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'post':
@@ -219,7 +222,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'kaiheila_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -240,7 +243,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'telegram_poll':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -297,7 +300,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodo_poll':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -360,8 +363,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     rx_queue = multiprocessing_dict[basic_conf_models_this['rx_queue']],
                                     tx_queue = None,
                                     control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
-                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                    bot_info_dict = plugin_bot_info_dict
                                 )
+                            #if True or 'auto' == tmp_proc_mode_raw:
+                            #    tmp_proc_mode = 'processing'
                             if basic_conf_models_this['name'] not in Proc_Proc_dict:
                                 Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config_save':
@@ -373,20 +379,28 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
                         if(platform.system() == 'Windows'):
                             for bot_info_key in plugin_bot_info_dict:
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp' or plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp_hide' or plugin_bot_info_dict[bot_info_key].platform['model'] == 'gocqhttp_show':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in [
+                                    'gocqhttp',
+                                    'gocqhttp_hide',
+                                    'gocqhttp_show',
+                                    'gocqhttp_show_old'
+                                ]:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                    tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                                    multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
                                     Proc_dict[tmp_Proc_name] = OlivOS.libEXEModelAPI.server(
                                         Proc_name = tmp_Proc_name,
                                         scan_interval = basic_conf_models_this['interval'],
                                         dead_interval = basic_conf_models_this['dead_interval'],
-                                        rx_queue = None,
+                                        rx_queue = multiprocessing_dict[tmp_queue_name],
                                         tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                        control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
                                         logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                                         bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                         target_proc = basic_conf_models[basic_conf_models_this['target_proc']],
                                         debug_mode = False
                                     )
-                                    Proc_Proc_dict[tmp_Proc_name] = OlivOS.API.Proc_start(Proc_dict[tmp_Proc_name])
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
             elif rx_packet_data.action == 'restart_do':
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
@@ -407,9 +421,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             for tmp_Proc_name in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[tmp_Proc_name]
                                 if basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
-                                    if basic_conf_models_this['name'] in Proc_dict:
-                                        if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue != None:
-                                            Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
+                                    model_name = basic_conf_models_this['name']
+                                    if 'hash' in rx_packet_data.key['target']:
+                                        model_name = '%s=%s' % (
+                                            basic_conf_models_this['name'],
+                                            rx_packet_data.key['target']['hash']
+                                        )
+                                    if model_name in Proc_dict:
+                                        if Proc_dict[model_name].Proc_info.rx_queue != None:
+                                            Proc_dict[model_name].Proc_info.rx_queue.put(
                                                 rx_packet_data,
                                                 block = False
                                             )

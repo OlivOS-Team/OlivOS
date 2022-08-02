@@ -248,6 +248,7 @@ class TreeEditUI(object):
         self.UIData['edit_root_Combobox_dict'] = {
             'type_list': [
                 '传统QQ',
+                '传统QQ - 旧',
                 '开黑啦 - KOOK',
                 'QQ频道 - 公域',
                 'QQ频道 - 私域',
@@ -256,10 +257,19 @@ class TreeEditUI(object):
                 'Telegram',
                 '自定义'
             ],
-            'type_mapping_list': { # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+            # 各类账号组合的匹配与注册表
+            # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+            'type_mapping_list': {
                 '传统QQ': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
+                        '账号': 'edit_root_Entry_ID'
+                        #'密码': 'edit_root_Entry_Password',
+                        #推荐使用扫码登录，所以隐藏密码栏
+                    }
+                ],
+                '传统QQ - 旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
+                        '账号': 'edit_root_Entry_ID'
+                        #'密码': 'edit_root_Entry_Password',
+                        #推荐使用扫码登录，所以隐藏密码栏
                     }
                 ],
                 '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
@@ -337,6 +347,7 @@ class TreeEditUI(object):
                         #'gocqhttp',
                         #'gocqhttp_hide',
                         'gocqhttp_show',
+                        'gocqhttp_show_old',
                         'default'
                     ]
                 },

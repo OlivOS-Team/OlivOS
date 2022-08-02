@@ -49,7 +49,8 @@ default_Conf = {
         "OlivOS_rx_queue",
         "OlivOS_logger_queue",
         "OlivOS_dodobot_rx_queue",
-        "OlivOS_nativeUI_rx_queue"
+        "OlivOS_nativeUI_rx_queue",
+        "OlivOS_gocqhttp_lib_rx_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
@@ -112,9 +113,11 @@ default_Conf = {
             "dead_interval" : 1,
             "proc_mode" : "auto",
             "rx_queue" : "OlivOS_logger_queue",
+            "control_queue" : "OlivOS_control_queue",
             "mode" : [
                 "console_color",
-                "logfile"
+                "logfile",
+                "native"
             ],
             "fliter" : [2, 3, 4, 5]
         },
@@ -239,9 +242,11 @@ default_Conf = {
             "type" : "gocqhttp_lib_exe_model",
             "interval" : 0.2,
             "dead_interval" : 1,
+            "rx_queue" : "OlivOS_gocqhttp_lib_rx_queue",
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
             "target_proc" : "OlivOS_flask_post_rx",
+            "control_queue" : "OlivOS_control_queue",
             "debug" : False
         }
     }
