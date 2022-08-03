@@ -254,6 +254,11 @@ class API(object):
                 self.guild_id = None
 
 
+def get_kmarkdown_message_raw(data:dict):
+    res = data['raw_content']
+    return res
+
+
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
@@ -306,8 +311,8 @@ def get_Event_from_SDK(target_event):
                         attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
                         if attachments_this['raw_content'] != '':
                             message_obj = OlivOS.messageAPI.Message_templet(
-                                'kaiheila_string',
-                                attachments_this['raw_content']
+                                'olivos_string',
+                                get_kmarkdown_message_raw(attachments_this)
                             )
                             message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                             message_obj.data_raw = message_obj.data.copy()
@@ -391,8 +396,8 @@ def get_Event_from_SDK(target_event):
                         attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
                         if attachments_this['raw_content'] != '':
                             message_obj = OlivOS.messageAPI.Message_templet(
-                                'kaiheila_string',
-                                attachments_this['raw_content']
+                                'olivos_string',
+                                get_kmarkdown_message_raw(attachments_this)
                             )
                             message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                             message_obj.data_raw = message_obj.data.copy()
@@ -404,7 +409,7 @@ def get_Event_from_SDK(target_event):
             if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
                 if target_event.sdk_event.payload.data.d['content'] != '':
                     message_obj = OlivOS.messageAPI.Message_templet(
-                        'olivos_string',
+                        'kaiheila_string',
                         target_event.sdk_event.payload.data.d['content']
                     )
                     message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
@@ -455,6 +460,12 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     def send_msg(target_event, chat_id, message, flag_direct = False):
         this_msg = None
+        res_data = {
+            "type": "card",
+            "theme": "secondary",
+            "size": "lg",
+            "modules": []
+        }
         if flag_direct:
             this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
         else:
@@ -462,17 +473,32 @@ class event_action(object):
         this_msg.data.target_id = str(chat_id)
         if this_msg == None:
             return
-        flag_now_type = 'string'
-        res = ''
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.image:
-                res += message_this.data['file']
-                flag_now_type = 'string'
+                res_data['modules'].append(
+                    {
+                        "type": "image-group",
+                        "elements": [
+                            {
+                                "type": "image",
+                                "src": message_this.data['file']
+                            }
+                        ]
+                    }
+                )
             elif type(message_this) == OlivOS.messageAPI.PARA.text:
-                res += message_this.kaiheila()
-                flag_now_type = 'string'
-        if res != '':
-            this_msg.data.content = res
+                res_data['modules'].append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "plain-text",
+                            "content": message_this.data['text']
+                        }
+                    }
+                )
+        if len(res_data['modules']) > 0:
+            this_msg.data.type = 10
+            this_msg.data.content = json.dumps([res_data], ensure_ascii = False)
             this_msg.do_api()
 
     def get_login_info(target_event):
