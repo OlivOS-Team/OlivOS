@@ -52,9 +52,6 @@
 ## 插件
 请参考插件默认模板[OlivOSPluginTemplate](https://github.com/OlivOS-Team/OlivOSPluginTemplate)和[官方文档](https://doc.olivos.wiki)进行插件开发。
 
-## 开始使用
-请参考[启程手册](https://wiki.dice.center/OlivOS_Login.html)进行OlivOS的首次使用
-
 ## 许可证
 
     Copyright (C) 2019-2021 lunzhiPenxil and OlivOS Team and contributors.
