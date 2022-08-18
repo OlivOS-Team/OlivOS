@@ -19,3 +19,6 @@ from PIL import Image
 
 #lxml
 from lxml import etree
+
+#yaml
+import yaml
