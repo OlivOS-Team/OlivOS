@@ -11,4 +11,4 @@ lxml
 rsa
 requests_toolbelt
 pystray
-yaml
+pyyaml
