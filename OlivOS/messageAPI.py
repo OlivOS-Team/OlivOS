@@ -395,7 +395,7 @@ class Message_templet(object):
     def init_from_kaiheila_code_string(self):
         tmp_data_raw = str(self.data_raw)
         tmp_data_raw = re.sub(r'\(met\)(\d+)\(met\)', r'[OP:at,id=\1]', tmp_data_raw)
-        tmp_data_raw = tmp_data_raw.replace(r'\*', r'*')
+        tmp_data_raw = re.sub(r'\\(.)', r'\1', tmp_data_raw)
         self.data_raw = tmp_data_raw
         self.init_from_code_string('OP')
 
