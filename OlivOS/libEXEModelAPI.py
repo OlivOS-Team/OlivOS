@@ -139,8 +139,9 @@ class server(OlivOS.API.Proc_templet):
                         if 'input' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data']:
                                 input_raw = str(rx_packet_data.key['data']['data'])
-                                input_data = ('%s\n' % input_raw).encode('utf-8')
+                                input_data = ('%s\r\n' % input_raw).encode('utf-8')
                                 model_Proc.stdin.write(input_data)
+                                model_Proc.stdin.flush()
                                 log_data = ('%s' % input_raw)
                                 self.send_log_event(log_data)
                                 self.log(2, log_data, [
