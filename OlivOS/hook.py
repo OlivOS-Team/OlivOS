@@ -22,3 +22,6 @@ from lxml import etree
 
 #yaml
 import yaml
+
+#sqlite
+import sqlite3
