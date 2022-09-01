@@ -36,7 +36,7 @@
 [![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![Onebot](https://img.shields.io/badge/-Onebot-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/botuniverse/onebot)
 [![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
-[![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://www.kaiheila.cn/)
+[![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://discord.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
 [![开黑啦](https://img.shields.io/badge/-%E5%BC%80%E9%BB%91%E5%95%A6KOOK-83E700?style=flat-square&logo=Discord&logoColor=white)](https://www.kaiheila.cn/)
 [![Dodo](https://img.shields.io/badge/-Dodo-00B8AA?style=flat-square&logo=%2Fe%2F&logoColor=white)](https://dodo.link/)
