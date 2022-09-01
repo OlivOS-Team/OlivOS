@@ -18,6 +18,7 @@ import multiprocessing
 import threading
 import time
 import json
+import traceback
 import websocket
 import ssl
 import asyncio
@@ -177,7 +178,7 @@ def accountFix(bot_info_dict, logger_proc):
                     logger_proc.log(2, '[discord] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
                 res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
             except:
-                #logger_proc.log(3, '[discord] account [' + str(bot_info_dict[bot_hash].id) + '] not hit:\n' + traceback.format_exc())
+                logger_proc.log(3, '[discord] account [' + str(bot_info_dict[bot_hash].id) + '] not hit:\n' + traceback.format_exc())
                 continue
         else:
             res[bot_info_dict_this] = bot_info_dict[bot_info_dict_this]

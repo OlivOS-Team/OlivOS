@@ -249,12 +249,13 @@ class TreeEditUI(object):
             'type_list': [
                 '传统QQ',
                 '传统QQ - 旧',
+                'Discord',
+                'Telegram',
                 '开黑啦 - KOOK',
                 'QQ频道 - 公域',
                 'QQ频道 - 私域',
                 '渡渡语音 - Dodo',
                 'Fanbook',
-                'Telegram',
                 '自定义'
             ],
             # 各类账号组合的匹配与注册表
@@ -286,6 +287,14 @@ class TreeEditUI(object):
                         '机器人令牌': 'edit_root_Entry_Server_access_token'
                     }
                 ],
+                'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
+                        'TOKEN': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
+                'Discord': ['discord', 'discord_link', 'default', 'True', 'websocket', {
+                        'TOKEN': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
                 '渡渡语音 - Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
                         'BotID': 'edit_root_Entry_ID',
                         'Bot私钥': 'edit_root_Entry_Server_access_token'
@@ -293,10 +302,6 @@ class TreeEditUI(object):
                 ],
                 'Fanbook': ['fanbook', 'fanbook_poll', 'default', 'True', 'post', {
                         'Token': 'edit_root_Entry_Server_access_token'
-                    }
-                ],
-                'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
                     }
                 ],
                 '自定义': ['qq', 'default', 'default', 'True', 'post', {
@@ -314,7 +319,8 @@ class TreeEditUI(object):
                 'kaiheila',
                 'telegram',
                 'dodo',
-                'fanbook'
+                'fanbook',
+                'discord'
             ],
             'platform_sdk_list': {
                 'qq': [
@@ -336,6 +342,9 @@ class TreeEditUI(object):
                 ],
                 'fanbook': [
                     'fanbook_poll'
+                ],
+                'discord': [
+                    'discord_link'
                 ]
             },
             'platform_sdk_model_list': {
@@ -362,6 +371,11 @@ class TreeEditUI(object):
                 },
                 'telegram': {
                     'telegram_poll': [
+                        'default'
+                    ]
+                },
+                'discord': {
+                    'discord_link': [
                         'default'
                     ]
                 },
@@ -753,6 +767,15 @@ class TreeEditUI(object):
                     tmp_host = 'https://api.telegram.org'
                 if tmp_port == '':
                     tmp_port = '443'
+            if tmp_platform_platform == 'discord' and tmp_platform_sdk == 'discord_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
             if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
