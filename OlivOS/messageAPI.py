@@ -149,6 +149,8 @@ class Message_templet(object):
             self.init_from_angle_code_string()
         elif self.mode_rx == 'kaiheila_string':
             self.init_from_kaiheila_code_string()
+        elif self.mode_rx == 'discord_string':
+            self.init_from_discord_code_string()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -396,6 +398,13 @@ class Message_templet(object):
         tmp_data_raw = str(self.data_raw)
         tmp_data_raw = re.sub(r'\(met\)(\d+)\(met\)', r'[OP:at,id=\1]', tmp_data_raw)
         tmp_data_raw = re.sub(r'\\(.)', r'\1', tmp_data_raw)
+        self.data_raw = tmp_data_raw
+        self.init_from_code_string('OP')
+
+    def init_from_discord_code_string(self):
+        tmp_data_raw = str(self.data_raw)
+        tmp_data_raw = re.sub(r'<@(\d+)>', r'[OP:at,id=\1]', tmp_data_raw)
+        #tmp_data_raw = re.sub(r'\\(.)', r'\1', tmp_data_raw)
         self.data_raw = tmp_data_raw
         self.init_from_code_string('OP')
 

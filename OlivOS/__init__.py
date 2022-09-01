@@ -36,6 +36,8 @@ from . import qqGuildSDK
 from . import qqGuildLinkServerAPI
 from . import telegramSDK
 from . import telegramPollServerAPI
+from . import discordSDK
+from . import discordLinkServerAPI
 from . import dodobotEAServerAPI
 from . import dodobotEATXAPI
 from . import dodobotEASDK

@@ -141,6 +141,8 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
             OlivOS.qqGuildSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.discordSDK.event:
+            OlivOS.discordSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
             OlivOS.telegramSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.fanbookSDK.event:
@@ -708,6 +710,24 @@ class Event(object):
                 else:
                     #主动私聊待实现
                     pass
+        elif self.platform['sdk'] == 'discord_link':
+            if flag_type == 'group':
+                if 'reply_msg_id' in self.data.extend:
+                    OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                else:
+                    OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message)
+            elif flag_type == 'private':
+                if host_id != None and not flag_log:
+                    OlivOS.discordSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
+                elif 'flag_from_direct' in self.data.extend:
+                    if self.data.extend['flag_from_direct']:
+                        OlivOS.discordSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
+                    else:
+                        #主动私聊待实现
+                        pass
+                else:
+                    #主动私聊待实现
+                    pass
         elif self.platform['sdk'] == 'kaiheila_link':
             if flag_type == 'group':
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = False)
@@ -1000,6 +1020,8 @@ class Event(object):
             res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'discord_link':
+            res_data = OlivOS.discordSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'fanbook_poll':
             res_data = OlivOS.fanbookSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'qqGuild_link':

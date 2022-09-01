@@ -6,7 +6,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   OlivOS/qqGuildSDK.py
+@File      :   OlivOS/discordSDK.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
@@ -17,27 +17,41 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 from enum import IntEnum
 import sys
 import json
+import traceback
 import requests as req
 import time
 
 import OlivOS
 
+# https://discord.com/developers/docs/topics/gateway#list-of-intents
 class intents_T(IntEnum):
     GUILDS = (1 << 0)                   #频道变更
     GUILD_MEMBERS = (1 << 1)            #频道成员变更
+    GUILD_BANS = (1 << 2)
+    GUILD_EMOJIS_AND_STICKERS = (1 << 3)
+    GUILD_INTEGRATIONS = (1 << 4)
+    GUILD_WEBHOOKS = (1 << 5)
+    GUILD_INVITES = (1 << 6)
+    GUILD_VOICE_STATES = (1 << 7)
+    GUILD_PRESENCES = (1 << 8)
     GUILD_MESSAGES = (1 << 9)           #消息事件，仅 *私域* 机器人能够设置此 intents。
     GUILD_MESSAGE_REACTIONS = (1 << 10) #戳表情
+    GUILD_MESSAGE_TYPING = (1 << 11)
     DIRECT_MESSAGE = (1 << 12)          #私聊消息
+    DIRECT_MESSAGE_REACTIONS = (1 << 13)
+    DIRECT_MESSAGE_TYPING = (1 << 14)
+    MESSAGE_CONTENT = (1 << 15)
+    GUILD_SCHEDULED_EVENTS = (1 << 16)
+    AUTO_MODERATION_CONFIGURATION = (1 << 20)
+    AUTO_MODERATION_EXECUTION = (1 << 21)
     INTERACTION = (1 << 26)             #互动事件变更
     MESSAGE_AUDIT = (1 << 27)           #消息审核变更
     FORUMS_EVENT = (1 << 28)            #论坛事件，仅 *私域* 机器人能够设置此 intents。
     AUDIO_ACTION = (1 << 29)            #语音消息
-    PUBLIC_GUILD_MESSAGES = (1 << 30)   # 消息事件，此为公域的消息事件
 
 
 sdkAPIHost = {
-    'default': 'https://api.sgroup.qq.com',
-    'sandbox': 'https://sandbox.api.sgroup.qq.com'
+    'default': 'https://discord.com/api/v10'
 }
 
 sdkAPIRoute = {
@@ -82,8 +96,8 @@ class event(object):
     def __init__(self, payload_obj = None, bot_info = None):
         self.payload = payload_obj
         self.platform = {}
-        self.platform['sdk'] = 'qqGuild_link'
-        self.platform['platform'] = 'qqGuild'
+        self.platform['sdk'] = 'discord_link'
+        self.platform['platform'] = 'discord'
         self.platform['model'] = 'default'
         self.active = False
         if self.payload != None:
@@ -153,19 +167,14 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info, intents = (int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
+        def __init__(self, bot_info, intents = (int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE | intents_T.GUILD_MESSAGES))):
             tmp_intents = intents
-            if bot_info.model == 'private':
-                tmp_intents |= int(intents_T.GUILD_MESSAGES)
-            elif bot_info.model == 'public':
-                tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             payload_template.__init__(self)
             self.data.op = 2
             try:
                 self.data.d = {
-                    'token': 'Bot %s.%s' % (str(bot_info.id), bot_info.access_token),
+                    'token': 'Bot %s' % (bot_info.access_token),
                     'intents': tmp_intents,
-                    'shard': [0,1],
                     'properties': {
                         'os': OlivOS.infoAPI.OlivOS_Header_UA
                     }
@@ -177,12 +186,12 @@ class PAYLOAD(object):
         def __init__(self, last_s = None):
             payload_template.__init__(self)
             self.data.op = 1
-            self.data.s = last_s
+            self.data.d = last_s
 
         def dump(self):
             res_obj = {}
             for data_this in self.data.__dict__:
-                if self.data.__dict__[data_this] != None or data_this == 's':
+                if self.data.__dict__[data_this] != None or data_this == 'd':
                     res_obj[data_this] = self.data.__dict__[data_this]
             res = json.dumps(obj = res_obj)
             return res
@@ -212,12 +221,12 @@ class api_templet(object):
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj = tmp_payload_dict)
-            send_url_temp = self.host + ':' + str(self.port) + self.route
+            send_url_temp = self.host + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
                 'Content-Type': 'application/json',
-                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token)
+                #'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                'Authorization': 'Bot %s' % (self.bot_info.access_token)
             }
 
             msg_res = None
@@ -232,7 +241,8 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception as e:
+            traceback.print_exc()
             return None
 
 class API(object):
@@ -270,10 +280,6 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None        #str
-                self.embed = None          #str
-                self.ark = None            #str
-                self.image = None          #str
-                self.msg_id = None         #str
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info = None):
@@ -366,7 +372,7 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
+                    'discord_string',
                     target_event.sdk_event.payload.data.d['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
@@ -441,7 +447,7 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
+                    'discord_string',
                     target_event.sdk_event.payload.data.d['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
@@ -519,16 +525,7 @@ class event_action(object):
                 res += message_this.OP()
                 flag_now_type = 'string'
         if res != '':
-            res_list = []
-            for res_this in res.split('\n'):
-                if res_this != '':
-                    res_list.append({
-                        'name': res_this,
-                    })
-            this_msg.data.embed = {
-                'prompt': res,
-                'fields': res_list
-            }
+            this_msg.data.content = res
             this_msg.do_api()
 
     def get_login_info(target_event):

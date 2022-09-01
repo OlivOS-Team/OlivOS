@@ -197,6 +197,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict = plugin_bot_info_dict,
                             logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                         )
+                        plugin_bot_info_dict = OlivOS.discordLinkServerAPI.accountFix(
+                            bot_info_dict = plugin_bot_info_dict,
+                            logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                        )
                         plugin_bot_info_dict = OlivOS.accountAPI.accountFix(
                             basic_conf_models = basic_conf_models,
                             bot_info_dict = plugin_bot_info_dict,
@@ -213,6 +217,27 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuild_link':
                                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                 Proc_dict[tmp_Proc_name] = OlivOS.qqGuildLinkServerAPI.server(
+                                    Proc_name = tmp_Proc_name,
+                                    scan_interval = basic_conf_models_this['interval'],
+                                    dead_interval = basic_conf_models_this['dead_interval'],
+                                    rx_queue = None,
+                                    tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                    bot_info_dict = plugin_bot_info_dict[bot_info_key],
+                                    debug_mode = False
+                                )
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'discord_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'discord_link':
+                                flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'discord_link':
+                                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                Proc_dict[tmp_Proc_name] = OlivOS.discordLinkServerAPI.server(
                                     Proc_name = tmp_Proc_name,
                                     scan_interval = basic_conf_models_this['interval'],
                                     dead_interval = basic_conf_models_this['dead_interval'],
