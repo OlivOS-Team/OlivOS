@@ -296,9 +296,6 @@ class TreeEditUI(object):
                     }
                 ],
                 'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
-                        'ID': 'edit_root_Entry_ID',
-                        'HOST': 'edit_root_Entry_Server_host',
-                        'PORT': 'edit_root_Entry_Server_port',
                         'TOKEN': 'edit_root_Entry_Server_access_token'
                     }
                 ],
@@ -744,6 +741,18 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
+            if tmp_platform_platform == 'telegram' and tmp_platform_sdk == 'telegram_poll':
+                if tmp_id == '':
+                    if len(tmp_access_token.split('.')) > 0:
+                        tmp_id = tmp_access_token.split('.')[0]
+                    if len(tmp_id) <= 0 or not tmp_id.isdigit():
+                        tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'https://api.telegram.org'
+                if tmp_port == '':
+                    tmp_port = '443'
             if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
