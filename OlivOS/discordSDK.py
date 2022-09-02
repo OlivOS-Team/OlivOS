@@ -279,7 +279,8 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None        #str
+                self.content = None
+                self.embeds = []
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info = None):
@@ -525,7 +526,13 @@ class event_action(object):
                 res += message_this.OP()
                 flag_now_type = 'string'
         if res != '':
-            this_msg.data.content = res
+            for src_this in ['\\', '*', '{', '}', '[', ']', '(', ')']:
+                res = res.replace(src_this, '\\' + src_this)
+            this_msg.data.embeds.append(
+                {
+                    "description": res
+                }
+            )
             this_msg.do_api()
 
     def get_login_info(target_event):
