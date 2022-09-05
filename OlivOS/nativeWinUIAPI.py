@@ -933,11 +933,11 @@ class OlivOSTerminalUI(object):
 
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
-            #input = self.UIData['root_input_StringVar'].get()
-            #if len(input) > 0:
+            input = self.UIData['root_input_StringVar'].get()
+            if len(input) > 0:
             #    self.root.setGoCqhttpModelSend(self.bot.hash, input)
-            #self.UIData['root_input_StringVar'].set('')
-            pass
+                pass
+            self.UIData['root_input_StringVar'].set('')
 
     def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title = '', mode = 'NONE'):
         self.UIObject[obj_name + '=Label'] = tkinter.Label(
