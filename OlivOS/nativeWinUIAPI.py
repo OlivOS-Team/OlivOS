@@ -93,7 +93,10 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_OlivOS_terminal_data_max'] = 500
         self.UIObject['root_gocqhttp_terminal'] = {}
         self.UIObject['root_gocqhttp_terminal_data'] = {}
-        self.UIObject['root_gocqhttp_terminal_data_max'] = 150
+        self.UIObject['root_gocqhttp_terminal_data_max'] = 500
+        self.UIObject['root_virtual_terminal_terminal'] = {}
+        self.UIObject['root_virtual_terminal_terminal_data'] = {}
+        self.UIObject['root_virtual_terminal_terminal_data_max'] = 150
         self.UIObject['root_qrcode_window'] = {}
         self.UIObject['root_qrcode_window_thread'] = {}
         self.UIObject['root_qrcode_window_enable'] = False
@@ -102,6 +105,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_plugin_edit_count'] = 0
         self.UIData['shallow_plugin_menu_list'] = None
         self.UIData['shallow_gocqhttp_menu_list'] = None
+        self.UIData['shallow_virtual_terminal_menu_list'] = None
         self.UIData['shallow_plugin_data_dict'] = None
         self.updateShallowMenuList()
 
@@ -202,6 +206,41 @@ class dock(OlivOS.API.Proc_templet):
                                                 elif 'gocqhttp_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startGoCqhttpTerminalUI(rx_packet_data.key['data']['hash'])
+                                        elif 'virtual_terminal' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data']:
+                                                if 'init' == rx_packet_data.key['data']['event']:
+                                                    if self.UIData['shallow_virtual_terminal_menu_list'] == None:
+                                                        self.UIData['shallow_virtual_terminal_menu_list'] = []
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                                            tmp_title = '%s' % (
+                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                            )
+                                                            self.UIData['shallow_virtual_terminal_menu_list'].append(
+                                                                [
+                                                                    tmp_title,
+                                                                    rx_packet_data.key['data']['hash'],
+                                                                    '',
+                                                                    'virtual_terminal'
+                                                                ]
+                                                            )
+                                                            self.updateShallowMenuList()
+                                                    if self.UIObject['root_shallow'] != None:
+                                                        self.updateShallow()
+                                                    self.startVirtualTerminalUISend(rx_packet_data.key['data']['hash'])
+                                                elif 'virtual_terminal_on' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        self.startVirtualTerminalUI(rx_packet_data.key['data']['hash'])
+                                                elif 'log' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in rx_packet_data.key['data'] and 'name' in rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash not in self.UIObject['root_virtual_terminal_terminal_data']:
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash] = []
+                                                        self.UIObject['root_virtual_terminal_terminal_data'][hash].append(rx_packet_data.key['data'])
+                                                        if len(self.UIObject['root_virtual_terminal_terminal_data'][hash]) > self.UIObject['root_virtual_terminal_terminal_data_max']:
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash].pop(0)
+                                                        if hash in self.UIObject['root_virtual_terminal_terminal']:
+                                                            self.UIObject['root_virtual_terminal_terminal'][hash].tree_add_line(rx_packet_data.key['data'])
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
 
@@ -211,13 +250,14 @@ class dock(OlivOS.API.Proc_templet):
             ['账号管理', False],
             ['打开终端', self.startOlivOSTerminalUISend],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
+            ['虚拟终端', self.UIData['shallow_virtual_terminal_menu_list']],
             ['插件管理', self.startPluginEditSend],
             ['插件菜单', self.UIData['shallow_plugin_menu_list']],
             ['重载插件', self.sendPluginRestart],
             ['退出OlivOS', self.setOlivOSExit]
         ]
         for data_this in self.UIData['shallow_menu_list']:
-            if data_this[0] == 'gocqhttp管理':
+            if data_this[0] in ['gocqhttp管理', '虚拟终端']:
                 if data_this[1] != None:
                     tmp_new.append(data_this)
             else:
@@ -258,6 +298,40 @@ class dock(OlivOS.API.Proc_templet):
             )
             self.UIObject['root_gocqhttp_terminal'][hash].start()
 
+    def startVirtualTerminalUISendFunc(self, hash):
+        def resFunc():
+            self.startVirtualTerminalUISend(hash)
+        return resFunc
+
+    def startVirtualTerminalUISend(self, hash):
+        self.sendControlEventSend('send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'virtual_terminal',
+                    'event': 'virtual_terminal_on',
+                    'hash': hash,
+                }
+            }
+        )
+
+    def startVirtualTerminalUI(self, hash):
+        if hash in self.bot_info:
+            if hash in self.UIObject['root_virtual_terminal_terminal']:
+                try:
+                    self.UIObject['root_virtual_terminal_terminal'][hash].stop()
+                except:
+                    pass
+            self.UIObject['root_virtual_terminal_terminal'][hash] = VirtualTerminalUI(
+                Model_name = 'virtual_terminal',
+                logger_proc = self.Proc_info.logger_proc.log,
+                root = self,
+                root_tk = None,
+                bot = self.bot_info[hash]
+            )
+            self.UIObject['root_virtual_terminal_terminal'][hash].start()
+
     def startOlivOSTerminalUISend(self):
         self.sendControlEventSend('send', {
                 'target': {
@@ -282,11 +356,24 @@ class dock(OlivOS.API.Proc_templet):
             root_tk = None
         )
         self.UIObject['root_OlivOS_terminal'].start()
-    
+
     def setGoCqhttpModelSend(self, hash, data):
         self.sendControlEventSend('send', {
                 'target': {
                     'type': 'gocqhttp_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
+            }
+        )
+
+    def setVirtualModelSend(self, hash, data):
+        self.sendControlEventSend('send', {
+                'target': {
+                    'type': 'terminal_link',
                     'hash': hash
                 },
                 'data': {
@@ -971,6 +1058,204 @@ class OlivOSTerminalUI(object):
     def exit(self):
         self.root.UIObject['root_OlivOS_terminal'] = None
 
+
+class VirtualTerminalUI(object):
+    def __init__(self, Model_name, logger_proc = None, root = None, root_tk = None, bot = None):
+        self.Model_name = Model_name
+        self.root = root
+        self.root_tk = root_tk
+        self.bot = bot
+        self.UIObject = {}
+        self.UIData = {}
+        self.UIConfig = {}
+        self.logger_proc = logger_proc
+        self.UIConfig.update(dictColorContext)
+
+    def start(self):
+        self.UIObject['root'] = tkinter.Toplevel()
+        self.UIObject['root'].title('Virtual Terminal 终端 - %s' % str(self.bot.id))
+        self.UIObject['root'].geometry('800x600')
+        self.UIObject['root'].minsize(800, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight = 15)
+        self.UIObject['root'].grid_rowconfigure(1, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(0, weight = 0)
+        self.UIObject['root'].grid_columnconfigure(1, weight = 2)
+        self.UIObject['root'].grid_columnconfigure(2, weight = 0)
+        self.UIObject['root'].resizable(
+            width = True,
+            height = True
+        )
+        self.UIObject['root'].configure(bg = self.UIConfig['color_001'])
+
+        self.UIObject['style'] = ttk.Style()
+        fix_Treeview_color(self.UIObject['style'])
+
+        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree']['show'] = 'headings'
+        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree'].column('DATA', width = 800 - 15 * 2 - 18 - 5)
+        self.UIObject['tree'].heading('DATA', text = '日志')
+        self.UIObject['tree']['selectmode'] = 'browse'
+        self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff = False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x : self.tree_rightKey(x))
+        self.UIObject['tree'].grid(
+            row = 0,
+            column = 0,
+            sticky = "nsew",
+            rowspan = 1,
+            columnspan = 2,
+            padx = (15, 0),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
+        )
+        self.UIObject['tree_yscroll'] = ttk.Scrollbar(
+            self.UIObject['root'],
+            orient = "vertical",
+            command = self.UIObject['tree'].yview
+        )
+        self.UIObject['tree_yscroll'].grid(
+            row = 0,
+            column = 2,
+            sticky = "nsw",
+            rowspan = 1,
+            columnspan = 1,
+            padx = (0, 15),
+            pady = (15, 0),
+            ipadx = 0,
+            ipady = 0
+        )
+        self.UIObject['tree'].configure(
+            yscrollcommand = self.UIObject['tree_yscroll'].set
+        )
+
+        self.root_Entry_init(
+            obj_root = 'root',
+            obj_name = 'root_input',
+            str_name = 'root_input_StringVar',
+            x = 15,
+            y = 600 - 15 * 1 - 24,
+            width_t = 0,
+            width = 800 - 15 * 2,
+            height = 24,
+            action = None,
+            title = '输入'
+        )
+        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].grid(
+            row = 1,
+            column = 1,
+            sticky = "s",
+            rowspan = 1,
+            columnspan = 3,
+            padx = (15, 15),
+            pady = (8, 15),
+            ipadx = 0,
+            ipady = 0
+        )
+        self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+
+        self.tree_init_line()
+
+        self.UIObject['root'].mainloop()
+
+        self.exit()
+
+    def tree_rightKey(self, event):
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label = '查看', command = lambda : self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label = '复制', command = lambda : self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action:str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
+    def root_Entry_enter_Func(self, name):
+        def resFunc(event):
+            self.root_Entry_enter(name, event)
+        return resFunc
+
+    def root_Entry_enter(self, name, event):
+        if name == 'root_input':
+            input = self.UIData['root_input_StringVar'].get()
+            if len(input) > 0 and len(input) < 1000:
+                self.root.setVirtualModelSend(self.bot.hash, input)
+                pass
+            self.UIData['root_input_StringVar'].set('')
+
+    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title = '', mode = 'NONE'):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(
+            self.UIObject[obj_root],
+            text = title
+        )
+        self.UIObject[obj_name + '=Label'].configure(
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004']
+        )
+        self.UIData[str_name] = tkinter.StringVar()
+        self.UIObject[obj_name] = tkinter.Entry(
+            self.UIObject[obj_root],
+            textvariable = self.UIData[str_name]
+        )
+        self.UIObject[obj_name].configure(
+            bg = self.UIConfig['color_004'],
+            fg = self.UIConfig['color_005'],
+            bd = 0
+        )
+        if mode == 'SAFE':
+            self.UIObject[obj_name].configure(
+                show = '●'
+            )
+        self.UIObject[obj_name].configure(
+            width = width
+        )
+
+    def tree_init_line(self):
+        if self.bot.hash in self.root.UIObject['root_virtual_terminal_terminal_data']:
+            for line in self.root.UIObject['root_virtual_terminal_terminal_data'][self.bot.hash]:
+                self.tree_add_line(line)
+
+    def tree_add_line(self, data):
+        res_data = data['data']
+        res_data = res_data.encode(encoding = 'gb2312', errors = 'replace').decode(encoding = 'gb2312', errors = 'replace')
+        res_data_1 = res_data
+        res_data = res_data.replace(' ', '\ ')
+        res_data = res_data.replace('\r\n', '\n')
+        res_data = '<%s>\n%s\n%s' % (data['name'], res_data, '-'*25)
+        res_data_list = res_data.split('\n')
+        for res_data_list_this in res_data_list:
+            try:
+                iid = self.UIObject['tree'].insert(
+                    '',
+                    tkinter.END,
+                    text = res_data_list_this,
+                    values=(
+                        res_data_list_this
+                    )
+                )
+                self.UIObject['tree'].see(iid)
+                self.UIObject['tree'].update()
+            except:
+                pass
+
+    def stop(self):
+        self.exit()
+        self.UIObject['root'].destroy()
+
+    def exit(self):
+        self.root.UIObject['root_virtual_terminal_terminal'].pop(self.bot.hash)
+
+
 class shallow(object):
     def __init__(self, name:str, image:str, root):
         self.name = name
@@ -1024,6 +1309,15 @@ class shallow(object):
                                         pystray.MenuItem(
                                             item_this[0],
                                             self.root.startGoCqhttpTerminalUISendFunc(
+                                                item_this[1]
+                                            )
+                                        )
+                                    )
+                                elif item_this[3] == 'virtual_terminal':
+                                    list_new.append(
+                                        pystray.MenuItem(
+                                            item_this[0],
+                                            self.root.startVirtualTerminalUISendFunc(
                                                 item_this[1]
                                             )
                                         )

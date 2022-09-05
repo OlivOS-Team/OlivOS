@@ -157,6 +157,31 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         if True or 'auto' == tmp_proc_mode_raw:
                             tmp_proc_mode = 'processing'
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'terminal_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'terminal_link':
+                                flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'terminal_link':
+                                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                                multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                Proc_dict[tmp_Proc_name] = OlivOS.virtualTerminalLinkServerAPI.server(
+                                    Proc_name = tmp_Proc_name,
+                                    scan_interval = basic_conf_models_this['interval'],
+                                    dead_interval = basic_conf_models_this['dead_interval'],
+                                    rx_queue = multiprocessing_dict[tmp_queue_name],
+                                    tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                    control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
+                                    logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                    bot_info_dict = plugin_bot_info_dict[bot_info_key],
+                                    debug_mode = False
+                                )
+                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'post':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:

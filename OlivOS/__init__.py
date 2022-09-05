@@ -32,6 +32,8 @@ from . import diagnoseAPI
 from . import flaskServerAPI
 from . import pluginAPI
 from . import onebotSDK
+from . import virtualTerminalSDK
+from . import virtualTerminalLinkServerAPI
 from . import qqGuildSDK
 from . import qqGuildLinkServerAPI
 from . import telegramSDK

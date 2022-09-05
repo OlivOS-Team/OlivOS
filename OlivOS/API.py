@@ -130,6 +130,7 @@ class Event(object):
         self.plugin_info['name'] = 'unity'
         self.plugin_info['namespace'] = 'unity'
         self.plugin_info['tx_queue'] = []
+        self.plugin_info['control_queue'] = None
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
         self.get_Event_from_SDK()
@@ -137,7 +138,9 @@ class Event(object):
         self.do_init_log()
 
     def get_Event_from_SDK(self):
-        if self.sdk_event_type is OlivOS.onebotSDK.event:
+        if self.sdk_event_type is OlivOS.virtualTerminalSDK.event:
+            OlivOS.virtualTerminalSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.onebotSDK.event:
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
             OlivOS.qqGuildSDK.get_Event_from_SDK(self)
@@ -677,7 +680,9 @@ class Event(object):
         [tmp_message, tmp_message_obj] = self.__message_router(message)
         if tmp_message == None:
             return
-        if self.platform['sdk'] == 'onebot':
+        if self.platform['sdk'] == 'terminal_link':
+            OlivOS.virtualTerminalSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
+        elif self.platform['sdk'] == 'onebot':
             if flag_type == 'private':
                 if 'host_id' in self.data.__dict__:
                     if self.data.host_id != None:

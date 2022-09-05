@@ -146,6 +146,7 @@ class shallow(OlivOS.API.Proc_templet):
                 plugin_event.active = False
         if plugin_event.active:
             plugin_event.plugin_info['tx_queue'] = self.Proc_info.tx_queue
+            plugin_event.plugin_info['control_queue'] = self.Proc_info.control_queue
             for plugin_models_index_this in self.plugin_models_call_list:
                 flag_support_found_dict = {}
                 flag_support_found_dict['sdk'] = False

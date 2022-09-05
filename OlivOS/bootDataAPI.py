@@ -31,12 +31,12 @@ default_Conf = {
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
+            "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
             "OlivOS_qqGuild_link",
             "OlivOS_discord_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
-            "OlivOS_dodo_poll",
             "OlivOS_kaiheila_link",
             "OlivOS_dodo_link",
             "OlivOS_nativeWinUIAPI"
@@ -51,7 +51,8 @@ default_Conf = {
         "OlivOS_logger_queue",
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
-        "OlivOS_gocqhttp_lib_rx_queue"
+        "OlivOS_gocqhttp_lib_rx_queue",
+        "OlivOS_virtual_terminal_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
@@ -137,6 +138,18 @@ default_Conf = {
             "treading_mode" : "full",
             "restart_gate" : 50000,
             "enable_auto_restart" : True,
+            "debug" : False
+        },
+        "OlivOS_virtual_terminal_link" : {
+            "enable" : True,
+            "name" : "OlivOS_virtual_terminal_link",
+            "type" : "terminal_link",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "rx_queue" : "OlivOS_virtual_terminal_queue",
+            "tx_queue" : "OlivOS_rx_queue",
+            "control_queue" : "OlivOS_control_queue",
+            "logger_proc" : "OlivOS_logger",
             "debug" : False
         },
         "OlivOS_flask_post_rx" : {
