@@ -70,6 +70,8 @@ sdkAPIRouteTemp = {
 
 sdkSubSelfInfo = {}
 
+sdkDMInfo = {}
+
 class bot_info_T(object):
     def __init__(self, id = -1, access_token = None, model = 'private'):
         self.id = id
@@ -282,27 +284,18 @@ class API(object):
                 self.content = None
                 self.embeds = []
 
-    class sendDirectMessage(api_templet):
+    class createDM(api_templet):
         def __init__(self, bot_info = None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
-            self.metadata = self.metadata_T()
+            self.metadata = None
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
+            self.route = sdkAPIRoute['users'] + '/@me/channels'
 
         class data_T(object):
             def __init__(self):
-                self.content = None        #str
-                self.embed = None          #str
-                self.ark = None            #str
-                self.image = None          #str
-                self.msg_id = None         #str
-
+                self.recipient_id = '-1'
 
 
 def checkInDictSafe(var_key, var_dict, var_path = []):
@@ -424,9 +417,11 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             target_event.data.sender['role'] = 'member'
-            target_event.data.host_id = target_event.sdk_event.payload.data.d['guild_id']
+            target_event.data.host_id = None
+            if 'guild_id' in target_event.sdk_event.payload.data.d:
+                target_event.data.host_id = target_event.sdk_event.payload.data.d['guild_id']
             target_event.data.extend['group_id'] = str(target_event.sdk_event.payload.data.d['channel_id'])
-            target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.d['guild_id'])
+            target_event.data.extend['host_group_id'] = str(target_event.data.host_id)
             target_event.data.extend['flag_from_direct'] = False
             target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
             if 'member' in target_event.sdk_event.payload.data.d:
@@ -442,6 +437,8 @@ def get_Event_from_SDK(target_event):
                         target_event.data.sender['role'] = 'member'
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+            if target_event.data.sender['id'] == target_event.base_info['self_id']:
+                target_event.active = False
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         message_obj = None
         message_para_list = []
@@ -506,17 +503,27 @@ def get_Event_from_SDK(target_event):
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, reply_msg_id = None ,flag_direct = False):
+    def send_msg(target_event, chat_id, message, flag_direct = False):
         this_msg = None
+        this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         if flag_direct:
-            this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.guild_id = int(chat_id)
+            if str(chat_id) in sdkDMInfo:
+                this_msg.metadata.channel_id = sdkDMInfo[str(chat_id)]
+            else:
+                this_msg_dm = API.createDM(get_SDK_bot_info_from_Event(target_event))
+                this_msg_dm.data.recipient_id = int(chat_id)
+                this_msg_dm.do_api()
+                raw_obj = None
+                if this_msg_dm.res != None:
+                    raw_obj = init_api_json(this_msg_dm.res)
+                if raw_obj != None:
+                    if type(raw_obj) == dict:
+                        this_msg.metadata.channel_id = int(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
+                        sdkDMInfo[str(chat_id)] = this_msg.metadata.channel_id
         else:
-            this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.channel_id = int(chat_id)
         if this_msg == None:
             return
-        this_msg.data.msg_id = reply_msg_id
         flag_now_type = 'string'
         res = ''
         for message_this in message.data:

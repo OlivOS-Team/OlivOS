@@ -712,22 +712,9 @@ class Event(object):
                     pass
         elif self.platform['sdk'] == 'discord_link':
             if flag_type == 'group':
-                if 'reply_msg_id' in self.data.extend:
-                    OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
-                else:
-                    OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message)
+                OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message)
             elif flag_type == 'private':
-                if host_id != None and not flag_log:
-                    OlivOS.discordSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
-                elif 'flag_from_direct' in self.data.extend:
-                    if self.data.extend['flag_from_direct']:
-                        OlivOS.discordSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct = True)
-                    else:
-                        #主动私聊待实现
-                        pass
-                else:
-                    #主动私聊待实现
-                    pass
+                OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = True)
         elif self.platform['sdk'] == 'kaiheila_link':
             if flag_type == 'group':
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = False)
