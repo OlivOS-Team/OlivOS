@@ -46,12 +46,13 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 class event(object):
-    def __init__(self, payload_obj = None, bot_info = None):
+    def __init__(self, payload_obj = None, bot_info = None, model = 'default', event_id = None):
         self.payload = payload_obj
+        self.event_id = event_id
         self.platform = {}
         self.platform['sdk'] = 'terminal_link'
         self.platform['platform'] = 'terminal'
-        self.platform['model'] = 'default'
+        self.platform['model'] = model
         self.active = False
         if self.payload != None:
             self.active = True
@@ -77,32 +78,69 @@ def get_Event_from_SDK(target_event):
         platform_platform = target_event.platform['platform'],
         platform_model = target_event.platform['model']
     )
-    message_obj = OlivOS.messageAPI.Message_templet(
-        'olivos_string',
-        target_event.sdk_event.payload.key['data']['data']
-    )
-    if message_obj.active:
-        target_event.active = True
-        target_event.plugin_info['func_type'] = 'group_message'
-        target_event.data = target_event.group_message(
-            str(88888888),
-            str(88888888),
-            message_obj,
-            'group'
+    message_obj = None
+    if target_event.platform['model'] in ['default']:
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_string',
+            target_event.sdk_event.payload.key['data']['data']
         )
-        target_event.data.message_sdk = message_obj
-        target_event.data.message_id = str(88888888)
-        target_event.data.raw_message = message_obj
-        target_event.data.raw_message_sdk = message_obj
-        target_event.data.font = None
-        target_event.data.sender['user_id'] = str(88888888)
-        target_event.data.sender['nickname'] = '仑质'
-        target_event.data.sender['id'] = str(88888888)
-        target_event.data.sender['name'] = '仑质'
-        target_event.data.sender['sex'] = 'unknown'
-        target_event.data.sender['age'] = 0
-        target_event.data.sender['role'] = 'owner'
-        target_event.data.host_id = None
+    if message_obj != None and target_event.platform['model'] in ['default']:
+        if message_obj.active:
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_message'
+            target_event.data = target_event.group_message(
+                str(88888888),
+                str(88888888),
+                message_obj,
+                'group'
+            )
+            target_event.data.message_sdk = message_obj
+            target_event.data.message_id = str(88888888)
+            target_event.data.raw_message = message_obj
+            target_event.data.raw_message_sdk = message_obj
+            target_event.data.font = None
+            target_event.data.sender['user_id'] = str(88888888)
+            target_event.data.sender['nickname'] = '仑质'
+            target_event.data.sender['id'] = str(88888888)
+            target_event.data.sender['name'] = '仑质'
+            target_event.data.sender['sex'] = 'unknown'
+            target_event.data.sender['age'] = 0
+            target_event.data.sender['role'] = 'owner'
+            target_event.data.host_id = None
+    elif target_event.platform['model'] in ['postapi']:
+        if 'type' in target_event.sdk_event.payload and target_event.sdk_event.payload['type'] == 'message':
+            if 'message_type' in target_event.sdk_event.payload and target_event.sdk_event.payload['message_type'] == 'group_message':
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'olivos_string',
+                    target_event.sdk_event.payload['message']
+                )
+                if message_obj.active:
+                    try:
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'group_message'
+                        target_event.data = target_event.group_message(
+                            str(target_event.sdk_event.payload['group_id']),
+                            str(target_event.sdk_event.payload['user_id']),
+                            message_obj,
+                            'group'
+                        )
+                        target_event.data.message_sdk = message_obj
+                        target_event.data.message_id = str(88888888)
+                        target_event.data.raw_message = message_obj
+                        target_event.data.raw_message_sdk = message_obj
+                        target_event.data.font = None
+                        target_event.data.sender['name'] = '仑质'
+                        target_event.data.sender['id'] = str(target_event.sdk_event.payload['user_id'])
+                        if 'sender' in target_event.sdk_event.payload and 'nickname' in target_event.sdk_event.payload['sender']:
+                            target_event.data.sender['name'] = target_event.sdk_event.payload['sender']['nickname']
+                        target_event.data.sender['nickname'] = target_event.data.sender['name']
+                        target_event.data.sender['user_id'] = target_event.data.sender['id']
+                        target_event.data.sender['sex'] = 'unknown'
+                        target_event.data.sender['age'] = 0
+                        target_event.data.sender['role'] = 'owner'
+                        target_event.data.host_id = None
+                    except:
+                        message_obj.active = False
 
 #支持OlivOS API调用的方法实现
 class event_action(object):
@@ -113,7 +151,15 @@ class event_action(object):
             platform_platform = target_event.platform['platform'],
             platform_model = target_event.platform['model']
         )
-        send_log_event(plugin_event_bot_hash, message, 'BOT', control_queue)
+        if target_event.platform['model'] in ['default']:
+            send_log_event(plugin_event_bot_hash, message, 'BOT', control_queue)
+        elif target_event.platform['model'] in ['postapi']:
+            if target_event.sdk_event.event_id != None:
+                evnet_id = target_event.sdk_event.event_id
+                event_data = {
+                    'reply': message
+                }
+                send_postapi_event(plugin_event_bot_hash, event_data, evnet_id, control_queue)
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue != None:
@@ -136,6 +182,21 @@ def send_log_event(hash, data, name, control_queue):
                 'hash': hash,
                 'data': data,
                 'name': name
+            }
+        },
+        control_queue
+    )
+
+def send_postapi_event(hash, data, event_id, control_queue):
+    sendControlEventSend('send', {
+            'target': {
+                'type': 'terminal_link',
+                'hash': hash
+            },
+            'data': {
+                'action': 'reply',
+                'event_id': str(event_id),
+                'data': data
             }
         },
         control_queue

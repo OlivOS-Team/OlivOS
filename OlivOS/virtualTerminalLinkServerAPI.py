@@ -14,6 +14,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+from gevent import pywsgi
+from flask import Flask
+from flask import current_app
+from flask import request
+from flask import g
+
 import multiprocessing
 import threading
 import time
@@ -41,28 +47,80 @@ class server(OlivOS.API.Proc_templet):
             control_queue = control_queue
         )
         self.Proc_config['debug_mode'] = debug_mode
+        self.Proc_config['Flask_app'] = None
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['platform_bot_info_dict'] = None
+        self.Proc_data['reply_event_pool'] = {}
 
     def run(self):
         time.sleep(2)
         self.log(2, 'OlivOS virtual terminal link server [' + self.Proc_name + '] is running')
-        self.send_init_event()
-        while True:
-            if self.Proc_info.rx_queue.empty():
-                time.sleep(self.Proc_info.scan_interval)
-            else:
+        if self.Proc_data['bot_info_dict'].platform['model'] == 'postapi':
+            threading.Thread(
+                target = self.set_flask,
+                args = ()
+            ).start()
+            while True:
+                if self.Proc_info.rx_queue.empty():
+                    time.sleep(self.Proc_info.scan_interval)
+                else:
+                    try:
+                        rx_packet_data = self.Proc_info.rx_queue.get(block = False)
+                    except:
+                        rx_packet_data = None
+                    if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
+                            if 'reply' == rx_packet_data.key['data']['action']:
+                                if 'data' in rx_packet_data.key['data'] and 'event_id' in rx_packet_data.key['data']:
+                                    self.Proc_data['reply_event_pool'][str(rx_packet_data.key['data']['event_id'])] = rx_packet_data.key['data']['data']
+        elif self.Proc_data['bot_info_dict'].platform['model'] == 'default':
+            self.send_init_event()
+            while True:
+                if self.Proc_info.rx_queue.empty():
+                    time.sleep(self.Proc_info.scan_interval)
+                else:
+                    try:
+                        rx_packet_data = self.Proc_info.rx_queue.get(block = False)
+                    except:
+                        rx_packet_data = None
+                    if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
+                            if 'input' == rx_packet_data.key['data']['action']:
+                                if 'data' in rx_packet_data.key['data']:
+                                    sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data, self.Proc_data['bot_info_dict'])
+                                    tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                                    self.send_log_event(rx_packet_data.key['data']['data'], '仑质')
+
+    def set_flask(self):
+        self.Proc_config['Flask_app'] = Flask('__main__')
+        with self.Proc_config['Flask_app'].app_context():
+            @current_app.route('/', methods = ['POST'])
+            def Flask_server_func():
+                res = '{}'
+                status = 200
+                header = {
+                    'Content-Type': 'application/json'
+                }
+                flag_active = False
+                rx_packet_data_raw = request.get_data(as_text = True)
                 try:
-                    rx_packet_data = self.Proc_info.rx_queue.get(block = False)
+                    event_id = str(uuid.uuid4())
+                    rx_packet_data = json.loads(rx_packet_data_raw)
+                    sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data, self.Proc_data['bot_info_dict'], model = 'postapi', event_id = event_id)
+                    tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
+                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                    flag_active = True
                 except:
-                    rx_packet_data = None
-                if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
-                        if 'input' == rx_packet_data.key['data']['action']:
-                            if 'data' in rx_packet_data.key['data']:
-                                sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data, self.Proc_data['bot_info_dict'])
-                                tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                                self.Proc_info.tx_queue.put(tx_packet_data, block = False)
-                                self.send_log_event(rx_packet_data.key['data']['data'], '仑质')
+                    flag_active = False
+                if flag_active:
+                    for count_i in range(30):
+                        if event_id in self.Proc_data['reply_event_pool']:
+                            res = json.dumps(self.Proc_data['reply_event_pool'][event_id])
+                            self.Proc_data['reply_event_pool'].pop(event_id)
+                            break
+                        time.sleep(1)
+                return res, status, header
+        server = pywsgi.WSGIServer(('0.0.0.0', self.Proc_data['bot_info_dict'].post_info.port), self.Proc_config['Flask_app'], log = None)
+        server.serve_forever()
 
     def send_init_event(self):
         self.sendControlEventSend('send', {

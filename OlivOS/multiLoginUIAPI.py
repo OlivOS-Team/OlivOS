@@ -257,6 +257,7 @@ class TreeEditUI(object):
                 '渡渡语音 - Dodo',
                 'Fanbook',
                 '虚拟终端',
+                '接口终端',
                 '自定义'
             ],
             # 各类账号组合的匹配与注册表
@@ -307,6 +308,11 @@ class TreeEditUI(object):
                 ],
                 '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {
                         '账号': 'edit_root_Entry_ID'
+                    }
+                ],
+                '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post', {
+                        '账号': 'edit_root_Entry_ID',
+                        '端口': 'edit_root_Entry_Server_port'
                     }
                 ],
                 '自定义': ['qq', 'default', 'default', 'True', 'post', {
@@ -407,7 +413,8 @@ class TreeEditUI(object):
                 },
                 'terminal': {
                     'terminal_link': [
-                        'default'
+                        'default',
+                        'postapi'
                     ]
                 }
             }
@@ -822,13 +829,20 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link':
+            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'default':
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'postapi':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
             if not checkByListEmptyOr([
