@@ -112,12 +112,12 @@ class server(OlivOS.API.Proc_templet):
                 except:
                     flag_active = False
                 if flag_active:
-                    for count_i in range(30):
+                    for count_i in range(30 * 4):
                         if event_id in self.Proc_data['reply_event_pool']:
                             res = json.dumps(self.Proc_data['reply_event_pool'][event_id])
                             self.Proc_data['reply_event_pool'].pop(event_id)
                             break
-                        time.sleep(1)
+                        time.sleep(0.25)
                 return res, status, header
         server = pywsgi.WSGIServer(('0.0.0.0', self.Proc_data['bot_info_dict'].post_info.port), self.Proc_config['Flask_app'], log = None)
         server.serve_forever()
