@@ -84,7 +84,9 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib')
         releaseDir('./lib/Lib')
         releaseDir('./lib/DLLs')
+        #self.set_check_update()
         self.sendPluginList()
+        time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.load_plugin_list()
         self.run_plugin_func(None, 'init_after')
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] is running')
@@ -105,6 +107,10 @@ class shallow(OlivOS.API.Proc_templet):
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init', self.Proc_name), block=False)
                         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] will restart')
+                    elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
+                        self.Proc_config['ready_for_restart'] = True
+                        self.run_plugin_func(None, 'save')
+                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'), block=False)
                     elif rx_packet_data.action == 'send':
                         t_run_plugin = None
                         t_run_plugin = threading.Thread(target=self.run_plugin, args=(rx_packet_data,))
@@ -124,6 +130,10 @@ class shallow(OlivOS.API.Proc_templet):
     def set_restart(self):
         self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] call restart')
         self.Proc_info.rx_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
+
+    def set_check_update(self):
+        self.log(2, 'OlivOS plugin shallow [' + self.Proc_name + '] call check update')
+        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_get'), block=False)
 
     def get_plugin_list(self):
         return self.plugin_models_call_list
