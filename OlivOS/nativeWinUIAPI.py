@@ -254,6 +254,7 @@ class dock(OlivOS.API.Proc_templet):
             ['插件管理', self.startPluginEditSend],
             ['插件菜单', self.UIData['shallow_plugin_menu_list']],
             ['重载插件', self.sendPluginRestart],
+            ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
         ]
         for data_this in self.UIData['shallow_menu_list']:
@@ -467,6 +468,17 @@ class dock(OlivOS.API.Proc_templet):
         if self.Proc_info.control_queue != None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet('restart_send', 'plugin'),
+                block = False
+            )
+
+    def sendOlivOSUpdateGet(self):
+        if self.UIObject['root_shallow'] != None:
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '正在检查更新……'
+            )
+        if self.Proc_info.control_queue != None:
+            self.Proc_info.control_queue.put(
+                OlivOS.API.Control.packet('init_type', 'update_get'),
                 block = False
             )
 
@@ -1009,8 +1021,16 @@ class OlivOSTerminalUI(object):
 
 
     def tree_init_line(self):
-        for line in self.root.UIObject['root_OlivOS_terminal_data']:
-            self.tree_add_line(line)
+        tmp_count_old = 0
+        tmp_count_new = len(self.root.UIObject['root_OlivOS_terminal_data'])
+        try:
+            while tmp_count_old < tmp_count_new:
+                for line in self.root.UIObject['root_OlivOS_terminal_data'].copy()[tmp_count_old:tmp_count_new]:
+                    self.tree_add_line(line)
+                tmp_count_old = tmp_count_new
+                tmp_count_new = len(self.root.UIObject['root_OlivOS_terminal_data'])
+        except:
+            pass
 
     def tree_add_line(self, data):
         data_raw = data['data']
@@ -1570,6 +1590,7 @@ def releaseBase64Data(dir_path, file_name, base64_data):
         os.makedirs(dir_path) 
     with open(dir_path + '/' + file_name, 'wb+') as tmp:
         tmp.write(base64.b64decode(base64_data))
+
 
 # 修复 tkinter 8.6.9 的Treeview颜色bug，后续升级Python版本与配套Tkinter版本后可以移除
 # 目前已知Python 3.10.4 中 tkinter 8.6.12 已修复

@@ -273,6 +273,18 @@ default_Conf = {
             "target_proc" : "OlivOS_flask_post_rx",
             "control_queue" : "OlivOS_control_queue",
             "debug" : False
+        },
+        "OlivOS_update_get" : {
+            "enable" : True,
+            "name" : "OlivOS_update_get",
+            "type" : "update_get",
+            "logger_proc" : "OlivOS_logger"
+        },
+        "OlivOS_update_replace" : {
+            "enable" : True,
+            "name" : "OlivOS_update_replace",
+            "type" : "update_replace",
+            "logger_proc" : "OlivOS_logger"
         }
     }
 }

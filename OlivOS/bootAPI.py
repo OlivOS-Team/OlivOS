@@ -16,8 +16,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
+import subprocess
 import sys
 import os
+import threading
 import time
 import json
 import multiprocessing
@@ -97,6 +99,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
         for basic_conf_models_this_name in main_control.init_list:
             main_control.control_queue.put(main_control.packet('init', basic_conf_models_this_name), block = False)
+
+        # 判断启动参数
+        basic_argv = []
+        if len(sys.argv) >= 1:
+            basic_argv = sys.argv[1:]
+        flag_noblock = False
+        if '--noblock' in basic_argv:
+            flag_noblock = True
 
         while True:
             if main_control.control_queue.empty():
@@ -393,7 +403,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             debug_mode = False
                         )
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
-                    elif basic_conf_models_this['type'] == 'multiLoginUI':
+                    elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock:
                         if(platform.system() == 'Windows'):
                             Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
                                 Model_name = basic_conf_models_this['name'],
@@ -451,6 +461,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         debug_mode = False
                                     )
                                     Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'update_get':
+                        threading.Thread(target = update_get_func, args = (Proc_dict, basic_conf_models, basic_conf_models_this)).start()
+                    elif basic_conf_models_this['type'] == 'update_replace':
+                        OlivOS.updateAPI.OlivOSUpdateReplace(
+                            logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                        )
             elif rx_packet_data.action == 'restart_do':
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
@@ -483,8 +499,34 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                                 rx_packet_data,
                                                 block = False
                                             )
+            elif rx_packet_data.action == 'init_type':
+                for tmp_Proc_name in basic_conf_models:
+                    basic_conf_models_this = basic_conf_models[tmp_Proc_name]
+                    if basic_conf_models_this['type'] == rx_packet_data.key:
+                        main_control.control_queue.put(
+                            main_control.packet('init', basic_conf_models_this['name']),
+                            block = False
+                        )
             elif rx_packet_data.action == 'exit_total':
                 killMain()
+
+def update_get_func(
+    Proc_dict,
+    basic_conf_models,
+    basic_conf_models_this
+):
+    tmp_model_this_res = OlivOS.updateAPI.OlivOSUpdateGet(
+        logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+    )
+    if tmp_model_this_res:
+        for tmp_Proc_name in basic_conf_models:
+            basic_conf_models_this = basic_conf_models[tmp_Proc_name]
+            if basic_conf_models_this['type'] == 'plugin':
+                if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue != None:
+                    Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
+                        OlivOS.API.Control.packet('update_hit', basic_conf_models_this['name']),
+                        block = False
+                    )
 
 def killMain():
     parent = psutil.Process(os.getpid())

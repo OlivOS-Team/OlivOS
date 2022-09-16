@@ -98,7 +98,9 @@ class server(OlivOS.API.Proc_templet):
                 res = '{}'
                 status = 200
                 header = {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'POST'
                 }
                 flag_active = False
                 rx_packet_data_raw = request.get_data(as_text = True)
