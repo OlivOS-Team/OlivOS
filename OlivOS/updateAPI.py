@@ -26,7 +26,7 @@ import zipfile
 
 import OlivOS
 
-update_bat_name = 'new.bat'
+update_bat_name = 'tmp.bat'
 
 def OlivOSUpdateReplace(logger_proc):
     if platform.system() == 'Windows':
@@ -41,7 +41,7 @@ def OlivOSUpdateReplace(logger_proc):
             TempList += 'choice /t 2 /d y /n >nul\n'
             TempList += 'del '+ exe_root_path + '\n'
             TempList += 'move /y .\\resource\\' + exe_name + ' ' + exe_root_path + '\n'
-            TempList += 'start ' + exe_name + '\n'
+            TempList += 'start ' + exe_name + ' --noblock\n'
             TempList += 'exit'
             b.write(TempList)
         subprocess.call(

@@ -100,6 +100,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         for basic_conf_models_this_name in main_control.init_list:
             main_control.control_queue.put(main_control.packet('init', basic_conf_models_this_name), block = False)
 
+        # 判断启动参数
+        basic_argv = []
+        if len(sys.argv) >= 1:
+            basic_argv = sys.argv[1:]
+        flag_noblock = False
+        if '--noblock' in basic_argv:
+            flag_noblock = True
+
         while True:
             if main_control.control_queue.empty():
                 time.sleep(main_control.scan_interval)
@@ -395,7 +403,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             debug_mode = False
                         )
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
-                    elif basic_conf_models_this['type'] == 'multiLoginUI':
+                    elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock:
                         if(platform.system() == 'Windows'):
                             Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
                                 Model_name = basic_conf_models_this['name'],
