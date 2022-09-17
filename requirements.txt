@@ -12,3 +12,4 @@ rsa
 requests_toolbelt
 pystray
 pyyaml
+openpyxl
