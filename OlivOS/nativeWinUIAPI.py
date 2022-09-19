@@ -117,7 +117,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['main_tk'].mainloop()
 
     def process_msg(self):
-        self.UIObject['main_tk'].after(50,self.process_msg)
+        self.UIObject['main_tk'].after(50, self.process_msg)
         self.mainrun()
 
     def mainrun(self):

@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import multiprocessing
+import platform
 import threading
 import time
 import datetime
@@ -25,6 +26,8 @@ import json
 import traceback
 import zipfile
 import shutil
+if platform.system() == 'Windows':
+    import tkinter
 
 import OlivOS
 
@@ -67,13 +70,30 @@ class shallow(OlivOS.API.Proc_templet):
         self.Proc_config['step_to_restart'] = restart_gate
         self.Proc_data['plugin_func_dict'] = plugin_func_dict
         self.Proc_data['bot_info_dict'] = bot_info_dict
+        self.Proc_data['main_tk'] = None
         self.plugin_models_dict = {}
         self.plugin_models_call_list = []
         self.tx_queue = []
+        self.menu_queue = []
 
     class rx_packet(object):
         def __init__(self, sdk_event):
             self.sdk_event = sdk_event
+
+    def __init_GUI(self):
+        if platform.system() == 'Windows':
+            self.Proc_data['main_tk'] = tkinter.Tk()
+            self.Proc_data['main_tk'].withdraw()
+            self.Proc_data['main_tk'].iconbitmap('./resource/tmp_favoricon.ico')
+            self.__update_GUI()
+            self.Proc_data['main_tk'].mainloop()
+
+    def __update_GUI(self):
+        if platform.system() == 'Windows':
+            self.Proc_data['main_tk'].after(50, self.__update_GUI)
+            if len(self.menu_queue) > 0:
+                rx_packet_data = self.menu_queue.pop(0)
+                self.run_plugin(rx_packet_data)
 
     def run(self):
         releaseDir('./plugin')
@@ -84,6 +104,7 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib')
         releaseDir('./lib/Lib')
         releaseDir('./lib/DLLs')
+        threading.Thread(target = self.__init_GUI).start()
         #self.set_check_update()
         self.sendPluginList()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
@@ -112,9 +133,7 @@ class shallow(OlivOS.API.Proc_templet):
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'), block=False)
                     elif rx_packet_data.action == 'send':
-                        t_run_plugin = None
-                        t_run_plugin = threading.Thread(target=self.run_plugin, args=(rx_packet_data,))
-                        t_run_plugin.start()
+                        self.menu_queue.append(rx_packet_data)
                 else:
                     if self.Proc_config['treading_mode'] == 'none':
                         self.run_plugin(rx_packet_data.sdk_event)
@@ -137,6 +156,9 @@ class shallow(OlivOS.API.Proc_templet):
 
     def get_plugin_list(self):
         return self.plugin_models_call_list
+
+    def get_main_root(self):
+        return self.Proc_data['main_tk']
 
     def run_plugin(self, sdk_event):
         plugin_event = OlivOS.API.Event(sdk_event, self.log)
