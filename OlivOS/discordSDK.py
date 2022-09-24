@@ -611,8 +611,8 @@ def get_system_proxy():
         res_data = winreg.QueryValueEx(__INTERNET_SETTINGS, "ProxyServer")
         if len(res_data) > 0 and res_data[0] != '':
             res = {
-                'http': res_data[0],
-                'https': res_data[0]
+                'http': 'http://'+res_data[0],
+                'https': 'https://'+res_data[0]
             }
     return res
 
