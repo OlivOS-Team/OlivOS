@@ -34,12 +34,14 @@ dictColorContext = {
 }
 
 class HostUI(object):
-    def __init__(self, Model_name, Account_data, logger_proc = None):
+    def __init__(self, Model_name, Account_data, logger_proc = None, callbackData = None):
         self.Model_name = Model_name
         self.UIObject = {}
         self.UIData = {}
         self.UIConfig = {}
         self.logger_proc = logger_proc
+        self.callbackData = callbackData
+        self.res = False
         self.UIData['Account_data'] = Account_data
         self.UIData['flag_commit'] = False
         self.UIConfig.update(dictColorContext)
@@ -135,6 +137,8 @@ class HostUI(object):
 
         self.UIObject['root'].mainloop()
 
+        return self.res
+
     def buttom_action(self, name, action):
         if name in self.UIObject:
             if action == '<Enter>':
@@ -217,6 +221,9 @@ class HostUI(object):
 
     def account_data_commit(self):
         self.UIData['flag_commit'] = True
+        self.res = True
+        if type(self.callbackData) == dict:
+            self.callbackData['res'] = self.res
         self.UIObject['root'].destroy()
 
 class TreeEditUI(object):

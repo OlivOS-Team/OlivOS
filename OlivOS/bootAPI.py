@@ -405,12 +405,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock:
                         if(platform.system() == 'Windows'):
+                            tmp_callbackData = {'res': False}
                             Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
                                 Model_name = basic_conf_models_this['name'],
                                 Account_data = plugin_bot_info_dict,
-                                logger_proc = Proc_dict[basic_conf_models_this['logger_proc']]
+                                logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
+                                callbackData = tmp_callbackData
                             )
-                            Proc_dict[basic_conf_models_this['name']].start()
+                            tmp_res = Proc_dict[basic_conf_models_this['name']].start()
+                            if tmp_res != True:
+                                killMain()
                             if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
                                 plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
                     elif basic_conf_models_this['type'] == 'nativeWinUI':
