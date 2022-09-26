@@ -150,7 +150,7 @@ class server(OlivOS.API.Proc_templet):
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
-        proxy_set = OlivOS.discordSDK.get_system_proxy_tuple('http')
+        proxy_set = OlivOS.webTool.get_system_proxy_tuple('http')
         ws.run_forever(http_proxy_host = proxy_set[0], http_proxy_port = proxy_set[1], proxy_type = proxy_set[2])
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None

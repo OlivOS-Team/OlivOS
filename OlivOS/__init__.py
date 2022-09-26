@@ -52,6 +52,7 @@ from . import fanbookPollServerAPI
 from . import kaiheilaSDK
 from . import kaiheilaLinkServerAPI
 from . import updateAPI
+from . import webTool
 if(platform.system() == 'Windows'):
     from . import multiLoginUIAPI
     from . import libEXEModelAPI

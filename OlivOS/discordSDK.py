@@ -15,14 +15,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 from enum import IntEnum
-import sys
 import json
 import traceback
 import requests as req
 import time
-import platform
-if platform.system() == 'Windows':
-    import winreg
 
 import OlivOS
 
@@ -236,9 +232,9 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers = headers, data = payload, proxies = get_system_proxy())
+                msg_res = req.request("POST", send_url, headers = headers, data = payload, proxies = OlivOS.webTool.get_system_proxy())
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers = headers, proxies = get_system_proxy())
+                msg_res = req.request("GET", send_url, headers = headers, proxies = OlivOS.webTool.get_system_proxy())
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger != None:
@@ -597,31 +593,3 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
             return None
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
-
-def get_system_proxy():
-    res = None
-    if platform.system() == 'Windows':
-        __path = r'Software\Microsoft\Windows\CurrentVersion\Internet Settings'
-        __INTERNET_SETTINGS = winreg.OpenKeyEx(
-            winreg.HKEY_CURRENT_USER,
-            __path,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
-        res_data = winreg.QueryValueEx(__INTERNET_SETTINGS, "ProxyServer")
-        if len(res_data) > 0 and res_data[0] != '':
-            res = {
-                'http': res_data[0],
-                'https': res_data[0]
-            }
-    return res
-
-def get_system_proxy_tuple(proxy_type = 'http'):
-    res = (None, None, None)
-    res_data = get_system_proxy()
-    if res_data != None:
-        if proxy_type in res_data:
-            res_data_1 = res_data[proxy_type].split(':')
-            if len(res_data_1) == 2:
-                res = (res_data_1[0], res_data_1[1], proxy_type)
-    return res
