@@ -35,6 +35,7 @@ default_Conf = {
             "OlivOS_flask_post_rx",
             "OlivOS_qqGuild_link",
             "OlivOS_discord_link",
+            "OlivOS_hackChat_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
@@ -52,7 +53,8 @@ default_Conf = {
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
-        "OlivOS_virtual_terminal_queue"
+        "OlivOS_virtual_terminal_queue",
+        "OlivOS_hackChat_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
@@ -185,6 +187,17 @@ default_Conf = {
             "interval" : 0.2,
             "dead_interval" : 1,
             "rx_queue" : None,
+            "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : False
+        },
+        "OlivOS_hackChat_link" : {
+            "enable" : True,
+            "name" : "OlivOS_hackChat_link",
+            "type" : "hackChat_link",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "rx_queue" : "OlivOS_hackChat_queue",
             "tx_queue" : "OlivOS_rx_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : False

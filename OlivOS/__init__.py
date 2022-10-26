@@ -40,6 +40,8 @@ from . import telegramSDK
 from . import telegramPollServerAPI
 from . import discordSDK
 from . import discordLinkServerAPI
+from . import hackChatSDK
+from . import hackChatLinkServerAPI
 from . import dodobotEAServerAPI
 from . import dodobotEATXAPI
 from . import dodobotEASDK

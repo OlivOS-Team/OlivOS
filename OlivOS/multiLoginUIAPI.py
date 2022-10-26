@@ -18,6 +18,7 @@ import tkinter
 import base64
 import os
 import hashlib
+import random
 
 from tkinter import ttk
 from tkinter import messagebox
@@ -263,6 +264,7 @@ class TreeEditUI(object):
                 'QQ频道 - 私域',
                 '渡渡语音 - Dodo',
                 'Fanbook',
+                'Hack.Chat',
                 '虚拟终端',
                 '接口终端',
                 '自定义'
@@ -313,6 +315,11 @@ class TreeEditUI(object):
                         'Token': 'edit_root_Entry_Server_access_token'
                     }
                 ],
+                'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
+                        '房间名称': 'edit_root_Entry_Server_host',
+                        'Bot名称': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
                 '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {
                         '账号': 'edit_root_Entry_ID'
                     }
@@ -339,7 +346,8 @@ class TreeEditUI(object):
                 'dodo',
                 'fanbook',
                 'discord',
-                'terminal'
+                'terminal',
+                'hackChat'
             ],
             'platform_sdk_list': {
                 'qq': [
@@ -367,6 +375,9 @@ class TreeEditUI(object):
                 ],
                 'terminal': [
                     'terminal_link'
+                ],
+                'hackChat': [
+                    'hackChat_link'
                 ]
             },
             'platform_sdk_model_list': {
@@ -422,6 +433,11 @@ class TreeEditUI(object):
                     'terminal_link': [
                         'default',
                         'postapi'
+                    ]
+                },
+                'hackChat': {
+                    'hackChat_link': [
+                        'default'
                     ]
                 }
             }
@@ -852,6 +868,13 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'hackChat' and tmp_platform_sdk == 'hackChat_link' and tmp_platform_model == 'default':
+                if tmp_id == '':
+                    tmp_id = random.randint(1000000000, 9999999999)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
             if not checkByListEmptyOr([
                 tmp_id,
                 tmp_server_auto,
