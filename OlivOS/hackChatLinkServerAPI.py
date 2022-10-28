@@ -14,7 +14,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-from macpath import join
 import time
 import json
 import websocket

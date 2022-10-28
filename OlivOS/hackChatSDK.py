@@ -176,11 +176,31 @@ class event_action(object):
             platform_platform = target_event.platform['platform'],
             platform_model = target_event.platform['model']
         )
-        send_ws_event(
-            plugin_event_bot_hash,
-            PAYLOAD.chat(message = message).dump(),
-            control_queue
+        message_new = ''
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_string',
+            message
         )
+        if message_obj.active == True:
+            for data_this in message_obj.data:
+                if data_this.type == 'text':
+                    message_new += data_this.data['text']
+                elif data_this.type == 'image':
+                    imagePath = data_this.data['file']
+                    if data_this.data['url'] != None:
+                        imagePath = data_this.data['url']
+                    message_new += '![%s](%s)' % (
+                        imagePath,
+                        imagePath
+                    )
+        if len(message_new) > 0:
+            send_ws_event(
+                plugin_event_bot_hash,
+                PAYLOAD.chat(
+                    message = message_new
+                ).dump(),
+                control_queue
+            )
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue != None:
