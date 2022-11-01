@@ -6,7 +6,7 @@ jobs:
   build-win64-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Packing by PyInstaller Windows
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
@@ -18,7 +18,7 @@ jobs:
         mkdir ./OlivOS-Win
         cp ./main.exe ./OlivOS-Win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win
         path: ./dist/windows/OlivOS-Win
@@ -27,7 +27,7 @@ jobs:
         mkdir ./dist/windows/OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./dist/windows/OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-with-lib
         path: ./dist/windows/OlivOS-Win
@@ -35,7 +35,7 @@ jobs:
   build-win64-debug:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Packing by PyInstaller Windows
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
@@ -47,7 +47,7 @@ jobs:
         mkdir ./OlivOS-Win
         cp ./main.exe ./OlivOS-Win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-debug
         path: ./dist/windows/OlivOS-Win
@@ -56,7 +56,7 @@ jobs:
         mkdir ./dist/windows/OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./dist/windows/OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-with-lib-debug
         path: ./dist/windows/OlivOS-Win
@@ -64,7 +64,7 @@ jobs:
   build-win32-release:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -83,7 +83,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32
         path: ./OlivOS-Win
@@ -92,7 +92,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-with-lib
         path: ./OlivOS-Win
@@ -100,7 +100,7 @@ jobs:
   build-win32-debug:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -119,7 +119,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-debug
         path: ./OlivOS-Win
@@ -128,7 +128,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-with-lib-debug
         path: ./OlivOS-Win
@@ -136,7 +136,7 @@ jobs:
   build-linux-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -155,7 +155,7 @@ jobs:
         mkdir OlivOS-PKG
         cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Linux-64
         path: ./OlivOS-PKG
@@ -163,7 +163,7 @@ jobs:
   build-win64-new-release:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -182,7 +182,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-64-new
         path: ./OlivOS-Win
@@ -191,7 +191,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-64-new-with-lib
         path: ./OlivOS-Win
@@ -199,7 +199,7 @@ jobs:
   build-win64-new-debug:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -218,7 +218,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-64-new-debug
         path: ./OlivOS-Win
@@ -227,7 +227,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-64-new-with-lib-debug
         path: ./OlivOS-Win
@@ -235,7 +235,7 @@ jobs:
   build-win32-new-release:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -254,7 +254,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-new
         path: ./OlivOS-Win
@@ -263,7 +263,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-new-with-lib
         path: ./OlivOS-Win
@@ -271,7 +271,7 @@ jobs:
   build-win32-new-debug:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -290,7 +290,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-new-debug
         path: ./OlivOS-Win
@@ -299,7 +299,7 @@ jobs:
         mkdir ./OlivOS-Win/lib
         curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Win-32-new-with-lib-debug
         path: ./OlivOS-Win
@@ -307,7 +307,7 @@ jobs:
   build-linux-new-release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python
       uses: actions/setup-python@v3.1.2
       with:
@@ -326,7 +326,7 @@ jobs:
         mkdir OlivOS-PKG
         cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: OlivOS-Linux-64
         path: ./OlivOS-PKG
