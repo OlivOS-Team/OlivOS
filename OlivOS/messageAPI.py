@@ -28,6 +28,13 @@ dictMessageType = {
             'gocqhttp_show': 'old_string'
         }
     },
+    'qqGuild': {
+        'qqGuild_link': {
+            'default': 'olivos_para',
+            'private': 'olivos_para',
+            'public': 'olivos_para'
+        }
+    },
     'telegram': {
         'telegram_poll': {
             'default': 'olivos_para'
@@ -41,6 +48,11 @@ dictMessageType = {
     },
     'kaiheila': {
         'kaiheila_link': {
+            'default': 'olivos_para'
+        }
+    },
+    'discord': {
+        'discord_link': {
             'default': 'olivos_para'
         }
     },
@@ -58,6 +70,17 @@ dictMessageType = {
     'fake': {
         'fake': {
             'default': 'olivos_para'
+        }
+    },
+    'terminal': {
+        'terminal_link': {
+            'default': 'olivos_string',
+            'postapi': 'olivos_string'
+        }
+    },
+    'hackChat': {
+        'hackChat_link': {
+            'default': 'olivos_string',
         }
     }
 }
