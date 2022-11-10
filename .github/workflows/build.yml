@@ -328,5 +328,5 @@ jobs:
     - name: Packing OlivOS-PKG
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Linux-64
+        name: OlivOS-Linux-64-new
         path: ./OlivOS-PKG
