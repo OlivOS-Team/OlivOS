@@ -20,6 +20,7 @@ import json
 import traceback
 import requests as req
 import time
+import hashlib
 
 import OlivOS
 
@@ -137,6 +138,12 @@ def get_Event_from_SDK(target_event):
                         target_event.data.sender['age'] = 0
                         target_event.data.sender['role'] = 'owner'
                         target_event.data.host_id = None
+                        if target_event.platform['model'] in ['ff14']:
+                            hash_tmp = hashlib.new('md5')
+                            hash_tmp.update(str(target_event.data.sender['name']).encode(encoding='UTF-8'))
+                            tmp_hash_user_id = str(int(int(hash_tmp.hexdigest(), 16) % 1000000000) + 1)
+                            target_event.data.user_id = tmp_hash_user_id
+                            target_event.data.sender['id'] = tmp_hash_user_id
                     except:
                         message_obj.active = False
 
@@ -159,8 +166,8 @@ class event_action(object):
                 }
                 send_postapi_event(plugin_event_bot_hash, event_data, evnet_id, control_queue)
         elif target_event.platform['model'] in ['ff14']:
+            time.sleep(1)
             send_ff14_post(target_event, message)
-        print(target_event.platform['model'])
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue != None:
