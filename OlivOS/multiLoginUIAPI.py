@@ -267,6 +267,7 @@ class TreeEditUI(object):
                 'Hack.Chat',
                 '虚拟终端',
                 '接口终端',
+                'FF14终端',
                 '自定义'
             ],
             # 各类账号组合的匹配与注册表
@@ -327,6 +328,12 @@ class TreeEditUI(object):
                 '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post', {
                         '账号': 'edit_root_Entry_ID',
                         '端口': 'edit_root_Entry_Server_port'
+                    }
+                ],
+                'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post', {
+                        '账号': 'edit_root_Entry_ID',
+                        '端口': 'edit_root_Entry_Server_port',
+                        '回调端口': 'edit_root_Entry_Server_access_token'
                     }
                 ],
                 '自定义': ['qq', 'default', 'default', 'True', 'post', {
@@ -432,7 +439,8 @@ class TreeEditUI(object):
                 'terminal': {
                     'terminal_link': [
                         'default',
-                        'postapi'
+                        'postapi',
+                        'ff14'
                     ]
                 },
                 'hackChat': {

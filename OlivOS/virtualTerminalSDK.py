@@ -24,7 +24,7 @@ import time
 import OlivOS
 
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None, model = 'private'):
+    def __init__(self, id = -1, access_token = None, model = 'default'):
         self.id = id
         self.access_token = access_token
         self.model = model
@@ -37,8 +37,6 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         plugin_bot_info.post_info.access_token
     )
     res.debug_mode = plugin_bot_info.debug_mode
-    if plugin_bot_info.platform['model'] == 'public':
-        res.model = 'public'
     return res
 
 def get_SDK_bot_info_from_Event(target_event):
@@ -107,7 +105,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['age'] = 0
             target_event.data.sender['role'] = 'owner'
             target_event.data.host_id = None
-    elif target_event.platform['model'] in ['postapi']:
+    elif target_event.platform['model'] in ['postapi', 'ff14']:
         if 'type' in target_event.sdk_event.payload and target_event.sdk_event.payload['type'] == 'message':
             if 'message_type' in target_event.sdk_event.payload and target_event.sdk_event.payload['message_type'] == 'group_message':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -160,6 +158,9 @@ class event_action(object):
                     'reply': message
                 }
                 send_postapi_event(plugin_event_bot_hash, event_data, evnet_id, control_queue)
+        elif target_event.platform['model'] in ['ff14']:
+            send_ff14_post(target_event, message)
+        print(target_event.platform['model'])
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue != None:
@@ -201,3 +202,13 @@ def send_postapi_event(hash, data, event_id, control_queue):
         },
         control_queue
     )
+
+def send_ff14_post(plugin_event, message:str):
+    if True:
+        send_url = 'http://127.0.0.1:%s/Command' % str(plugin_event.bot_info.post_info.access_token)
+        headers = {
+            'Content-Type': 'text/plain'
+        }
+        data = message.encode('UTF-8')
+        msg_res = req.request("POST", send_url, headers = headers, data = data)
+        return msg_res

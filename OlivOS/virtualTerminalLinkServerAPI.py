@@ -18,7 +18,6 @@ from gevent import pywsgi
 from flask import Flask
 from flask import current_app
 from flask import request
-from flask import g
 
 import multiprocessing
 import threading
@@ -55,7 +54,7 @@ class server(OlivOS.API.Proc_templet):
     def run(self):
         time.sleep(2)
         self.log(2, 'OlivOS virtual terminal link server [' + self.Proc_name + '] is running')
-        if self.Proc_data['bot_info_dict'].platform['model'] == 'postapi':
+        if self.Proc_data['bot_info_dict'].platform['model'] in ['postapi', 'ff14']:
             threading.Thread(
                 target = self.set_flask,
                 args = ()
@@ -107,11 +106,18 @@ class server(OlivOS.API.Proc_templet):
                 try:
                     event_id = str(uuid.uuid4())
                     rx_packet_data = json.loads(rx_packet_data_raw)
-                    sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data, self.Proc_data['bot_info_dict'], model = 'postapi', event_id = event_id)
+                    sdk_event = OlivOS.virtualTerminalSDK.event(
+                        rx_packet_data,
+                        self.Proc_data['bot_info_dict'],
+                        model = self.Proc_data['bot_info_dict'].platform['model'],
+                        event_id = event_id
+                    )
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block = False)
                     flag_active = True
                 except:
+                    flag_active = False
+                if self.Proc_data['bot_info_dict'].platform['model'] == 'ff14':
                     flag_active = False
                 if flag_active:
                     for count_i in range(30 * 4):
