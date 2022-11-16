@@ -876,6 +876,11 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'ff14':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
             if tmp_platform_platform == 'hackChat' and tmp_platform_sdk == 'hackChat_link' and tmp_platform_model == 'default':
                 if tmp_id == '':
                     tmp_id = random.randint(1000000000, 9999999999)
