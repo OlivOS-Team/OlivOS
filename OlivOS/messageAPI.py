@@ -75,7 +75,8 @@ dictMessageType = {
     'terminal': {
         'terminal_link': {
             'default': 'olivos_string',
-            'postapi': 'olivos_string'
+            'postapi': 'olivos_string',
+            'ff14': 'olivos_string'
         }
     },
     'hackChat': {
