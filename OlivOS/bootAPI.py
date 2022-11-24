@@ -204,7 +204,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             scan_interval = basic_conf_models_this['interval'],
                             dead_interval = basic_conf_models_this['dead_interval'],
                             Flask_namespace = __name__,
-                            Flask_server_methods = ['POST'],
+                            Flask_server_methods = ['GET', 'POST'],
                             Flask_host = basic_conf_models_this['server']['host'],
                             Flask_port = basic_conf_models_this['server']['port'],
                             tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
