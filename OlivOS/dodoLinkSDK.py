@@ -23,6 +23,7 @@ import traceback
 import rsa
 import base64
 import uuid
+from urllib import parse
 
 import OlivOS
 
@@ -529,17 +530,31 @@ class event_action(object):
         return res_data
 
     #现场上传的就地实现
-    def setImageUploadFast(target_event, url):
+    def setImageUploadFast(target_event, url: str):
         res = None
         try:
-            send_url = url
-            headers = {
-                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-            }
-            msg_res = None
-            msg_res = req.request("GET", send_url, headers = headers)
+            pic_file = None
+            if url.startswith("base64://"):
+                data = url[9:]
+                pic_file = base64.decodebytes(data.encode("utf-8"))
+            else:
+                url_parsed = parse.urlparse(url)
+                if url_parsed.scheme in ["http", "https"]:
+                    send_url = url
+                    headers = {
+                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
+                    }
+                    msg_res = None
+                    msg_res = req.request("GET", send_url, headers = headers)
+                    pic_file = msg_res.content
+
+                elif url_parsed.scheme == "file":
+                    file_path = url_parsed.path
+                    with open(file_path, "rb") as f:
+                        pic_file = f.read()
+
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
-            msg_upload_api.data.file = msg_res.content
+            msg_upload_api.data.file = pic_file
             msg_upload_api.do_api()
             if msg_upload_api.res != None:
                 msg_upload_api_obj = json.loads(msg_upload_api.res)
