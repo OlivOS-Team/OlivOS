@@ -14,6 +14,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import platform
+
 #pillow
 from PIL import Image
 
@@ -28,3 +30,8 @@ import sqlite3
 
 #openpyxl
 import openpyxl
+
+#win
+if platform.system() == 'Windows':
+    import win32com.client
+    import pythoncom
