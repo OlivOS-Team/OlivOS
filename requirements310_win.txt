@@ -13,4 +13,4 @@ requests_toolbelt
 pystray
 pyyaml
 openpyxl
-win32com
+pypiwin32
