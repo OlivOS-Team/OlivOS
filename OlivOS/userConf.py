@@ -17,7 +17,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 '''
-import OlivOS
 import pickle
 import os.path
 
@@ -46,17 +45,20 @@ def setUserConf(user_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """
-    fileName = './plugin/data/UserConf.dat'
+    fileName = 'UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
     tmpConf = readOut(fileName)
-    tmpLst = tmpConf[0]["uid"][str(user_id)] or {}
+    try:
+        tmpLst = tmpConf[0]["uid"][str(user_id)]
+    except KeyError:
+        tmpLst = tmpConf[0]["uid"][str(user_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
     writeInto(fileName,tmpConf)
 
-def getUserConf(user_id:'int|str',keyConf:str,perhapsVal:None) -> any:  # type: ignore
+def getUserConf(user_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type: ignore
     """获取用户配置
     
     @user_id : int|str
@@ -70,7 +72,7 @@ def getUserConf(user_id:'int|str',keyConf:str,perhapsVal:None) -> any:  # type: 
     >>> print(getUserConf(plugin_event.data.user_id,"jrrp",0))
     100
     """
-    fileName = './plugin/data/UserConf.dat'
+    fileName = 'UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
@@ -93,12 +95,15 @@ def setGroupConf(group_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """   
-    fileName = './plugin/data/UserConf.dat'
+    fileName = 'UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
     tmpConf = readOut(fileName)
-    tmpLst = tmpConf[1]["gid"][str(group_id)] or {}
+    try:
+        tmpLst = tmpConf[0]["uid"][str(user_id)]
+    except KeyError:
+        tmpLst = tmpConf[0]["uid"][str(user_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
     writeInto(fileName,tmpConf)
@@ -117,7 +122,7 @@ def getGroupConf(group_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type
     >>> print(getGroupConf(plugin_event.data.group_id,"许可",0))
     True
     """
-    fileName = './plugin/data/UserConf.dat'
+    fileName = 'UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
