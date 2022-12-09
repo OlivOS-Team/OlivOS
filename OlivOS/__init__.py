@@ -18,6 +18,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
+from . import userConf
 from . import infoAPI
 from . import bootAPI
 from . import bootDataAPI
