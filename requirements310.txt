@@ -14,4 +14,4 @@ pystray
 pyyaml
 openpyxl
 aiohttp==3.7.4
-qrcode[pil]
+qrcode==7.3.1
