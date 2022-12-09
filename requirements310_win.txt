@@ -15,4 +15,4 @@ pyyaml
 openpyxl
 pypiwin32
 aiohttp==3.7.4
-qrcode[pil]
+qrcode
