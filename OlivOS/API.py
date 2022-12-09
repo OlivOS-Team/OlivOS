@@ -21,8 +21,6 @@ import threading
 import hashlib
 import time
 import traceback
-import pickle
-import os.path
 
 from functools import wraps
 
