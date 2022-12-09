@@ -45,7 +45,7 @@ def setUserConf(user_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """
-    fileName = 'UserConf.dat'
+    fileName = './plugin/data/UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
@@ -72,7 +72,7 @@ def getUserConf(user_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type: 
     >>> print(getUserConf(plugin_event.data.user_id,"jrrp",0))
     100
     """
-    fileName = 'UserConf.dat'
+    fileName = './plugin/data/UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
@@ -95,7 +95,7 @@ def setGroupConf(group_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """   
-    fileName = 'UserConf.dat'
+    fileName = './plugin/data/UserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
@@ -122,7 +122,7 @@ def getGroupConf(group_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type
     >>> print(getGroupConf(plugin_event.data.group_id,"许可",0))
     True
     """
-    fileName = 'UserConf.dat'
+    fileName = './plugin/dataUserConf.dat'
     if not os.path.exists(fileName):
         originalConf = [{"uid":{}},{"gid":{}}]
         writeInto(fileName,originalConf)
