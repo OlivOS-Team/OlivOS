@@ -17,8 +17,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = 'jyunko.2'
-OlivOS_SVN = 116
+OlivOS_Version = '0.10.14'
+OlivOS_SVN = 114
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
 # OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn
@@ -29,7 +29,7 @@ OlivOS_compatible_svn_default = 0
 
 OlivOS_Version_Short = '%s(%s)' % (OlivOS_Version, str(OlivOS_SVN))
 
-OlivOS_Header_UA = 'OlivOS&jyunko/' + OlivOS_Version
+OlivOS_Header_UA = 'OlivOS/' + OlivOS_Version
 
 OlivOS_message_mode_rx_default = 'old_string'
 OlivOS_message_mode_tx_default = 'old_string'
