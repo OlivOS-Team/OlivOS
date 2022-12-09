@@ -13,3 +13,5 @@ requests_toolbelt
 pystray
 pyyaml
 openpyxl
+aiohttp==3.7.4
+qrcode[pil]
