@@ -40,7 +40,9 @@ setuptools.setup(name='olivos',
         'lxml',
         'rsa',
         'requests_toolbelt',
-        'pystray'
+        'pystray',
+        'aiohttp',
+        'qrcode'
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),
