@@ -25,7 +25,7 @@ import traceback
 from functools import wraps
 
 import OlivOS
-
+from userConf import *
 OlivOS_Version = OlivOS.infoAPI.OlivOS_Version
 mod_global_name = sys.modules[__name__]
 
