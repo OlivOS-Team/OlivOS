@@ -13,3 +13,5 @@ rsa==4.9
 setuptools==63.2.0
 websocket_client==1.4.2
 websockets==10.1
+aiohttp==3.7.4
+qrcode[pil]
