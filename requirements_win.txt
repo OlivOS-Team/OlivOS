@@ -15,4 +15,4 @@ websocket_client==1.4.2
 websockets==10.1
 pypiwin32
 aiohttp==3.7.4
-qrcode[pil]
+qrcode==7.3.1
