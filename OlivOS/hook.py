@@ -34,6 +34,9 @@ import openpyxl
 #aiohttp
 import aiohttp
 
+#qrcode
+import qrcode
+
 #win
 if platform.system() == 'Windows':
     import win32com.client
