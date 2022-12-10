@@ -31,6 +31,9 @@ import sqlite3
 #openpyxl
 import openpyxl
 
+#aiohttp
+import aiohttp
+
 #win
 if platform.system() == 'Windows':
     import win32com.client
