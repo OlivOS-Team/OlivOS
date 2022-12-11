@@ -1,0 +1,12 @@
+pyinstaller
+flask
+gevent
+psutil
+requests
+pybase64
+websockets
+websocket-client
+pillow
+rsa
+requests_toolbelt
+pystray

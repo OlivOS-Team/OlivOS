@@ -26,3 +26,19 @@ import sqlite3
 if platform.system() == 'Windows':
     import win32com.client
     import pythoncom
+
+#ext pack
+#lxml
+from lxml import etree
+
+#yaml
+import yaml
+
+#openpyxl
+import openpyxl
+
+#aiohttp
+import aiohttp
+
+#qrcode
+import qrcode
