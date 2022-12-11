@@ -19,8 +19,8 @@ jobs:
         python -m pip install -r ./requirements_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main.spec
     - name: Run artifact
       run: |
@@ -57,8 +57,8 @@ jobs:
         python -m pip install -r ./requirements_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -95,8 +95,8 @@ jobs:
         python -m pip install -r ./requirements_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main.spec
     - name: Run artifact
       run: |
@@ -133,8 +133,8 @@ jobs:
         python -m pip install -r ./requirements_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -171,8 +171,8 @@ jobs:
         python -m pip install -r ./requirements.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -200,8 +200,8 @@ jobs:
         python -m pip install -r ./requirements310_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main.spec
     - name: Run artifact
       run: |
@@ -238,8 +238,8 @@ jobs:
         python -m pip install -r ./requirements310_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -276,8 +276,8 @@ jobs:
         python -m pip install -r ./requirements310_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main.spec
     - name: Run artifact
       run: |
@@ -314,8 +314,8 @@ jobs:
         python -m pip install -r ./requirements310_win.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -352,8 +352,8 @@ jobs:
         python -m pip install -r ./requirements310.txt
     - name: Run packing
       run: |
-        cp ./hook.py ./hook_bak.py
-        cp ./hook_pack.py ./hook.py
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
