@@ -18,7 +18,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-from . import JyunkoUserConf
 from . import infoAPI
 from . import bootAPI
 from . import bootDataAPI
@@ -60,3 +59,4 @@ if(platform.system() == 'Windows'):
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
     from . import nativeWinUIAPI
+from . import userModule
