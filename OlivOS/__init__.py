@@ -59,3 +59,4 @@ if(platform.system() == 'Windows'):
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
     from . import nativeWinUIAPI
+from . import userModule
