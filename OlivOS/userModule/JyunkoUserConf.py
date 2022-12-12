@@ -18,16 +18,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 import pickle
-import os.path
+import os
 
+FILE_NAME = './user/UserConf.dat'
+        
 def writeInto(_file:str,_obj:any,_mode='wb'):  # type: ignore    
     """写入文件"""
+    try:
+        os.mkdir('user')
+    except FileExistsError:
+        pass
     file = open(_file,_mode)
     pickle.dump(_obj,file)
     file.close()
 
 def readOut(_file:str,_mode='rb'):
     """读取文件"""
+    try:
+        os.mkdir('user')
+    except FileExistsError:
+        pass
     file = open(_file,_mode)
     tmpOut = pickle.load(file)
     file.close()
@@ -45,18 +55,17 @@ def setUserConf(user_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """
-    fileName = './plugin/data/UserConf.dat'
-    if not os.path.exists(fileName):
+    if not os.path.exists(FILE_NAME):
         originalConf = [{"uid":{}},{"gid":{}}]
-        writeInto(fileName,originalConf)
-    tmpConf = readOut(fileName)
+        writeInto(FILE_NAME,originalConf)
+    tmpConf = readOut(FILE_NAME)
     try:
         tmpLst = tmpConf[0]["uid"][str(user_id)]
     except KeyError:
         tmpLst = tmpConf[0]["uid"][str(user_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
-    writeInto(fileName,tmpConf)
+    writeInto(FILE_NAME,tmpConf)
 
 def getUserConf(user_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type: ignore
     """获取用户配置
@@ -72,11 +81,10 @@ def getUserConf(user_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type: 
     >>> print(getUserConf(plugin_event.data.user_id,"jrrp",0))
     100
     """
-    fileName = './plugin/data/UserConf.dat'
-    if not os.path.exists(fileName):
+    if not os.path.exists(FILE_NAME):
         originalConf = [{"uid":{}},{"gid":{}}]
-        writeInto(fileName,originalConf)
-    tmpConf = readOut(fileName)
+        writeInto(FILE_NAME,originalConf)
+    tmpConf = readOut(FILE_NAME)
     # TODO(简律纯/2022年12月9日): 多配置项的获取.
     try:
         return tmpConf[0]["uid"][str(user_id)][keyConf]
@@ -95,18 +103,17 @@ def setGroupConf(group_id:'int|str',keyConf:str,val:any):  # type: ignore
 
     >>> setUserConf(plugin_event.data.user_id,"jrrp",0)
     """   
-    fileName = './plugin/data/UserConf.dat'
-    if not os.path.exists(fileName):
+    if not os.path.exists(FILE_NAME):
         originalConf = [{"uid":{}},{"gid":{}}]
-        writeInto(fileName,originalConf)
-    tmpConf = readOut(fileName)
+        writeInto(FILE_NAME,originalConf)
+    tmpConf = readOut(FILE_NAME)
     try:
-        tmpLst = tmpConf[0]["uid"][str(user_id)]
+        tmpLst = tmpConf[0]["uid"][str(group_id)]
     except KeyError:
-        tmpLst = tmpConf[0]["uid"][str(user_id)] = {}
+        tmpLst = tmpConf[0]["uid"][str(group_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
-    writeInto(fileName,tmpConf)
+    writeInto(FILE_NAME,tmpConf)
 
 def getGroupConf(group_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type: ignore
     """获取群组配置
@@ -122,11 +129,10 @@ def getGroupConf(group_id:'int|str',keyConf:str,perhapsVal=None) -> any:  # type
     >>> print(getGroupConf(plugin_event.data.group_id,"许可",0))
     True
     """
-    fileName = './plugin/dataUserConf.dat'
-    if not os.path.exists(fileName):
+    if not os.path.exists(FILE_NAME):
         originalConf = [{"uid":{}},{"gid":{}}]
-        writeInto(fileName,originalConf)
-    tmpConf = readOut(fileName)
+        writeInto(FILE_NAME,originalConf)
+    tmpConf = readOut(FILE_NAME)
     # TODO(简律纯/2022年12月9日): 多配置项的获取.
     try:
         return tmpConf[1]["gid"][str(group_id)][keyConf]
