@@ -365,7 +365,7 @@ jobs:
         name: OlivOS-Linux
         path: ./OlivOS-PKG
 
-  build-darwin-new-release:
+  build-macos-new-release:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
@@ -391,5 +391,5 @@ jobs:
     - name: Packing OlivOS-PKG
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Darwin-64-new
+        name: OlivOS-MacOS
         path: ./OlivOS-PKG
