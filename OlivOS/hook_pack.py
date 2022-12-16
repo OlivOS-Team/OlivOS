@@ -22,6 +22,15 @@ from PIL import Image
 #sqlite
 import sqlite3
 
+#brotli
+import brotli
+
+#aiohttp
+import aiohttp
+
+#qrcode
+import qrcode
+
 #win
 if platform.system() == 'Windows':
     import win32com.client
@@ -36,9 +45,3 @@ import yaml
 
 #openpyxl
 import openpyxl
-
-#aiohttp
-import aiohttp
-
-#qrcode
-import qrcode

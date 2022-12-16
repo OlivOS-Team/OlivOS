@@ -83,6 +83,11 @@ dictMessageType = {
         'hackChat_link': {
             'default': 'olivos_string',
         }
+    },
+    'biliLive': {
+        'biliLive_link': {
+            'default': 'olivos_string',
+        }
     }
 }
 

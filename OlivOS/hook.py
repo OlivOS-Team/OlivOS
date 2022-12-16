@@ -26,3 +26,12 @@ import sqlite3
 if platform.system() == 'Windows':
     import win32com.client
     import pythoncom
+
+#aiohttp
+import aiohttp
+
+#qrcode
+import qrcode
+
+#brotli
+import brotli

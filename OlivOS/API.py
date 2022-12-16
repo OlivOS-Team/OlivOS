@@ -162,6 +162,8 @@ class Event(object):
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
+            OlivOS.biliLiveSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
             getMenuEvent(self)
 
