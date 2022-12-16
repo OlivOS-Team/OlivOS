@@ -595,7 +595,6 @@ class BLiveClient:
         results = await asyncio.shield(
             asyncio.gather(
                 *(handler.handle(self, command) for handler in self._handlers),
-                loop=self._loop,
                 return_exceptions=True
             ),
             loop=self._loop

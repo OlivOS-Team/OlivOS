@@ -29,7 +29,7 @@ jobs:
     - name: Packing OlivOS-Win
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Win-origin
+        name: OlivOS-Win-old-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
       run: |
@@ -38,7 +38,7 @@ jobs:
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Win
+        name: OlivOS-Win-old
         path: ./OlivOS-Win
 
   build-win64-debug:
@@ -67,7 +67,7 @@ jobs:
     - name: Packing OlivOS-Win
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Win-64-debug-origin
+        name: OlivOS-Win-64-old-debug-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
       run: |
@@ -76,7 +76,7 @@ jobs:
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
-        name: OlivOS-Win-64-debug
+        name: OlivOS-Win-64-old-debug
         path: ./OlivOS-Win
 
   build-win32-release:
