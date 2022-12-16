@@ -596,8 +596,7 @@ class BLiveClient:
             asyncio.gather(
                 *(handler.handle(self, command) for handler in self._handlers),
                 return_exceptions=True
-            ),
-            loop=self._loop
+            )
         )
         for res in results:
             if isinstance(res, Exception):
