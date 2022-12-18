@@ -322,6 +322,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     dead_interval = basic_conf_models_this['dead_interval'],
                                     rx_queue = multiprocessing_dict[tmp_queue_name],
                                     tx_queue = multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                    control_queue = multiprocessing_dict[basic_conf_models_this['control_queue']],
                                     logger_proc = Proc_dict[basic_conf_models_this['logger_proc']],
                                     bot_info_dict = plugin_bot_info_dict[bot_info_key],
                                     debug_mode = False

@@ -55,7 +55,8 @@ default_Conf = {
         "OlivOS_nativeUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
         "OlivOS_virtual_terminal_queue",
-        "OlivOS_hackChat_queue"
+        "OlivOS_hackChat_queue",
+        "OlivOS_biliLive_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
@@ -211,6 +212,7 @@ default_Conf = {
             "dead_interval" : 1,
             "rx_queue" : "OlivOS_biliLive_queue",
             "tx_queue" : "OlivOS_rx_queue",
+            "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : False
         },

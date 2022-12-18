@@ -17,6 +17,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 import time
+import aiohttp
+from aiohttp.client import ClientSession
+from enum import IntEnum
+from aiohttp import cookiejar
+
+
+QRCODE_REQUEST_URL = 'http://passport.bilibili.com/qrcode/getLoginUrl'
+CHECK_LOGIN_RESULT = 'http://passport.bilibili.com/qrcode/getLoginInfo'
+SEND_URL = 'https://api.live.bilibili.com/msg/send'
+MUTE_USER_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/AddSilentUser'
+ROOM_SLIENT_URL = 'https://api.live.bilibili.com/xlive/web-room/v1/banned/RoomSilent'
+ADD_BADWORD_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/AddShieldKeyword'
+DEL_BADWORD_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/DelShieldKeyword'
 
 
 class bot_info_T(object):
@@ -130,3 +143,150 @@ def get_Event_from_SDK(target_event:event):
         target_event.data.sender['age'] = 0
         target_event.data.sender['role'] = 'member'
         target_event.data.host_id = None
+
+
+#支持OlivOS API调用的方法实现
+class event_action(object):
+    def send_msg(target_event, message, control_queue):
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id = target_event.base_info['self_id'],
+            platform_sdk = target_event.platform['sdk'],
+            platform_platform = target_event.platform['platform'],
+            platform_model = target_event.platform['model']
+        )
+        message_new = ''
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_string',
+            message
+        )
+        if message_obj.active == True:
+            for data_this in message_obj.data:
+                if data_this.type == 'text':
+                    message_new += data_this.data['text']
+                elif data_this.type == 'image':
+                    imagePath = data_this.data['file']
+                    if data_this.data['url'] != None:
+                        imagePath = data_this.data['url']
+                    message_new += '![%s](%s)' % (
+                        imagePath,
+                        imagePath
+                    )
+        if len(message_new) > 0:
+            send_ws_event(
+                plugin_event_bot_hash,
+                PAYLOAD.chat(
+                    message = message_new
+                ).data,
+                control_queue
+            )
+
+def sendControlEventSend(action, data, control_queue):
+    if control_queue != None:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                action,
+                data
+            ),
+            block = False
+        )
+
+def send_ws_event(hash, data, control_queue):
+    sendControlEventSend('send', {
+            'target': {
+                'type': 'biliLive_link',
+                'hash': hash
+            },
+            'data': {
+                'action': 'send',
+                'data': data
+            }
+        },
+        control_queue
+    )
+
+def send_QRCode_event(hash, path:str, control_queue):
+    sendControlEventSend('send', {
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'gocqhttp',
+                'event': 'qrcode',
+                'hash': hash,
+                'path': path
+            }
+        },
+        control_queue,
+    )
+
+
+class DanmakuPosition(IntEnum):
+    TOP = 5,
+    BOTTOM = 4,
+    NORMAL = 1
+
+'''
+对于WEBSOCKET接口的PAYLOAD实现
+'''
+class payload_template(object):
+    def __init__(self, data = None, is_rx = False):
+        self.active = True
+        self.cmd = None
+        self.data = None
+        self.load(data, is_rx)
+
+    def load(self, data, is_rx:bool):
+        if data != None:
+            if type(data) == dict:
+                if 'cmd' in data and type(data['cmd']) == str:
+                    self.cmd = data['cmd']
+                else:
+                    self.active = False
+                self.data = data
+            else:
+                self.active = False
+        return self
+
+class PAYLOAD(object):
+    class chat(payload_template):
+        def __init__(self, message:str):
+            payload_template.__init__(self)
+            self.cmd = 'chat'
+            self.data = {
+                'msg': message,
+                'fontsize': 25,
+                'color': 0xffffff,
+                'pos': DanmakuPosition.NORMAL,
+                'roomid': -1,
+                'bubble': 0
+            }
+
+"""
+Http Request
+
+"""
+async def aiohttpGet(session: ClientSession, url: str):
+    async with session.get(url) as resp:
+        resp.raise_for_status()
+        data = await resp.json()
+        if 'code' in data and data['code'] != 0:
+            raise Exception(data['message'] if 'message' in data else data['code'])
+        return data
+
+
+async def aiohttpPost(session: ClientSession, url: str, **data):
+    form = aiohttp.FormData()
+    for (k, v) in data.items():
+        form.add_field(k, v)
+    async with session.post(url, data=form) as resp:
+        resp.raise_for_status()
+        data = await resp.json()
+        if 'code' in data and data['code'] != 0:
+            raise Exception(data['message'] if 'message' in data else data['code'])
+        return data
+
+def get_cookies(cookies:cookiejar.CookieJar, name: str) -> any:
+    for cookie in cookies:
+        if cookie.key == name:
+            return cookie.value
+    return None

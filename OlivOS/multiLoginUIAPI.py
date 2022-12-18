@@ -260,7 +260,8 @@ class TreeEditUI(object):
                 'Discord',
                 'Telegram',
                 '开黑啦 - KOOK',
-                'B站直播间',
+                'B站直播间 - 游客',
+                'B站直播间 - 登录',
                 'QQ频道 - 公域',
                 'QQ频道 - 私域',
                 '渡渡语音 - Dodo',
@@ -290,7 +291,11 @@ class TreeEditUI(object):
                         'Token': 'edit_root_Entry_Server_access_token'
                     }
                 ],
-                'B站直播间': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
+                'B站直播间 - 游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
+                        '直播间ID': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
+                'B站直播间 - 登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
                         '直播间ID': 'edit_root_Entry_Server_access_token'
                     }
                 ],
@@ -459,7 +464,8 @@ class TreeEditUI(object):
                 },
                 'biliLive': {
                     'biliLive_link': [
-                        'default'
+                        'default',
+                        'login'
                     ]
                 }
             }
