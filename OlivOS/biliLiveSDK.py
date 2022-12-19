@@ -21,6 +21,8 @@ import aiohttp
 from aiohttp.client import ClientSession
 from enum import IntEnum
 from aiohttp import cookiejar
+from genericpath import exists
+import json
 
 
 QRCODE_REQUEST_URL = 'http://passport.bilibili.com/qrcode/getLoginUrl'
@@ -285,8 +287,24 @@ async def aiohttpPost(session: ClientSession, url: str, **data):
             raise Exception(data['message'] if 'message' in data else data['code'])
         return data
 
-def get_cookies(cookies:cookiejar.CookieJar, name: str) -> any:
+def get_cookies(cookies:cookiejar.CookieJar, name: str):
     for cookie in cookies:
         if cookie.key == name:
             return cookie.value
+    return None
+
+def load_cookies(path: str):
+    cookies = {}
+    session_exist = exists(path)
+    if session_exist:
+        with open(path, encoding = 'utf-8') as f:
+            cookies = json.load(f)
+    return cookies
+
+def save_cookies(cookies:cookiejar.CookieJar, path: str):
+    cookies_dict = {}
+    for cookie in cookies:
+        cookies_dict[cookie.key] = cookie.value
+    with open(path, mode='w', encoding = 'utf-8') as f:
+        json.dump(cookies_dict, f)
     return None

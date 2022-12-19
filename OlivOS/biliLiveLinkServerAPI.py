@@ -42,52 +42,65 @@ class server(OlivOS.API.Proc_templet):
 
     def run(self):
         self.log(2, 'OlivOS biliLive Link server [' + self.Proc_name + '] is running')
-        asyncio.run(start(int(self.Proc_data['bot_info_dict'].post_info.access_token), self))
+        while True:
+            try:
+                asyncio.run(start(int(self.Proc_data['bot_info_dict'].post_info.access_token), self))
+            except:
+                self.log(2, 'OlivOS biliLive Link server [' + self.Proc_name + '] link lost')
+            time.sleep(5)
 
 async def start(room: int, Proc:server):
     cookie = cookiejar.CookieJar()
     async with ClientSession(cookie_jar = cookie) as session:
         if Proc.Proc_data['bot_info_dict'].platform['model'] == 'login':
             isLoop = True
+            conf_dir_path = './conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash
+            cookie_new = {}
+            #cookie_new = OlivOS.biliLiveSDK.load_cookies(conf_dir_path + '/cookies.json')
             while isLoop:
                 try:
-                    res = await OlivOS.biliLiveSDK.aiohttpGet(session, OlivOS.biliLiveSDK.QRCODE_REQUEST_URL)
-                    ts = res['ts']
-                    outdated = ts + 180 * 1000 # 180 秒後逾時
-                    authKey = res['data']['oauthKey']
-                    url = res['data']['url']
-                    qr = qrcode.QRCode()
-                    qr.add_data(url)
-                    qr.print_ascii(invert=True)
-                    releaseDir('./conf/')
-                    releaseDir('./conf/biliLive')
-                    releaseDir('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash)
-                    releaseDir('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/')
-                    qr.make_image().save('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/qrcode.png')
-                    OlivOS.biliLiveSDK.send_QRCode_event(
-                        Proc.Proc_data['bot_info_dict'].hash,
-                        os.path.abspath('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/qrcode.png'),
-                        Proc.Proc_info.control_queue
-                    )
-                    # os.startfile(os.path.abspath('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/qrcode.png')) # Linux方案: subprocess.call(["xdg-open",file_path])
-                    while True:
-                        await asyncio.sleep(5)
-                        if time.time() > outdated:
-                            Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login out of time')
-                            break # 登入失敗
-                        res = await OlivOS.biliLiveSDK.aiohttpPost(
-                            session,
-                            OlivOS.biliLiveSDK.CHECK_LOGIN_RESULT,
-                            oauthKey = authKey
+                    if 'bili_jct' in cookie_new and 'DedeUserID' in cookie_new:
+                        session.cookie_jar.update_cookies(cookies = cookie_new)
+                        # 此处需要一个判断cookies有效的接口
+                        isLoop = False
+                    else:
+                        res = await OlivOS.biliLiveSDK.aiohttpGet(session, OlivOS.biliLiveSDK.QRCODE_REQUEST_URL)
+                        ts = res['ts']
+                        outdated = ts + 180 * 1000 # 180 秒後逾時
+                        authKey = res['data']['oauthKey']
+                        url = res['data']['url']
+                        qr = qrcode.QRCode()
+                        qr.add_data(url)
+                        qr.print_ascii(invert=True)
+                        releaseDir('./conf/')
+                        releaseDir('./conf/biliLive')
+                        releaseDir(conf_dir_path)
+                        qr.make_image().save(conf_dir_path + '/qrcode.png')
+                        OlivOS.biliLiveSDK.send_QRCode_event(
+                            Proc.Proc_data['bot_info_dict'].hash,
+                            os.path.abspath(conf_dir_path + '/qrcode.png'),
+                            Proc.Proc_info.control_queue
                         )
-                        if res['status']:
-                            isLoop = False
-                            break
-                        else:
-                            code = res['data']
-                            if code in [-1, -2]:
-                                Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login failed')
+                        # os.startfile(os.path.abspath('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/qrcode.png')) # Linux方案: subprocess.call(["xdg-open",file_path])
+                        while True:
+                            await asyncio.sleep(5)
+                            if time.time() > outdated:
+                                Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login out of time')
+                                break # 登入失敗
+                            res = await OlivOS.biliLiveSDK.aiohttpPost(
+                                session,
+                                OlivOS.biliLiveSDK.CHECK_LOGIN_RESULT,
+                                oauthKey = authKey
+                            )
+                            if res['status']:
+                                isLoop = False
+                                OlivOS.biliLiveSDK.save_cookies(cookie, conf_dir_path + '/cookies.json')
                                 break
+                            else:
+                                code = res['data']
+                                if code in [-1, -2]:
+                                    Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login failed')
+                                    break
                 except:
                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login error')
             Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login succeed')
