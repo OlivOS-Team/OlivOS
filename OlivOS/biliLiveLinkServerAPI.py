@@ -135,7 +135,7 @@ async def start(room: int, Proc:server):
                                         tmp_msg = tmp_data['msg']
                                         flag_msg_loop = True
                                         flag_continue = False
-                                        while flag_msg_loop:
+                                        while flag_msg_loop or not flag_continue:
                                             if not flag_continue:
                                                 if len(tmp_msg) > 20:
                                                     flag_msg_loop = True
