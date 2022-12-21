@@ -40,6 +40,7 @@ default_Conf = {
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
             "OlivOS_dodo_link",
+            "OlivOS_biliLive_link",
             "OlivOS_nativeWinUIAPI"
         ],
         "control_queue" : "OlivOS_control_queue",
@@ -54,7 +55,8 @@ default_Conf = {
         "OlivOS_nativeUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
         "OlivOS_virtual_terminal_queue",
-        "OlivOS_hackChat_queue"
+        "OlivOS_hackChat_queue",
+        "OlivOS_biliLive_queue"
     ],
     "models" : {
         "OlivOS_multiLoginUI" : {
@@ -199,6 +201,18 @@ default_Conf = {
             "dead_interval" : 1,
             "rx_queue" : "OlivOS_hackChat_queue",
             "tx_queue" : "OlivOS_rx_queue",
+            "logger_proc" : "OlivOS_logger",
+            "debug" : False
+        },
+        "OlivOS_biliLive_link" : {
+            "enable" : True,
+            "name" : "OlivOS_biliLive_link",
+            "type" : "biliLive_link",
+            "interval" : 0.2,
+            "dead_interval" : 1,
+            "rx_queue" : "OlivOS_biliLive_queue",
+            "tx_queue" : "OlivOS_rx_queue",
+            "control_queue" : "OlivOS_control_queue",
             "logger_proc" : "OlivOS_logger",
             "debug" : False
         },

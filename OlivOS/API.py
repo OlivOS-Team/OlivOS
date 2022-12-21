@@ -162,6 +162,8 @@ class Event(object):
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
+            OlivOS.biliLiveSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
             getMenuEvent(self)
 
@@ -729,6 +731,8 @@ class Event(object):
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct = True)
         elif self.platform['sdk'] == 'hackChat_link':
             OlivOS.hackChatSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
+        elif self.platform['sdk'] == 'biliLive_link':
+            OlivOS.biliLiveSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.send_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'fanbook_poll':

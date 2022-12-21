@@ -10,3 +10,6 @@ pillow
 rsa
 requests_toolbelt
 pystray
+aiohttp
+qrcode
+brotli

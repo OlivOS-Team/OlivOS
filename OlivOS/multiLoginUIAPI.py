@@ -260,6 +260,8 @@ class TreeEditUI(object):
                 'Discord',
                 'Telegram',
                 '开黑啦 - KOOK',
+                'B站直播间 - 游客',
+                'B站直播间 - 登录',
                 'QQ频道 - 公域',
                 'QQ频道 - 私域',
                 '渡渡语音 - Dodo',
@@ -287,6 +289,14 @@ class TreeEditUI(object):
                 ],
                 '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
                         'Token': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
+                'B站直播间 - 游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
+                        '直播间ID': 'edit_root_Entry_Server_access_token'
+                    }
+                ],
+                'B站直播间 - 登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
+                        '直播间ID': 'edit_root_Entry_Server_access_token'
                     }
                 ],
                 'QQ频道 - 公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
@@ -354,7 +364,8 @@ class TreeEditUI(object):
                 'fanbook',
                 'discord',
                 'terminal',
-                'hackChat'
+                'hackChat',
+                'biliLive'
             ],
             'platform_sdk_list': {
                 'qq': [
@@ -385,6 +396,9 @@ class TreeEditUI(object):
                 ],
                 'hackChat': [
                     'hackChat_link'
+                ],
+                'biliLive': [
+                    'biliLive_link'
                 ]
             },
             'platform_sdk_model_list': {
@@ -446,6 +460,12 @@ class TreeEditUI(object):
                 'hackChat': {
                     'hackChat_link': [
                         'default'
+                    ]
+                },
+                'biliLive': {
+                    'biliLive_link': [
+                        'default',
+                        'login'
                     ]
                 }
             }
@@ -831,6 +851,15 @@ class TreeEditUI(object):
             if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'biliLive' and tmp_platform_sdk == 'biliLive_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16) % 100000000000000
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':

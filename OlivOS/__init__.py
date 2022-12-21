@@ -27,6 +27,7 @@ from . import contentAPI
 from . import messageAPI
 from . import metadataAPI
 from . import API
+from . import thirdPartyModule
 from . import accountAPI
 from . import diagnoseAPI
 from . import flaskServerAPI
@@ -53,6 +54,8 @@ from . import fanbookSDK
 from . import fanbookPollServerAPI
 from . import kaiheilaSDK
 from . import kaiheilaLinkServerAPI
+from . import biliLiveSDK
+from . import biliLiveLinkServerAPI
 from . import updateAPI
 from . import webTool
 if(platform.system() == 'Windows'):

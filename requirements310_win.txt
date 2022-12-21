@@ -16,3 +16,4 @@ openpyxl
 pypiwin32
 aiohttp
 qrcode
+brotli
