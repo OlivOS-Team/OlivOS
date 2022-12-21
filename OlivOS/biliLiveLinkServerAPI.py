@@ -72,7 +72,10 @@ async def start(room: int, Proc:server):
                         url = res['data']['url']
                         qr = qrcode.QRCode()
                         qr.add_data(url)
-                        qr.print_ascii(invert=True)
+                        try:
+                            qr.print_ascii(invert=True)
+                        except:
+                            pass
                         releaseDir('./conf/')
                         releaseDir('./conf/biliLive')
                         releaseDir(conf_dir_path)
