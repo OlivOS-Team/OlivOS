@@ -22,6 +22,7 @@ from aiohttp import cookiejar
 import qrcode
 import time
 import os
+import traceback
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, logger_proc = None, control_queue = None, debug_mode = False, bot_info_dict = None):
@@ -101,8 +102,9 @@ async def start(room: int, Proc:server):
                                 if code in [-1, -2]:
                                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login failed')
                                     break
-                except:
+                except Exception as e:
                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login error')
+                    traceback.print_exc()
             Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login succeed')
         bot = OlivOS.biliLiveSDK.BiliLiveBot(
             room_id = room,
