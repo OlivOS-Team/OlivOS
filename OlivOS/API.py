@@ -187,7 +187,7 @@ class Event(object):
                 ])
             elif self.plugin_info['func_type'] == 'group_message':
                 tmp_host_id = '-'
-                if self.data.host_id != None:
+                if self.data.host_id is not None:
                     tmp_host_id = str(self.data.host_id)
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['host_id', tmp_host_id],
@@ -568,7 +568,7 @@ class Event(object):
         tmp_message_obj = None
         tmp_message_log = None
         [tmp_message, tmp_message_obj] = self.__message_router(message)
-        if tmp_message == None:
+        if tmp_message is None:
             return
         if checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -674,7 +674,7 @@ class Event(object):
         tmp_message_obj = None
         tmp_message_log = None
         [tmp_message, tmp_message_obj] = self.__message_router(message)
-        if tmp_message == None:
+        if tmp_message is None:
             return
         if self.platform['sdk'] == 'terminal_link':
             OlivOS.virtualTerminalSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
@@ -1027,7 +1027,7 @@ class Event(object):
         elif self.platform['sdk'] == 'dodo_link':
             res_data = OlivOS.dodoLinkSDK.event_action.get_login_info(self)
 
-        if res_data == None:
+        if res_data is None:
             return None
 
         if flag_log and self.log_func is not None:

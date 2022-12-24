@@ -592,7 +592,7 @@ def update_get_func(
         for tmp_Proc_name in basic_conf_models:
             basic_conf_models_this = basic_conf_models[tmp_Proc_name]
             if basic_conf_models_this['type'] == 'plugin':
-                if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue != None:
+                if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue is not None:
                     Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
                         OlivOS.API.Control.packet('update_hit', basic_conf_models_this['name']),
                         block=False

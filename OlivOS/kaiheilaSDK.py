@@ -488,7 +488,7 @@ class event_action(object):
         else:
             this_msg = API.creatMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.target_id = str(chat_id)
-        if this_msg == None:
+        if this_msg is None:
             return
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.image:

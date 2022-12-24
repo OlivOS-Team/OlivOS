@@ -114,7 +114,7 @@ class server(OlivOS.API.Proc_templet):
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
                 except:
                     rx_packet_data = None
-                if rx_packet_data != None:
+                if rx_packet_data is not None:
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'send' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data']:

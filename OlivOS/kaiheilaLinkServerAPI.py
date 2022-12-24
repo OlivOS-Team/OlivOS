@@ -101,7 +101,7 @@ class server(OlivOS.API.Proc_templet):
 
     def run_pulse(self):
         tmp_ws_item = self.Proc_data['extend_data']['ws_item']
-        while self.Proc_data['extend_data']['pulse_interval'] != None:
+        while self.Proc_data['extend_data']['pulse_interval'] is not None:
             tmp_pulse_interval = self.Proc_data['extend_data']['pulse_interval']
             if tmp_pulse_interval > 1:
                 tmp_pulse_interval -= 1

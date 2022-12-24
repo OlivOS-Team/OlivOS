@@ -977,7 +977,7 @@ class TreeEditUI(object):
             ]
         self.edit_commit_callback(self.UIData['Edit_res'])
         if self.action == 'create' or self.action == 'update':
-            if miss_key_list != None:
+            if miss_key_list is not None:
                 if type(miss_key_list) == list:
                     # tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(miss_key_list)
                     tmp_messagebox_str = '发现未填写条目！请确认完成填写。'

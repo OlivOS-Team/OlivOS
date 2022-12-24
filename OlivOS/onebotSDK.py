@@ -423,9 +423,9 @@ class event_action(object):
         this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = str(message_id)
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
