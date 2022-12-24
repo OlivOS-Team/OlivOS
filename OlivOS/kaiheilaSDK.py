@@ -40,12 +40,14 @@ sdkAPIRouteTemp = {}
 
 sdkSubSelfInfo = {}
 
+
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None):
+    def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
@@ -55,6 +57,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
         target_event.bot_info.id,
@@ -63,15 +66,13 @@ def get_SDK_bot_info_from_Event(target_event):
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
+
 class event(object):
-    def __init__(self, payload_obj = None, bot_info = None):
+    def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
-        self.platform = {}
-        self.platform['sdk'] = 'kaiheila_link'
-        self.platform['platform'] = 'kaiheila'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'kaiheila_link', 'platform': 'kaiheila', 'model': 'default'}
         self.active = False
-        if self.payload != None:
+        if self.payload is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -80,11 +81,14 @@ class event(object):
             self.base_info['token'] = bot_info.post_info.access_token
             self.base_info['post_type'] = None
 
+
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
+
+
 class payload_template(object):
-    def __init__(self, data = None, is_rx = False):
+    def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
@@ -98,13 +102,13 @@ class payload_template(object):
     def dump(self):
         res_obj = {}
         for data_this in self.data.__dict__:
-            if self.data.__dict__[data_this] != None:
+            if self.data.__dict__[data_this] is not None:
                 res_obj[data_this] = self.data.__dict__[data_this]
-        res = json.dumps(obj = res_obj)
+        res = json.dumps(obj=res_obj)
         return res
 
     def load(self, data, is_rx):
-        if data != None:
+        if data is not None:
             if type(data) == dict:
                 if 's' in data:
                     self.data.s = data['s']
@@ -116,20 +120,24 @@ class payload_template(object):
                 self.active = False
         return self
 
+
 class PAYLOAD(object):
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
 
     class sendPing(payload_template):
-        def __init__(self, last_s = None):
+        def __init__(self, last_s=None):
             payload_template.__init__(self)
             self.data.s = 2
             self.data.sn = last_s
 
+
 '''
 对于POST接口的实现
 '''
+
+
 class api_templet(object):
     def __init__(self):
         self.bot_info = None
@@ -140,18 +148,18 @@ class api_templet(object):
         self.route = None
         self.res = None
 
-    def do_api(self, req_type = 'POST'):
+    def do_api(self, req_type='POST'):
         try:
             tmp_payload_dict = {}
             tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-            if self.metadata != None:
+            if self.metadata is not None:
                 tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
-            if self.data != None:
+            if self.data is not None:
                 for data_this in self.data.__dict__:
-                    if self.data.__dict__[data_this] != None:
+                    if self.data.__dict__[data_this] is not None:
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
-            payload = json.dumps(obj = tmp_payload_dict)
+            payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
@@ -162,18 +170,19 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers = headers, data = payload)
+                msg_res = req.request("POST", send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers = headers)
+                msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
             return msg_res.text
         except:
             return None
 
+
 class API(object):
     class getGateway(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -182,7 +191,7 @@ class API(object):
             self.route = sdkAPIRoute['gateway'] + '/index?compress=0'
 
     class getMe(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -191,7 +200,7 @@ class API(object):
             self.route = sdkAPIRoute['user'] + '/me'
 
     class creatMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -209,7 +218,7 @@ class API(object):
                 self.temp_target_id = None
 
     class creatDirectMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -227,7 +236,7 @@ class API(object):
                 self.nonce = None
 
     class getUserViewStranger(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -240,7 +249,7 @@ class API(object):
                 self.user_id = '-1'
 
     class getUserView(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -254,7 +263,7 @@ class API(object):
                 self.guild_id = None
 
 
-def get_kmarkdown_message_raw(data:dict):
+def get_kmarkdown_message_raw(data: dict):
     res = data['raw_content']
     return res
 
@@ -269,10 +278,10 @@ def get_Event_from_SDK(target_event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id = target_event.base_info['self_id'],
-        platform_sdk = target_event.platform['sdk'],
-        platform_platform = target_event.platform['platform'],
-        platform_model = target_event.platform['model']
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.platform['sdk'],
+        platform_platform=target_event.platform['platform'],
+        platform_model=target_event.platform['model']
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
@@ -355,10 +364,14 @@ def get_Event_from_SDK(target_event):
                         target_event.data.raw_message = message_obj
                         target_event.data.raw_message_sdk = message_obj
                         target_event.data.font = None
-                        target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                        target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['user_id'] = str(
+                            target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author'][
+                            'username']
+                        target_event.data.sender['id'] = str(
+                            target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author'][
+                            'username']
                         target_event.data.sender['sex'] = 'unknown'
                         target_event.data.sender['age'] = 0
                         target_event.data.sender['role'] = 'member'
@@ -439,10 +452,14 @@ def get_Event_from_SDK(target_event):
                         target_event.data.raw_message = message_obj
                         target_event.data.raw_message_sdk = message_obj
                         target_event.data.font = None
-                        target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
-                        target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
-                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author']['username']
+                        target_event.data.sender['user_id'] = str(
+                            target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['extra']['author'][
+                            'username']
+                        target_event.data.sender['id'] = str(
+                            target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['extra']['author'][
+                            'username']
                         target_event.data.sender['sex'] = 'unknown'
                         target_event.data.sender['age'] = 0
                         target_event.data.extend['flag_from_direct'] = True
@@ -456,9 +473,9 @@ def get_Event_from_SDK(target_event):
                     target_event.active = False
 
 
-#支持OlivOS API调用的方法实现
+# 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, flag_direct = False):
+    def send_msg(target_event, chat_id, message, flag_direct=False):
         this_msg = None
         res_data = {
             "type": "card",
@@ -498,7 +515,7 @@ class event_action(object):
                 )
         if len(res_data['modules']) > 0:
             this_msg.data.type = 10
-            this_msg.data.content = json.dumps([res_data], ensure_ascii = False)
+            this_msg.data.content = json.dumps([res_data], ensure_ascii=False)
             this_msg.do_api()
 
     def get_login_info(target_event):
@@ -507,9 +524,9 @@ class event_action(object):
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
         try:
             this_msg.do_api('GET')
-            if this_msg.res != None:
+            if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
-            if raw_obj != None:
+            if raw_obj is not None:
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
@@ -525,9 +542,9 @@ class event_action(object):
         this_msg.metadata.user_id = str(user_id)
         try:
             this_msg.do_api('GET')
-            if this_msg.res != None:
+            if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
-            if raw_obj != None:
+            if raw_obj is not None:
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
@@ -545,16 +562,17 @@ class event_action(object):
         this_msg.do_api()
         try:
             this_msg.do_api('GET')
-            if this_msg.res != None:
+            if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
-            if raw_obj != None:
+            if raw_obj is not None:
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
                     res_data['data']['id'] = str(user_id)
                     res_data['data']['user_id'] = str(user_id)
                     res_data['data']['group_id'] = str(host_id)
-                    res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'joined_at'], int)
+                    res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj,
+                                                                                          ['data', 'joined_at'], int)
                     res_data['data']['times']['last_sent_time'] = 0
                     res_data['data']['times']['shut_up_timestamp'] = 0
                     res_data['data']['role'] = 'member'
@@ -563,6 +581,7 @@ class event_action(object):
         except:
             res_data['active'] = False
         return res_data
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -582,9 +601,11 @@ def init_api_json(raw_str):
             res_data = tmp_obj.copy()
     return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
     if type(src_data) == src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None

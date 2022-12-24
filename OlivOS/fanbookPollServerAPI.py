@@ -22,17 +22,19 @@ import traceback
 
 import OlivOS
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, logger_proc = None, debug_mode = False, bot_info_dict = None):
+    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
+                 debug_mode=False, bot_info_dict=None):
         OlivOS.API.Proc_templet.__init__(
             self,
-            Proc_name = Proc_name,
-            Proc_type = 'fanbook_poll',
-            scan_interval = scan_interval,
-            dead_interval = dead_interval,
-            rx_queue = None,
-            tx_queue = tx_queue,
-            logger_proc = logger_proc
+            Proc_name=Proc_name,
+            Proc_type='fanbook_poll',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=None,
+            tx_queue=tx_queue,
+            logger_proc=logger_proc
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -74,12 +76,12 @@ class server(OlivOS.API.Proc_templet):
                     if bot_info_this in self.Proc_data['bot_info_first']:
                         try:
                             res_obj = json.loads(sdk_api_res)
-                            if res_obj['ok'] == True:
+                            if res_obj['ok']:
                                 if type(res_obj['result']) == list:
                                     for tmp_messages_this in res_obj['result']:
                                         sdk_event = OlivOS.fanbookSDK.event(tmp_messages_this, bot_info_this_obj)
                                         tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                                        self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                                        self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                                 else:
                                     continue
                             else:
@@ -99,20 +101,25 @@ class server(OlivOS.API.Proc_templet):
     def run_sdk_api(self, sdk_api):
         sdk_api.do_api()
 
+
 def accountFix(bot_info_dict, logger_proc):
     res = {}
     for bot_info_dict_this in bot_info_dict:
         bot_hash = bot_info_dict_this
         if bot_info_dict[bot_hash].platform['sdk'] == 'fanbook_poll':
-            this_msg = OlivOS.fanbookSDK.API.getMe(OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
-            this_msg_2 = OlivOS.fanbookSDK.API.setBotPrivacyMode(OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
+            this_msg = OlivOS.fanbookSDK.API.getMe(
+                OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
+            this_msg_2 = OlivOS.fanbookSDK.API.setBotPrivacyMode(
+                OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
             try:
-                #刷新至真实bot_id
+                # 刷新至真实bot_id
                 this_msg_res = this_msg.do_api()
                 this_msg_res_obj = json.loads(this_msg_res)
-                if this_msg_res_obj['ok'] == True:
+                if this_msg_res_obj['ok']:
                     if type(this_msg_res_obj['result']['id']) == int:
-                        logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] will be updated as [' + str(this_msg_res_obj['result']['id']) + ']')
+                        logger_proc.log(2, '[fanbook] account [' + str(
+                            bot_info_dict[bot_hash].id) + '] will be updated as [' + str(
+                            this_msg_res_obj['result']['id']) + ']')
                         bot_info_dict[bot_hash].id = this_msg_res_obj['result']['id']
                         bot_info_dict[bot_hash].getHash()
                     else:
@@ -120,13 +127,14 @@ def accountFix(bot_info_dict, logger_proc):
                 else:
                     logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
                 res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
-                #刷新至私有模式
+                # 刷新至私有模式
                 if bot_info_dict[bot_hash].platform['model'] == 'private':
                     this_msg_2.data.owner_id = this_msg_res_obj['result']['owner_id']
                     this_msg_2.data.bot_id = this_msg_res_obj['result']['id']
                     this_msg_2.data.enable = True
                     this_msg_res_2 = this_msg_2.do_api()
-                    logger_proc.log(2, '[fanbook] account [' + str(this_msg_res_obj['result']['id']) + '] set to private mode')
+                    logger_proc.log(2, '[fanbook] account [' + str(
+                        this_msg_res_obj['result']['id']) + '] set to private mode')
                 continue
             except:
                 logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')

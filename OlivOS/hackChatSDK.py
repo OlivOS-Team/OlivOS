@@ -24,34 +24,34 @@ import OlivOS
 
 
 class bot_info_T(object):
-    def __init__(self, id = -1, nickname = None, chatroom = None):
+    def __init__(self, id=-1, nickname=None, chatroom=None):
         self.id = id
         self.nickname = nickname
         self.chatroom = chatroom
         self.debug_mode = False
         self.debug_logger = None
 
+
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
-        id = plugin_bot_info.id,
-        nickname = plugin_bot_info.post_info.access_token,
-        chatroom = plugin_bot_info.post_info.host
+        id=plugin_bot_info.id,
+        nickname=plugin_bot_info.post_info.access_token,
+        chatroom=plugin_bot_info.post_info.host
     )
     return res
+
 
 def get_SDK_bot_info_from_Event(target_event):
     res = get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
     return res
 
+
 class event(object):
-    def __init__(self, payload_data = None, bot_info = None):
+    def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
-        self.platform = {}
-        self.platform['sdk'] = 'hackChat_link'
-        self.platform['platform'] = 'hackChat'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'hackChat_link', 'platform': 'hackChat', 'model': 'default'}
         self.active = False
-        if self.payload != None:
+        if self.payload is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -72,19 +72,19 @@ def get_Event_from_SDK(target_event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id = target_event.base_info['self_id'],
-        platform_sdk = target_event.platform['sdk'],
-        platform_platform = target_event.platform['platform'],
-        platform_model = target_event.platform['model']
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.platform['sdk'],
+        platform_platform=target_event.platform['platform'],
+        platform_model=target_event.platform['model']
     )
-    if target_event.sdk_event.payload.active == True:
+    if target_event.sdk_event.payload.active:
         if target_event.sdk_event.payload.cmd == 'chat':
             if (
-                'nick' in target_event.sdk_event.payload.data
+                    'nick' in target_event.sdk_event.payload.data
             ) and (
-                'userid' in target_event.sdk_event.payload.data
+                    'userid' in target_event.sdk_event.payload.data
             ) and (
-                'text' in target_event.sdk_event.payload.data
+                    'text' in target_event.sdk_event.payload.data
             ):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
@@ -111,28 +111,30 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['age'] = 0
                 target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
-                #if plugin_event_bot_hash in sdkSubSelfInfo:
+                # if plugin_event_bot_hash in sdkSubSelfInfo:
                 #    target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                #if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
+                # if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
                 #    target_event.active = False
 
 
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
+
+
 class payload_template(object):
-    def __init__(self, data = None, is_rx = False):
+    def __init__(self, data=None, is_rx=False):
         self.active = True
         self.cmd = None
         self.data = None
         self.load(data, is_rx)
 
     def dump(self):
-        res = json.dumps(obj = self.data)
+        res = json.dumps(obj=self.data)
         return res
 
-    def load(self, data, is_rx:bool):
-        if data != None:
+    def load(self, data, is_rx: bool):
+        if data is not None:
             if type(data) == dict:
                 if 'cmd' in data and type(data['cmd']) == str:
                     self.cmd = data['cmd']
@@ -143,13 +145,14 @@ class payload_template(object):
                 self.active = False
         return self
 
+
 class PAYLOAD(object):
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
 
     class join(payload_template):
-        def __init__(self, nickname:str, chatroom:str):
+        def __init__(self, nickname: str, chatroom: str):
             payload_template.__init__(self)
             self.cmd = 'join'
             self.data = {
@@ -159,7 +162,7 @@ class PAYLOAD(object):
             }
 
     class chat(payload_template):
-        def __init__(self, message:str):
+        def __init__(self, message: str):
             payload_template.__init__(self)
             self.cmd = 'chat'
             self.data = {
@@ -167,27 +170,28 @@ class PAYLOAD(object):
                 "text": message
             }
 
-#支持OlivOS API调用的方法实现
+
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
-            bot_id = target_event.base_info['self_id'],
-            platform_sdk = target_event.platform['sdk'],
-            platform_platform = target_event.platform['platform'],
-            platform_model = target_event.platform['model']
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
         )
         message_new = ''
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_string',
             message
         )
-        if message_obj.active == True:
+        if message_obj.active:
             for data_this in message_obj.data:
                 if data_this.type == 'text':
                     message_new += data_this.data['text']
                 elif data_this.type == 'image':
                     imagePath = data_this.data['file']
-                    if data_this.data['url'] != None:
+                    if data_this.data['url'] is not None:
                         imagePath = data_this.data['url']
                     message_new += '![%s](%s)' % (
                         imagePath,
@@ -197,31 +201,33 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.chat(
-                    message = message_new
+                    message=message_new
                 ).dump(),
                 control_queue
             )
 
+
 def sendControlEventSend(action, data, control_queue):
-    if control_queue != None:
+    if control_queue is not None:
         control_queue.put(
             OlivOS.API.Control.packet(
                 action,
                 data
             ),
-            block = False
+            block=False
         )
+
 
 def send_ws_event(hash, data, control_queue):
     sendControlEventSend('send', {
-            'target': {
-                'type': 'hackChat_link',
-                'hash': hash
-            },
-            'data': {
-                'action': 'send',
-                'data': data
-            }
+        'target': {
+            'type': 'hackChat_link',
+            'hash': hash
         },
-        control_queue
-    )
+        'data': {
+            'action': 'send',
+            'data': data
+        }
+    },
+                         control_queue
+                         )

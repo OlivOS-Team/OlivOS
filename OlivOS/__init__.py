@@ -58,7 +58,7 @@ from . import biliLiveSDK
 from . import biliLiveLinkServerAPI
 from . import updateAPI
 from . import webTool
-if(platform.system() == 'Windows'):
+if platform.system() == 'Windows':
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
     from . import nativeWinUIAPI

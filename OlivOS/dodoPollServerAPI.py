@@ -21,17 +21,19 @@ import json
 
 import OlivOS
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, logger_proc = None, debug_mode = False, bot_info_dict = None):
+    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
+                 debug_mode=False, bot_info_dict=None):
         OlivOS.API.Proc_templet.__init__(
             self,
-            Proc_name = Proc_name,
-            Proc_type = 'dodo_poll',
-            scan_interval = scan_interval,
-            dead_interval = dead_interval,
-            rx_queue = None,
-            tx_queue = tx_queue,
-            logger_proc = logger_proc
+            Proc_name=Proc_name,
+            Proc_type='dodo_poll',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=None,
+            tx_queue=tx_queue,
+            logger_proc=logger_proc
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -67,7 +69,8 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['bot_info_token_life'][bot_info_this] -= 1
                     if self.Proc_data['bot_info_token_life'][bot_info_this] <= 0:
                         flag_need_extend = True
-                        self.Proc_data['bot_info_token_life'][bot_info_this] = self.Proc_data['bot_info_token_life_counter']
+                        self.Proc_data['bot_info_token_life'][bot_info_this] = self.Proc_data[
+                            'bot_info_token_life_counter']
                 if flag_need_extend:
                     sdk_api_tmp_3 = OlivOS.dodoSDK.API.extendMyLife(sdk_bot_info_this)
                     sdk_api_res_3 = None
@@ -124,9 +127,11 @@ class server(OlivOS.API.Proc_templet):
                                         for tmp_messages_this in res_obj_2['data']['messages']:
                                             if self.Proc_data['bot_info_update_id'][bot_info_this] < tmp_messages_this['id']:
                                                 if tmp_messages_this['uid'] != bot_info_this_obj.id:
-                                                    sdk_event = OlivOS.dodoSDK.event(tmp_messages_this, bot_info_this_obj, sdk_api_tmp_2.data.islandId)
+                                                    sdk_event = OlivOS.dodoSDK.event(tmp_messages_this,
+                                                                                     bot_info_this_obj,
+                                                                                     sdk_api_tmp_2.data.islandId)
                                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                                                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                                                    self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                                             if tmp_message_id_max < tmp_messages_this['id']:
                                                 tmp_message_id_max = tmp_messages_this['id']
                                         self.Proc_data['bot_info_update_id'][bot_info_this] = tmp_message_id_max

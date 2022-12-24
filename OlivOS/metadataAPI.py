@@ -16,7 +16,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
-def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res = 'N/A'):
+
+def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res='N/A'):
     global globalMetaTableTemp
     tmp_res = default_res
     tmp_src = tmp_res
@@ -30,7 +31,10 @@ def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res = 'N/
             tmp_res = default_res
     return tmp_res
 
-def getPairMapping(pair_list = []):
+
+def getPairMapping(pair_list=None):
+    if pair_list is None:
+        pair_list = []
     tmp_res = {}
     for pair_list_this in pair_list:
         if type(pair_list_this) == list:
@@ -41,6 +45,7 @@ def getPairMapping(pair_list = []):
         else:
             continue
     return tmp_res
+
 
 globalMetaTableTemp = {
     'nickname': 'N/A',
@@ -86,85 +91,84 @@ globalMetaTable = {
 }
 
 eventLogMetaTable = {
-    'fake_event' : {
-        'level' : 0,
-        'message_key' : 'event_fake_event_log'
+    'fake_event': {
+        'level': 0,
+        'message_key': 'event_fake_event_log'
     },
-    'private_message' : {
-        'level' : 2,
-        'message_key' : 'event_private_message_log'
+    'private_message': {
+        'level': 2,
+        'message_key': 'event_private_message_log'
     },
-    'group_message' : {
-        'level' : 2,
-        'message_key' : 'event_group_message_log'
+    'group_message': {
+        'level': 2,
+        'message_key': 'event_group_message_log'
     },
-    'group_file_upload' : {
-        'level' : 2,
-        'message_key' : 'event_group_file_upload_log'
+    'group_file_upload': {
+        'level': 2,
+        'message_key': 'event_group_file_upload_log'
     },
-    'group_admin' : {
-        'level' : 2,
-        'message_key' : 'event_group_admin_log'
+    'group_admin': {
+        'level': 2,
+        'message_key': 'event_group_admin_log'
     },
-    'group_member_decrease' : {
-        'level' : 2,
-        'message_key' : 'event_group_member_decrease_log'
+    'group_member_decrease': {
+        'level': 2,
+        'message_key': 'event_group_member_decrease_log'
     },
-    'group_member_increase' : {
-        'level' : 2,
-        'message_key' : 'event_group_member_increase_log'
+    'group_member_increase': {
+        'level': 2,
+        'message_key': 'event_group_member_increase_log'
     },
-    'group_ban' : {
-        'level' : 2,
-        'message_key' : 'event_group_ban_log'
+    'group_ban': {
+        'level': 2,
+        'message_key': 'event_group_ban_log'
     },
-    'friend_add' : {
-        'level' : 2,
-        'message_key' : 'event_friend_add_log'
+    'friend_add': {
+        'level': 2,
+        'message_key': 'event_friend_add_log'
     },
-    'group_message_recall' : {
-        'level' : 2,
-        'message_key' : 'event_group_message_recall_log'
+    'group_message_recall': {
+        'level': 2,
+        'message_key': 'event_group_message_recall_log'
     },
-    'private_message_recall' : {
-        'level' : 2,
-        'message_key' : 'event_private_message_recall_log'
+    'private_message_recall': {
+        'level': 2,
+        'message_key': 'event_private_message_recall_log'
     },
-    'poke' : {
-        'level' : 2,
-        'message_key' : 'event_poke_log'
+    'poke': {
+        'level': 2,
+        'message_key': 'event_poke_log'
     },
-    'group_lucky_king' : {
-        'level' : 2,
-        'message_key' : 'event_group_lucky_king_log'
+    'group_lucky_king': {
+        'level': 2,
+        'message_key': 'event_group_lucky_king_log'
     },
-    'group_honor' : {
-        'level' : 2,
-        'message_key' : 'event_group_honor_log'
+    'group_honor': {
+        'level': 2,
+        'message_key': 'event_group_honor_log'
     },
-    'friend_add_request' : {
-        'level' : 2,
-        'message_key' : 'event_friend_add_request_log'
+    'friend_add_request': {
+        'level': 2,
+        'message_key': 'event_friend_add_request_log'
     },
-    'group_add_request' : {
-        'level' : 2,
-        'message_key' : 'event_group_add_request_log'
+    'group_add_request': {
+        'level': 2,
+        'message_key': 'event_group_add_request_log'
     },
-    'group_invite_request' : {
-        'level' : 2,
-        'message_key' : 'event_group_invite_request_log'
+    'group_invite_request': {
+        'level': 2,
+        'message_key': 'event_group_invite_request_log'
     },
-    'lifecycle' : {
-        'level' : 2,
-        'message_key' : 'event_lifecycle_log'
+    'lifecycle': {
+        'level': 2,
+        'message_key': 'event_lifecycle_log'
     },
-    'heartbeat' : {
-        'level' : 1,
-        'message_key' : 'event_heartbeat_log'
+    'heartbeat': {
+        'level': 1,
+        'message_key': 'event_heartbeat_log'
     },
-    'menu' : {
-        'level' : 2,
-        'message_key' : 'event_menu_log'
+    'menu': {
+        'level': 2,
+        'message_key': 'event_menu_log'
     }
 }
-

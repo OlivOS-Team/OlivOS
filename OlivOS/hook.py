@@ -16,13 +16,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-#pillow
+# pillow
 from PIL import Image
 
-#sqlite
+# sqlite
 import sqlite3
 
-#win
+# win
 if platform.system() == 'Windows':
     import win32com.client
     import pythoncom

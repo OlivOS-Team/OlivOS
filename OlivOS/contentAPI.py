@@ -19,10 +19,12 @@ import OlivOS
 from enum import Enum
 import time
 
+
 class api_result_error_template(object):
     class OlivOSTypeError(TypeError):
         def __init__(self, arg):
             TypeError.__init__(self, arg)
+
 
 class api_result_data_template(object):
     class get_msg(dict):
@@ -137,7 +139,7 @@ class api_result_data_template(object):
             )
 
         def yes(self):
-            if self['data']['yes'] == True:
+            if self['data']['yes']:
                 return True
             return False
 
@@ -152,7 +154,7 @@ class api_result_data_template(object):
             )
 
         def yes(self):
-            if self['data']['yes'] == True:
+            if self['data']['yes']:
                 return True
             return False
 
@@ -190,6 +192,7 @@ class api_result_data_template(object):
                 }
             )
 
+
 def get_Event_from_fake_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
@@ -201,8 +204,11 @@ def get_Event_from_fake_SDK(target_event):
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if target_event.platform['platform'] in OlivOS.messageAPI.dictMessageType:
         if target_event.platform['sdk'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']]:
-            if target_event.platform['model'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']]:
-                target_event.plugin_info['message_mode_rx'] = OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']][target_event.platform['model']]
+            if target_event.platform['model'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][
+                target_event.platform['sdk']]:
+                target_event.plugin_info['message_mode_rx'] = \
+                    OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']][
+                        target_event.platform['model']]
     target_event.plugin_info['name'] = target_event.sdk_event.fakename
     if True:
         if target_event.sdk_event.data['type'] == 'fake_event':
@@ -210,8 +216,9 @@ def get_Event_from_fake_SDK(target_event):
             target_event.plugin_info['func_type'] = 'fake_event'
             target_event.data = target_event.fake_event()
 
+
 class fake_sdk_event(object):
-    def __init__(self, bot_info, data = None, platform = None, fakename = 'unity'):
+    def __init__(self, bot_info, data=None, platform=None, fakename='unity'):
         self.fakename = fakename
         tmp_platform = {
             'sdk': 'fake',
@@ -231,7 +238,7 @@ class fake_sdk_event(object):
             self.platform.update(platform)
         self.active = False
         self.bot_info = bot_info
-        if self.bot_info != None:
+        if self.bot_info is not None:
             self.active = True
         self.base_info = {}
         if self.active:

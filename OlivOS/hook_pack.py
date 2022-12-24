@@ -16,29 +16,29 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-#pillow
+# pillow
 from PIL import Image
 
-#sqlite
+# sqlite
 import sqlite3
 
-#win
+# win
 if platform.system() == 'Windows':
     import win32com.client
     import pythoncom
 
-#ext pack
-#lxml
+# ext pack
+# lxml
 from lxml import etree
 
-#yaml
+# yaml
 import yaml
 
-#openpyxl
+# openpyxl
 import openpyxl
 
-#aiohttp
+# aiohttp
 import aiohttp
 
-#qrcode
+# qrcode
 import qrcode
