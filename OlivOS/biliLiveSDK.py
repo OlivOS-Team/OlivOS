@@ -206,9 +206,7 @@ def send_ws_event(hash, data, control_queue):
             'action': 'send',
             'data': data
         }
-    },
-                         control_queue
-                         )
+    }, control_queue)
 
 
 def send_QRCode_event(hash, path: str, control_queue):
@@ -222,9 +220,7 @@ def send_QRCode_event(hash, path: str, control_queue):
             'hash': hash,
             'path': path
         }
-    },
-                         control_queue,
-                         )
+    }, control_queue)
 
 
 class DanmakuPosition(IntEnum):
