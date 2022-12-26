@@ -76,7 +76,7 @@ class server(OlivOS.API.Proc_templet):
                     if bot_info_this in self.Proc_data['bot_info_first']:
                         try:
                             res_obj = json.loads(sdk_api_res)
-                            if res_obj['ok']:
+                            if res_obj['ok'] is True:
                                 if type(res_obj['result']) == list:
                                     for tmp_messages_this in res_obj['result']:
                                         sdk_event = OlivOS.fanbookSDK.event(tmp_messages_this, bot_info_this_obj)
