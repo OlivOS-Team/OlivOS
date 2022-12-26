@@ -115,7 +115,7 @@ def accountFix(bot_info_dict, logger_proc):
                 # 刷新至真实bot_id
                 this_msg_res = this_msg.do_api()
                 this_msg_res_obj = json.loads(this_msg_res)
-                if this_msg_res_obj['ok']:
+                if this_msg_res_obj['ok'] is True:
                     if type(this_msg_res_obj['result']['id']) == int:
                         logger_proc.log(2, '[fanbook] account [' + str(
                             bot_info_dict[bot_hash].id) + '] will be updated as [' + str(
