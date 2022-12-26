@@ -139,7 +139,7 @@ class api_result_data_template(object):
             )
 
         def yes(self):
-            if self['data']['yes']:
+            if self['data']['yes'] is True:
                 return True
             return False
 
@@ -154,7 +154,7 @@ class api_result_data_template(object):
             )
 
         def yes(self):
-            if self['data']['yes']:
+            if self['data']['yes'] is True:
                 return True
             return False
 

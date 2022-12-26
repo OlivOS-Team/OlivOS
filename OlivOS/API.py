@@ -482,7 +482,7 @@ class Event(object):
                         callback_msg = 'done'
                     elif warppedRes.__class__.__base__ == dict:
                         if 'active' in warppedRes:
-                            if warppedRes['active']:
+                            if warppedRes['active'] is True:
                                 if type(val_list) == list and 'data' in warppedRes:
                                     callback_msg_list = []
                                     for val_list_this in val_list:
