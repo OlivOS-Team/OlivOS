@@ -25,17 +25,19 @@ import traceback
 
 import OlivOS
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, logger_proc = None, debug_mode = False, bot_info_dict = None):
+    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
+                 debug_mode=False, bot_info_dict=None):
         OlivOS.API.Proc_templet.__init__(
             self,
-            Proc_name = Proc_name,
-            Proc_type = 'dodo_link',
-            scan_interval = scan_interval,
-            dead_interval = dead_interval,
-            rx_queue = rx_queue,
-            tx_queue = tx_queue,
-            logger_proc = logger_proc
+            Proc_name=Proc_name,
+            Proc_type='dodo_link',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=rx_queue,
+            tx_queue=tx_queue,
+            logger_proc=logger_proc
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -65,20 +67,20 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['extend_data']['websocket_url'] = None
             except:
                 self.Proc_data['extend_data']['websocket_url'] = None
-            if self.Proc_data['extend_data']['websocket_url'] != None:
+            if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
             time.sleep(self.Proc_info.scan_interval)
 
     def on_message(self, ws, message):
         try:
             tmp_data_rx_obj = OlivOS.dodoLinkSDK.PAYLOAD.rxPacket(
-                data = json.loads(message.decode('utf-8'))
+                data=json.loads(message.decode('utf-8'))
             )
             if tmp_data_rx_obj.active:
                 if tmp_data_rx_obj.data.type == 0:
                     sdk_event = OlivOS.dodoLinkSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                    self.Proc_info.tx_queue.put(tx_packet_data, block=False)
         except:
             pass
 
@@ -95,16 +97,16 @@ class server(OlivOS.API.Proc_templet):
         websocket.enableTrace(False)
         ws = websocket.WebSocketApp(
             self.Proc_data['extend_data']['websocket_url'],
-            on_open = self.on_open,
-            on_message = self.on_message,
-            on_error = self.on_error,
-            on_close = self.on_close
+            on_open=self.on_open,
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
         ws.run_forever(
-            ping_interval = 30,
-            ping_timeout = 5
+            ping_interval=30,
+            ping_timeout=5
         )
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None

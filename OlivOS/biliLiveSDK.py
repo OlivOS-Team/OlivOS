@@ -24,7 +24,6 @@ from aiohttp import cookiejar
 from genericpath import exists
 import json
 
-
 QRCODE_REQUEST_URL = 'http://passport.bilibili.com/qrcode/getLoginUrl'
 CHECK_LOGIN_RESULT = 'http://passport.bilibili.com/qrcode/getLoginInfo'
 SEND_URL = 'https://api.live.bilibili.com/msg/send'
@@ -35,11 +34,12 @@ DEL_BADWORD_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/Del
 
 
 class bot_info_T(object):
-    def __init__(self, id = -1, room_id = None):
+    def __init__(self, id=-1, room_id=None):
         self.id = id
         self.room_id = room_id
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
@@ -49,6 +49,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
         target_event.bot_info.id,
@@ -57,15 +58,13 @@ def get_SDK_bot_info_from_Event(target_event):
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
+
 class event(object):
-    def __init__(self, payload_data = None, bot_info = None):
+    def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
-        self.platform = {}
-        self.platform['sdk'] = 'biliLive_link'
-        self.platform['platform'] = 'biliLive'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'biliLive_link', 'platform': 'biliLive', 'model': 'default'}
         self.active = False
-        if self.payload != None:
+        if self.payload is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -74,39 +73,42 @@ class event(object):
             self.base_info['room_id'] = bot_info.post_info.access_token
             self.base_info['post_type'] = None
 
+
 class BiliLiveBot(OlivOS.thirdPartyModule.blivedm.BLiveClient):
     def __init__(
             self,
             room_id,
-            uid = 0,
-            session = None, 
-            heartbeat_interval = 30,
-            ssl = True,
-            loop = None,
-            Proc = None
-        ):
+            uid=0,
+            session=None,
+            heartbeat_interval=30,
+            ssl=True,
+            loop=None,
+            Proc=None
+    ):
         super().__init__(
             room_id,
-            uid = uid,
-            session = session,
-            heartbeat_interval = heartbeat_interval,
-            ssl = ssl,
-            loop = loop
+            uid=uid,
+            session=session,
+            heartbeat_interval=heartbeat_interval,
+            ssl=ssl,
+            loop=loop
         )
         self.Proc = Proc
         handler = SDKHandler()
         self.add_handler(handler)
 
+
 class SDKHandler(OlivOS.thirdPartyModule.blivedm.BaseHandler):
-    async def _on_danmaku(self, client:BiliLiveBot, message:OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage):
+    async def _on_danmaku(self, client: BiliLiveBot, message: OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage):
         try:
             sdk_event = event(message, client.Proc.Proc_data['bot_info_dict'])
             tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-            client.Proc.Proc_info.tx_queue.put(tx_packet_data, block = False)
+            client.Proc.Proc_info.tx_queue.put(tx_packet_data, block=False)
         except Exception as e:
             pass
 
-def get_Event_from_SDK(target_event:event):
+
+def get_Event_from_SDK(target_event: event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -115,14 +117,14 @@ def get_Event_from_SDK(target_event:event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id = target_event.base_info['self_id'],
-        platform_sdk = target_event.platform['sdk'],
-        platform_platform = target_event.platform['platform'],
-        platform_model = target_event.platform['model']
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.platform['sdk'],
+        platform_platform=target_event.platform['platform'],
+        platform_model=target_event.platform['model']
     )
     type_sdk_event = type(target_event.sdk_event.payload)
     if type_sdk_event == OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage:
-        sdk_payload:OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage = target_event.sdk_event.payload
+        sdk_payload: OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage = target_event.sdk_event.payload
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         message_obj = OlivOS.messageAPI.Message_templet('olivos_string', sdk_payload.msg)
@@ -147,27 +149,27 @@ def get_Event_from_SDK(target_event:event):
         target_event.data.host_id = None
 
 
-#支持OlivOS API调用的方法实现
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
-            bot_id = target_event.base_info['self_id'],
-            platform_sdk = target_event.platform['sdk'],
-            platform_platform = target_event.platform['platform'],
-            platform_model = target_event.platform['model']
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
         )
         message_new = ''
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_string',
             message
         )
-        if message_obj.active == True:
+        if message_obj.active:
             for data_this in message_obj.data:
                 if data_this.type == 'text':
                     message_new += data_this.data['text']
                 elif data_this.type == 'image':
                     imagePath = data_this.data['file']
-                    if data_this.data['url'] != None:
+                    if data_this.data['url'] is not None:
                         imagePath = data_this.data['url']
                     message_new += '![%s](%s)' % (
                         imagePath,
@@ -177,49 +179,48 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.chat(
-                    message = message_new
+                    message=message_new
                 ).data,
                 control_queue
             )
 
+
 def sendControlEventSend(action, data, control_queue):
-    if control_queue != None:
+    if control_queue is not None:
         control_queue.put(
             OlivOS.API.Control.packet(
                 action,
                 data
             ),
-            block = False
+            block=False
         )
+
 
 def send_ws_event(hash, data, control_queue):
     sendControlEventSend('send', {
-            'target': {
-                'type': 'biliLive_link',
-                'hash': hash
-            },
-            'data': {
-                'action': 'send',
-                'data': data
-            }
+        'target': {
+            'type': 'biliLive_link',
+            'hash': hash
         },
-        control_queue
-    )
+        'data': {
+            'action': 'send',
+            'data': data
+        }
+    }, control_queue)
 
-def send_QRCode_event(hash, path:str, control_queue):
+
+def send_QRCode_event(hash, path: str, control_queue):
     sendControlEventSend('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'gocqhttp',
-                'event': 'qrcode',
-                'hash': hash,
-                'path': path
-            }
+        'target': {
+            'type': 'nativeWinUI'
         },
-        control_queue,
-    )
+        'data': {
+            'action': 'gocqhttp',
+            'event': 'qrcode',
+            'hash': hash,
+            'path': path
+        }
+    }, control_queue)
 
 
 class DanmakuPosition(IntEnum):
@@ -227,18 +228,21 @@ class DanmakuPosition(IntEnum):
     BOTTOM = 4,
     NORMAL = 1
 
+
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
+
+
 class payload_template(object):
-    def __init__(self, data = None, is_rx = False):
+    def __init__(self, data=None, is_rx=False):
         self.active = True
         self.cmd = None
         self.data = None
         self.load(data, is_rx)
 
-    def load(self, data, is_rx:bool):
-        if data != None:
+    def load(self, data, is_rx: bool):
+        if data is not None:
             if type(data) == dict:
                 if 'cmd' in data and type(data['cmd']) == str:
                     self.cmd = data['cmd']
@@ -249,9 +253,10 @@ class payload_template(object):
                 self.active = False
         return self
 
+
 class PAYLOAD(object):
     class chat(payload_template):
-        def __init__(self, message:str):
+        def __init__(self, message: str):
             payload_template.__init__(self)
             self.cmd = 'chat'
             self.data = {
@@ -263,10 +268,13 @@ class PAYLOAD(object):
                 'bubble': 0
             }
 
+
 """
 Http Request
 
 """
+
+
 async def aiohttpGet(session: ClientSession, url: str):
     async with session.get(url) as resp:
         resp.raise_for_status()
@@ -287,24 +295,27 @@ async def aiohttpPost(session: ClientSession, url: str, **data):
             raise Exception(data['message'] if 'message' in data else data['code'])
         return data
 
-def get_cookies(cookies:cookiejar.CookieJar, name: str):
+
+def get_cookies(cookies: cookiejar.CookieJar, name: str):
     for cookie in cookies:
         if cookie.key == name:
             return cookie.value
     return None
 
+
 def load_cookies(path: str):
     cookies = {}
     session_exist = exists(path)
     if session_exist:
-        with open(path, encoding = 'utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             cookies = json.load(f)
     return cookies
 
-def save_cookies(cookies:cookiejar.CookieJar, path: str):
+
+def save_cookies(cookies: cookiejar.CookieJar, path: str):
     cookies_dict = {}
     for cookie in cookies:
         cookies_dict[cookie.key] = cookie.value
-    with open(path, mode='w', encoding = 'utf-8') as f:
+    with open(path, mode='w', encoding='utf-8') as f:
         json.dump(cookies_dict, f)
     return None

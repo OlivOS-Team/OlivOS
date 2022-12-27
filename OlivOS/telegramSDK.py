@@ -25,14 +25,16 @@ telegram_port_default = 443
 sdkSubSelfInfo = {}
 sdkSubInfo = {}
 
+
 class bot_info_T(object):
-    def __init__(self, id = -1, host = '', port = -1, access_token = None):
+    def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
         self.port = port
         self.access_token = access_token
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
@@ -44,6 +46,7 @@ def get_SDK_bot_info_from_Event(target_event):
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
         plugin_bot_info.id,
@@ -54,6 +57,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 class send_telegram_post_json_T(object):
     def __init__(self):
         self.bot_info = None
@@ -61,31 +65,32 @@ class send_telegram_post_json_T(object):
         self.node_ext = ''
 
     def send_telegram_post_json(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj == None or self.node_ext == '':
+        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
             return None
         else:
-            json_str_tmp = json.dumps(obj = self.obj.__dict__)
-            send_url = self.bot_info.host + ':' + str(self.bot_info.port) + '/bot' + self.bot_info.access_token + '/' + self.node_ext
+            json_str_tmp = json.dumps(obj=self.obj.__dict__)
+            send_url = self.bot_info.host + ':' + str(
+                self.bot_info.port) + '/bot' + self.bot_info.access_token + '/' + self.node_ext
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
 
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
-            msg_res = req.request("POST", send_url, headers = headers, data = json_str_tmp)
+            msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
             return msg_res
 
 
 class event(object):
-    def __init__(self, json_obj = None, sdk_mode = 'poll', bot_info = None):
+    def __init__(self, json_obj=None, sdk_mode='poll', bot_info=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
         self.platform = {}
@@ -98,7 +103,7 @@ class event(object):
         self.platform['platform'] = 'telegram'
         self.platform['model'] = 'default'
         self.active = False
-        if self.json != None:
+        if self.json is not None:
             self.active = True
         self.base_info = {}
         if checkByListAnd([
@@ -123,7 +128,10 @@ class event(object):
             res = None
         return res
 
-def checkInDictSafe(var_key, var_dict, var_path = []):
+
+def checkInDictSafe(var_key, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -135,7 +143,10 @@ def checkInDictSafe(var_key, var_dict, var_path = []):
     else:
         return False
 
-def checkEquelInDictSafe(var_it, var_dict, var_path = []):
+
+def checkEquelInDictSafe(var_it, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -147,6 +158,7 @@ def checkEquelInDictSafe(var_it, var_dict, var_path = []):
     else:
         return False
 
+
 def checkByListAnd(check_list):
     flag_res = True
     for check_list_this in check_list:
@@ -154,6 +166,7 @@ def checkByListAnd(check_list):
             flag_res = False
             return flag_res
     return flag_res
+
 
 def get_message_obj_from_SDK(target_event):
     message_obj = None
@@ -177,26 +190,27 @@ def get_message_obj_from_SDK(target_event):
                         tmp_message_raw_2 = ''
                         tmp_message_raw_3 = ''
                         tmp_message_raw_1 = tmp_message_raw[tmp_message_offset_count:entities_this['offset']]
-                        tmp_message_raw_2 = tmp_message_raw[entities_this['offset']:entities_this['offset'] + entities_this['length']]
+                        tmp_message_raw_2 = tmp_message_raw[
+                                            entities_this['offset']:entities_this['offset'] + entities_this['length']]
                         tmp_message_raw_2 = tmp_message_raw_2[1:]
                         tmp_message_raw_3 = tmp_message_raw[entities_this['offset'] + entities_this['length']:]
                         tmp_message_offset_count = entities_this['offset'] + entities_this['length']
                         if len(tmp_message_raw_1) > 0:
                             message_list.append(
                                 OlivOS.messageAPI.PARA.text(
-                                    text = tmp_message_raw_1
+                                    text=tmp_message_raw_1
                                 )
                             )
                         if len(tmp_message_raw_2) > 0:
                             message_list.append(
                                 OlivOS.messageAPI.PARA.at(
-                                    id = tmp_message_raw_2
+                                    id=tmp_message_raw_2
                                 )
                             )
             if len(tmp_message_raw_3) > 0:
                 message_list.append(
                     OlivOS.messageAPI.PARA.text(
-                        text = tmp_message_raw_3
+                        text=tmp_message_raw_3
                     )
                 )
             message_obj = OlivOS.messageAPI.Message_templet(
@@ -235,6 +249,7 @@ def get_message_obj_from_SDK(target_event):
             target_event.active = True
     return message_obj
 
+
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
@@ -245,10 +260,10 @@ def get_Event_from_SDK(target_event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id = target_event.base_info['self_id'],
-        platform_sdk = target_event.platform['sdk'],
-        platform_platform = target_event.platform['platform'],
-        platform_model = target_event.platform['model']
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.platform['sdk'],
+        platform_platform=target_event.platform['platform'],
+        platform_model=target_event.platform['model']
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
@@ -421,7 +436,8 @@ def get_Event_from_SDK(target_event):
                 target_event.data.action = 'kick'
     return target_event.active
 
-#支持OlivOS API调用的方法实现
+
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
@@ -430,7 +446,7 @@ class event_action(object):
         this_msg_image.data.chat_id = str(chat_id)
         this_msg.data.text = ''
         flag_now_type = 'string'
-        if message != None:
+        if message is not None:
             if type(message.data) == list:
                 for message_this in message.data:
                     if type(message_this) == OlivOS.messageAPI.PARA.image:
@@ -459,9 +475,9 @@ class event_action(object):
         raw_obj = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
@@ -473,16 +489,16 @@ class event_action(object):
         raw_obj = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
         return res_data
 
-    def set_chat_leave(target_event, chat_id, is_dismiss = False):
+    def set_chat_leave(target_event, chat_id, is_dismiss=False):
         this_msg = API.leaveChat(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = str(chat_id)
         this_msg.do_api()
@@ -497,11 +513,11 @@ class event_action(object):
         this_msg_2 = API.getChatMemberCount(get_SDK_bot_info_from_Event(target_event))
         this_msg_2.data.chat_id = str(chat_id)
         this_msg_2.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if this_msg_2.res != None:
+        if this_msg_2.res is not None:
             raw_obj_2 = init_api_json(this_msg_2.res.text)
-        if raw_obj != None and raw_obj_2 != None:
+        if raw_obj is not None and raw_obj_2 is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
@@ -524,9 +540,9 @@ class event_action(object):
         this_msg.data.chat_id = str(chat_id)
         this_msg.data.user_id = str(user_id)
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
@@ -546,7 +562,6 @@ class event_action(object):
                 res_data['data']['title'] = ''
         return res_data
 
-    
 
 def init_api_json(raw_str):
     res_data = None
@@ -559,7 +574,7 @@ def init_api_json(raw_str):
     if type(tmp_obj) == dict:
         if 'ok' in tmp_obj:
             if type(tmp_obj['ok']) == bool:
-                if tmp_obj['ok'] == True:
+                if tmp_obj['ok']:
                     flag_is_active = True
     if flag_is_active:
         if 'result' in tmp_obj:
@@ -571,9 +586,11 @@ def init_api_json(raw_str):
                 res_data = tmp_obj['result']
     return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
     if type(src_data) == src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
@@ -592,6 +609,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
 
+
 class api_templet(object):
     def __init__(self):
         self.bot_info = None
@@ -607,9 +625,10 @@ class api_templet(object):
         self.res = this_post_json.send_telegram_post_json()
         return self.res
 
+
 class API(object):
     class getMe(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -621,7 +640,7 @@ class API(object):
                 self.default = None
 
     class getUpdates(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -635,7 +654,7 @@ class API(object):
                 self.timeout = 0
 
     class getUpdatesWithAllowed(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -650,7 +669,7 @@ class API(object):
                 self.allowed_updates = None
 
     class sendMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -665,7 +684,7 @@ class API(object):
                 self.disable_notification = False
 
     class sendMessageWithReply(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -682,7 +701,7 @@ class API(object):
                 self.allow_sending_without_reply = True
 
     class sendPhoto(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -695,7 +714,7 @@ class API(object):
                 self.photo = ''
 
     class leaveChat(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -707,7 +726,7 @@ class API(object):
                 self.chat_id = 0
 
     class getChat(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -719,7 +738,7 @@ class API(object):
                 self.chat_id = 0
 
     class getChatMember(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -732,7 +751,7 @@ class API(object):
                 self.user_id = 0
 
     class getChatMemberCount(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()

@@ -24,15 +24,16 @@ default_account_conf = {
     'account': []
 }
 
+
 class Account(object):
-    def load(path, logger_proc, safe_mode = False):
+    def load(path, logger_proc, safe_mode=False):
         account_conf = None
         try:
-            with open(path, 'r', encoding = 'utf-8') as account_conf_f:
+            with open(path, 'r', encoding='utf-8') as account_conf_f:
                 account_conf = json.loads(account_conf_f.read())
         except:
             pass
-        if account_conf == None:
+        if account_conf is None:
             logger_proc.log(3, 'init account from [' + path + '] ... failed')
             account_conf = default_account_conf
             logger_proc.log(2, 'init account from default ... done')
@@ -47,24 +48,25 @@ class Account(object):
             else:
                 tmp_password = account_conf_account_this['password']
             bot_info_tmp = OlivOS.API.bot_info_T(
-                id = account_conf_account_this['id'],
-                password = tmp_password,
-                server_auto = account_conf_account_this['server']['auto'],
-                server_type = account_conf_account_this['server']['type'],
-                host = account_conf_account_this['server']['host'],
-                port = account_conf_account_this['server']['port'],
-                access_token = account_conf_account_this['server']['access_token'],
-                platform_sdk = account_conf_account_this['sdk_type'],
-                platform_platform = account_conf_account_this['platform_type'],
-                platform_model = account_conf_account_this['model_type']
+                id=account_conf_account_this['id'],
+                password=tmp_password,
+                server_auto=account_conf_account_this['server']['auto'],
+                server_type=account_conf_account_this['server']['type'],
+                host=account_conf_account_this['server']['host'],
+                port=account_conf_account_this['server']['port'],
+                access_token=account_conf_account_this['server']['access_token'],
+                platform_sdk=account_conf_account_this['sdk_type'],
+                platform_platform=account_conf_account_this['platform_type'],
+                platform_model=account_conf_account_this['model_type']
             )
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
-            logger_proc.log(2, 'generate [' + str(account_conf_account_this['platform_type']) + '] account [' + str(account_conf_account_this['id']) + '] as [' + bot_info_tmp.hash + '] ... done')
+            logger_proc.log(2, 'generate [' + str(account_conf_account_this['platform_type']) + '] account [' + str(
+                account_conf_account_this['id']) + '] as [' + bot_info_tmp.hash + '] ... done')
         logger_proc.log(2, 'generate account ... all done')
         return plugin_bot_info_dict
 
-    def save(path, logger_proc, Account_data, safe_mode = False):
+    def save(path, logger_proc, Account_data, safe_mode=False):
         tmp_total_account_data = {}
         tmp_total_account_data['account'] = []
         for Account_data_this_key in Account_data:
@@ -83,8 +85,9 @@ class Account(object):
             tmp_this_account_data['server']['access_token'] = Account_data_this.post_info.access_token
             tmp_this_account_data['debug'] = Account_data_this.debug_mode
             tmp_total_account_data['account'].append(tmp_this_account_data)
-        with open(path, 'w', encoding = 'utf-8') as account_conf_f:
-            account_conf_f.write(json.dumps(tmp_total_account_data, indent = 4))
+        with open(path, 'w', encoding='utf-8') as account_conf_f:
+            account_conf_f.write(json.dumps(tmp_total_account_data, indent=4))
+
 
 def accountFix(basic_conf_models, bot_info_dict, logger_proc):
     res = {}
@@ -93,8 +96,8 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
             if basic_conf_models[basic_conf_models_this]['server']['auto'] == True:
                 basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
                 if isInuse(
-                    '127.0.0.1',
-                    basic_conf_models[basic_conf_models_this]['server']['port']
+                        '127.0.0.1',
+                        basic_conf_models[basic_conf_models_this]['server']['port']
                 ):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = get_free_port()
     for bot_info_dict_this in bot_info_dict:
@@ -107,6 +110,7 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                 Account_data_this.post_info.access_token = bot_info_dict_this
         res[bot_info_dict_this] = Account_data_this
     return res
+
 
 def isInuse(ip, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -121,7 +125,7 @@ def isInuse(ip, port):
 
 
 def get_free_port():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s: 
-        s.bind(('', 0)) 
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
-        return s.getsockname()[1] 
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]

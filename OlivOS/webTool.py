@@ -46,7 +46,7 @@ def get_system_proxy():
 def get_system_proxy_tuple(proxy_type = 'http'):
     res = (None, None, None)
     res_data = get_system_proxy()
-    if res_data != None:
+    if res_data is not None:
         if proxy_type in res_data:
             res_data_1 = res_data[proxy_type].lstrip('%s://' % proxy_type).split(':')
             if len(res_data_1) == 2:
