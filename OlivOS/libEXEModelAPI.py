@@ -91,6 +91,9 @@ class server(OlivOS.API.Proc_templet):
                     target=self.check_qrcode,
                     args=()
                 ).start()
+                tmp_env = dict(os.environ)
+                # 依据 https://github.com/Mrs4s/go-cqhttp/pull/1772 的改动
+                tmp_env['FORCE_TTY'] = ''
                 model_Proc = subprocess.Popen(
                     '..\\..\\..\\lib\\go-cqhttp.exe',
                     cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
@@ -98,7 +101,8 @@ class server(OlivOS.API.Proc_templet):
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    env=tmp_env
                 )
                 threading.Thread(
                     target=self.check_stdin,
