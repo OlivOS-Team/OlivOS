@@ -19,6 +19,10 @@ import json
 import traceback
 import requests as req
 import time
+import base64
+from urllib import parse
+from urllib3 import encode_multipart_formdata
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -283,6 +287,7 @@ class API(object):
             self.bot_info = bot_info
             self.data = self.data_T()
             self.metadata = self.metadata_T()
+            self.imagedata = []
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
 
@@ -294,6 +299,52 @@ class API(object):
             def __init__(self):
                 self.content = None
                 self.embeds = []
+
+        def do_api(self, req_type='POST', proxy=None):
+            try:
+                tmp_payload_dict = {}
+                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+                if self.metadata is not None:
+                    tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
+                if self.data is not None:
+                    for data_this in self.data.__dict__:
+                        if self.data.__dict__[data_this] is not None:
+                            tmp_payload_dict[data_this] = self.data.__dict__[data_this]
+
+                payload = json.dumps(obj=tmp_payload_dict)
+                send_url_temp = self.host + self.route
+                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+                headers = {
+                    'Content-Type': 'application/json',
+                    # 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                    'Authorization': 'Bot %s' % self.bot_info.access_token
+                }
+
+                if len(self.imagedata) > 0:
+                    payload = {
+                        'payload_json': (payload, 'application/json')
+                        #'payload_json': (None, payload, 'image/png'),
+                        #'payload_json': (None, payload, 'image/png')
+                    }
+                    count = 0
+                    for i in self.imagedata:
+                        payload['file[%d]' % count] = ('image_%d.png' % count, i, 'image/png')
+                    count += 1
+                    payload, payload_content_type = encode_multipart_formdata(fields=payload, boundary='boundary')
+                    headers['Content-Type'] = payload_content_type
+
+                msg_res = None
+                if req_type == 'POST':
+                    msg_res = req.request("POST", send_url, headers=headers, data=payload,
+                                          proxies=OlivOS.webTool.get_system_proxy())
+                elif req_type == 'GET':
+                    msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
+
+                self.res = msg_res.text
+                return msg_res.text
+            except Exception as e:
+                traceback.print_exc()
+                return None
 
     class createDM(api_templet):
         def __init__(self, bot_info=None):
@@ -406,7 +457,7 @@ def get_Event_from_SDK(target_event):
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
                                 OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
+                                    '%s' % attachments_this['url']
                                 )
                             )
         try:
@@ -485,7 +536,7 @@ def get_Event_from_SDK(target_event):
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
                                 OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
+                                    '%s' % attachments_this['url']
                                 )
                             )
         try:
@@ -545,20 +596,55 @@ class event_action(object):
             return
         flag_now_type = 'string'
         res = ''
+        image_res = []
+        image_count = 0
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.image:
-                pass
+                url_path = message_this.data['file']
+                pic_file = None
+                try:
+                    if url_path.startswith("base64://"):
+                        data = url_path[9:]
+                        pic_file = base64.decodebytes(data.encode("utf-8"))
+                    else:
+                        url_parsed = parse.urlparse(url_path)
+                        if url_parsed.scheme in ["http", "https"]:
+                            send_url = url_path
+                            headers = {
+                                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
+                            }
+                            msg_res = None
+                            msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
+                            pic_file = msg_res.content
+                        elif url_parsed.scheme == "file":
+                            file_path = url_parsed.path
+                            with open(file_path, "rb") as f:
+                                pic_file = f.read()
+                except:
+                    pass
+                if pic_file != None:
+                    image_res.append(pic_file)
+                    this_msg.data.embeds.append(
+                        {
+                            "image": {
+                                "url": 'attachment://image_%d.png' % image_count
+                            }
+                        }
+                    )
+                    image_count += 1
             elif type(message_this) == OlivOS.messageAPI.PARA.text:
-                res += message_this.OP()
+                res_this = message_this.OP()
+                for src_this in ['\\', '*', '{', '}', '[', ']', '(', ')']:
+                    res_this = res_this.replace(src_this, '\\' + src_this)
+                this_msg.data.embeds.append(
+                    {
+                        "description": res_this
+                    }
+                )
                 flag_now_type = 'string'
-        if res != '':
-            for src_this in ['\\', '*', '{', '}', '[', ']', '(', ')']:
-                res = res.replace(src_this, '\\' + src_this)
-            this_msg.data.embeds.append(
-                {
-                    "description": res
-                }
-            )
+        if len(image_res) > 0:
+            this_msg.imagedata = image_res
+        if len(this_msg.data.embeds) > 0:
             this_msg.do_api()
 
     def get_login_info(target_event):
