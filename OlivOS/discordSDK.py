@@ -299,6 +299,7 @@ class API(object):
             def __init__(self):
                 self.content = None
                 self.embeds = []
+                self.attachments = []
 
         def do_api(self, req_type='POST', proxy=None):
             try:
@@ -322,9 +323,7 @@ class API(object):
 
                 if len(self.imagedata) > 0:
                     payload = {
-                        'payload_json': (payload, 'application/json')
-                        #'payload_json': (None, payload, 'image/png'),
-                        #'payload_json': (None, payload, 'image/png')
+                        #'payload_json': (None, payload, 'application/json')
                     }
                     count = 0
                     for i in self.imagedata:
@@ -594,11 +593,11 @@ class event_action(object):
             this_msg.metadata.channel_id = int(chat_id)
         if this_msg is None:
             return
-        flag_now_type = 'string'
-        res = ''
-        image_res = []
         image_count = 0
         for message_this in message.data:
+            this_msg.data.embeds = []
+            this_msg.data.attachments = []
+            this_msg.imagedata = []
             if type(message_this) == OlivOS.messageAPI.PARA.image:
                 url_path = message_this.data['file']
                 pic_file = None
@@ -616,22 +615,31 @@ class event_action(object):
                             msg_res = None
                             msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
                             pic_file = msg_res.content
-                        elif url_parsed.scheme == "file":
+                        else:
                             file_path = url_parsed.path
                             with open(file_path, "rb") as f:
                                 pic_file = f.read()
-                except:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
                 if pic_file != None:
-                    image_res.append(pic_file)
+                    this_msg.imagedata.append(pic_file)
+                    pic_name = 'image_%d.png' % image_count
                     this_msg.data.embeds.append(
                         {
-                            "image": {
-                                "url": 'attachment://image_%d.png' % image_count
+                            "thumbnail": {
+                                "url": 'attachment://%s' % pic_name
                             }
                         }
                     )
+                    this_msg.data.attachments.append(
+                        {
+                            "id": image_count,
+                            "description": "",
+                            "filename": pic_name
+                        }
+                    )
                     image_count += 1
+                    this_msg.do_api()
             elif type(message_this) == OlivOS.messageAPI.PARA.text:
                 res_this = message_this.OP()
                 for src_this in ['\\', '*', '{', '}', '[', ']', '(', ')']:
@@ -641,11 +649,7 @@ class event_action(object):
                         "description": res_this
                     }
                 )
-                flag_now_type = 'string'
-        if len(image_res) > 0:
-            this_msg.imagedata = image_res
-        if len(this_msg.data.embeds) > 0:
-            this_msg.do_api()
+                this_msg.do_api()
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
