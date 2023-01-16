@@ -22,17 +22,18 @@ import time
 
 import OlivOS
 
+
 class intents_T(IntEnum):
-    GUILDS = (1 << 0)                   #频道变更
-    GUILD_MEMBERS = (1 << 1)            #频道成员变更
-    GUILD_MESSAGES = (1 << 9)           #消息事件，仅 *私域* 机器人能够设置此 intents。
-    GUILD_MESSAGE_REACTIONS = (1 << 10) #戳表情
-    DIRECT_MESSAGE = (1 << 12)          #私聊消息
-    INTERACTION = (1 << 26)             #互动事件变更
-    MESSAGE_AUDIT = (1 << 27)           #消息审核变更
-    FORUMS_EVENT = (1 << 28)            #论坛事件，仅 *私域* 机器人能够设置此 intents。
-    AUDIO_ACTION = (1 << 29)            #语音消息
-    PUBLIC_GUILD_MESSAGES = (1 << 30) # 消息事件，此为公域的消息事件
+    GUILDS = (1 << 0)  # 频道变更
+    GUILD_MEMBERS = (1 << 1)  # 频道成员变更
+    GUILD_MESSAGES = (1 << 9)  # 消息事件，仅 *私域* 机器人能够设置此 intents。
+    GUILD_MESSAGE_REACTIONS = (1 << 10)  # 戳表情
+    DIRECT_MESSAGE = (1 << 12)  # 私聊消息
+    INTERACTION = (1 << 26)  # 互动事件变更
+    MESSAGE_AUDIT = (1 << 27)  # 消息审核变更
+    FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
+    AUDIO_ACTION = (1 << 29)  # 语音消息
+    PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
 
 
 sdkAPIHost = {
@@ -56,13 +57,15 @@ sdkAPIRouteTemp = {
 
 sdkSubSelfInfo = {}
 
+
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None, model = 'private'):
+    def __init__(self, id=-1, access_token=None, model='private'):
         self.id = id
         self.access_token = access_token
         self.model = model
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
@@ -74,19 +77,18 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         res.model = 'public'
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     res = get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
     return res
 
+
 class event(object):
-    def __init__(self, payload_obj = None, bot_info = None):
+    def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
-        self.platform = {}
-        self.platform['sdk'] = 'qqGuild_link'
-        self.platform['platform'] = 'qqGuild'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'qqGuild_link', 'platform': 'qqGuild', 'model': 'default'}
         self.active = False
-        if self.payload != None:
+        if self.payload is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -95,11 +97,14 @@ class event(object):
             self.base_info['token'] = bot_info.post_info.access_token
             self.base_info['post_type'] = None
 
+
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
+
+
 class payload_template(object):
-    def __init__(self, data = None, is_rx = False):
+    def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
@@ -114,13 +119,13 @@ class payload_template(object):
     def dump(self):
         res_obj = {}
         for data_this in self.data.__dict__:
-            if self.data.__dict__[data_this] != None:
+            if self.data.__dict__[data_this] is not None:
                 res_obj[data_this] = self.data.__dict__[data_this]
-        res = json.dumps(obj = res_obj)
+        res = json.dumps(obj=res_obj)
         return res
 
     def load(self, data, is_rx):
-        if data != None:
+        if data is not None:
             if type(data) == dict:
                 if 'op' in data:
                     if type(data['op']) == int:
@@ -147,13 +152,14 @@ class payload_template(object):
                 self.active = False
         return self
 
+
 class PAYLOAD(object):
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info, intents = (int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
+        def __init__(self, bot_info, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
             tmp_intents = intents
             if bot_info.model == 'private':
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
@@ -165,7 +171,7 @@ class PAYLOAD(object):
                 self.data.d = {
                     'token': 'Bot %s.%s' % (str(bot_info.id), bot_info.access_token),
                     'intents': tmp_intents,
-                    'shard': [0,1],
+                    'shard': [0, 1],
                     'properties': {
                         'os': OlivOS.infoAPI.OlivOS_Header_UA
                     }
@@ -174,7 +180,7 @@ class PAYLOAD(object):
                 self.active = False
 
     class sendHeartbeat(payload_template):
-        def __init__(self, last_s = None):
+        def __init__(self, last_s=None):
             payload_template.__init__(self)
             self.data.op = 1
             self.data.s = last_s
@@ -182,14 +188,17 @@ class PAYLOAD(object):
         def dump(self):
             res_obj = {}
             for data_this in self.data.__dict__:
-                if self.data.__dict__[data_this] != None or data_this == 's':
+                if self.data.__dict__[data_this] is not None or data_this == 's':
                     res_obj[data_this] = self.data.__dict__[data_this]
-            res = json.dumps(obj = res_obj)
+            res = json.dumps(obj=res_obj)
             return res
+
 
 '''
 对于POST接口的实现
 '''
+
+
 class api_templet(object):
     def __init__(self):
         self.bot_info = None
@@ -200,18 +209,18 @@ class api_templet(object):
         self.route = None
         self.res = None
 
-    def do_api(self, req_type = 'POST'):
+    def do_api(self, req_type='POST'):
         try:
             tmp_payload_dict = {}
             tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-            if self.metadata != None:
+            if self.metadata is not None:
                 tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
-            if self.data != None:
+            if self.data is not None:
                 for data_this in self.data.__dict__:
-                    if self.data.__dict__[data_this] != None:
+                    if self.data.__dict__[data_this] is not None:
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
-            payload = json.dumps(obj = tmp_payload_dict)
+            payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
@@ -222,12 +231,12 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers = headers, data = payload)
+                msg_res = req.request("POST", send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers = headers)
+                msg_res = req.request("GET", send_url, headers=headers)
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
             self.res = msg_res.text
@@ -235,9 +244,10 @@ class api_templet(object):
         except:
             return None
 
+
 class API(object):
     class getGateway(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -246,7 +256,7 @@ class API(object):
             self.route = sdkAPIRoute['gateway']
 
     class getMe(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -255,7 +265,7 @@ class API(object):
             self.route = sdkAPIRoute['users'] + '/@me'
 
     class sendMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -269,14 +279,14 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None        #str
-                self.embed = None          #str
-                self.ark = None            #str
-                self.image = None          #str
-                self.msg_id = None         #str
+                self.content = None  # str
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
 
     class sendDirectMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -290,15 +300,16 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None        #str
-                self.embed = None          #str
-                self.ark = None            #str
-                self.image = None          #str
-                self.msg_id = None         #str
+                self.content = None  # str
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
 
 
-
-def checkInDictSafe(var_key, var_dict, var_path = []):
+def checkInDictSafe(var_key, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -310,7 +321,10 @@ def checkInDictSafe(var_key, var_dict, var_path = []):
     else:
         return False
 
-def checkEquelInDictSafe(var_it, var_dict, var_path = []):
+
+def checkEquelInDictSafe(var_it, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -322,6 +336,7 @@ def checkEquelInDictSafe(var_it, var_dict, var_path = []):
     else:
         return False
 
+
 def checkByListAnd(check_list):
     flag_res = True
     for check_list_this in check_list:
@@ -329,6 +344,7 @@ def checkByListAnd(check_list):
             flag_res = False
             return flag_res
     return flag_res
+
 
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
@@ -340,10 +356,10 @@ def get_Event_from_SDK(target_event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id = target_event.base_info['self_id'],
-        platform_sdk = target_event.platform['sdk'],
-        platform_platform = target_event.platform['platform'],
-        platform_model = target_event.platform['model']
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.platform['sdk'],
+        platform_platform=target_event.platform['platform'],
+        platform_model=target_event.platform['model']
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
@@ -497,9 +513,10 @@ def get_Event_from_SDK(target_event):
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
-#支持OlivOS API调用的方法实现
+
+# 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, reply_msg_id = None ,flag_direct = False):
+    def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
         if flag_direct:
             this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
@@ -507,7 +524,7 @@ class event_action(object):
         else:
             this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.channel_id = int(chat_id)
-        if this_msg == None:
+        if this_msg is None:
             return
         this_msg.data.msg_id = reply_msg_id
         flag_now_type = 'string'
@@ -537,9 +554,9 @@ class event_action(object):
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
         try:
             this_msg.do_api('GET')
-            if this_msg.res != None:
+            if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
-            if raw_obj != None:
+            if raw_obj is not None:
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
@@ -547,6 +564,7 @@ class event_action(object):
         except:
             res_data['active'] = False
         return res_data
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -565,9 +583,11 @@ def init_api_json(raw_str):
             res_data = tmp_obj.copy()
     return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
     if type(src_data) == src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None

@@ -28,116 +28,120 @@ logfile_file = 'OlivOS_logfile_%s.log'
 logfile_file_unity = 'OlivOS_logfile_unity.log'
 
 level_dict = {
-    -1 : 'TRACE',
-    0  : 'DEBUG',
-    1  : 'NOTE' ,
-    2  : 'INFO' ,
-    3  : 'WARN' ,
-    4  : 'ERROR',
-    5  : 'FATAL'
+    -1: 'TRACE',
+    0: 'DEBUG',
+    1: 'NOTE',
+    2: 'INFO',
+    3: 'WARN',
+    4: 'ERROR',
+    5: 'FATAL'
 }
 
 level_color_dict = {
-    'TRACE' : '#666666',
-    'DEBUG'  : 'green',
-    'NOTE'  : 'black' ,
-    'INFO'  : 'black' ,
-    'WARN'  : '#E6992C', # 原版'yellow'亮瞎狗眼，换一个
-    'ERROR'  : 'red',
-    'FATAL'  : 'red'
+    'TRACE': '#666666',
+    'DEBUG': 'green',
+    'NOTE': 'black',
+    'INFO': 'black',
+    'WARN': '#E6992C',  # 原版'yellow'亮瞎狗眼，换一个
+    'ERROR': 'red',
+    'FATAL': 'red'
 }
 
 dict_ctype = {
     'STD_HANDLE': {
-        'STD_INPUT_HANDLE'  : -10,
-        'STD_OUTPUT_HANDLE' : -11,
-        'STD_ERROR_HANDLE'  : -12
+        'STD_INPUT_HANDLE': -10,
+        'STD_OUTPUT_HANDLE': -11,
+        'STD_ERROR_HANDLE': -12
     }
 }
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
+
 class logger(OlivOS.API.Proc_templet):
     def __init__(
-        self,
-        Proc_name = 'native_logger',
-        scan_interval = 0.001,
-        dead_interval = 1,
-        logger_queue = None,
-        logger_mode = 'console',
-        logger_vis_level = [2, 3, 4, 5],
-        control_queue = None
+            self,
+            Proc_name='native_logger',
+            scan_interval=0.001,
+            dead_interval=1,
+            logger_queue=None,
+            logger_mode='console',
+            logger_vis_level=None,
+            control_queue=None
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
-            Proc_name = Proc_name,
-            Proc_type = 'logger',
-            scan_interval = scan_interval,
-            dead_interval = dead_interval,
-            rx_queue = logger_queue,
-            tx_queue = None,
-            control_queue = control_queue,
-            logger_proc = self
+            Proc_name=Proc_name,
+            Proc_type='logger',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=logger_queue,
+            tx_queue=None,
+            control_queue=control_queue,
+            logger_proc=self
         )
+        if logger_vis_level is None:
+            logger_vis_level = [2, 3, 4, 5]
         self.Proc_config['logger_queue'] = logger_queue
         self.Proc_config['logger_mode'] = logger_mode
         self.Proc_config['level_dict'] = level_dict
         self.Proc_config['color_dict'] = {
             'color': {
-                'BLACK'       : 0,
-                'RED'         : 1,
-                'GREEN'       : 2,
-                'YELLOW'      : 3,
-                'BLUE'        : 4,
-                'MAGENTA'     : 5,
-                'CYAN'        : 6,
-                'WHITE'       : 7
+                'BLACK': 0,
+                'RED': 1,
+                'GREEN': 2,
+                'YELLOW': 3,
+                'BLUE': 4,
+                'MAGENTA': 5,
+                'CYAN': 6,
+                'WHITE': 7
             },
             'type': {
-                'front'       : 3,
-                'background'  : 4
+                'front': 3,
+                'background': 4
             },
             'shader': {
-                'default'     : 0 ,
-                'highlight'   : 1 ,
-                '-highlight'  : 22,
-                'underline'   : 4 ,
-                '-underline'  : 24,
-                'blink'       : 5 ,
-                '-blink'      : 25,
-                'reverse'     : 7 ,
-                '-reverse'    : 27,
-                'invisiable'  : 8 ,
-                '-invisiable' : 28
+                'default': 0,
+                'highlight': 1,
+                '-highlight': 22,
+                'underline': 4,
+                '-underline': 24,
+                'blink': 5,
+                '-blink': 25,
+                'reverse': 7,
+                '-reverse': 27,
+                'invisiable': 8,
+                '-invisiable': 28
             },
             'color_win': {
-                'BLACK'       : 0                       , # None
-                'BLUE'        : 1 << 0                  , # B
-                'GREEN'       : 1 << 1                  , # G
-                'RED'         : 1 << 2                  , # R
-                'YELLOW'      : 1 << 1 | 1 << 2         , # G + R
-                'MAGENTA'     : 1 << 0 | 1 << 2         , # B + R
-                'CYAN'        : 1 << 0 | 1 << 1         , # B + G
-                'WHITE'       : 1 << 0 | 1 << 1 | 1 << 2  # G + B + R
+                'BLACK': 0,  # None
+                'BLUE': 1 << 0,  # B
+                'GREEN': 1 << 1,  # G
+                'RED': 1 << 2,  # R
+                'YELLOW': 1 << 1 | 1 << 2,  # G + R
+                'MAGENTA': 1 << 0 | 1 << 2,  # B + R
+                'CYAN': 1 << 0 | 1 << 1,  # B + G
+                'WHITE': 1 << 0 | 1 << 1 | 1 << 2  # G + B + R
             },
             'type_win': {
-                'front'       : 0,
-                'background'  : 4
+                'front': 0,
+                'background': 4
             },
             'shader_win': {
-                'default'     : 0     ,
-                'highlight'   : 1 << 3,
-                '-highlight'  : 0     ,
-                'underline'   : 0     ,
-                '-underline'  : 0     ,
-                'blink'       : 0     ,
-                '-blink'      : 0     ,
-                'reverse'     : 1 << 3,
-                '-reverse'    : 0     ,
-                'invisiable'  : 0     ,
-                '-invisiable' : 0
+                'default': 0,
+                'highlight': 1 << 3,
+                '-highlight': 0,
+                'underline': 0,
+                '-underline': 0,
+                'blink': 0,
+                '-blink': 0,
+                'reverse': 1 << 3,
+                '-reverse': 0,
+                'invisiable': 0,
+                '-invisiable': 0
             },
             'mapping': {
                 'need': [-1, 0, 3, 4, 5],
@@ -159,8 +163,8 @@ class logger(OlivOS.API.Proc_templet):
         }
         self.Proc_config['logger_vis_level'] = logger_vis_level
         self.Proc_config['segment_type'] = {
-            'default' : ['[', ']'],
-            'callback' : ['<', '>']
+            'default': ['[', ']'],
+            'callback': ['<', '>']
         }
         self.Proc_config['logfile_count'] = 10
         self.Proc_data['logfile_count'] = self.Proc_config['logfile_count']
@@ -171,7 +175,9 @@ class logger(OlivOS.API.Proc_templet):
         }
 
     class log_packet(dict):
-        def __init__(self, log_level, log_message, log_time, log_segment = []):
+        def __init__(self, log_level, log_message, log_time, log_segment=None):
+            if log_segment is None:
+                log_segment = []
             self['log_level'] = log_level
             self['log_message'] = log_message
             self['log_time'] = log_time
@@ -181,7 +187,7 @@ class logger(OlivOS.API.Proc_templet):
         releaseDir(logfile_dir)
         self.log_output_shader_init()
         self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
-        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding = 'utf-8') as logfile_f:
+        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding='utf-8') as logfile_f:
             pass
         self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
         flag_need_refresh = False
@@ -195,7 +201,7 @@ class logger(OlivOS.API.Proc_templet):
                 continue
             else:
                 try:
-                    packet_this = self.Proc_info.rx_queue.get(block = False)
+                    packet_this = self.Proc_info.rx_queue.get(block=False)
                 except:
                     continue
                 self.log_output(packet_this, flag_need_refresh)
@@ -204,9 +210,12 @@ class logger(OlivOS.API.Proc_templet):
                 flag_need_refresh = False
                 self.Proc_data['logfile_count_out'] = self.Proc_config['logfile_count_out']
 
-    def log(self, log_level, log_message, log_segment = []):
+    def log(self, log_level, log_message, log_segment=None):
+        if log_segment is None:
+            log_segment = []
         try:
-            self.Proc_config['logger_queue'].put(self.log_packet(log_level, log_message, time.time(), log_segment), block = False)
+            self.Proc_config['logger_queue'].put(self.log_packet(log_level, log_message, time.time(), log_segment),
+                                                 block=False)
         except:
             pass
 
@@ -214,24 +223,24 @@ class logger(OlivOS.API.Proc_templet):
         if self.Proc_data['data_tmp']['logfile'] != '':
             file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
             file_name_unity = logfile_file_unity
-            with open('%s/%s' % (logfile_dir, file_name), 'a+', encoding = 'utf-8') as logfile_f:
+            with open('%s/%s' % (logfile_dir, file_name), 'a+', encoding='utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
                 except:
                     pass
-            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+', encoding = 'utf-8') as logfile_f:
+            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+', encoding='utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
                 except:
                     pass
             self.Proc_data['data_tmp']['logfile'] = ''
 
-    def log_output_shader_key(self, key = None):
+    def log_output_shader_key(self, key=None):
         keylist = key
         keylist_str = None
         keylist_new = []
         keylist_new_this = None
-        if keylist == None:
+        if keylist is None:
             keylist = [self.Proc_config['color_dict']['shader']['default']]
         for keylist_this in keylist:
             keylist_new_this = None
@@ -245,7 +254,7 @@ class logger(OlivOS.API.Proc_templet):
                 keylist_new_this = keylist_this
             if keylist_new_this == '':
                 keylist_new_this = None
-            if keylist_new_this != None:
+            if keylist_new_this is not None:
                 if type(keylist_new_this) == str:
                     keylist_new.append(keylist_new_this)
         keylist_str = '\033[%sm' % (';'.join(keylist_new),)
@@ -258,8 +267,9 @@ class logger(OlivOS.API.Proc_templet):
         elif type(self.Proc_config['logger_mode']) == list:
             tmp_logger_mode_list = self.Proc_config['logger_mode']
         if 'console_color' in tmp_logger_mode_list and platform.system() == 'Windows':
-            self.Proc_data['extend_data']['std_out_handle'] = ctypes.windll.kernel32.GetStdHandle(dict_ctype['STD_HANDLE']['STD_OUTPUT_HANDLE'])
-            if self.Proc_data['extend_data']['std_out_handle'] != None:
+            self.Proc_data['extend_data']['std_out_handle'] = ctypes.windll.kernel32.GetStdHandle(
+                dict_ctype['STD_HANDLE']['STD_OUTPUT_HANDLE'])
+            if self.Proc_data['extend_data']['std_out_handle'] is not None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
                     self.Proc_config['color_dict']['shader_win'][
@@ -285,7 +295,7 @@ class logger(OlivOS.API.Proc_templet):
             if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['shader']:
                 tmp_shader = self.Proc_config['color_dict']['mapping']['shader'][log_packet_this['log_level']]
         if platform.system() == 'Windows':
-            if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] != None:
+            if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] is not None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
                     self.Proc_config['color_dict']['shader_win'][
@@ -325,7 +335,7 @@ class logger(OlivOS.API.Proc_templet):
         else:
             print(log_output_str)
 
-    def log_output(self, log_packet_this, flag_need_refresh_out = False):
+    def log_output(self, log_packet_this, flag_need_refresh_out=False):
         tmp_logger_mode_list = []
         flag_need_refresh = False
         if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
@@ -345,7 +355,8 @@ class logger(OlivOS.API.Proc_templet):
                     'native'
                 ]:
                     log_output_str = ''
-                    log_output_str += '[' + str(datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
+                    log_output_str += '[' + str(
+                        datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
                     log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
                     log_output_str_1 = self.__get_log_message(log_packet_this)
                     log_output_str += log_output_str_1
@@ -359,19 +370,19 @@ class logger(OlivOS.API.Proc_templet):
                             self.save_logfile()
         if type(self.Proc_config['logger_mode']) == list and 'native' in self.Proc_config['logger_mode']:
             self.__sendControlEventSend('send', {
-                    'target': {
-                        'type': 'nativeWinUI'
-                    },
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'logger',
+                    'event': 'log',
                     'data': {
-                        'action': 'logger',
-                        'event': 'log',
-                        'data': {
-                            'data': log_packet_this,
-                            'str': self.__get_log_message(log_packet_this)
-                        }
+                        'data': log_packet_this,
+                        'str': self.__get_log_message(log_packet_this)
                     }
                 }
-            )
+            }
+                                        )
 
     def __get_log_message(self, log_packet_this):
         log_output_str_1 = ''
@@ -384,11 +395,11 @@ class logger(OlivOS.API.Proc_templet):
         return log_output_str_1
 
     def __sendControlEventSend(self, action, data):
-        if self.Proc_info.control_queue != None:
+        if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet(
                     action,
                     data
                 ),
-                block = False
+                block=False
             )

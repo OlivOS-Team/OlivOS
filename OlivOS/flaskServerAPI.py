@@ -27,9 +27,14 @@ import threading
 
 import OlivOS
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port, tx_queue = None, debug_mode = False, logger_proc = None, scan_interval = 0.001, dead_interval = 16, Flask_server_xpath = '/OlivOSMsgApi'):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name = Proc_name, Proc_type = 'Flask_rx', scan_interval = scan_interval, dead_interval = dead_interval, rx_queue = None, tx_queue = tx_queue, logger_proc = logger_proc)
+    def __init__(self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port, tx_queue=None,
+                 debug_mode=False, logger_proc=None, scan_interval=0.001, dead_interval=16,
+                 Flask_server_xpath='/OlivOSMsgApi'):
+        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='Flask_rx', scan_interval=scan_interval,
+                                         dead_interval=dead_interval, rx_queue=None, tx_queue=tx_queue,
+                                         logger_proc=logger_proc)
         self.Proc_config['Flask_namespace'] = Flask_namespace
         self.Proc_config['Flask_app'] = None
         self.Proc_config['Flask_name'] = Proc_name
@@ -49,7 +54,8 @@ class server(OlivOS.API.Proc_templet):
 
     def set_config(self):
         with self.Proc_config['Flask_app'].app_context():
-            @current_app.route(self.Proc_config['Flask_server_xpath'] + '/<platform_path>/<sdk_path>/<model_path>', methods = self.Proc_config['Flask_server_methods'])
+            @current_app.route(self.Proc_config['Flask_server_xpath'] + '/<platform_path>/<sdk_path>/<model_path>',
+                               methods=self.Proc_config['Flask_server_methods'])
             def Flask_server_func(sdk_path, platform_path, model_path):
                 sdk_event = OlivOS.onebotSDK.event(request.get_data(as_text=True))
                 sdk_event.platform['sdk'] = sdk_path
@@ -57,7 +63,7 @@ class server(OlivOS.API.Proc_templet):
                 sdk_event.platform['model'] = model_path
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 try:
-                    self.Proc_info.tx_queue.put(tx_packet_data, block = False)
+                    self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                 except:
                     pass
                 return '200'
@@ -68,9 +74,9 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
         self.log(2, 'OlivOS flask server [' + self.Proc_config['Flask_name'] + '] is running')
         if self.Proc_config['config'].debug_mode:
-            self.Proc_config['Flask_app'].run(host = self.Proc_config['Flask_server_host'], port = self.Proc_config['Flask_server_port'])
+            self.Proc_config['Flask_app'].run(host=self.Proc_config['Flask_server_host'],
+                                              port=self.Proc_config['Flask_server_port'])
         else:
-            server = pywsgi.WSGIServer((self.Proc_config['Flask_server_host'], self.Proc_config['Flask_server_port']), self.Proc_config['Flask_app'], log = None)
+            server = pywsgi.WSGIServer((self.Proc_config['Flask_server_host'], self.Proc_config['Flask_server_port']),
+                                       self.Proc_config['Flask_app'], log=None)
             server.serve_forever()
-
-

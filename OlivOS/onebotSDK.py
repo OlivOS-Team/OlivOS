@@ -19,14 +19,16 @@ import json
 import requests as req
 import OlivOS
 
+
 class bot_info_T(object):
-    def __init__(self, id = -1, host = '', port = -1, access_token = None):
+    def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
         self.port = port
         self.access_token = access_token
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
@@ -38,6 +40,7 @@ def get_SDK_bot_info_from_Event(target_event):
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
+
 class send_onebot_post_json_T(object):
     def __init__(self):
         self.bot_info = None
@@ -45,26 +48,28 @@ class send_onebot_post_json_T(object):
         self.node_ext = ''
 
     def send_onebot_post_json(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj == None or self.node_ext == '':
+        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
             return None
         else:
-            json_str_tmp = json.dumps(obj = self.obj.__dict__)
-            send_url = self.bot_info.host + ':' + str(self.bot_info.port) + '/' + self.node_ext + '?access_token=' + self.bot_info.access_token
+            json_str_tmp = json.dumps(obj=self.obj.__dict__)
+            send_url = self.bot_info.host + ':' + str(
+                self.bot_info.port) + '/' + self.node_ext + '?access_token=' + self.bot_info.access_token
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
 
             headers = {
                 'Content-Type': 'application/json'
             }
-            msg_res = req.request("POST", send_url, headers = headers, data = json_str_tmp)
+            msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
             return msg_res
+
 
 class api_templet(object):
     def __init__(self):
@@ -106,16 +111,14 @@ class api_templet(object):
             self.res = None
         return self.res
 
+
 class event(object):
     def __init__(self, raw):
         self.raw = raw
         self.json = self.event_load(raw)
-        self.platform = {}
-        self.platform['sdk'] = 'onebot'
-        self.platform['platform'] = 'qq'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'default'}
         self.active = False
-        if self.json != None:
+        if self.json is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -131,7 +134,7 @@ class event(object):
         return res
 
 
-#支持OlivOS API事件生成的映射实现
+# 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
@@ -149,10 +152,13 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.json['message'],
                 target_event.sdk_event.json['sub_type']
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                              target_event.sdk_event.json['message'])
             target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
             target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'raw_message'])
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
             if 'user_id' in target_event.sdk_event.json['sender']:
@@ -169,10 +175,14 @@ def get_Event_from_SDK(target_event):
                     target_event.sdk_event.json['message'],
                     target_event.sdk_event.json['sub_type']
                 )
-                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'message'])
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
                 target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['raw_message'])
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                      target_event.sdk_event.json[
+                                                                                          'raw_message'])
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
@@ -189,10 +199,14 @@ def get_Event_from_SDK(target_event):
                     target_event.sdk_event.json['message'],
                     target_event.sdk_event.json['sub_type']
                 )
-                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'message'])
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
                 target_event.data.raw_message = target_event.sdk_event.json['message']
-                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json['message'])
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                      target_event.sdk_event.json[
+                                                                                          'message'])
                 target_event.data.font = None
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
@@ -206,7 +220,7 @@ def get_Event_from_SDK(target_event):
                     target_event.data.extend['sub_self_id'] = str(target_event.sdk_event.json['self_tiny_id'])
                     if str(target_event.sdk_event.json['user_id']) == str(target_event.sdk_event.json['self_tiny_id']):
                         target_event.active = False
-        if target_event.data != None:
+        if target_event.data is not None:
             if target_event.data.raw_message == '':
                 target_event.active = False
         else:
@@ -368,7 +382,7 @@ def get_Event_from_SDK(target_event):
             )
 
 
-#支持OlivOS API调用的方法实现
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def reply_private_msg(target_event, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
@@ -409,43 +423,46 @@ class event_action(object):
         this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = str(message_id)
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
-                res_data['data']['sender']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
+                res_data['data']['sender']['id'] = str(
+                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
                 res_data['data']['sender']['name'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
-                res_data['data']['sender']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
-                res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
+                res_data['data']['sender']['user_id'] = str(
+                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
+                res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'],
+                                                                                      str)
                 res_data['data']['time'] = init_api_do_mapping_for_dict(raw_obj, ['time'], int)
                 res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
                 res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)
         return res_data
 
-    def send_like(target_event, user_id, times = 1):
+    def send_like(target_event, user_id, times=1):
         this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.times = times
         this_msg.do_api()
 
-    def set_group_kick(target_event, group_id, user_id, rehect_add_request = False):
+    def set_group_kick(target_event, group_id, user_id, rehect_add_request=False):
         this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.rehect_add_request = rehect_add_request
         this_msg.do_api()
 
-    def set_group_ban(target_event, group_id, user_id, duration = 1800):
+    def set_group_ban(target_event, group_id, user_id, duration=1800):
         this_msg = api.set_group_ban(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.duration = duration
         this_msg.do_api()
 
-    def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration = 1800):
+    def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration=1800):
         this_msg = api.set_group_anonymous_ban(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.anonymous = anonymous
@@ -485,7 +502,7 @@ class event_action(object):
         this_msg.data.group_name = group_name
         this_msg.do_api()
 
-    def set_group_leave(target_event, group_id, is_dismiss = False):
+    def set_group_leave(target_event, group_id, is_dismiss=False):
         this_msg = api.set_group_leave(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.is_dismiss = is_dismiss
@@ -519,25 +536,25 @@ class event_action(object):
         raw_obj = None
         this_msg = api.get_login_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
         return res_data
 
-    def get_stranger_info(target_event, user_id, no_cache = False):
+    def get_stranger_info(target_event, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
         this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
@@ -549,9 +566,9 @@ class event_action(object):
         raw_obj = None
         this_msg = api.get_friend_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
@@ -561,16 +578,16 @@ class event_action(object):
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def get_group_info(target_event, group_id, no_cache = False):
+    def get_group_info(target_event, group_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
         this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
@@ -585,9 +602,9 @@ class event_action(object):
         raw_obj = None
         this_msg = api.get_group_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
@@ -595,12 +612,14 @@ class event_action(object):
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
-                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['member_count'], int)
-                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['max_member_count'], int)
+                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['member_count'],
+                                                                                     int)
+                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this,
+                                                                                         ['max_member_count'], int)
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def get_group_member_info(target_event, group_id, user_id, no_cache = False):
+    def get_group_member_info(target_event, group_id, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
         this_msg = api.get_group_member_info(get_SDK_bot_info_from_Event(target_event))
@@ -608,9 +627,9 @@ class event_action(object):
         this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
@@ -618,8 +637,11 @@ class event_action(object):
                 res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
                 res_data['data']['group_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
                 res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['join_time'], int)
-                res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj, ['last_sent_time'], int)
-                res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj, ['shut_up_timestamp'], int)
+                res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj, ['last_sent_time'],
+                                                                                           int)
+                res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj,
+                                                                                              ['shut_up_timestamp'],
+                                                                                              int)
                 res_data['data']['role'] = init_api_do_mapping_for_dict(raw_obj, ['role'], str)
                 res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['card'], str)
                 res_data['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
@@ -631,9 +653,9 @@ class event_action(object):
         this_msg = api.get_group_member_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
@@ -642,9 +664,12 @@ class event_action(object):
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
                     tmp_res_data_this['user_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
                     tmp_res_data_this['group_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
-                    tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['join_time'], int)
-                    tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['last_sent_time'], int)
-                    tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj_this, ['shut_up_timestamp'], int)
+                    tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['join_time'],
+                                                                                           int)
+                    tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj_this,
+                                                                                                ['last_sent_time'], int)
+                    tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj_this, [
+                        'shut_up_timestamp'], int)
                     tmp_res_data_this['role'] = init_api_do_mapping_for_dict(raw_obj_this, ['role'], str)
                     tmp_res_data_this['card'] = init_api_do_mapping_for_dict(raw_obj_this, ['card'], str)
                     tmp_res_data_this['title'] = init_api_do_mapping_for_dict(raw_obj_this, ['title'], str)
@@ -656,9 +681,9 @@ class event_action(object):
         raw_obj = None
         this_msg = api.can_send_image(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
@@ -669,9 +694,9 @@ class event_action(object):
         raw_obj = None
         this_msg = api.can_send_record(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
@@ -682,20 +707,32 @@ class event_action(object):
         raw_obj = None
         this_msg = api.get_status(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['online'] = init_api_do_mapping_for_dict(raw_obj, ['online'], bool)
-                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_received'], int)
-                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_sent'], int)
-                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'packet_lost'], int)
-                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'message_received'], int)
-                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'message_sent'], int)
-                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'disconnect_times'], int)
-                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'lost_times'], int)
-                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'last_message_time'], int)
+                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
+                                                                                                       'packet_received'],
+                                                                                             int)
+                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(raw_obj,
+                                                                                         ['stat', 'packet_sent'], int)
+                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(raw_obj,
+                                                                                         ['stat', 'packet_lost'], int)
+                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
+                                                                                                        'message_received'],
+                                                                                              int)
+                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(raw_obj,
+                                                                                          ['stat', 'message_sent'], int)
+                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
+                                                                                                        'disconnect_times'],
+                                                                                              int)
+                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'lost_times'],
+                                                                                        int)
+                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
+                                                                                                         'last_message_time'],
+                                                                                               int)
         return res_data
 
     def get_version_info(target_event):
@@ -703,9 +740,9 @@ class event_action(object):
         raw_obj = None
         this_msg = api.get_version_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['app_name'], str)
@@ -715,7 +752,7 @@ class event_action(object):
                 res_data['data']['os'] = init_api_do_mapping_for_dict(raw_obj, ['runtime_os'], str)
         return res_data
 
-    #以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
+    # 以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
 
     def send_guild_channel_msg(target_event, guild_id, channel_id, message):
         this_msg = api.send_guild_channel_msg(get_SDK_bot_info_from_Event(target_event))
@@ -731,9 +768,9 @@ class event_action(object):
         this_msg.data.guild_id = int(guild_id)
         this_msg.data.user_id = int(user_id)
         this_msg.do_api()
-        if this_msg.res != None:
+        if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj != None:
+        if raw_obj is not None:
             if type(raw_obj) == dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
@@ -747,6 +784,7 @@ class event_action(object):
                 res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['title'] = ''
         return res_data
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -773,9 +811,11 @@ def init_api_json(raw_str):
                 res_data = tmp_obj['data'].copy()
     return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
     if type(src_data) == src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
@@ -792,7 +832,8 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
 
-#onebot协议标准api调用实现
+
+# onebot协议标准api调用实现
 class api(object):
     class send_private_msg(api_templet):
         def __init__(self, bot_info=None):
@@ -806,8 +847,7 @@ class api(object):
             def __init__(self):
                 self.user_id = -1
                 self.message = ''
-                self.auto_escape  = False
-
+                self.auto_escape = False
 
     class send_group_msg(api_templet):
         def __init__(self, bot_info=None):
@@ -821,8 +861,7 @@ class api(object):
             def __init__(self):
                 self.group_id = -1
                 self.message = ''
-                self.auto_escape  = False
-
+                self.auto_escape = False
 
     class send_group_forward_msg(api_templet):
         def __init__(self, bot_info=None):
@@ -836,7 +875,6 @@ class api(object):
             def __init__(self):
                 self.group_id = -1
                 self.messages = ''
-
 
     class send_msg(api_templet):
         def __init__(self, bot_info=None):
@@ -854,7 +892,6 @@ class api(object):
                 self.message = ''
                 self.auto_escape = False
 
-
     class delete_msg(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -862,11 +899,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'delete_msg'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.message_id = -1
-
 
     class get_msg(api_templet):
         def __init__(self, bot_info=None):
@@ -880,7 +916,6 @@ class api(object):
             def __init__(self):
                 self.message_id = -1
 
-
     class get_forward_msg(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -888,11 +923,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_forward_msg'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.id = -1
-
 
     class send_like(api_templet):
         def __init__(self, bot_info=None):
@@ -901,12 +935,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'send_like'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.user_id = -1
                 self.times = 1
-
 
     class set_group_kick(api_templet):
         def __init__(self, bot_info=None):
@@ -915,13 +948,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_kick'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.rehect_add_request = False
-
 
     class set_group_ban(api_templet):
         def __init__(self, bot_info=None):
@@ -930,13 +962,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_ban'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.duration = 1800
-
 
     class set_group_anonymous_ban(api_templet):
         def __init__(self, bot_info=None):
@@ -945,14 +976,13 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_anonymous_ban'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.anonymous = None
                 self.anonymous_flag = ''
                 self.duration = 1800
-
 
     class set_group_whole_ban(api_templet):
         def __init__(self, bot_info=None):
@@ -961,12 +991,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_whole_ban'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.enable = True
-
 
     class set_group_admin(api_templet):
         def __init__(self, bot_info=None):
@@ -975,13 +1004,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_admin'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.enable = True
-
 
     class set_group_anonymous(api_templet):
         def __init__(self, bot_info=None):
@@ -990,12 +1018,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_anonymous'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.enable = True
-
 
     class set_group_card(api_templet):
         def __init__(self, bot_info=None):
@@ -1004,13 +1031,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_card'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.card = ''
-
 
     class set_group_name(api_templet):
         def __init__(self, bot_info=None):
@@ -1019,12 +1045,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_name'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.group_name = ''
-
 
     class set_group_leave(api_templet):
         def __init__(self, bot_info=None):
@@ -1033,12 +1058,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_leave'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.is_dismiss = False
-
 
     class set_group_special_title(api_templet):
         def __init__(self, bot_info=None):
@@ -1047,14 +1071,13 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_special_title'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.special_title = None
                 self.duration = -1
-
 
     class set_friend_add_request(api_templet):
         def __init__(self, bot_info=None):
@@ -1063,13 +1086,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_friend_add_request'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.flag = ''
                 self.approve = True
                 self.remark = None
-
 
     class set_group_add_request(api_templet):
         def __init__(self, bot_info=None):
@@ -1078,14 +1100,13 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'set_group_add_request'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.flag = ''
                 self.sub_type = ''
                 self.approve = True
                 self.reason = None
-
 
     class get_login_info(api_templet):
         def __init__(self, bot_info=None):
@@ -1094,11 +1115,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_login_info'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
-
 
     class get_stranger_info(api_templet):
         def __init__(self, bot_info=None):
@@ -1107,12 +1127,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_stranger_info'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.user_id = -1
                 self.no_cache = False
-
 
     class get_friend_list(api_templet):
         def __init__(self, bot_info=None):
@@ -1121,11 +1140,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_friend_list'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
-
 
     class get_group_info(api_templet):
         def __init__(self, bot_info=None):
@@ -1134,12 +1152,11 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_group_info'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.no_cache = False
-
 
     class get_group_list(api_templet):
         def __init__(self, bot_info=None):
@@ -1148,11 +1165,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_group_list'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
-
 
     class get_group_member_info(api_templet):
         def __init__(self, bot_info=None):
@@ -1161,13 +1177,12 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_group_member_info'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
                 self.no_cache = False
-
 
     class get_group_member_list(api_templet):
         def __init__(self, bot_info=None):
@@ -1176,11 +1191,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_group_member_list'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.group_id = -1
-
 
     class get_cookies(api_templet):
         def __init__(self, bot_info=None):
@@ -1189,11 +1203,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_cookies'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.domain = ''
-
 
     class get_csrf_token(api_templet):
         def __init__(self, bot_info=None):
@@ -1202,11 +1215,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_csrf_token'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
-
 
     class get_credentails(api_templet):
         def __init__(self, bot_info=None):
@@ -1215,11 +1227,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_credentails'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.domain = ''
-
 
     class get_record(api_templet):
         def __init__(self, bot_info=None):
@@ -1234,7 +1245,6 @@ class api(object):
                 self.file = ''
                 self.out_format = ''
 
-
     class get_image(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1242,11 +1252,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_image'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.file = ''
-
 
     class can_send_image(api_templet):
         def __init__(self, bot_info=None):
@@ -1255,7 +1264,7 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'can_send_image'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
@@ -1265,7 +1274,6 @@ class api(object):
                 json_obj = json.loads(self.res.text)
                 yes_tmp = json_obj['data']['yes']
                 return yes_tmp
-
 
     class can_send_record(api_templet):
         def __init__(self, bot_info=None):
@@ -1274,7 +1282,7 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'can_send_record'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
@@ -1285,7 +1293,6 @@ class api(object):
                 yes_tmp = json_obj['data']['yes']
                 return yes_tmp
 
-
     class get_status(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1293,11 +1300,10 @@ class api(object):
             self.data = self.data_T()
             self.node_ext = 'get_status'
             self.res = None
-    
+
         class data_T(object):
             def __init__(self):
                 self.default = None
-
 
     class get_version_info(api_templet):
         def __init__(self, bot_info=None):
@@ -1311,7 +1317,6 @@ class api(object):
             def __init__(self):
                 self.default = None
 
-
     class set_restart(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1323,7 +1328,6 @@ class api(object):
         class data_T(object):
             def __init__(self):
                 self.delay = 0
-
 
     class clean_cache(api_templet):
         def __init__(self, bot_info=None):
@@ -1337,8 +1341,7 @@ class api(object):
             def __init__(self):
                 self.default = None
 
-
-    #以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
+    # 以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
 
     class send_guild_channel_msg(api_templet):
         def __init__(self, bot_info=None):

@@ -23,18 +23,20 @@ import traceback
 
 import OlivOS
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval = 0.001, dead_interval = 1, rx_queue = None, tx_queue = None, control_queue = None, logger_proc = None, target_proc = None, debug_mode = False, bot_info_dict = None):
+    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
+                 control_queue=None, logger_proc=None, target_proc=None, debug_mode=False, bot_info_dict=None):
         OlivOS.API.Proc_templet.__init__(
             self,
-            Proc_name = Proc_name,
-            Proc_type = 'lib_exe_model',
-            scan_interval = scan_interval,
-            dead_interval = dead_interval,
-            rx_queue = rx_queue,
-            tx_queue = tx_queue,
-            control_queue = control_queue,
-            logger_proc = logger_proc
+            Proc_name=Proc_name,
+            Proc_type='lib_exe_model',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=rx_queue,
+            tx_queue=tx_queue,
+            control_queue=control_queue,
+            logger_proc=logger_proc
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -65,14 +67,14 @@ class server(OlivOS.API.Proc_templet):
             ]):
                 model_Proc = subprocess.Popen(
                     '..\\..\\..\\lib\\go-cqhttp.exe faststart',
-                    cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
-                    shell = True,
-                    stdin = subprocess.PIPE,
-                    stdout = subprocess.PIPE,
-                    stderr = subprocess.PIPE
+                    cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
                 )
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] is running')
-                model_Proc.communicate(timeout = None)
+                model_Proc.communicate(timeout=None)
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] exited')
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp',
@@ -86,24 +88,28 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_data['check_qrcode_flag'] = True
                 self.Proc_data['check_stdin'] = True
                 threading.Thread(
-                    target = self.check_qrcode,
-                    args = ()
+                    target=self.check_qrcode,
+                    args=()
                 ).start()
+                tmp_env = dict(os.environ)
+                # 依据 https://github.com/Mrs4s/go-cqhttp/pull/1772 的改动
+                tmp_env['FORCE_TTY'] = ''
                 model_Proc = subprocess.Popen(
                     '..\\..\\..\\lib\\go-cqhttp.exe',
-                    cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
-                    shell = True,
-                    stdin = subprocess.PIPE,
-                    stdout = subprocess.PIPE,
-                    stderr = subprocess.PIPE,
-                    creationflags = subprocess.CREATE_NEW_CONSOLE
+                    cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    env=tmp_env
                 )
                 threading.Thread(
-                    target = self.check_stdin,
-                    args = (model_Proc, )
+                    target=self.check_stdin,
+                    args=(model_Proc,)
                 ).start()
                 self.get_model_stdout(model_Proc)
-                #model_Proc.communicate(timeout = None)
+                # model_Proc.communicate(timeout = None)
                 self.log(3, 'OlivOS libEXEModel server [' + self.Proc_name + '] will retry in 10s...')
                 time.sleep(8)
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
@@ -112,47 +118,48 @@ class server(OlivOS.API.Proc_templet):
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
                 subprocess.call(
                     'start cmd /K "title GoCqHttp For OlivOS|..\\..\\..\\lib\\go-cqhttp.exe"',
-                    shell = True,
-                    cwd = '.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
+                    shell=True,
+                    cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
                 )
                 flag_run = False
 
     def getBotIDStr(self):
         tmp_self_data = self.Proc_data['bot_info_dict'].platform['platform']
-        if self.Proc_data['bot_info_dict'].id != None:
+        if self.Proc_data['bot_info_dict'].id is not None:
             tmp_self_data = '%s|%s' % (
                 self.Proc_data['bot_info_dict'].platform['platform'],
                 str(self.Proc_data['bot_info_dict'].id)
             )
         return tmp_self_data
 
-    def check_stdin(self, model_Proc:subprocess.Popen):
+    def check_stdin(self, model_Proc: subprocess.Popen):
         while self.Proc_data['check_stdin']:
             if self.Proc_info.rx_queue.empty():
                 time.sleep(0.02)
             else:
                 try:
-                    rx_packet_data = self.Proc_info.rx_queue.get(block = False)
+                    rx_packet_data = self.Proc_info.rx_queue.get(block=False)
                 except:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
-                        if 'input' == rx_packet_data.key['data']['action']:
-                            if 'data' in rx_packet_data.key['data']:
-                                input_raw = str(rx_packet_data.key['data']['data'])
-                                input_data = ('%s\n' % input_raw).encode('utf-8')
-                                model_Proc.stdin.write(input_data)
-                                log_data = ('%s' % input_raw)
-                                self.send_log_event(log_data)
-                                self.log(2, log_data, [
-                                    (self.getBotIDStr(), 'default'),
-                                    ('gocqhttp', 'default'),
-                                    ('onebot_send', 'default')
-                                ])
+                    if 'input' == rx_packet_data.key['data']['action']:
+                        if 'data' in rx_packet_data.key['data']:
+                            input_raw = str(rx_packet_data.key['data']['data'])
+                            input_data = ('%s\r\n' % input_raw).encode('utf-8')
+                            model_Proc.stdin.write(input_data)
+                            model_Proc.stdin.flush()
+                            log_data = ('%s' % input_raw)
+                            self.send_log_event(log_data)
+                            self.log(2, log_data, [
+                                (self.getBotIDStr(), 'default'),
+                                ('gocqhttp', 'default'),
+                                ('onebot_send', 'default')
+                            ])
 
-    def get_model_stdout(self, model_Proc:subprocess.Popen):
+    def get_model_stdout(self, model_Proc: subprocess.Popen):
         for line in iter(model_Proc.stdout.readline, b''):
             try:
-                log_data = ('%s' % line.decode('utf-8', errors = 'replace')).rstrip('\n')
+                log_data = ('%s' % line.decode('utf-8', errors='replace')).rstrip('\n')
                 self.send_log_event(log_data)
                 self.log(1, log_data, [
                     (self.getBotIDStr(), 'default'),
@@ -161,23 +168,23 @@ class server(OlivOS.API.Proc_templet):
                 ])
             except Exception as e:
                 self.log(4, 'OlivOS libEXEModelAPI failed: %s\n%s' % (
-                        str(e),
-                        traceback.format_exc()
-                    )
+                    str(e),
+                    traceback.format_exc()
                 )
+                         )
 
     def send_init_event(self):
         self.sendControlEventSend('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'gocqhttp',
-                    'event': 'init',
-                    'hash': self.Proc_data['bot_info_dict'].hash
-                }
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'gocqhttp',
+                'event': 'init',
+                'hash': self.Proc_data['bot_info_dict'].hash
             }
-        )
+        }
+                                  )
 
     def clear_gocqhttp(self):
         file_path = './conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash + '/qrcode.png'
@@ -195,43 +202,44 @@ class server(OlivOS.API.Proc_templet):
             time.sleep(1)
         self.Proc_data['check_qrcode_flag'] = False
 
-    def send_QRCode_event(self, path:str):
+    def send_QRCode_event(self, path: str):
         self.sendControlEventSend('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'gocqhttp',
-                    'event': 'qrcode',
-                    'hash': self.Proc_data['bot_info_dict'].hash,
-                    'path': path
-                }
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'gocqhttp',
+                'event': 'qrcode',
+                'hash': self.Proc_data['bot_info_dict'].hash,
+                'path': path
             }
-        )
+        }
+                                  )
 
     def send_log_event(self, data):
         self.sendControlEventSend('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'gocqhttp',
-                    'event': 'log',
-                    'hash': self.Proc_data['bot_info_dict'].hash,
-                    'data': data
-                }
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'gocqhttp',
+                'event': 'log',
+                'hash': self.Proc_data['bot_info_dict'].hash,
+                'data': data
             }
-        )
+        }
+                                  )
 
     def sendControlEventSend(self, action, data):
-        if self.Proc_info.control_queue != None:
+        if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet(
                     action,
                     data
                 ),
-                block = False
+                block=False
             )
+
 
 class goTypeConfig(object):
     def __init__(self, bot_info_dict, target_proc):
@@ -312,12 +320,14 @@ class goTypeConfig(object):
                     break
         self.config_file_format['servers-host'] = tmp_host
         self.config_file_format['servers-port'] = str(self.bot_info_dict.post_info.port)
-        self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
+        self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(
+            self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 
-        with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+', encoding = 'utf-8') as tmp:
+        with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+', encoding='utf-8') as tmp:
             tmp.write(self.config_file_str)
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):

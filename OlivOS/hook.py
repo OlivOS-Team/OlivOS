@@ -14,8 +14,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-#pillow
+import platform
+
+# pillow
 from PIL import Image
 
-#lxml
-from lxml import etree
+# sqlite
+import sqlite3
+
+# win
+if platform.system() == 'Windows':
+    import win32com.client
+    import pythoncom

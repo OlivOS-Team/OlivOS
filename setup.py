@@ -20,7 +20,7 @@ with open('README.md', 'r', encoding = 'utf-8') as f:
   long_description = f.read()
 
 setuptools.setup(name='olivos',
-    version='0.10.2',
+    version='0.10.17',
     description='OlivOS - Witness Union',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -28,7 +28,6 @@ setuptools.setup(name='olivos',
     author_email='lunzhipenxil@gmail.com',
     url='https://github.com/OlivOS-Team/OlivOS',
     install_requires=[
-        'pyinstaller==3.5',
         'flask',
         'gevent',
         'psutil',
@@ -37,10 +36,12 @@ setuptools.setup(name='olivos',
         'websockets',
         'websocket-client',
         'pillow',
-        'lxml',
         'rsa',
         'requests_toolbelt',
-        'pystray'
+        'pystray',
+        'aiohttp',
+        'qrcode',
+        'brotli'
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),

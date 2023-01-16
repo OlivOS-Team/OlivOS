@@ -18,10 +18,9 @@ import requests as req
 import json
 import time
 import uuid
-#import urllib
+# import urllib
 
 import OlivOS
-
 
 dodoAPIHost = {
     'beta': 'https://apis.mahuatalk.com'
@@ -34,11 +33,12 @@ dodoAPIRoute = {
 
 
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None):
+    def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
@@ -48,6 +48,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
         target_event.bot_info.id,
@@ -55,6 +56,7 @@ def get_SDK_bot_info_from_Event(target_event):
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
+
 
 class api_templet(object):
     def __init__(self):
@@ -72,12 +74,12 @@ class api_templet(object):
                 'token': self.bot_info.access_token,
                 'clientType': 3
             }
-            if self.data != None:
+            if self.data is not None:
                 for data_this in self.data.__dict__:
-                    if self.data.__dict__[data_this] != None:
+                    if self.data.__dict__[data_this] is not None:
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
-            #payload = urllib.parse.urlencode(tmp_payload_dict)
+            # payload = urllib.parse.urlencode(tmp_payload_dict)
             payload = tmp_payload_dict
             send_url = self.host + ':' + str(self.port) + self.route
             headers = {
@@ -85,10 +87,10 @@ class api_templet(object):
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
-            msg_res = req.request("POST", send_url, headers = headers, data = payload)
+            msg_res = req.request("POST", send_url, headers=headers, data=payload)
 
             if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger != None:
+                if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
             self.res = msg_res.text
@@ -96,17 +98,15 @@ class api_templet(object):
         except:
             return None
 
+
 class event(object):
-    def __init__(self, json_obj = None, bot_info = None, islandId = None):
+    def __init__(self, json_obj=None, bot_info=None, islandId=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
-        self.platform = {}
-        self.platform['sdk'] = 'dodo_poll'
-        self.platform['platform'] = 'dodo'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'dodo_poll', 'platform': 'dodo', 'model': 'default'}
         self.islandId = islandId
         self.active = False
-        if self.json != None:
+        if self.json is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -120,6 +120,7 @@ class event(object):
         except:
             res = None
         return res
+
 
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
@@ -152,7 +153,7 @@ def get_Event_from_SDK(target_event):
                     )
                 except:
                     return
-        if message_obj != None:
+        if message_obj is not None:
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
             target_event.data = target_event.group_message(
@@ -172,11 +173,12 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['name'] = target_event.sdk_event.json['nickName']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
-            if target_event.sdk_event.islandId != None:
+            if target_event.sdk_event.islandId is not None:
                 target_event.data.host_id = target_event.sdk_event.islandId
                 target_event.data.extend['host_group_id'] = target_event.sdk_event.islandId
 
-#支持OlivOS API调用的方法实现
+
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
         flag_now_type = 'string'
@@ -190,11 +192,11 @@ class event_action(object):
                         this_msg.do_api()
                 this_msg.data.content = ''
                 this_msg.data.resourceJson = json.dumps({
-                        'resourceType': 1,
-                        'useType': 1,
-                        'width': 283,
-                        'height': 283,
-                        'resourceUrl': message_this.data['file']
+                    'resourceType': 1,
+                    'useType': 1,
+                    'width': 283,
+                    'height': 283,
+                    'resourceUrl': message_this.data['file']
                 })
                 this_msg.data.type = 2
                 this_msg.data.tk = uuid.uuid4()
@@ -215,7 +217,7 @@ class event_action(object):
 
     def send_private_msg(target_event, host_id, chat_id, message):
         this_msg = API.sendMessagePrivate(get_SDK_bot_info_from_Event(target_event))
-        if host_id != None:
+        if host_id is not None:
             this_msg.data.islandId = host_id
         this_msg.data.toUid = chat_id
         this_msg.data.content = ''
@@ -230,47 +232,45 @@ class event_action(object):
             elif type(message_this) == OlivOS.messageAPI.PARA.image:
                 this_msg.data.content = ''
                 this_msg.data.resourceJson = json.dumps({
-                        'resourceType': 1,
-                        'useType': 1,
-                        'width': 283,
-                        'height': 283,
-                        'resourceUrl': message_this.data['file']
+                    'resourceType': 1,
+                    'useType': 1,
+                    'width': 283,
+                    'height': 283,
+                    'resourceUrl': message_this.data['file']
                 })
                 this_msg.data.type = 2
                 this_msg.data.tk = uuid.uuid4()
                 if this_msg.data.resourceJson != '{}':
                     this_msg.do_api()
 
+
 class API(object):
     class extendMyLife(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['tokenmgr'] + '/extend-my-life'
 
-
     class requestNewToken(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['tokenmgr'] + '/request-new-token'
 
-
     class getIslandList(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/islands'
 
-
     class getChannelList(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -281,9 +281,8 @@ class API(object):
             def __init__(self):
                 self.islandId = 0
 
-
     class getChannelUpdate(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -295,9 +294,8 @@ class API(object):
                 self.channelId = 0
                 self.size = 50
 
-
     class getIslandUpdate(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -308,9 +306,8 @@ class API(object):
             def __init__(self):
                 self.islandId = 0
 
-
     class sendMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -326,9 +323,8 @@ class API(object):
                 self.referencedMessageId = None
                 self.tk = uuid.uuid4()
 
-
     class sendMessagePrivate(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -345,9 +341,8 @@ class API(object):
                 self.referencedMessageId = None
                 self.tk = uuid.uuid4()
 
-
     class setMemberNickname(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()

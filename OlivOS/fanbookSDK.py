@@ -21,7 +21,6 @@ import uuid
 
 import OlivOS
 
-
 fanbookAPIHost = {
     'a1': 'https://a1.fanbook.mobi'
 }
@@ -36,11 +35,12 @@ fanbookAPIRouteTemp = {
 
 
 class bot_info_T(object):
-    def __init__(self, id = -1, access_token = None):
+    def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
         self.debug_mode = False
         self.debug_logger = None
+
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
@@ -50,6 +50,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
         target_event.bot_info.id,
@@ -57,6 +58,7 @@ def get_SDK_bot_info_from_Event(target_event):
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
+
 
 class api_templet(object):
     def __init__(self):
@@ -74,12 +76,12 @@ class api_templet(object):
             tmp_fanbookAPIRouteTemp.update({
                 'token': self.bot_info.access_token
             })
-            if self.data != None:
+            if self.data is not None:
                 for data_this in self.data.__dict__:
-                    if self.data.__dict__[data_this] != None:
+                    if self.data.__dict__[data_this] is not None:
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
-            payload = json.dumps(obj = tmp_payload_dict)
+            payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_fanbookAPIRouteTemp)
             headers = {
@@ -87,21 +89,19 @@ class api_templet(object):
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
-            msg_res = req.request("POST", send_url, headers = headers, data = payload)
+            msg_res = req.request("POST", send_url, headers=headers, data=payload)
 
             self.res = msg_res.text
             return msg_res.text
 
+
 class event(object):
-    def __init__(self, json_obj = None, bot_info = None):
+    def __init__(self, json_obj=None, bot_info=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
-        self.platform = {}
-        self.platform['sdk'] = 'fanbook_poll'
-        self.platform['platform'] = 'fanbook'
-        self.platform['model'] = 'default'
+        self.platform = {'sdk': 'fanbook_poll', 'platform': 'fanbook', 'model': 'default'}
         self.active = False
-        if self.json != None:
+        if self.json is not None:
             self.active = True
         self.base_info = {}
         if self.active:
@@ -116,7 +116,10 @@ class event(object):
             res = None
         return res
 
-def checkInDictSafe(var_key, var_dict, var_path = []):
+
+def checkInDictSafe(var_key, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -128,7 +131,10 @@ def checkInDictSafe(var_key, var_dict, var_path = []):
     else:
         return False
 
-def checkEquelInDictSafe(var_it, var_dict, var_path = []):
+
+def checkEquelInDictSafe(var_it, var_dict, var_path=None):
+    if var_path is None:
+        var_path = []
     var_dict_this = var_dict
     for var_key_this in var_path:
         if var_key_this in var_dict_this:
@@ -140,6 +146,7 @@ def checkEquelInDictSafe(var_it, var_dict, var_path = []):
     else:
         return False
 
+
 def checkByListAnd(check_list):
     flag_res = True
     for check_list_this in check_list:
@@ -147,6 +154,7 @@ def checkByListAnd(check_list):
             flag_res = False
             return flag_res
     return flag_res
+
 
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
@@ -238,7 +246,8 @@ def get_Event_from_SDK(target_event):
         target_event.data.host_id = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
         target_event.data.extend['host_group_id'] = str(target_event.sdk_event.json['channel_post']['chat']['guild_id'])
 
-#支持OlivOS API调用的方法实现
+
+# 支持OlivOS API调用的方法实现
 class event_action(object):
     def send_msg(target_event, chat_id, message):
         flag_now_type = 'string'
@@ -273,11 +282,11 @@ class event_action(object):
         try:
             tmp_res = this_msg.do_api()
             tmp_res_obj = json.loads(tmp_res)
-            if tmp_res_obj['ok'] == True:
+            if tmp_res_obj['ok']:
                 private_chat_id = tmp_res_obj['result']['id']
         except:
             return
-        if private_chat_id != None:
+        if private_chat_id is not None:
             event_action.send_msg(target_event, private_chat_id, message)
 
     def get_login_info(target_event):
@@ -287,7 +296,7 @@ class event_action(object):
         try:
             tmp_res = this_msg.do_api()
             tmp_res_obj = json.loads(tmp_res)
-            if tmp_res_obj['ok'] == True:
+            if tmp_res_obj['ok']:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'username'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'id'], int))
@@ -295,9 +304,11 @@ class event_action(object):
             res_data['active'] = False
         return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
     if type(src_data) == src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
@@ -314,18 +325,18 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
 
+
 class API(object):
     class getMe(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/{token}/getMe'
 
-
     class getUpdates(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -339,7 +350,7 @@ class API(object):
                 self.timeout = 2
 
     class sendMessage(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -354,7 +365,7 @@ class API(object):
                 self.disable_notification = False
 
     class sendPhoto(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -369,7 +380,7 @@ class API(object):
                 }
 
     class getPrivateChat(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
@@ -381,7 +392,7 @@ class API(object):
                 self.user_id = 0
 
     class setBotPrivacyMode(api_templet):
-        def __init__(self, bot_info = None):
+        def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()

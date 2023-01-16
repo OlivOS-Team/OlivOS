@@ -19,9 +19,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 default_Conf = {
-    "system" : {
-        "name" : "OlivOS",
-        "init" : [
+    "system": {
+        "name": "OlivOS",
+        "init": [
             "OlivOS_logger",
             "OlivOS_account_config",
             "OlivOS_multiLoginUI",
@@ -31,224 +31,287 @@ default_Conf = {
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
+            "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
             "OlivOS_qqGuild_link",
+            "OlivOS_discord_link",
+            "OlivOS_hackChat_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
-            "OlivOS_dodo_poll",
             "OlivOS_kaiheila_link",
             "OlivOS_dodo_link",
+            "OlivOS_biliLive_link",
             "OlivOS_nativeWinUIAPI"
         ],
-        "control_queue" : "OlivOS_control_queue",
-        "interval" : 0.2,
-        "proc_mode" : "auto"
+        "control_queue": "OlivOS_control_queue",
+        "interval": 0.2,
+        "proc_mode": "auto"
     },
-    "queue" : [
+    "queue": [
         "OlivOS_control_queue",
         "OlivOS_rx_queue",
         "OlivOS_logger_queue",
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
-        "OlivOS_gocqhttp_lib_rx_queue"
+        "OlivOS_gocqhttp_lib_rx_queue",
+        "OlivOS_virtual_terminal_queue",
+        "OlivOS_hackChat_queue",
+        "OlivOS_biliLive_queue"
     ],
-    "models" : {
-        "OlivOS_multiLoginUI" : {
-            "enable" : True,
-            "name" : "OlivOS_multiLoginUI",
-            "type" : "multiLoginUI",
-            "logger_proc" : "OlivOS_logger"
+    "models": {
+        "OlivOS_multiLoginUI": {
+            "enable": True,
+            "name": "OlivOS_multiLoginUI",
+            "type": "multiLoginUI",
+            "logger_proc": "OlivOS_logger"
         },
-        "OlivOS_nativeWinUIAPI" : {
-            "enable" : True,
-            "name" : "OlivOS_nativeWinUIAPI",
-            "type" : "nativeWinUI",
-            "interval" : 0.002,
-            "dead_interval" : 1,
-            "rx_queue" : "OlivOS_nativeUI_rx_queue",
-            "tx_queue" : [
+        "OlivOS_nativeWinUIAPI": {
+            "enable": True,
+            "name": "OlivOS_nativeWinUIAPI",
+            "type": "nativeWinUI",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_nativeUI_rx_queue",
+            "tx_queue": [
                 "OlivOS_rx_queue"
             ],
-            "control_queue" : "OlivOS_control_queue",
-            "logger_proc" : "OlivOS_logger"
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger"
         },
-        "OlivOS_account_config_save" : {
-            "enable" : True,
-            "name" : "OlivOS_account_config_save",
-            "type" : "account_config_save",
-            "logger_proc" : "OlivOS_logger",
-            "data" : {
-                "path" : "./conf/account.json"
+        "OlivOS_account_config_save": {
+            "enable": True,
+            "name": "OlivOS_account_config_save",
+            "type": "account_config_save",
+            "logger_proc": "OlivOS_logger",
+            "data": {
+                "path": "./conf/account.json"
             }
         },
-        "OlivOS_account_fix" : {
-            "enable" : True,
-            "name" : "OlivOS_account_fix",
-            "type" : "account_fix",
-            "logger_proc" : "OlivOS_logger"
+        "OlivOS_account_fix": {
+            "enable": True,
+            "name": "OlivOS_account_fix",
+            "type": "account_fix",
+            "logger_proc": "OlivOS_logger"
         },
-        "OlivOS_account_config" : {
-            "enable" : True,
-            "name" : "OlivOS_account_config",
-            "type" : "account_config",
-            "logger_proc" : "OlivOS_logger",
-            "data" : {
-                "path" : "./conf/account.json"
+        "OlivOS_account_config": {
+            "enable": True,
+            "name": "OlivOS_account_config",
+            "type": "account_config",
+            "logger_proc": "OlivOS_logger",
+            "data": {
+                "path": "./conf/account.json"
             }
         },
-        "OlivOS_account_config_safe" : {
-            "enable" : True,
-            "name" : "OlivOS_account_config_safe",
-            "type" : "account_config_safe",
-            "logger_proc" : "OlivOS_logger",
-            "data" : {
-                "path" : "./conf/account.json"
+        "OlivOS_account_config_safe": {
+            "enable": True,
+            "name": "OlivOS_account_config_safe",
+            "type": "account_config_safe",
+            "logger_proc": "OlivOS_logger",
+            "data": {
+                "path": "./conf/account.json"
             }
         },
-        "OlivOS_logger" : {
-            "enable" : True,
-            "name" : "OlivOS_logger",
-            "type" : "logger",
-            "interval" : 0.002,
-            "dead_interval" : 1,
-            "proc_mode" : "auto",
-            "rx_queue" : "OlivOS_logger_queue",
-            "control_queue" : "OlivOS_control_queue",
-            "mode" : [
+        "OlivOS_logger": {
+            "enable": True,
+            "name": "OlivOS_logger",
+            "type": "logger",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "proc_mode": "auto",
+            "rx_queue": "OlivOS_logger_queue",
+            "control_queue": "OlivOS_control_queue",
+            "mode": [
                 "console_color",
                 "logfile",
                 "native"
             ],
-            "fliter" : [2, 3, 4, 5]
+            "fliter": [2, 3, 4, 5]
         },
-        "OlivOS_plugin" : {
-            "enable" : True,
-            "name" : "OlivOS_plugin",
-            "type" : "plugin",
-            "interval" : 0.002,
-            "dead_interval" : 1,
-            "rx_queue" : "OlivOS_rx_queue",
-            "tx_queue" : [
+        "OlivOS_plugin": {
+            "enable": True,
+            "name": "OlivOS_plugin",
+            "type": "plugin",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_rx_queue",
+            "tx_queue": [
                 "OlivOS_dodobot_rx_queue"
             ],
-            "control_queue" : "OlivOS_control_queue",
-            "logger_proc" : "OlivOS_logger",
-            "treading_mode" : "full",
-            "restart_gate" : 50000,
-            "enable_auto_restart" : True,
-            "debug" : False
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "treading_mode": "full",
+            "restart_gate": 50000,
+            "enable_auto_restart": True,
+            "debug": False
         },
-        "OlivOS_flask_post_rx" : {
-            "enable" : True,
-            "name" : "OlivOS_flask_post_rx",
-            "type" : "post",
-            "interval" : 0.002,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False,
-            "server" : {
-                "auto" : True,
-                "host" : "0.0.0.0",
-                "port" : 55001
+        "OlivOS_virtual_terminal_link": {
+            "enable": True,
+            "name": "OlivOS_virtual_terminal_link",
+            "type": "terminal_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_virtual_terminal_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_flask_post_rx": {
+            "enable": True,
+            "name": "OlivOS_flask_post_rx",
+            "type": "post",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False,
+            "server": {
+                "auto": True,
+                "host": "0.0.0.0",
+                "port": 55001
             }
         },
-        "OlivOS_qqGuild_link" : {
-            "enable" : True,
-            "name" : "OlivOS_qqGuild_link",
-            "type" : "qqGuild_link",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "rx_queue" : None,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_qqGuild_link": {
+            "enable": True,
+            "name": "OlivOS_qqGuild_link",
+            "type": "qqGuild_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": None,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_kaiheila_link" : {
-            "enable" : True,
-            "name" : "OlivOS_kaiheila_link",
-            "type" : "kaiheila_link",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_discord_link": {
+            "enable": True,
+            "name": "OlivOS_discord_link",
+            "type": "discord_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": None,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_telegram_poll" : {
-            "enable" : True,
-            "name" : "OlivOS_telegram_poll",
-            "type" : "telegram_poll",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_hackChat_link": {
+            "enable": True,
+            "name": "OlivOS_hackChat_link",
+            "type": "hackChat_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_hackChat_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_fanbook_poll" : {
-            "enable" : True,
-            "name" : "OlivOS_fanbook_poll",
-            "type" : "fanbook_poll",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_biliLive_link": {
+            "enable": True,
+            "name": "OlivOS_biliLive_link",
+            "type": "biliLive_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_biliLive_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_dodo_link" : {
-            "enable" : True,
-            "name" : "OlivOS_dodo_link",
-            "type" : "dodo_link",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_kaiheila_link": {
+            "enable": True,
+            "name": "OlivOS_kaiheila_link",
+            "type": "kaiheila_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_dodo_poll" : {
-            "enable" : True,
-            "name" : "OlivOS_dodo_poll",
-            "type" : "dodo_poll",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_telegram_poll": {
+            "enable": True,
+            "name": "OlivOS_telegram_poll",
+            "type": "telegram_poll",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_dodobot_ea" : {
-            "enable" : False,
-            "name" : "OlivOS_dodobot_ea",
-            "type" : "dodobot_ea",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "rx_queue" : "OlivOS_dodobot_rx_queue",
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_fanbook_poll": {
+            "enable": True,
+            "name": "OlivOS_fanbook_poll",
+            "type": "fanbook_poll",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_dodobot_ea_tx" : {
-            "enable" : False,
-            "name" : "OlivOS_dodobot_ea_tx",
-            "type" : "dodobot_ea_tx",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "rx_queue" : "OlivOS_dodobot_rx_queue",
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "debug" : False
+        "OlivOS_dodo_link": {
+            "enable": True,
+            "name": "OlivOS_dodo_link",
+            "type": "dodo_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
-        "OlivOS_gocqhttp_lib_exe_model" : {
-            "enable" : True,
-            "name" : "OlivOS_gocqhttp_lib_exe_model",
-            "type" : "gocqhttp_lib_exe_model",
-            "interval" : 0.2,
-            "dead_interval" : 1,
-            "rx_queue" : "OlivOS_gocqhttp_lib_rx_queue",
-            "tx_queue" : "OlivOS_rx_queue",
-            "logger_proc" : "OlivOS_logger",
-            "target_proc" : "OlivOS_flask_post_rx",
-            "control_queue" : "OlivOS_control_queue",
-            "debug" : False
+        "OlivOS_dodo_poll": {
+            "enable": True,
+            "name": "OlivOS_dodo_poll",
+            "type": "dodo_poll",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_dodobot_ea": {
+            "enable": False,
+            "name": "OlivOS_dodobot_ea",
+            "type": "dodobot_ea",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_dodobot_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_dodobot_ea_tx": {
+            "enable": False,
+            "name": "OlivOS_dodobot_ea_tx",
+            "type": "dodobot_ea_tx",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_dodobot_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_gocqhttp_lib_exe_model": {
+            "enable": True,
+            "name": "OlivOS_gocqhttp_lib_exe_model",
+            "type": "gocqhttp_lib_exe_model",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_gocqhttp_lib_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "target_proc": "OlivOS_flask_post_rx",
+            "control_queue": "OlivOS_control_queue",
+            "debug": False
+        },
+        "OlivOS_update_get": {
+            "enable": True,
+            "name": "OlivOS_update_get",
+            "type": "update_get",
+            "logger_proc": "OlivOS_logger"
+        },
+        "OlivOS_update_replace": {
+            "enable": True,
+            "name": "OlivOS_update_replace",
+            "type": "update_replace",
+            "logger_proc": "OlivOS_logger"
         }
     }
 }
-

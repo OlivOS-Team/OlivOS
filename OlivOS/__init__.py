@@ -27,15 +27,22 @@ from . import contentAPI
 from . import messageAPI
 from . import metadataAPI
 from . import API
+from . import thirdPartyModule
 from . import accountAPI
 from . import diagnoseAPI
 from . import flaskServerAPI
 from . import pluginAPI
 from . import onebotSDK
+from . import virtualTerminalSDK
+from . import virtualTerminalLinkServerAPI
 from . import qqGuildSDK
 from . import qqGuildLinkServerAPI
 from . import telegramSDK
 from . import telegramPollServerAPI
+from . import discordSDK
+from . import discordLinkServerAPI
+from . import hackChatSDK
+from . import hackChatLinkServerAPI
 from . import dodobotEAServerAPI
 from . import dodobotEATXAPI
 from . import dodobotEASDK
@@ -47,7 +54,12 @@ from . import fanbookSDK
 from . import fanbookPollServerAPI
 from . import kaiheilaSDK
 from . import kaiheilaLinkServerAPI
-if(platform.system() == 'Windows'):
+from . import biliLiveSDK
+from . import biliLiveLinkServerAPI
+from . import updateAPI
+from . import webTool
+if platform.system() == 'Windows':
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
     from . import nativeWinUIAPI
+from . import userModule
