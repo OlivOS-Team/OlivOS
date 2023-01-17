@@ -20,7 +20,7 @@ limitations under the License.
 import pickle
 import os
 
-FILE_NAME = './user/UserConf.dat'
+FILE_NAME = '.'+os.sep+'user'+os.sep+'UserConf.dat'
         
 def writeInto(_file:str,_obj:any,_mode='wb'):  # type: ignore    
     """写入文件"""
@@ -108,9 +108,9 @@ def setGroupConf(group_id:'int|str',keyConf:str,val:any):  # type: ignore
         writeInto(FILE_NAME,originalConf)
     tmpConf = readOut(FILE_NAME)
     try:
-        tmpLst = tmpConf[0]["uid"][str(group_id)]
+        tmpLst = tmpConf[0]["gid"][str(group_id)]
     except KeyError:
-        tmpLst = tmpConf[0]["uid"][str(group_id)] = {}
+        tmpLst = tmpConf[0]["gid"][str(group_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
     writeInto(FILE_NAME,tmpConf)
