@@ -16,4 +16,4 @@ openpyxl
 aiohttp
 qrcode
 brotli
-pyjosn5
+pyjson5

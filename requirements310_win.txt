@@ -17,4 +17,4 @@ pypiwin32
 aiohttp
 qrcode
 brotli
-pyjosn5
+pyjson5
