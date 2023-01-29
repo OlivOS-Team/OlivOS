@@ -13,3 +13,4 @@ pystray
 aiohttp
 qrcode
 brotli
+pyjosn5
