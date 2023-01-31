@@ -561,8 +561,9 @@ class event_action(object):
                     msg_res = req.request("GET", send_url, headers=headers)
                     pic_file = msg_res.content
 
-                elif url_parsed.scheme == "file":
+                else:
                     file_path = url_parsed.path
+                    file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
                     with open(file_path, "rb") as f:
                         pic_file = f.read()
 

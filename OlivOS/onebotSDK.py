@@ -17,6 +17,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import sys
 import json
 import requests as req
+from urllib import parse
+import os
 import OlivOS
 
 
@@ -381,40 +383,64 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.json['interval']
             )
 
+def formatMessage(data:str):
+    res = data
+    data_obj = OlivOS.messageAPI.Message_templet(
+        mode_rx = 'old_string',
+        data_raw = data
+    )
+    for data_obj_this in data_obj.data:
+        if type(data_obj_this) is OlivOS.messageAPI.PARA.image:
+            if data_obj_this.data['url'] != None:
+                data_obj_this.data['file'] = data_obj_this.data['url']
+                data_obj_this.data['url'] = None
+            url_path = data_obj_this.data['file']
+            if not url_path.startswith("base64://"):
+                url_parsed = parse.urlparse(url_path)
+                if url_parsed.scheme not in ["http", "https"]:
+                    file_path = url_parsed.path
+                    if not os.path.isabs(file_path):
+                        file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+                        if os.path.exists(file_path):
+                            data_obj_this.data['file'] = 'file:///%s' % file_path
+                    if not data_obj_this.data['file'].startswith('file:///'):
+                        data_obj_this.data['file'] = 'file:///%s' % data_obj_this.data['file']
+                    res = data_obj.get('old_string')
+    return res
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
     def reply_private_msg(target_event, message):
-        this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_type = 'private'
-        this_msg.data.user_id = int(target_event.data.user_id)
-        this_msg.data.message = message
-        this_msg.do_api()
+        event_action.send_private_msg(
+            target_event = target_event,
+            user_id = target_event.data.user_id,
+            message = message
+        )
 
     def reply_group_msg(target_event, message):
-        this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_type = 'group'
-        this_msg.data.group_id = int(target_event.data.group_id)
-        this_msg.data.message = message
-        this_msg.do_api()
+        event_action.send_group_msg(
+            target_event = target_event,
+            user_id = target_event.data.group_id,
+            message = message
+        )
 
     def send_private_msg(target_event, user_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
-        this_msg.data.user_id = int(user_id)
-        this_msg.data.message = message
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.message = formatMessage(message)
         this_msg.do_api()
 
     def send_group_msg(target_event, group_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
-        this_msg.data.group_id = int(group_id)
-        this_msg.data.message = message
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.message = formatMessage(message)
         this_msg.do_api()
 
     def delete_msg(target_event, message_id):
         this_msg = api.delete_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_id = int(message_id)
+        this_msg.data.message_id = str(message_id)
         this_msg.do_api()
 
     def get_msg(target_event, message_id):
