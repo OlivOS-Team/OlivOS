@@ -553,6 +553,7 @@ class QRcodeUI(object):
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
 
+        self.UIObject['root'].after(180 * 1000, self.sleepExit)
         self.UIObject['root'].mainloop()
 
         self.exit()
@@ -560,8 +561,12 @@ class QRcodeUI(object):
     def exit(self):
         pass
 
+    def sleepExit(self):
+        self.stop()
+
     def stop(self):
         self.UIObject['root'].quit()
+        self.UIObject['root'].destroy()
 
 
 class gocqhttpTerminalUI(object):
