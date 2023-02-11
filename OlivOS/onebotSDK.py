@@ -403,9 +403,7 @@ def formatMessage(data:str):
                         file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
                         if os.path.exists(file_path):
                             data_obj_this.data['file'] = 'file:///%s' % file_path
-                    if not data_obj_this.data['file'].startswith('file:///'):
-                        data_obj_this.data['file'] = 'file:///%s' % data_obj_this.data['file']
-                    res = data_obj.get('old_string')
+                            res = data_obj.get('old_string')
     return res
 
 # 支持OlivOS API调用的方法实现
