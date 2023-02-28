@@ -274,86 +274,90 @@ class TreeEditUI(object):
                 ],
                 # 各类账号组合的匹配与注册表
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+                'type_note_list': {
+                    '传统QQ': '密码留空即尝试使用扫码登录',
+                    '传统QQ - 旧': '密码留空即尝试使用扫码登录'
+                },
                 'type_mapping_list': {
                     '传统QQ': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID'
-                        # '密码': 'edit_root_Entry_Password',
-                        # 推荐使用扫码登录，所以隐藏密码栏
-                    }
-                             ],
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
                     '传统QQ - 旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID'
-                        # '密码': 'edit_root_Entry_Password',
-                        # 推荐使用扫码登录，所以隐藏密码栏
-                    }
-                                 ],
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
                     '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            'Token': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'B站直播间 - 游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            '直播间ID': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'B站直播间 - 登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            '直播间ID': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'QQ频道 - 公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
-                        'BotAppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            'BotAppID': 'edit_root_Entry_ID',
+                            '机器人令牌': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'QQ频道 - 私域': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
-                        'BotAppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            'BotAppID': 'edit_root_Entry_ID',
+                            '机器人令牌': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                                 ],
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Discord': ['discord', 'discord_link', 'default', 'True', 'websocket', {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                                ],
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     '渡渡语音 - Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
-                        'BotID': 'edit_root_Entry_ID',
-                        'Bot私钥': 'edit_root_Entry_Server_access_token'
-                    }
-                                    ],
+                            'BotID': 'edit_root_Entry_ID',
+                            'Bot私钥': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Fanbook': ['fanbook', 'fanbook_poll', 'default', 'True', 'post', {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    }
-                                ],
+                            'Token': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
-                        '房间名称': 'edit_root_Entry_Server_host',
-                        'Bot名称': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            '房间名称': 'edit_root_Entry_Server_host',
+                            'Bot名称': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {
-                        '账号': 'edit_root_Entry_ID'
-                    }
-                             ],
+                            '账号': 'edit_root_Entry_ID'
+                        }
+                    ],
                     '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port'
-                    }
-                             ],
+                            '账号': 'edit_root_Entry_ID',
+                            '端口': 'edit_root_Entry_Server_port'
+                        }
+                    ],
                     'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port',
-                        '回调端口': 'edit_root_Entry_Server_access_token'
-                    }
-                               ],
+                            '账号': 'edit_root_Entry_ID',
+                            '端口': 'edit_root_Entry_Server_port',
+                            '回调端口': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     '自定义': ['qq', 'default', 'default', 'True', 'post', {
-                        'ID': 'edit_root_Entry_ID',
-                        'PASSWORD': 'edit_root_Entry_Password',
-                        'HOST': 'edit_root_Entry_Server_host',
-                        'PORT': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                            ],
+                            'ID': 'edit_root_Entry_ID',
+                            'PASSWORD': 'edit_root_Entry_Password',
+                            'HOST': 'edit_root_Entry_Server_host',
+                            'PORT': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                 },
                 'platform_list': [
                     'qq',
@@ -550,6 +554,22 @@ class TreeEditUI(object):
             height=height
         )
 
+    def tree_edit_UI_Label_init(self, obj_root, obj_name, x, y, width, height, title=''):
+        self.UIObject[obj_name] = tkinter.Label(
+            self.UIObject[obj_root],
+            text=title
+        )
+        self.UIObject[obj_name].configure(
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004']
+        )
+        self.UIObject[obj_name].place(
+            x=x,
+            y=y,
+            width=width,
+            height=height
+        )
+
     def tree_edit_UI_Entry_init(self, obj_root, obj_name, str_name, x, y, width, height, action, title='', mode='NONE'):
         self.UIObject[obj_name + '=Label'] = tkinter.Label(
             self.UIObject[obj_root],
@@ -635,7 +655,8 @@ class TreeEditUI(object):
             'edit_root_Combobox_sdk',
             'edit_root_Combobox_model',
             'edit_root_Combobox_Server_auto',
-            'edit_root_Combobox_Server_type'
+            'edit_root_Combobox_Server_type',
+            'edit_root_Label_type_note'
         ]:
             try:
                 self.UIObject[item_this].place_forget()
@@ -731,6 +752,18 @@ class TreeEditUI(object):
                         action=self.action,
                         title=entry_this,
                         mode=tmp_mode
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_note_list']:
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note',
+                        x=100,
+                        y=40 + count * (24 + 6),
+                        width=200,
+                        height=24,
+                        title=self.UIData['edit_root_Combobox_dict']['type_note_list'][tmp_type]
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
