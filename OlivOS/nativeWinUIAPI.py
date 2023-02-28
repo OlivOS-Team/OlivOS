@@ -937,7 +937,7 @@ class OlivOSTerminalUI(object):
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stopManual)
 
         self.tree_init_line()
 
@@ -1103,6 +1103,16 @@ class OlivOSTerminalUI(object):
                     self.UIObject['tree'].update()
                 except:
                     pass
+
+    def stopManual(self):
+        # 手动关闭时要给用户气泡，不然有些用户不知道自己还开着
+        try:
+            self.root.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '已最小化至托盘'
+            )
+        except:
+            pass
+        self.stop()
 
     def stop(self):
         self.exit()
