@@ -255,7 +255,10 @@ class TreeEditUI(object):
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_dict': {
                 'type_list': [
-                    '传统QQ',
+                    '传统QQ - 默认',
+                    '传统QQ - 安卓手机',
+                    '传统QQ - 安卓手表',
+                    '传统QQ - iPad',
                     '传统QQ - 旧',
                     'Discord',
                     'Telegram',
@@ -275,11 +278,32 @@ class TreeEditUI(object):
                 # 各类账号组合的匹配与注册表
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
                 'type_note_list': {
-                    '传统QQ': '密码留空即尝试使用扫码登录',
+                    '传统QQ - 默认': '密码留空即尝试使用扫码登录',
+                    '传统QQ - 安卓手机': '密码留空即尝试使用扫码登录',
+                    '传统QQ - 安卓手表': '密码留空即尝试使用扫码登录',
+                    '传统QQ - iPad': '密码留空即尝试使用扫码登录',
                     '传统QQ - 旧': '密码留空即尝试使用扫码登录'
                 },
                 'type_mapping_list': {
-                    '传统QQ': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
+                    '传统QQ - 默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    '传统QQ - 安卓手机': ['qq', 'onebot', 'gocqhttp_show_Android_Phone', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    '传统QQ - 安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    '传统QQ - iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
@@ -411,6 +435,9 @@ class TreeEditUI(object):
                             # 'gocqhttp',
                             # 'gocqhttp_hide',
                             'gocqhttp_show',
+                            'gocqhttp_show_Android_Phone',
+                            'gocqhttp_show_Android_Watch',
+                            'gocqhttp_show_iPad',
                             'gocqhttp_show_old',
                             'default'
                         ]

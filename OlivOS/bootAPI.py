@@ -241,6 +241,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict=plugin_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                         )
+                        if platform.system() == 'Windows':
+                            OlivOS.libEXEModelAPI.accountFix(
+                                bot_info_dict=plugin_bot_info_dict,
+                                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                            )
                         plugin_bot_info_dict = OlivOS.accountAPI.accountFix(
                             basic_conf_models=basic_conf_models,
                             bot_info_dict=plugin_bot_info_dict,
@@ -511,6 +516,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     'gocqhttp',
                                     'gocqhttp_hide',
                                     'gocqhttp_show',
+                                    'gocqhttp_show_Android_Phone',
+                                    'gocqhttp_show_Android_Watch',
+                                    'gocqhttp_show_iPad',
                                     'gocqhttp_show_old'
                                 ]:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key

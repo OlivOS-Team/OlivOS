@@ -20,6 +20,7 @@ import threading
 import time
 import os
 import traceback
+import json
 
 import OlivOS
 
@@ -47,7 +48,10 @@ class server(OlivOS.API.Proc_templet):
     def run(self):
         flag_run = True
         if self.Proc_data['bot_info_dict'].platform['model'] in [
-            'gocqhttp_show'
+            'gocqhttp_show',
+            'gocqhttp_show_Android_Phone',
+            'gocqhttp_show_Android_Watch',
+            'gocqhttp_show_iPad'
         ]:
             self.send_init_event()
         while flag_run:
@@ -78,7 +82,10 @@ class server(OlivOS.API.Proc_templet):
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] exited')
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp',
-                'gocqhttp_show'
+                'gocqhttp_show',
+                'gocqhttp_show_Android_Phone',
+                'gocqhttp_show_Android_Watch',
+                'gocqhttp_show_iPad'
             ]:
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
                 self.clear_gocqhttp()
@@ -327,6 +334,38 @@ class goTypeConfig(object):
 
         with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+', encoding='utf-8') as tmp:
             tmp.write(self.config_file_str)
+
+def accountFix(bot_info_dict, logger_proc):
+    releaseDir('./conf')
+    releaseDir('./conf/gocqhttp')
+    for bot_info_dict_this in bot_info_dict:
+        bot_hash = bot_info_dict_this
+        if bot_info_dict[bot_hash].platform['sdk'] == 'onebot' \
+        and bot_info_dict[bot_hash].platform['platform'] == 'qq' \
+        and bot_info_dict[bot_hash].platform['model'] in [
+            'gocqhttp_show_Android_Phone',
+            'gocqhttp_show_Android_Watch',
+            'gocqhttp_show_iPad',
+        ]:
+            releaseDir('./conf/gocqhttp/' + bot_hash)
+            file_path = './conf/gocqhttp/' + bot_hash + '/device.json'
+            device_info = {}
+            try:
+                with open(file_path, 'r', encoding = 'utf-8') as f:
+                    device_info = json.loads(f.read())
+            except:
+                device_info = {}
+            if bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_Android_Phone':
+                device_info['protocol'] = 1
+            elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_Android_Watch':
+                device_info['protocol'] = 2
+            elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_iPad':
+                device_info['protocol'] = 5
+            try:
+                with open(file_path, 'w', encoding = 'utf-8') as f:
+                    f.write(json.dumps(device_info, ensure_ascii = False))
+            except:
+                pass
 
 
 def releaseDir(dir_path):
