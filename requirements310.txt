@@ -17,4 +17,4 @@ aiohttp
 qrcode
 brotli
 pyjson5
-APScheduler==3.10.5
+APScheduler==3.10.1
