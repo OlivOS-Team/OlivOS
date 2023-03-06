@@ -159,7 +159,9 @@ class Event(object):
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
             'private_message',
-            'group_message'
+            'private_message_sent',
+            'group_message',
+            'group_message_sent'
         ]:
             if self.plugin_info['message_mode_tx'] == 'olivos_para' or self.data.message_sdk.mode_rx != \
                     self.plugin_info['message_mode_tx']:
@@ -185,7 +187,24 @@ class Event(object):
                     ['user_id', self.data.user_id],
                     ['message', self.data.message]
                 ])
+            elif self.plugin_info['func_type'] == 'private_message_sent':
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['nickname', self.data.sender['nickname']],
+                    ['user_id', self.data.user_id],
+                    ['message', self.data.message]
+                ])
             elif self.plugin_info['func_type'] == 'group_message':
+                tmp_host_id = '-'
+                if self.data.host_id is not None:
+                    tmp_host_id = str(self.data.host_id)
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['host_id', tmp_host_id],
+                    ['group_id', self.data.group_id],
+                    ['nickname', self.data.sender['nickname']],
+                    ['user_id', self.data.user_id],
+                    ['message', self.data.message]
+                ])
+            elif self.plugin_info['func_type'] == 'group_message_sent':
                 tmp_host_id = '-'
                 if self.data.host_id is not None:
                     tmp_host_id = str(self.data.host_id)
@@ -339,8 +358,42 @@ class Event(object):
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
+    
+    class private_message_sent(object):
+        def __init__(self, user_id, message, sub_type, flag_lazy=True):
+            self.sub_type = sub_type
+            self.message = message
+            self.message_sdk = message
+            self.message_id = None
+            self.raw_message = None
+            self.raw_message_sdk = None
+            self.user_id = user_id
+            self.font = None
+            self.sender = {}
+            self.extend = {}
+            if flag_lazy:
+                self.sender['nickname'] = 'Nobody'
+                self.extend['host_group_id'] = None
 
     class group_message(object):
+        def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
+            self.sub_type = sub_type
+            self.host_id = None
+            self.group_id = group_id
+            self.message = message
+            self.message_sdk = message
+            self.message_id = None
+            self.raw_message = None
+            self.raw_message_sdk = None
+            self.user_id = user_id
+            self.font = None
+            self.sender = {}
+            self.extend = {}
+            if flag_lazy:
+                self.sender['nickname'] = 'Nobody'
+                self.extend['host_group_id'] = None
+    
+    class group_message_sent(object):
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.host_id = None
@@ -573,6 +626,7 @@ class Event(object):
         if checkByListOrEqual(
                 self.plugin_info['func_type'],
                 [
+                    'private_message_sent',
                     'private_message',
                     'friend_add',
                     'private_message_recall',
@@ -588,6 +642,7 @@ class Event(object):
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
                 [
+                    'group_message_sent',
                     'group_message'
                 ]
         ):
@@ -638,6 +693,7 @@ class Event(object):
                 if checkByListOrEqual(
                         self.plugin_info['func_type'],
                         [
+                            'group_message_sent',
                             'group_message'
                         ]
                 ):
