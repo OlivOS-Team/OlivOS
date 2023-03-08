@@ -24,6 +24,8 @@ import pystray
 import tkinter
 import re
 import datetime
+import webbrowser
+import platform
 
 from PIL import Image
 from PIL import ImageTk
@@ -711,7 +713,7 @@ class gocqhttpTerminalUI(object):
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) > 0 and len(input) < 1000:
+            if len(input) >= 0 and len(input) < 1000:
                 self.root.setGoCqhttpModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
@@ -755,13 +757,22 @@ class gocqhttpTerminalUI(object):
         #    height = height
         # )
 
+    def show_url_webbrowser(self, url):
+        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        try:
+            if res == 'yes':
+                webbrowser.open(url)
+        except webbrowser.Error as error_info:
+            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_gocqhttp_terminal_data']:
             for line in self.root.UIObject['root_gocqhttp_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line)
+                self.tree_add_line(line, flagInit = True)
 
-    def tree_add_line(self, data):
-        res_data = re.sub('\033\[[\d;]*m?', '', data)
+    def tree_add_line(self, data, flagInit = False):
+        res_data = re.sub(r'\033\[[\d;]*m?', '', data)
+        res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace(' ', '\ ')
@@ -777,6 +788,20 @@ class gocqhttpTerminalUI(object):
                 )
                 self.UIObject['tree'].see(iid)
                 self.UIObject['tree'].update()
+            except:
+                pass
+
+        if not flagInit and platform.system() == 'Windows':
+            try:
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    matchResList = list(matchRes.groups())
+                    if len(matchResList) == 1:
+                        matchResUrl = matchResList[0]
+                        self.show_url_webbrowser(matchResUrl)
             except:
                 pass
 
@@ -1252,7 +1277,7 @@ class VirtualTerminalUI(object):
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) > 0 and len(input) < 1000:
+            if len(input) >= 0 and len(input) < 1000:
                 self.root.setVirtualModelSend(self.bot.hash, input)
                 pass
             self.UIData['root_input_StringVar'].set('')

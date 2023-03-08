@@ -21,6 +21,10 @@ import time
 import os
 import traceback
 import json
+import copy
+import random
+import uuid
+import hashlib
 
 import OlivOS
 
@@ -51,7 +55,9 @@ class server(OlivOS.API.Proc_templet):
             'gocqhttp_show',
             'gocqhttp_show_Android_Phone',
             'gocqhttp_show_Android_Watch',
-            'gocqhttp_show_iPad'
+            'gocqhttp_show_iMac',
+            'gocqhttp_show_iPad',
+            'gocqhttp_show_Android_Pad'
         ]:
             self.send_init_event()
         while flag_run:
@@ -85,7 +91,9 @@ class server(OlivOS.API.Proc_templet):
                 'gocqhttp_show',
                 'gocqhttp_show_Android_Phone',
                 'gocqhttp_show_Android_Watch',
-                'gocqhttp_show_iPad'
+                'gocqhttp_show_iMac',
+                'gocqhttp_show_iPad',
+                'gocqhttp_show_Android_Pad'
             ]:
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
                 self.clear_gocqhttp()
@@ -123,10 +131,13 @@ class server(OlivOS.API.Proc_templet):
                 'gocqhttp_show_old'
             ]:
                 self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                tmp_env = dict(os.environ)
+                tmp_env['FORCE_TTY'] = ''
                 subprocess.call(
                     'start cmd /K "title GoCqHttp For OlivOS|..\\..\\..\\lib\\go-cqhttp.exe"',
                     shell=True,
-                    cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash
+                    cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
+                    env=tmp_env
                 )
                 flag_run = False
 
@@ -345,28 +356,133 @@ def accountFix(bot_info_dict, logger_proc):
         and bot_info_dict[bot_hash].platform['model'] in [
             'gocqhttp_show_Android_Phone',
             'gocqhttp_show_Android_Watch',
+            'gocqhttp_show_iMac',
             'gocqhttp_show_iPad',
+            'gocqhttp_show_Android_Pad'
         ]:
             releaseDir('./conf/gocqhttp/' + bot_hash)
             file_path = './conf/gocqhttp/' + bot_hash + '/device.json'
             device_info = {}
+
+            # 读取文件
             try:
                 with open(file_path, 'r', encoding = 'utf-8') as f:
                     device_info = json.loads(f.read())
             except:
                 device_info = {}
+
+            # 协议修改
             if bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_Android_Phone':
                 device_info['protocol'] = 1
             elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_Android_Watch':
                 device_info['protocol'] = 2
+            elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_iMac':
+                device_info['protocol'] = 3
+            elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_QiDian':
+                device_info['protocol'] = 4
             elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_iPad':
                 device_info['protocol'] = 5
+            elif bot_info_dict[bot_hash].platform['model'] == 'gocqhttp_show_Android_Pad':
+                device_info['protocol'] = 6
+
+            # 补全虚拟设备信息
+            device_info = deviceInfoFix(device_info)
+
+            # 刷写回文件
             try:
                 with open(file_path, 'w', encoding = 'utf-8') as f:
                     f.write(json.dumps(device_info, ensure_ascii = False))
             except:
                 pass
 
+def deviceInfoFix(deviceInfo:dict):
+    deviceRes = copy.deepcopy(deviceInfo)
+    deviceResPatch = {}
+    flagRelease = False
+
+    deviceRes.setdefault('protocol', 0)
+
+    if len(list(deviceInfo.keys())) == 1:
+        flagRelease = True
+
+    if flagRelease:
+        deviceResPatch.update({
+            'display': 'MIRAI.123456.001',
+            'product': 'mirai',
+            'device': 'mirai',
+            'board': 'mirai',
+            'model': 'mirai',
+            'boot_id': 'cb886ae2-00b6-4d68-a230-787f111d12c7',
+            'proc_version': 'Linux version 3.0.31-cb886ae2 (android-build@xxx.xxx.xxx.xxx.com)',
+            'imei': '468356291846738',
+            'brand': 'mamoe',
+            'bootloader': 'unknown',
+            'base_band': '',
+            'version': {
+                'incremental': '5891938',
+                'release': '10',
+                'codename': 'REL',
+                'sdk': 29
+            },
+            'sim_info': 'T-Mobile',
+            'os_type': 'android',
+            'mac_address': '00:50:56:C0:00:08',
+            'ip_address': [10, 0, 1, 3],
+            'wifi_bssid': '00:50:56:C0:00:08',
+            'wifi_ssid': '<unknown ssid>',
+            'android_id': 'MIRAI.123456.001',
+            'apn': 'wifi',
+            'vendor_name': 'MIUI',
+            'vendor_os_name': 'mirai'
+        })
+        deviceResPatch['android_id'] = 'MIRAI.%s.001' % getRandomStringOfInt(6)
+        deviceResPatch['finger_print'] = 'mamoe/mirai/mirai:10/MIRAI.200122.001/%s:user/release-keys' % getRandomStringOfInt(7)
+        deviceResPatch['boot_id'] = str(uuid.uuid4())
+        deviceResPatch['proc_version'] = 'Linux version 3.0.31-%s (android-build@xxx.xxx.xxx.xxx.com)' % getRandomString(8)
+        deviceResPatch['imei'] = GenIMEI()
+        deviceResPatch['imsi_md5'] = getMD5([deviceResPatch['imei']])
+        deviceResPatch['display'] = deviceResPatch['android_id']
+        deviceResPatch['android_id'] = getHEX(getRandomString(8))
+
+        deviceRes.update(deviceResPatch)
+
+    return deviceRes
+
+def GenIMEI():
+    sum = 0 # the control sum of digits
+    final = ''
+    for i in range(14): # generating all the base digits
+        toAdd = random.randint(0, 9)
+        if (i + 1) % 2 == 0: # special proc for every 2nd one
+            toAdd *= 2
+            if toAdd >= 10:
+                toAdd = (toAdd % 10) + 1
+        sum += toAdd
+        final += str(toAdd) # and even printing them here!
+    ctrlDigit = (sum * 9) % 10 # calculating the control digit
+    final += str(ctrlDigit)
+    return final
+
+def getMD5(src:list):
+    hashObj = hashlib.new('md5')
+    for srcThis in src:
+        hashObj.update(str(srcThis).encode(encoding='UTF-8'))
+    return hashObj.hexdigest()
+
+def getHEX(src:str):
+    return ''.join([hex(int(i)).lstrip('0x') for i in src.encode('utf-8')])
+
+def getRandomString(length:int):
+    return getRandomStringRange(length, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890')
+
+def getRandomStringOfInt(length:int):
+    return getRandomStringRange(length, '0123456789')
+
+def getRandomStringRange(length:int, string:str):
+    s = ''
+    for i in range(length):
+        s += random.choice(string)
+    return s
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
