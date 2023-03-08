@@ -257,8 +257,10 @@ class TreeEditUI(object):
                 'type_list': [
                     '传统QQ - 默认',
                     '传统QQ - 安卓手机',
+                    '传统QQ - 安卓平板',
                     '传统QQ - 安卓手表',
                     '传统QQ - iPad',
+                    '传统QQ - iMac',
                     '传统QQ - 旧',
                     'Discord',
                     'Telegram',
@@ -280,8 +282,10 @@ class TreeEditUI(object):
                 'type_note_list': {
                     '传统QQ - 默认': '密码留空即尝试使用扫码登录',
                     '传统QQ - 安卓手机': '密码留空即尝试使用扫码登录',
+                    '传统QQ - 安卓平板': '密码留空即尝试使用扫码登录',
                     '传统QQ - 安卓手表': '密码留空即尝试使用扫码登录',
                     '传统QQ - iPad': '密码留空即尝试使用扫码登录',
+                    '传统QQ - iMac': '密码留空即尝试使用扫码登录',
                     '传统QQ - 旧': '密码留空即尝试使用扫码登录'
                 },
                 'type_mapping_list': {
@@ -297,6 +301,12 @@ class TreeEditUI(object):
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
+                    '传统QQ - 安卓平板': ['qq', 'onebot', 'gocqhttp_show_Android_Pad', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
                     '传统QQ - 安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
@@ -304,6 +314,12 @@ class TreeEditUI(object):
                         }
                     ],
                     '传统QQ - iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    '传统QQ - iMac': ['qq', 'onebot', 'gocqhttp_show_iMac', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
@@ -436,8 +452,10 @@ class TreeEditUI(object):
                             # 'gocqhttp_hide',
                             'gocqhttp_show',
                             'gocqhttp_show_Android_Phone',
+                            'gocqhttp_show_Android_Pad',
                             'gocqhttp_show_Android_Watch',
                             'gocqhttp_show_iPad',
+                            'gocqhttp_show_iMac',
                             'gocqhttp_show_old',
                             'default'
                         ]

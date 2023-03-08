@@ -518,7 +518,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     'gocqhttp_show',
                                     'gocqhttp_show_Android_Phone',
                                     'gocqhttp_show_Android_Watch',
+                                    'gocqhttp_show_iMac',
                                     'gocqhttp_show_iPad',
+                                    'gocqhttp_show_Android_Pad',
                                     'gocqhttp_show_old'
                                 ]:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
