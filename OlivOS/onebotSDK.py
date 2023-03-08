@@ -151,8 +151,8 @@ def get_Event_from_SDK(target_event):
         """
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
-            target_event.plugin_info['func_type'] = 'private_message'
-            target_event.data = target_event.private_message(
+            target_event.plugin_info['func_type'] = 'private_message_sent'
+            target_event.data = target_event.private_message_sent(
                 str(target_event.sdk_event.json['user_id']),
                 target_event.sdk_event.json['message'],
                 target_event.sdk_event.json['sub_type']
@@ -173,8 +173,8 @@ def get_Event_from_SDK(target_event):
         elif target_event.sdk_event.json['message_type'] == 'group':
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_message'
-                target_event.data = target_event.group_message(
+                target_event.plugin_info['func_type'] = 'group_message_sent'
+                target_event.data = target_event.group_message_sent(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
                     target_event.sdk_event.json['message'],
