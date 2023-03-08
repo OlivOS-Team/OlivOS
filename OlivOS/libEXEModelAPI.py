@@ -279,7 +279,7 @@ class goTypeConfig(object):
             "  force-fragment: false\n"
             "  fix-url: false\n"
             "  proxy-rewrite: ''\n"
-            "  report-self-message: false\n"
+            "  report-self-message: true\n"
             "  remove-reply-at: false\n"
             "  extra-reply-data: false\n"
             "\n"

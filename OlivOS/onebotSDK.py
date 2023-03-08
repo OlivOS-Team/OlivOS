@@ -145,7 +145,56 @@ def get_Event_from_SDK(target_event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'old_string'
-    if target_event.base_info['type'] == 'message':
+    if target_event.base_info['type'] == 'message_sent':
+        """_自身消息事件_
+        添加`message_sent`事件,详见:https://docs.go-cqhttp.org/event/#%E6%89%80%E6%9C%89%E4%B8%8A%E6%8A%A5
+        """
+        if target_event.sdk_event.json['message_type'] == 'private':
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'private_message_sent'
+            target_event.data = target_event.private_message_sent(
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['message'],
+                target_event.sdk_event.json['sub_type']
+            )
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                              target_event.sdk_event.json['message'])
+            target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
+            target_event.data.raw_message = target_event.sdk_event.json['raw_message']
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'raw_message'])
+            target_event.data.font = target_event.sdk_event.json['font']
+            target_event.data.sender.update(target_event.sdk_event.json['sender'])
+            if 'user_id' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
+            if 'nickname' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
+        elif target_event.sdk_event.json['message_type'] == 'group':
+            if target_event.sdk_event.json['sub_type'] == 'normal':
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_message_sent'
+                target_event.data = target_event.group_message_sent(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['message'],
+                    target_event.sdk_event.json['sub_type']
+                )
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'message'])
+                target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
+                target_event.data.raw_message = target_event.sdk_event.json['raw_message']
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                      target_event.sdk_event.json[
+                                                                                          'raw_message'])
+                target_event.data.font = target_event.sdk_event.json['font']
+                target_event.data.sender.update(target_event.sdk_event.json['sender'])
+                if 'user_id' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
+                if 'nickname' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
+    elif target_event.base_info['type'] == 'message':
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'

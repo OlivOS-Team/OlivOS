@@ -248,8 +248,12 @@ class shallow(OlivOS.API.Proc_templet):
             try:
                 if plugin_event.plugin_info['func_type'] == 'private_message':
                     plugin_model.main.Event.private_message(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'private_message_sent':
+                    plugin_model.main.Event.private_message_sent(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_message':
                     plugin_model.main.Event.group_message(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'group_message_sent':
+                    plugin_model.main.Event.group_message_sent(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_file_upload':
                     plugin_model.main.Event.group_file_upload(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_admin':
