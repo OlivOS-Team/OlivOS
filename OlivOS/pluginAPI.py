@@ -109,6 +109,7 @@ class shallow(OlivOS.API.Proc_templet):
                 self.run_plugin(rx_packet_data)
 
     def run(self):
+        self.sendPluginList()
         releaseDir('./plugin')
         releaseDir('./plugin/app')
         releaseDir('./plugin/conf')
@@ -119,7 +120,6 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib/DLLs')
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
-        self.sendPluginList()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.load_plugin_list()
         self.run_plugin_func(None, 'init_after')

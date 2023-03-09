@@ -28,6 +28,7 @@ default_Conf = {
             "OlivOS_account_fix",
             "OlivOS_account_config_save",
             "OlivOS_account_config",
+            "OlivOS_nativeWinUIAPI",
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
@@ -40,8 +41,7 @@ default_Conf = {
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
             "OlivOS_dodo_link",
-            "OlivOS_biliLive_link",
-            "OlivOS_nativeWinUIAPI"
+            "OlivOS_biliLive_link"
         ],
         "control_queue": "OlivOS_control_queue",
         "interval": 0.2,
@@ -59,6 +59,12 @@ default_Conf = {
         "OlivOS_biliLive_queue"
     ],
     "models": {
+        "OlivOS_sleep": {
+            "enable": True,
+            "name": "OlivOS_sleep",
+            "type": "sleep",
+            "logger_proc": "OlivOS_logger"
+        },
         "OlivOS_multiLoginUI": {
             "enable": True,
             "name": "OlivOS_multiLoginUI",

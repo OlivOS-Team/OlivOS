@@ -115,6 +115,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['main_tk'] = tkinter.Tk()
         self.UIObject['main_tk'].withdraw()
         self.UIObject['main_tk'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.startShallowSend()
         self.process_msg()
         self.UIObject['main_tk'].mainloop()
 
@@ -293,7 +294,7 @@ class dock(OlivOS.API.Proc_templet):
         return resFunc
 
     def startGoCqhttpTerminalUISend(self, hash):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -328,7 +329,7 @@ class dock(OlivOS.API.Proc_templet):
         return resFunc
 
     def startVirtualTerminalUISend(self, hash):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -357,7 +358,7 @@ class dock(OlivOS.API.Proc_templet):
             self.UIObject['root_virtual_terminal_terminal'][hash].start()
 
     def startOlivOSTerminalUISend(self):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -408,7 +409,7 @@ class dock(OlivOS.API.Proc_templet):
                                   )
 
     def startPluginEditSend(self):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -417,6 +418,16 @@ class dock(OlivOS.API.Proc_templet):
             }
         }
                                   )
+
+    def sendRxEvent(self, action, data):
+        if self.Proc_info.rx_queue is not None:
+            self.Proc_info.rx_queue.put(
+                OlivOS.API.Control.packet(
+                    action,
+                    data
+                ),
+                block=False
+            )
 
     def startPluginEdit(self):
         count_str = str(self.UIObject['root_plugin_edit_count'])
@@ -505,6 +516,16 @@ class dock(OlivOS.API.Proc_templet):
                 OlivOS.API.Control.packet('init_type', 'update_get'),
                 block=False
             )
+
+    def startShallowSend(self):
+        self.sendRxEvent('send', {
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'start_shallow'
+            }
+        })
 
     def startShallow(self):
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)

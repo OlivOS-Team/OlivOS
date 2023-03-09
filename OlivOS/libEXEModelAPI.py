@@ -25,9 +25,139 @@ import copy
 import random
 import uuid
 import hashlib
+import platform
+import shutil
 
 import OlivOS
 
+
+def startGoCqhttpLibExeModel(
+    plugin_bot_info_dict,
+    basic_conf_models_this,
+    multiprocessing_dict,
+    Proc_dict,
+    Proc_Proc_dict,
+    basic_conf_models,
+    tmp_proc_mode
+):
+    checkGoCqHttpExeLib(Proc_dict[basic_conf_models_this['logger_proc']])
+    if platform.system() == 'Windows':
+        for bot_info_key in plugin_bot_info_dict:
+            if plugin_bot_info_dict[bot_info_key].platform['model'] in [
+                'gocqhttp',
+                'gocqhttp_hide',
+                'gocqhttp_show',
+                'gocqhttp_show_Android_Phone',
+                'gocqhttp_show_Android_Watch',
+                'gocqhttp_show_iMac',
+                'gocqhttp_show_iPad',
+                'gocqhttp_show_Android_Pad',
+                'gocqhttp_show_old'
+            ]:
+                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                Proc_dict[tmp_Proc_name] = OlivOS.libEXEModelAPI.server(
+                    Proc_name=tmp_Proc_name,
+                    scan_interval=basic_conf_models_this['interval'],
+                    dead_interval=basic_conf_models_this['dead_interval'],
+                    rx_queue=multiprocessing_dict[tmp_queue_name],
+                    tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                    control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
+                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                    bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                    target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
+                    debug_mode=False
+                )
+                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+
+def checkGoCqHttpExeLib(logger_proc:OlivOS.diagnoseAPI.logger):
+    logger = loggerGen(logger_proc)
+    filePath = './lib/go-cqhttp.exe'
+    filePathUpdate = './lib/go-cqhttp.exe.tmp'
+    filePathFORCESKIP = './lib/FORCESKIP'
+    sleepTime = 2
+    architecture_num = platform.architecture()[0]
+
+    logger(2, 'will check go-cqhttp lib after %ds ...' % (sleepTime))
+    time.sleep(sleepTime)
+
+    for i in range(1):
+        fMD5 = None
+        fMD5Update = None
+        flagFORCESKIP = False
+        flagAlreadyLatest = False
+        releaseDir('./lib')
+        fMD5 = checkFileMD5(filePath)
+        logger(2, 'check go-cqhttp lib [%s] md5: [%s]' % (
+                filePath,
+                str(fMD5)
+            )
+        )
+
+        flagFORCESKIP = os.path.exists(filePathFORCESKIP)
+
+        if not flagFORCESKIP:
+            apiJsonData = OlivOS.updateAPI.GETHttpJson2Dict('https://api.oliva.icu/olivosver/gocqhttp/')
+            fMD5UpdateTarget = None
+            fMD5UpdateUrl = None
+            try:
+                fMD5UpdateTarget = apiJsonData['version']['go-cqhttp'][architecture_num]['md5']
+                fMD5UpdateUrl = apiJsonData['version']['go-cqhttp'][architecture_num]['path']
+            except:
+                fMD5UpdateTarget = None
+            if apiJsonData != None \
+            and fMD5UpdateTarget != None \
+            and fMD5UpdateUrl != None:
+                logger(2, 'check go-cqhttp lib patch target md5: [%s]' % (str(fMD5UpdateTarget)))
+                if fMD5UpdateTarget != fMD5:
+                    logger(2, 'download new go-cqhttp lib ...')
+                    if OlivOS.updateAPI.GETHttpFile(fMD5UpdateUrl, filePathUpdate):
+                        logger(2, 'download new go-cqhttp lib done')
+                        fMD5Update = checkFileMD5(filePathUpdate)
+                        logger(2, 'check go-cqhttp lib patch [%s] md5: [%s]' % (filePathUpdate, str(fMD5Update)))
+                    else:
+                        fMD5Update = None
+                        logger(4, 'download new go-cqhttp lib FAILED! md5 check FAILED!')
+                else:
+                    flagAlreadyLatest = True
+            else:
+                logger(4, 'check go-cqhttp lib patch api FAILED! try later please!')
+                fMD5Update = None
+
+            if flagAlreadyLatest:
+                logger(2, 'go-cqhttp lib already latest!')
+            elif fMD5UpdateTarget != None and fMD5Update != fMD5UpdateTarget:
+                logger(4, 'download go-cqhttp lib patch FAILED! try later please!')
+            elif fMD5Update != None and fMD5 != fMD5Update:
+                logger(3, 'update go-cqhttp lib patch [%s] -> [%s]' % (filePathUpdate, filePath))
+                shutil.copyfile(src = filePathUpdate, dst = filePath)
+                os.remove(filePathUpdate)
+                logger(2, 'update go-cqhttp lib patch done!')
+            else:
+                logger(2, 'go-cqhttp lib already latest!')
+        else:
+            logger(3, 'go-cqhttp lib update FORCESKIP!')
+
+        break
+
+def checkFileMD5(filePath):
+    res = None
+    if os.path.exists(filePath):
+        with open(filePath, 'rb') as fp:
+            fObj = fp.read()
+            res = hashlib.md5(fObj).hexdigest()
+    return res
+
+def loggerGen(logger_proc:'OlivOS.diagnoseAPI.logger|None'):
+    def logF(log_level, log_message, log_segment=None):
+        if type(logger_proc) is OlivOS.diagnoseAPI.logger:
+            logger_proc.log(
+                log_level=log_level,
+                log_message=log_message,
+                log_segment=log_segment
+            )
+    return logF
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,

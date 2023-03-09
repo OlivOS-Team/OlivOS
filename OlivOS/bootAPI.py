@@ -132,7 +132,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if 'auto' == tmp_proc_mode_raw:
                     tmp_proc_mode = 'threading'
                 if basic_conf_models_this['enable']:
-                    if basic_conf_models_this['type'] == 'logger':
+                    if basic_conf_models_this['type'] == 'sleep':
+                        time.sleep(10)
+                    elif basic_conf_models_this['type'] == 'logger':
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.diagnoseAPI.logger(
                             Proc_name=basic_conf_models_this['name'],
                             scan_interval=basic_conf_models_this['interval'],
@@ -510,35 +512,18 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
-                        if platform.system() == 'Windows':
-                            for bot_info_key in plugin_bot_info_dict:
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in [
-                                    'gocqhttp',
-                                    'gocqhttp_hide',
-                                    'gocqhttp_show',
-                                    'gocqhttp_show_Android_Phone',
-                                    'gocqhttp_show_Android_Watch',
-                                    'gocqhttp_show_iMac',
-                                    'gocqhttp_show_iPad',
-                                    'gocqhttp_show_Android_Pad',
-                                    'gocqhttp_show_old'
-                                ]:
-                                    tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
-                                    tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
-                                    multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
-                                    Proc_dict[tmp_Proc_name] = OlivOS.libEXEModelAPI.server(
-                                        Proc_name=tmp_Proc_name,
-                                        scan_interval=basic_conf_models_this['interval'],
-                                        dead_interval=basic_conf_models_this['dead_interval'],
-                                        rx_queue=multiprocessing_dict[tmp_queue_name],
-                                        tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
-                                        control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
-                                        logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                                        bot_info_dict=plugin_bot_info_dict[bot_info_key],
-                                        target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
-                                        debug_mode=False
-                                    )
-                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+                        threading.Thread(
+                            target = OlivOS.libEXEModelAPI.startGoCqhttpLibExeModel,
+                            kwargs = {
+                                'plugin_bot_info_dict': plugin_bot_info_dict,
+                                'basic_conf_models_this': basic_conf_models_this,
+                                'multiprocessing_dict': multiprocessing_dict,
+                                'Proc_dict': Proc_dict,
+                                'Proc_Proc_dict': Proc_Proc_dict,
+                                'basic_conf_models': basic_conf_models,
+                                'tmp_proc_mode': tmp_proc_mode
+                            }
+                        ).start()
                     elif basic_conf_models_this['type'] == 'update_get':
                         threading.Thread(target=update_get_func,
                                          args=(Proc_dict, basic_conf_models, basic_conf_models_this)).start()
