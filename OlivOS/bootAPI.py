@@ -512,18 +512,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
-                        threading.Thread(
-                            target = OlivOS.libEXEModelAPI.startGoCqhttpLibExeModel,
-                            kwargs = {
-                                'plugin_bot_info_dict': plugin_bot_info_dict,
-                                'basic_conf_models_this': basic_conf_models_this,
-                                'multiprocessing_dict': multiprocessing_dict,
-                                'Proc_dict': Proc_dict,
-                                'Proc_Proc_dict': Proc_Proc_dict,
-                                'basic_conf_models': basic_conf_models,
-                                'tmp_proc_mode': tmp_proc_mode
-                            }
-                        ).start()
+                        if platform.system() == 'Windows':
+                            threading.Thread(
+                                target = OlivOS.libEXEModelAPI.startGoCqhttpLibExeModel,
+                                kwargs = {
+                                    'plugin_bot_info_dict': plugin_bot_info_dict,
+                                    'basic_conf_models_this': basic_conf_models_this,
+                                    'multiprocessing_dict': multiprocessing_dict,
+                                    'Proc_dict': Proc_dict,
+                                    'Proc_Proc_dict': Proc_Proc_dict,
+                                    'basic_conf_models': basic_conf_models,
+                                    'tmp_proc_mode': tmp_proc_mode
+                                }
+                            ).start()
                     elif basic_conf_models_this['type'] == 'update_get':
                         threading.Thread(target=update_get_func,
                                          args=(Proc_dict, basic_conf_models, basic_conf_models_this)).start()
