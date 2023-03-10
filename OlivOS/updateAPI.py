@@ -107,7 +107,7 @@ def GETHttpJson2Dict(url):
         'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
     }
     try:
-        msg_res = req.request("GET", send_url, headers=headers, timeout=60)
+        msg_res = req.request("GET", send_url, headers=headers, timeout=60, proxies=OlivOS.webTool.get_system_proxy())
         res = json.loads(msg_res.text)
     except:
         pass
@@ -121,7 +121,7 @@ def GETHttpFile(url, path):
         'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
     }
     try:
-        msg_res = req.request("GET", send_url, headers=headers)
+        msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
         releaseToDirForFile(path)
         with open(path, 'wb+') as tmp:
             tmp.write(msg_res.content)
