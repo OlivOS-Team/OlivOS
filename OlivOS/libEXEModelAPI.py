@@ -40,8 +40,8 @@ def startGoCqhttpLibExeModel(
     basic_conf_models,
     tmp_proc_mode
 ):
-    checkGoCqHttpExeLib(Proc_dict[basic_conf_models_this['logger_proc']])
     if platform.system() == 'Windows':
+        checkGoCqHttpExeLib(Proc_dict[basic_conf_models_this['logger_proc']])
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in [
                 'gocqhttp',
