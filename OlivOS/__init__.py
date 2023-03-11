@@ -19,6 +19,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import platform
 
 from . import infoAPI
+from . import L10NAPI
+from . import L10NDataAPI
 from . import bootAPI
 from . import bootDataAPI
 from . import data

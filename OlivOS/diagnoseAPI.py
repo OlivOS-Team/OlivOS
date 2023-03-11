@@ -186,10 +186,10 @@ class logger(OlivOS.API.Proc_templet):
     def run(self):
         releaseDir(logfile_dir)
         self.log_output_shader_init()
-        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
+        self.log(2, OlivOS.L10NAPI.getText('diagnoseAPI_0001', [OlivOS.infoAPI.OlivOS_Version_Short]))
         with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding='utf-8') as logfile_f:
             pass
-        self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
+        self.log(2, OlivOS.L10NAPI.getText('diagnoseAPI_0002', [self.Proc_name]))
         flag_need_refresh = False
         while True:
             if self.Proc_data['logfile_count_out'] >= 0:
