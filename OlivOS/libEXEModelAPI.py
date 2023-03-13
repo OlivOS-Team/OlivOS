@@ -569,7 +569,7 @@ def deviceInfoFix(deviceInfo:dict):
         deviceResPatch['finger_print'] = 'mamoe/mirai/mirai:10/MIRAI.200122.001/%s:user/release-keys' % getRandomStringOfInt(7)
         deviceResPatch['boot_id'] = str(uuid.uuid4())
         deviceResPatch['proc_version'] = 'Linux version 3.0.31-%s (android-build@xxx.xxx.xxx.xxx.com)' % getRandomString(8)
-        deviceResPatch['imei'] = GenIMEI()
+        deviceResPatch['imei'] = GenIMEI('XXXXXXXXXXXXXXX')
         deviceResPatch['imsi_md5'] = getMD5([deviceResPatch['imei']])
         deviceResPatch['display'] = deviceResPatch['android_id']
         deviceResPatch['android_id'] = getHEX(getRandomString(8))
@@ -578,18 +578,22 @@ def deviceInfoFix(deviceInfo:dict):
 
     return deviceRes
 
-def GenIMEI():
-    sum = 0 # the control sum of digits
+def GenIMEI(src:str):
+    sum = 0
     final = ''
-    for i in range(14): # generating all the base digits
-        toAdd = random.randint(0, 9)
-        if (i + 1) % 2 == 0: # special proc for every 2nd one
+    for i in range(14):
+        toAdd = 0
+        if i < len(src) and src[i] in '0123456789':
+            toAdd = int(src[i])
+        else:
+            toAdd = random.randint(0, 9)
+        final += str(toAdd) # 先行进行数值拼接
+        if (i + 1) % 2 == 0: # 针对偶数位进行处理
             toAdd *= 2
             if toAdd >= 10:
-                toAdd = (toAdd % 10) + 1
+                toAdd = (toAdd % 10) + 1 # luna algorithm 中间部分
         sum += toAdd
-        final += str(toAdd) # and even printing them here!
-    ctrlDigit = (sum * 9) % 10 # calculating the control digit
+    ctrlDigit = (sum * 9) % 10 # luna algorithm 求和部分
     final += str(ctrlDigit)
     return final
 
