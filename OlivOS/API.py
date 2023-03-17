@@ -111,15 +111,29 @@ def getMenuEvent(target_event):
 class Event(object):
     def __init__(self, sdk_event=None, log_func=None):
         self.bot_info = None
-        self.platform = {'sdk': None, 'platform': None, 'model': None}
+        self.platform = {
+            'sdk': None,
+            'platform': None,
+            'model': None
+        }
         self.data = None
         self.active = False
         self.blocked = False
         self.log_func = log_func
-        self.base_info = {'time': None, 'self_id': None, 'type': None}
-        self.plugin_info = {'func_type': None, 'message_mode_rx': OlivOS.infoAPI.OlivOS_message_mode_rx_default,
-                            'message_mode_tx': OlivOS.infoAPI.OlivOS_message_mode_tx_unity, 'name': 'unity',
-                            'namespace': 'unity', 'tx_queue': [], 'control_queue': None}
+        self.base_info = {
+            'time': None,
+            'self_id': None,
+            'type': None
+        }
+        self.plugin_info = {
+            'func_type': None,
+            'message_mode_rx': OlivOS.infoAPI.OlivOS_message_mode_rx_default,
+            'message_mode_tx': OlivOS.infoAPI.OlivOS_message_mode_tx_unity,
+            'name': 'unity',
+            'namespace': 'unity',
+            'tx_queue': [],
+            'control_queue': None
+        }
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
         self.get_Event_from_SDK()
@@ -391,6 +405,7 @@ class Event(object):
             self.extend = {}
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
+                self.sender['name'] = 'Nobody'
                 self.extend['host_group_id'] = None
     
     class group_message_sent(object):
@@ -467,7 +482,7 @@ class Event(object):
             self.message_id = message_id
 
     class poke(object):
-        def __init__(self, user_id, target_id, group_id=-1, flag_lazy=True):
+        def __init__(self, user_id, target_id, group_id='-1', flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.target_id = target_id
@@ -671,7 +686,7 @@ class Event(object):
                     'poke'
                 ]
         ):
-            if self.data.group_id == -1:
+            if self.data.group_id in [-1, '-1', None]:
                 self.__send('private', self.data.user_id, tmp_message, flag_log=False)
                 flag_type = 'private'
             else:
