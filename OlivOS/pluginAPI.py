@@ -122,6 +122,7 @@ class shallow(OlivOS.API.Proc_templet):
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.load_plugin_list()
+        self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
         self.log(2, OlivOS.L10NAPI.getText('pluginAPI_0001', [self.Proc_name]))
         self.sendPluginList()
@@ -300,16 +301,30 @@ class shallow(OlivOS.API.Proc_templet):
                 plugin_event.set_block()
         return
 
+    def check_plugin_list(self):
+        new_list = []
+        for plugin_models_index_this in self.plugin_models_call_list:
+            if plugin_models_index_this in self.plugin_models_dict:
+                new_list.append(plugin_models_index_this)
+            else:
+                self.log(4, OlivOS.L10NAPI.getText('pluginAPI_0013', [
+                    plugin_models_index_this,
+                    self.Proc_name,
+                    'namespace failed'
+                ]))
+        self.plugin_models_call_list = new_list
+
     def run_plugin_func(self, plugin_event, func_name):
         for plugin_models_index_this in self.plugin_models_call_list:
-            if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name):
+            if plugin_models_index_this in self.plugin_models_dict:
                 try:
-                    getattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name)(
-                        plugin_event=plugin_event, Proc=self)
-                    self.log(2, OlivOS.L10NAPI.getText('pluginAPI_0009', [
-                        self.plugin_models_dict[plugin_models_index_this]['name'],
-                        func_name
-                    ]))
+                    if hasattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name):
+                        getattr(self.plugin_models_dict[plugin_models_index_this]['model'].main.Event, func_name)(
+                            plugin_event=plugin_event, Proc=self)
+                        self.log(2, OlivOS.L10NAPI.getText('pluginAPI_0009', [
+                            self.plugin_models_dict[plugin_models_index_this]['name'],
+                            func_name
+                        ]))
                 except Exception as e:
                     # traceback.print_exc()
                     self.log(4, OlivOS.L10NAPI.getText('pluginAPI_0008', [
@@ -318,6 +333,12 @@ class shallow(OlivOS.API.Proc_templet):
                         str(e),
                         traceback.format_exc()
                     ]))
+            else:
+                self.log(4, OlivOS.L10NAPI.getText('pluginAPI_0013', [
+                    plugin_models_index_this,
+                    self.Proc_name,
+                    'namespace failed'
+                ]))
         return
 
     def sendPluginList(self):
