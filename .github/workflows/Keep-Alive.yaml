@@ -1,0 +1,26 @@
+name: Keep Alive
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: 0 0 */30 * *
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.ACTION_SECRET }}
+      - name: Keep Alive
+        run: date > .github/KEEP
+      - name: Push
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Keep Alive
+          skip_dirty_check: false
+          commit_user_name: Action Bot
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_author: Action <actions@github.com>
