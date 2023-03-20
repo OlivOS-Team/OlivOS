@@ -280,12 +280,7 @@ class TreeEditUI(object):
                 # 各类账号组合的匹配与注册表
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
                 'type_note_list': {
-                    '传统QQ - 默认': '密码留空即尝试使用扫码登录',
-                    '传统QQ - 安卓手机': '密码留空即尝试使用扫码登录',
-                    '传统QQ - 安卓平板': '密码留空即尝试使用扫码登录',
                     '传统QQ - 安卓手表': '密码留空即尝试使用扫码登录',
-                    '传统QQ - iPad': '密码留空即尝试使用扫码登录',
-                    '传统QQ - iMac': '密码留空即尝试使用扫码登录',
                     '传统QQ - 旧': '密码留空即尝试使用扫码登录'
                 },
                 'type_mapping_list': {
