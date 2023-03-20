@@ -80,11 +80,11 @@ def get_Event_from_SDK(target_event):
     if target_event.sdk_event.payload.active:
         if target_event.sdk_event.payload.cmd == 'chat':
             if (
-                    'nick' in target_event.sdk_event.payload.data
+                'nick' in target_event.sdk_event.payload.data
             ) and (
-                    'userid' in target_event.sdk_event.payload.data
+                'userid' in target_event.sdk_event.payload.data
             ) and (
-                    'text' in target_event.sdk_event.payload.data
+                'text' in target_event.sdk_event.payload.data
             ):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
@@ -111,10 +111,26 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['age'] = 0
                 target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
-                # if plugin_event_bot_hash in sdkSubSelfInfo:
-                #    target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                # if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
-                #    target_event.active = False
+        elif target_event.sdk_event.payload.cmd == 'onlineAdd':
+            if 'userid' in target_event.sdk_event.payload.data:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_member_increase'
+                target_event.data = target_event.group_member_increase(
+                    str(0),
+                    str(0),
+                    str(target_event.sdk_event.payload.data['userid']),
+                    'approve'
+                )
+        elif target_event.sdk_event.payload.cmd == 'onlineRemove':
+            if 'userid' in target_event.sdk_event.payload.data:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_member_decrease'
+                target_event.data = target_event.group_member_decrease(
+                    str(0),
+                    str(0),
+                    str(target_event.sdk_event.payload.data['userid']),
+                    'leave'
+                )
 
 
 '''
