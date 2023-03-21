@@ -30,6 +30,17 @@ import shutil
 
 import OlivOS
 
+gCheckList = [
+    'gocqhttp',
+    'gocqhttp_hide',
+    'gocqhttp_show',
+    'gocqhttp_show_Android_Phone',
+    'gocqhttp_show_Android_Watch',
+    'gocqhttp_show_iMac',
+    'gocqhttp_show_iPad',
+    'gocqhttp_show_Android_Pad',
+    'gocqhttp_show_old'
+]
 
 def startGoCqhttpLibExeModel(
     plugin_bot_info_dict,
@@ -41,19 +52,14 @@ def startGoCqhttpLibExeModel(
     tmp_proc_mode
 ):
     if platform.system() == 'Windows':
-        checkGoCqHttpExeLib(Proc_dict[basic_conf_models_this['logger_proc']])
+        flagActive = False
         for bot_info_key in plugin_bot_info_dict:
-            if plugin_bot_info_dict[bot_info_key].platform['model'] in [
-                'gocqhttp',
-                'gocqhttp_hide',
-                'gocqhttp_show',
-                'gocqhttp_show_Android_Phone',
-                'gocqhttp_show_Android_Watch',
-                'gocqhttp_show_iMac',
-                'gocqhttp_show_iPad',
-                'gocqhttp_show_Android_Pad',
-                'gocqhttp_show_old'
-            ]:
+            if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
+                flagActive = True
+        if flagActive:
+            checkGoCqHttpExeLib(Proc_dict[basic_conf_models_this['logger_proc']])
+        for bot_info_key in plugin_bot_info_dict:
+            if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                 tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                 multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
