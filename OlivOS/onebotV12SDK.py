@@ -29,6 +29,8 @@ gResReg = {}
 
 gTmpReg = {}
 
+gUsrReg = {}
+
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
@@ -83,6 +85,15 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'obv12_para'
+
+    control_queue = target_event.plugin_info['control_queue']
+    bot_hash = OlivOS.API.getBotHash(
+        bot_id=target_event.base_info['self_id'],
+        platform_sdk=target_event.sdk_event.platform['sdk'],
+        platform_platform=target_event.sdk_event.platform['platform'],
+        platform_model=target_event.sdk_event.platform['model']
+    )
+
     if 'retcode' in target_event.sdk_event.json \
     and 'echo' in target_event.sdk_event.json \
     and type(target_event.sdk_event.json['echo']) is str:
@@ -815,6 +826,21 @@ def getReg(flag:str):
 def setReg(flag:str, value):
     global gTmpReg
     gTmpReg[flag] = value
+
+def setUserReg(botHash:str, regType:str, flag:str, value:str):
+    global gUsrReg
+    gUsrReg.setdefault(botHash, {})
+    gUsrReg[botHash].setdefault(regType, {})
+    gUsrReg[botHash][regType][flag] = value
+
+def getUserReg(botHash:str, regType:str, flag:str):
+    global gUsrReg
+    res = None
+    if botHash in gUsrReg \
+    and regType in gUsrReg[botHash] \
+    and flag in gUsrReg[botHash][regType]:
+        res = gUsrReg[botHash][regType][flag]
+    return res
 
 def waitForResSet(echo:str, data):
     global gResReg
