@@ -27,6 +27,18 @@ import threading
 
 import OlivOS
 
+gCheckList = [
+    'default',
+    'gocqhttp',
+    'gocqhttp_hide',
+    'gocqhttp_show',
+    'gocqhttp_show_Android_Phone',
+    'gocqhttp_show_Android_Pad',
+    'gocqhttp_show_Android_Watch',
+    'gocqhttp_show_iPad',
+    'gocqhttp_show_iMac',
+    'gocqhttp_show_old'
+]
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port, tx_queue=None,

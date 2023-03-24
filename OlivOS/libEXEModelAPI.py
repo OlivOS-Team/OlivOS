@@ -171,7 +171,7 @@ class server(OlivOS.API.Proc_templet):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
-            Proc_type='lib_exe_model',
+            Proc_type='gocqhttp_lib_exe_model',
             scan_interval=scan_interval,
             dead_interval=dead_interval,
             rx_queue=rx_queue,

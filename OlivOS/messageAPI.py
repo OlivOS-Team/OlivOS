@@ -25,7 +25,25 @@ dictMessageType = {
     'qq': {
         'onebot': {
             'default': 'old_string',
-            'gocqhttp_show': 'old_string'
+            'onebotV12': 'obv12_para',
+            'gocqhttp': 'old_string',
+            'gocqhttp_hide': 'old_string',
+            'gocqhttp_show': 'old_string',
+            'gocqhttp_show_Android_Phone': 'old_string',
+            'gocqhttp_show_Android_Pad': 'old_string',
+            'gocqhttp_show_Android_Watch': 'old_string',
+            'gocqhttp_show_iPad': 'old_string',
+            'gocqhttp_show_iMac': 'old_string',
+            'gocqhttp_show_old': 'old_string',
+            'walleq': 'obv12_para',
+            'walleq_hide': 'obv12_para',
+            'walleq_show': 'obv12_para',
+            'walleq_show_Android_Phone': 'obv12_para',
+            'walleq_show_Android_Pad': 'obv12_para',
+            'walleq_show_Android_Watch': 'obv12_para',
+            'walleq_show_iPad': 'obv12_para',
+            'walleq_show_iMac': 'obv12_para',
+            'walleq_show_old': 'obv12_para'
         }
     },
     'qqGuild': {
@@ -141,6 +159,10 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.OP()
+        elif get_type == 'obv12_para':
+            res = []
+            for data_this in self.data:
+                res.append(data_this.OBV12())
         elif get_type == 'old_string':
             res = ''
             for data_this in self.data:
@@ -170,6 +192,8 @@ class Message_templet(object):
             self.init_from_olivos_para()
         elif self.mode_rx == 'olivos_string':
             self.init_from_code_string('OP')
+        elif self.mode_rx == 'obv12_para':
+            self.init_from_obv12_para()
         elif self.mode_rx == 'old_string':
             self.init_from_code_string('CQ')
         elif self.mode_rx == 'fanbook_string':
@@ -189,6 +213,81 @@ class Message_templet(object):
             for data_raw_this in self.data_raw:
                 if data_raw_this.__class__.__base__ == PARA_templet:
                     tmp_data.append(data_raw_this)
+            self.data = tmp_data
+        else:
+            self.active = False
+
+    def init_from_obv12_para(self):
+        tmp_data = []
+        if type(self.data_raw) == list:
+            for data_raw_this in self.data_raw:
+                if type(data_raw_this) is dict \
+                and 'type' in data_raw_this \
+                and 'data' in data_raw_this \
+                and type(data_raw_this['data']) is dict:
+                    if 'text' == data_raw_this['type'] \
+                    and 'text' in data_raw_this['data']:
+                        tmp_data.append(
+                            PARA.text(data_raw_this['data']['text'])
+                        )
+                    elif 'mention' == data_raw_this['type'] \
+                    and 'user_id' in data_raw_this['data']:
+                        tmp_data.append(
+                            PARA.at(str(data_raw_this['data']['user_id']))
+                        )
+                    elif 'mention_all' == data_raw_this['type']:
+                        tmp_data.append(
+                            PARA.at('all')
+                        )
+                    elif 'image' == data_raw_this['type'] \
+                    and 'file_id' in data_raw_this['data']:
+                        tmp_this = PARA.image(data_raw_this['data']['file_id'])
+                        if 'url' in data_raw_this['data']:
+                            tmp_this.data['url'] = data_raw_this['data']['url']
+                        if 'flush' in data_raw_this['data'] \
+                        and True is data_raw_this['data']['flush']:
+                            tmp_this.data['type'] = 'flush'
+                        tmp_data.append(tmp_this)
+                    elif 'voice' == data_raw_this['type'] \
+                    and 'file_id' in data_raw_this['data']:
+                        tmp_this = PARA.record(data_raw_this['data']['file_id'])
+                        tmp_data.append(tmp_this)
+                    elif 'audio' == data_raw_this['type'] \
+                    and 'file_id' in data_raw_this['data']:
+                        tmp_this = PARA.record(data_raw_this['data']['file_id'])
+                        tmp_data.append(tmp_this)
+                    elif 'video' == data_raw_this['type'] \
+                    and 'file_id' in data_raw_this['data']:
+                        tmp_this = PARA.video(data_raw_this['data']['file_id'])
+                        tmp_data.append(tmp_this)
+                    elif 'location' == data_raw_this['type'] \
+                    and 'latitude' in data_raw_this['data'] \
+                    and 'longitude' in data_raw_this['data'] \
+                    and 'title' in data_raw_this['data'] \
+                    and 'content' in data_raw_this['data']:
+                        tmp_this = PARA.location(
+                            lat=data_raw_this['data']['latitude'],
+                            lon=data_raw_this['data']['longitude'],
+                            title=data_raw_this['data']['title'],
+                            content=data_raw_this['data']['content']
+                        )
+                        tmp_data.append(tmp_this)
+                    elif 'face' == data_raw_this['type'] \
+                    and 'id' in data_raw_this['data']:
+                        tmp_data.append(PARA.face(data_raw_this['data']['id']))
+                    elif 'dice' == data_raw_this['type']:
+                        tmp_data.append(PARA.dice())
+                    elif 'rps' == data_raw_this['type']:
+                        tmp_data.append(PARA.rps())
+                    elif 'reply' == data_raw_this['type'] \
+                    and 'message_id' in data_raw_this['data']:
+                        tmp_data.append(PARA.reply(str(data_raw_this['data']['message_id'])))
+                    elif 'json' == data_raw_this['type'] \
+                    and 'data' in data_raw_this['data']:
+                        tmp_data.append(PARA.json(data_raw_this['data']['data']))
+                    elif 'xml' == data_raw_this['type'] \
+                    and 'data' in data_raw_this['data']:
+                        tmp_data.append(PARA.xml(data_raw_this['data']['data']))
             self.data = tmp_data
         else:
             self.active = False
@@ -450,6 +549,64 @@ class PARA_templet(object):
 
     def OP(self):
         return self.get_string_by_key('OP')
+
+    def OBV12(self):
+        paraType = None
+        paraData = {}
+        try:
+            if type(self) is PARA.text:
+                paraType = 'text'
+                paraData['text'] = str(self.data['text'])
+            elif type(self) is PARA.at \
+            and self.data['id'] == 'all':
+                paraType = 'mention_all'
+            elif type(self) is PARA.at:
+                paraType = 'mention'
+                paraData['user_id'] = str(self.data['id'])
+            elif type(self) is PARA.image:
+                paraType = 'image'
+                paraData['file_id'] = self.data['file']
+                paraData['url'] = self.data['url']
+                paraData['flush'] = True if self.data['type'] == 'flush' else False
+            elif type(self) is PARA.record:
+                paraType = 'record'
+                paraData['file_id'] = self.data['file']
+            elif type(self) is PARA.video:
+                paraType = 'video'
+                paraData['file_id'] = self.data['file']
+            elif type(self) is PARA.location:
+                paraType = 'location'
+                paraData['latitude'] = self.data['lat']
+                paraData['longitude'] = self.data['lon']
+                paraData['title'] = self.data['title']
+                paraData['content'] = self.data['content']
+            elif type(self) is PARA.face:
+                paraType = 'face'
+                paraData['id'] = self.data['id']
+            elif type(self) is PARA.dice:
+                paraType = 'dice'
+            elif type(self) is PARA.rps:
+                paraType = 'rps'
+            elif type(self) is PARA.reply:
+                paraType = 'reply'
+                paraData['message_id'] = self.data['id']
+            elif type(self) is PARA.json:
+                paraType = 'json'
+                paraData['data'] = self.data['data']
+            elif type(self) is PARA.xml:
+                paraType = 'xml'
+                paraData['data'] = self.data['data']
+        except Exception as e:
+            traceback.print_exc()
+            paraType = None
+        if paraType is None:
+            paraType = 'text'
+            paraData = {'text': ''}
+        res = {
+            'type': paraType,
+            'data': paraData
+        }
+        return res
 
     def kaiheila(self):
         code_tmp = '${'

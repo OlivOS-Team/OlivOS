@@ -33,6 +33,8 @@ from . import thirdPartyModule
 from . import accountAPI
 from . import diagnoseAPI
 from . import flaskServerAPI
+from . import onebotV12SDK
+from . import onebotV12LinkServerAPI
 from . import pluginAPI
 from . import onebotSDK
 from . import virtualTerminalSDK
@@ -63,5 +65,6 @@ from . import webTool
 if platform.system() == 'Windows':
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
+    from . import libWQEXEModelAPI
     from . import nativeWinUIAPI
 from . import userModule

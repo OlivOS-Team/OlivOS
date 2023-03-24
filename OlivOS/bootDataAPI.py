@@ -30,10 +30,12 @@ default_Conf = {
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
             "OlivOS_gocqhttp_lib_exe_model",
+            "OlivOS_walleq_lib_exe_model",
             "OlivOS_account_config_safe",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
+            "OlivOS_onebotv12_link",
             "OlivOS_qqGuild_link",
             "OlivOS_discord_link",
             "OlivOS_hackChat_link",
@@ -54,9 +56,11 @@ default_Conf = {
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
+        "OlivOS_walleq_lib_rx_queue",
         "OlivOS_virtual_terminal_queue",
         "OlivOS_hackChat_queue",
-        "OlivOS_biliLive_queue"
+        "OlivOS_biliLive_queue",
+        "OlivOS_onebotv12_queue"
     ],
     "models": {
         "OlivOS_sleep": {
@@ -176,6 +180,17 @@ default_Conf = {
                 "host": "0.0.0.0",
                 "port": 55001
             }
+        },
+        "OlivOS_onebotv12_link": {
+            "enable": True,
+            "name": "OlivOS_onebotv12_link",
+            "type": "onebotV12_link",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_onebotv12_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
         "OlivOS_qqGuild_link": {
             "enable": True,
@@ -304,6 +319,19 @@ default_Conf = {
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "target_proc": "OlivOS_flask_post_rx",
+            "control_queue": "OlivOS_control_queue",
+            "debug": False
+        },
+        "OlivOS_walleq_lib_exe_model": {
+            "enable": True,
+            "name": "OlivOS_walleq_lib_exe_model",
+            "type": "walleq_lib_exe_model",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_walleq_lib_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "target_proc": None,
             "control_queue": "OlivOS_control_queue",
             "debug": False
         },
