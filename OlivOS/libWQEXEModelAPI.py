@@ -88,6 +88,73 @@ def checkWalleQExeLib(logger_proc:OlivOS.diagnoseAPI.logger):
     logger(2, 'will check walle-q lib after %ds ...' % (sleepTime))
     time.sleep(sleepTime)
 
+    for i in range(1):
+        fMD5 = None
+        fMD5Update = None
+        flagFORCESKIP = False
+        flagAlreadyLatest = False
+        releaseDir('./lib')
+        fMD5 = checkFileMD5(filePath)
+        logger(2, 'check walle-q lib [%s] md5: [%s]' % (
+                filePath,
+                str(fMD5)
+            )
+        )
+
+        flagFORCESKIP = os.path.exists(filePathFORCESKIP)
+
+        if not flagFORCESKIP:
+            apiJsonData = OlivOS.updateAPI.GETHttpJson2Dict('https://api.oliva.icu/olivosver/walleq/')
+            fMD5UpdateTarget = None
+            fMD5UpdateUrl = None
+            try:
+                fMD5UpdateTarget = apiJsonData['version']['walle-q'][architecture_num]['md5']
+                fMD5UpdateUrl = apiJsonData['version']['walle-q'][architecture_num]['path']
+            except:
+                fMD5UpdateTarget = None
+            if apiJsonData != None \
+            and fMD5UpdateTarget != None \
+            and fMD5UpdateUrl != None:
+                logger(2, 'check walle-q lib patch target md5: [%s]' % (str(fMD5UpdateTarget)))
+                if fMD5UpdateTarget != fMD5:
+                    logger(2, 'download new walle-q lib ...')
+                    if OlivOS.updateAPI.GETHttpFile(fMD5UpdateUrl, filePathUpdate):
+                        logger(2, 'download new walle-q lib done')
+                        fMD5Update = checkFileMD5(filePathUpdate)
+                        logger(2, 'check walle-q lib patch [%s] md5: [%s]' % (filePathUpdate, str(fMD5Update)))
+                    else:
+                        fMD5Update = None
+                        logger(4, 'download new walle-q lib FAILED! md5 check FAILED!')
+                else:
+                    flagAlreadyLatest = True
+            else:
+                logger(4, 'check walle-q lib patch api FAILED! try later please!')
+                fMD5Update = None
+
+            if flagAlreadyLatest:
+                logger(2, 'walle-q lib already latest!')
+            elif fMD5UpdateTarget != None and fMD5Update != fMD5UpdateTarget:
+                logger(4, 'download walle-q lib patch FAILED! try later please!')
+            elif fMD5Update != None and fMD5 != fMD5Update:
+                logger(3, 'update walle-q lib patch [%s] -> [%s]' % (filePathUpdate, filePath))
+                shutil.copyfile(src = filePathUpdate, dst = filePath)
+                os.remove(filePathUpdate)
+                logger(2, 'update walle-q lib patch done!')
+            else:
+                logger(2, 'walle-q lib already latest!')
+        else:
+            logger(3, 'walle-q lib update FORCESKIP!')
+
+        break
+
+def checkFileMD5(filePath):
+    res = None
+    if os.path.exists(filePath):
+        with open(filePath, 'rb') as fp:
+            fObj = fp.read()
+            res = hashlib.md5(fObj).hexdigest()
+    return res
+
 def loggerGen(logger_proc:'OlivOS.diagnoseAPI.logger|None'):
     def logF(log_level, log_message, log_segment=None):
         if type(logger_proc) is OlivOS.diagnoseAPI.logger:
