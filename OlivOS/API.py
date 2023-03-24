@@ -109,7 +109,7 @@ def getMenuEvent(target_event):
 
 
 class Event(object):
-    def __init__(self, sdk_event=None, log_func=None):
+    def __init__(self, sdk_event=None, log_func=None, Proc=None):
         self.bot_info = None
         self.platform = {
             'sdk': None,
@@ -136,6 +136,10 @@ class Event(object):
         }
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
+        if type(Proc) is OlivOS.pluginAPI.shallow:
+            self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
+        if type(self.log_func) is None:
+            self.log_func = Proc.log
         self.get_Event_from_SDK()
         self.get_Event_on_Plugin()
         self.do_init_log()

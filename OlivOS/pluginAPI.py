@@ -177,7 +177,7 @@ class shallow(OlivOS.API.Proc_templet):
         return self.Proc_data['main_tk']
 
     def run_plugin(self, sdk_event):
-        plugin_event = OlivOS.API.Event(sdk_event, self.log)
+        plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=plugin_event.base_info['self_id'],
             platform_sdk=plugin_event.platform['sdk'],
