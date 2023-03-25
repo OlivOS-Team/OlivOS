@@ -136,7 +136,11 @@ class Event(object):
         }
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
-        if type(Proc) is OlivOS.pluginAPI.shallow:
+        if type(OlivOS.pluginAPI.gProc) is OlivOS.pluginAPI.shallow:
+            self.plugin_info['control_queue'] = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+            self.log_func = OlivOS.pluginAPI.gProc.log
+        if self.plugin_info['control_queue'] is None \
+        and type(Proc) is OlivOS.pluginAPI.shallow:
             self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
         if type(self.log_func) is None:
             self.log_func = Proc.log

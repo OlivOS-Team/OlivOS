@@ -32,6 +32,7 @@ if platform.system() == 'Windows':
 
 import OlivOS
 
+gProc = None
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -109,6 +110,7 @@ class shallow(OlivOS.API.Proc_templet):
                 self.run_plugin(rx_packet_data)
 
     def run(self):
+        OlivOS.pluginAPI.gProc = self
         self.sendPluginList()
         releaseDir('./plugin')
         releaseDir('./plugin/app')
@@ -177,7 +179,8 @@ class shallow(OlivOS.API.Proc_templet):
         return self.Proc_data['main_tk']
 
     def run_plugin(self, sdk_event):
-        plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
+        #plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
+        plugin_event = OlivOS.API.Event(sdk_event=sdk_event)
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=plugin_event.base_info['self_id'],
             platform_sdk=plugin_event.platform['sdk'],
