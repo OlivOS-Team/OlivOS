@@ -334,7 +334,7 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'heartbeat'
             target_event.data = target_event.heartbeat(
-                target_event.sdk_event.json['interval']
+                int(target_event.sdk_event.json['interval']) * 1000
             )
         elif 'detail_type' in target_event.sdk_event.json \
         and 'connect' == target_event.sdk_event.json['detail_type']:
@@ -730,6 +730,63 @@ class event_action(object):
             this_msg.params.message_id = str(message_id)
             this_msg.do_api(bot_hash, control_queue)
 
+    def set_group_kick(target_event, group_id, user_id):
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.kick_group_member()
+            this_msg.params.group_id = str(group_id)
+            this_msg.params.user_id = str(user_id)
+            this_msg.do_api(bot_hash, control_queue)
+
+    def set_group_leave(target_event, group_id):
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.leave_group()
+            this_msg.params.group_id = str(group_id)
+            this_msg.do_api(bot_hash, control_queue)
+
+    def set_group_name(target_event, group_id, group_name):
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.set_group_name()
+            this_msg.params.group_id = str(group_id)
+            this_msg.params.group_name = str(group_name)
+            this_msg.do_api(bot_hash, control_queue)
+
+    def set_group_ban(target_event, group_id, user_id, duration=1800):
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            if 0 == duration:
+                this_msg = api.ban_group_member()
+                this_msg.params.group_id = str(group_id)
+                this_msg.params.user_id = str(user_id)
+                this_msg.params.duration = str(duration)
+                this_msg.do_api(bot_hash, control_queue)
+            else:
+                this_msg = api.unban_group_member()
+                this_msg.params.group_id = str(group_id)
+                this_msg.params.user_id = str(user_id)
+                this_msg.do_api(bot_hash, control_queue)
+
+    def set_group_admin(target_event, group_id, user_id, enable):
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            if True is enable:
+                this_msg = api.set_group_admin()
+                this_msg.params.group_id = str(group_id)
+                this_msg.params.user_id = str(user_id)
+                this_msg.do_api(bot_hash, control_queue)
+            else:
+                this_msg = api.unset_group_admin()
+                this_msg.params.group_id = str(group_id)
+                this_msg.params.user_id = str(user_id)
+                this_msg.do_api(bot_hash, control_queue)
+
     def get_login_info(target_event:OlivOS.API.Event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
@@ -746,6 +803,150 @@ class event_action(object):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user_name'], str)
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+        return res_data
+
+    def get_stranger_info(target_event:OlivOS.API.Event, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_user_info()
+            this_msg.params.user_id = str(user_id)
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) is dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user_name'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+        return res_data
+
+    def get_friend_list(target_event:OlivOS.API.Event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_friend_list()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_friend_list()
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_name'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], str)
+                    res_data['data'].append(tmp_res_data_this)
+        return res_data
+
+    def get_group_info(target_event:OlivOS.API.Event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_group_info()
+            this_msg.params.group_id = str(group_id)
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) is dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['group_id'], str)
+                res_data['data']['memo'] = ''
+                res_data['data']['member_count'] = 0
+                res_data['data']['max_member_count'] = 0
+        return res_data
+
+    def get_group_list(target_event:OlivOS.API.Event):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_group_list()
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], str)
+                    tmp_res_data_this['memo'] = ''
+                    tmp_res_data_this['member_count'] = 0
+                    tmp_res_data_this['max_member_count'] = 0
+                    res_data['data'].append(tmp_res_data_this)
+        return res_data
+
+    def get_group_member_info(target_event:OlivOS.API.Event, group_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_group_member_info()
+            this_msg.params.group_id = str(group_id)
+            this_msg.params.user_id = str(user_id)
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) is dict:
+                res_data['active'] = True
+                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user_name'], str)
+                res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+                res_data['data']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+                res_data['data']['group_id'] = this_msg.params.group_id
+                res_data['data']['times']['join_time'] = 0
+                res_data['data']['times']['last_sent_time'] = 0
+                res_data['data']['times']['shut_up_timestamp'] = 0
+                res_data['data']['role'] = 'member'
+                res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user_remark'], str)
+                res_data['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['user_displayname'], str)
+        return res_data
+
+    def get_group_member_list(target_event:OlivOS.API.Event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        raw_obj = None
+        if target_event.bot_info != None:
+            bot_hash = target_event.bot_info.hash
+            control_queue = target_event.plugin_info['control_queue']
+            this_msg = api.get_group_member_list()
+            this_msg.params.group_id = str(group_id)
+            waitForResReady(this_msg.echo)
+            this_msg.do_api(bot_hash, control_queue)
+            res_raw = waitForRes(this_msg.echo)
+            raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
+                    tmp_res_data_this['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user_name'], str)
+                    tmp_res_data_this['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+                    tmp_res_data_this['data']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
+                    tmp_res_data_this['data']['group_id'] = this_msg.params.group_id
+                    tmp_res_data_this['data']['times']['join_time'] = 0
+                    tmp_res_data_this['data']['times']['last_sent_time'] = 0
+                    tmp_res_data_this['data']['times']['shut_up_timestamp'] = 0
+                    tmp_res_data_this['data']['role'] = 'member'
+                    tmp_res_data_this['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user_remark'], str)
+                    tmp_res_data_this['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['user_displayname'], str)
+                    res_data['data'].append(tmp_res_data_this)
         return res_data
 
     def set_friend_add_request(target_event, flag, approve:bool, remark):
