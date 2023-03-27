@@ -83,7 +83,8 @@ class server(OlivOS.API.Proc_templet):
         ws.send(
             OlivOS.hackChatSDK.PAYLOAD.join(
                 nickname=self.Proc_data['bot_info_dict'].post_info.access_token,
-                chatroom=self.Proc_data['bot_info_dict'].post_info.host
+                chatroom=self.Proc_data['bot_info_dict'].post_info.host,
+                password=self.Proc_data['bot_info_dict'].password
             ).dump()
         )
         self.log(2, 'OlivOS hackChat link server [' + self.Proc_name + '] websocket link start')

@@ -284,7 +284,8 @@ class TreeEditUI(object):
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
                 'type_note_list': {
                     'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
-                    'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录'
+                    'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
+                    'Hack.Chat': '密码可以留空'
                 },
                 'type_clear_note_list': {
                     'QQ - GoCq - 默认': './conf/gocqhttp/{bothash}',
@@ -417,7 +418,8 @@ class TreeEditUI(object):
                     ],
                     'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
                             '房间名称': 'edit_root_Entry_Server_host',
-                            'Bot名称': 'edit_root_Entry_Server_access_token'
+                            'Bot名称': 'edit_root_Entry_Server_access_token',
+                            '密码': 'edit_root_Entry_Password'
                         }
                     ],
                     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {

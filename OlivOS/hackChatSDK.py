@@ -25,9 +25,10 @@ import OlivOS
 gBotIdDict = {}
 
 class bot_info_T(object):
-    def __init__(self, id=-1, nickname=None, chatroom=None):
+    def __init__(self, id=-1, nickname=None, password='', chatroom=None):
         self.id = id
         self.nickname = nickname
+        self.password = password
         self.chatroom = chatroom
         self.debug_mode = False
         self.debug_logger = None
@@ -36,6 +37,7 @@ class bot_info_T(object):
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
         id=plugin_bot_info.id,
+        password=plugin_bot_info.password,
         nickname=plugin_bot_info.post_info.access_token,
         chatroom=plugin_bot_info.post_info.host
     )
@@ -186,7 +188,7 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class join(payload_template):
-        def __init__(self, nickname: str, chatroom: str):
+        def __init__(self, nickname: str, chatroom: str, password:str=None):
             payload_template.__init__(self)
             self.cmd = 'join'
             self.data = {
@@ -194,6 +196,9 @@ class PAYLOAD(object):
                 "channel": chatroom,
                 "nick": nickname
             }
+            if type(password) is str \
+            and len(password) > 0:
+                self.data['password'] = password
 
     class chat(payload_template):
         def __init__(self, message: str):
