@@ -18,6 +18,28 @@ import copy
 
 import OlivOS
 
+def getTrans(srcWord:str, spec:list, prefix:'str|None'=None):
+    return getTransByL10N(srcWord, spec, OlivOS.L10NDataAPI.flagL10NSelection, prefix)
+
+def getTransByL10N(srcWord:str, spec:list, L10N:str, prefix:'str|None'=None):
+    res = srcWord
+    dstWordKey = None
+    flagL10N = OlivOS.L10NDataAPI.flagL10NSelectionDefault
+    flagL10NDefault = OlivOS.L10NDataAPI.flagL10NSelectionDefault
+    if L10N in OlivOS.L10NDataAPI.dictL10NSTR:
+        flagL10N = L10N
+    for key in OlivOS.L10NDataAPI.dictL10NSTR[flagL10NDefault]:
+        if ((type(prefix) is str and key.startswith(prefix)) or type(prefix) is not str) \
+        and srcWord == OlivOS.L10NDataAPI.dictL10NSTR[flagL10NDefault][key]:
+            dstWordKey = key
+            break
+    if dstWordKey is not None \
+    and flagL10N in OlivOS.L10NDataAPI.dictL10NSTR \
+    and dstWordKey in OlivOS.L10NDataAPI.dictL10NSTR[flagL10N]:
+        res = OlivOS.L10NDataAPI.dictL10NSTR[flagL10N][dstWordKey]
+    res = formatSTR(res, spec)
+    return res
+
 def getText(key:str, spec:list):
     return getTextByL10N(key, spec, OlivOS.L10NDataAPI.flagL10NSelection)
 

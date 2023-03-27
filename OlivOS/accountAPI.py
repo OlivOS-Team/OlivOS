@@ -25,6 +25,7 @@ default_account_conf = {
     'account': []
 }
 
+modelName = 'accountAPI'
 
 class Account(object):
     def load(path, logger_proc, safe_mode=False):
@@ -35,11 +36,11 @@ class Account(object):
         except:
             pass
         if account_conf is None:
-            logger_proc.log(3, OlivOS.L10NAPI.getText('accountAPI_0003', [path]))
+            logger_proc.log(3, OlivOS.L10NAPI.getTrans('init account from [{0}] ... failed', [path], modelName))
             account_conf = default_account_conf
-            logger_proc.log(2, OlivOS.L10NAPI.getText('accountAPI_0001', []))
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('init account from default ... done', [], modelName))
         else:
-            logger_proc.log(2, OlivOS.L10NAPI.getText('accountAPI_0002', [path]))
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('init account from [{0}] ... done', [path], modelName))
         plugin_bot_info_dict = {}
         for account_conf_account_this in account_conf['account']:
             if safe_mode and account_conf_account_this['sdk_type'] not in [
@@ -62,12 +63,12 @@ class Account(object):
             )
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
-            logger_proc.log(2, OlivOS.L10NAPI.getText('accountAPI_0004', [
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
                 str(account_conf_account_this['platform_type']),
                 str(account_conf_account_this['id']),
                 bot_info_tmp.hash
-            ]))
-        logger_proc.log(2, OlivOS.L10NAPI.getText('accountAPI_0005', []))
+            ], modelName))
+        logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate account ... all done', [], modelName))
         return plugin_bot_info_dict
 
     def save(path, logger_proc, Account_data, safe_mode=False):
