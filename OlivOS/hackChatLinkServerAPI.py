@@ -24,6 +24,7 @@ import OlivOS
 from OlivOS import hackChatSDK
 from OlivOS.qqGuildSDK import PAYLOAD
 
+modelName = 'hackChatLinkServerAPI'
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
@@ -48,7 +49,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        self.log(2, 'OlivOS hackChat link server [' + self.Proc_name + '] is running')
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS hackChat link server [{0}] is running', [self.Proc_name], modelName))
         threading.Thread(
             target=self.message_router,
             args=()
@@ -74,10 +75,18 @@ class server(OlivOS.API.Proc_templet):
             pass
 
     def on_error(self, ws, error):
-        self.log(0, 'OlivOS hackChat link server [' + self.Proc_name + '] websocket link error')
+        self.log(0, OlivOS.L10NAPI.getTrans(
+            'OlivOS hackChat link server [{0}] websocket link error',
+            [self.Proc_name],
+            modelName
+        ))
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.log(0, 'OlivOS hackChat link server [' + self.Proc_name + '] websocket link close')
+        self.log(0, OlivOS.L10NAPI.getTrans(
+            'OlivOS hackChat link server [{0}] websocket link close',
+            [self.Proc_name],
+            modelName
+        ))
 
     def on_open(self, ws: websocket.WebSocketApp):
         ws.send(
@@ -87,7 +96,11 @@ class server(OlivOS.API.Proc_templet):
                 password=self.Proc_data['bot_info_dict'].password
             ).dump()
         )
-        self.log(2, 'OlivOS hackChat link server [' + self.Proc_name + '] websocket link start')
+        self.log(2, OlivOS.L10NAPI.getTrans(
+            'OlivOS hackChat link server [{0}] websocket link start',
+            [self.Proc_name],
+            modelName
+        ))
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
@@ -104,7 +117,11 @@ class server(OlivOS.API.Proc_templet):
         ws.run_forever(http_proxy_host=proxy_set[0], http_proxy_port=proxy_set[1], proxy_type=proxy_set[2])
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None
-        self.log(2, 'OlivOS hackChat link server [' + self.Proc_name + '] websocket link lost')
+        self.log(2, OlivOS.L10NAPI.getTrans(
+            'OlivOS hackChat link server [{0}] websocket link lost',
+            [self.Proc_name],
+            modelName
+        ))
 
     def message_router(self):
         while True:
