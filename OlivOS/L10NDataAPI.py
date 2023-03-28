@@ -44,6 +44,12 @@ dictL10NSTR = {
         'pluginAPI_0013': 'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}',
         'pluginAPI_0014': 'OlivOS plugin [{0}] is loaded by OlivOS plugin shallow [{1}]',
         'pluginAPI_0015': 'Total count [{0}] OlivOS plugin is loaded by OlivOS plugin shallow [{1}]',
+        'onebotV12LinkServerAPI_0001': 'OlivOS onebotV12 link server [{0}] is running',
+        'onebotV12LinkServerAPI_0002': 'OlivOS onebotV12 link server [{0}] websocket link will retry in {1}s',
+        'onebotV12LinkServerAPI_0003': 'OlivOS onebotV12 link server [{0}] websocket link error',
+        'onebotV12LinkServerAPI_0004': 'OlivOS onebotV12 link server [{0}] websocket link close',
+        'onebotV12LinkServerAPI_0005': 'OlivOS onebotV12 link server [{0}] websocket link start',
+        'onebotV12LinkServerAPI_0006': 'OlivOS onebotV12 link server [{0}] websocket link lost',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -68,5 +74,11 @@ dictL10NSTR = {
         'pluginAPI_0013': 'OlivOS 插件 [{0}] 被 OlivOS 插件组件 [{1}] 跳过: {2}',
         'pluginAPI_0014': 'OlivOS 插件 [{0}] 被 OlivOS 插件组件 [{1}] 加载',
         'pluginAPI_0015': '共 [{0}] 个 OlivOS 插件被 OlivOS 插件组件 [{1}] 加载',
+        'onebotV12LinkServerAPI_0001': 'OlivOS onebotV12 连接服务组件 [{0}] 正在运作',
+        'onebotV12LinkServerAPI_0002': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 将在{1}秒内重试',
+        'onebotV12LinkServerAPI_0003': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 发生错误',
+        'onebotV12LinkServerAPI_0004': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经关闭',
+        'onebotV12LinkServerAPI_0005': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经启动',
+        'onebotV12LinkServerAPI_0006': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经丢失',
     }
 }
