@@ -68,7 +68,7 @@ def OlivOSUpdateGet(logger_proc):
             down_dir_name = './tmp/tmp/'
             down_name = down_dir_name + exe_name
             target_name = './resource/' + exe_name
-            logger_proc.log(2, 'check update ......')
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('check OlivOS update ......', [], modelName))
             down_url_obj = GETHttpJson2Dict('https://api.oliva.icu/olivosver/')
             down_url = None
             if down_url_obj is not None:
@@ -78,10 +78,10 @@ def OlivOSUpdateGet(logger_proc):
                         down_url = down_url_obj['version']['OlivOS'][architecture_num]['path']
                     else:
                         down_url_obj = None
-                        logger_proc.log(2, 'already latest.')
+                        logger_proc.log(2, OlivOS.L10NAPI.getTrans('OlivOS already latest.', [], modelName))
                 except:
                     down_url = None
-                    logger_proc.log(3, 'api error, skip update replace.')
+                    logger_proc.log(3, OlivOS.L10NAPI.getTrans('check OlivOS update api error, skip update replace.', [], modelName))
             if down_url is not None:
                 if GETHttpFile(
                         down_url,
@@ -91,13 +91,13 @@ def OlivOSUpdateGet(logger_proc):
                     shutil.move(down_name, target_name)
                     if os.path.isfile(target_name):
                         res = True
-                        logger_proc.log(2, 'update file hit, will run update replace.')
+                        logger_proc.log(2, OlivOS.L10NAPI.getTrans('check OlivOS update file hit, will run update replace.', [], modelName))
                     else:
-                        logger_proc.log(3, 'update file not hit, skip update replace.')
+                        logger_proc.log(3, OlivOS.L10NAPI.getTrans('check OlivOS update file not hit, skip update replace.', [], modelName))
                 clearFile(down_file_name)
                 removeDir(down_dir_name)
         else:
-            logger_proc.log(3, 'running in src mode, skip update replace.')
+            logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS running in src mode, skip update replace.', [], modelName))
     return res
 
 

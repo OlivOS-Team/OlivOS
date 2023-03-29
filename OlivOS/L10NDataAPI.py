@@ -68,6 +68,12 @@ dictL10NSTR = {
         'updateAPI_0010': '{0} lib already latest!',
         'updateAPI_0011': '{0} lib update FORCESKIP!',
         'updateAPI_0012': 'download new {0} lib done',
+        'updateAPI_0013': 'check OlivOS update ......',
+        'updateAPI_0014': 'OlivOS already latest.',
+        'updateAPI_0015': 'check OlivOS update api error, skip update replace.',
+        'updateAPI_0016': 'check OlivOS update file hit, will run update replace.',
+        'updateAPI_0017': 'check OlivOS update file not hit, skip update replace.',
+        'updateAPI_0018': 'OlivOS running in src mode, skip update replace.',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -116,5 +122,11 @@ dictL10NSTR = {
         'updateAPI_0010': '{0} 依赖库 已是最新!',
         'updateAPI_0011': '{0} 依赖库更新 强制跳过(FORCESKIP)!',
         'updateAPI_0012': '下载新的 {0} 依赖库 完成',
+        'updateAPI_0013': '检查 OlivOS 更新 ......',
+        'updateAPI_0014': 'OlivOS 已是最新。',
+        'updateAPI_0015': '检查 OlivOS 更新接口失败, 跳过更新',
+        'updateAPI_0016': '检查 OlivOS 更新文件命中, 即将更新',
+        'updateAPI_0017': '检查 OlivOS 更新文件未命中, 跳过更新',
+        'updateAPI_0018': '检测到 OlivOS 在源码模式下运行, 跳过更新',
     }
 }
