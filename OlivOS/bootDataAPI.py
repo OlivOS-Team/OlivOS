@@ -43,7 +43,8 @@ default_Conf = {
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
             "OlivOS_dodo_link",
-            "OlivOS_biliLive_link"
+            "OlivOS_biliLive_link",
+            "OlivOS_update_check"
         ],
         "control_queue": "OlivOS_control_queue",
         "interval": 0.2,
@@ -67,6 +68,12 @@ default_Conf = {
             "enable": True,
             "name": "OlivOS_sleep",
             "type": "sleep",
+            "logger_proc": "OlivOS_logger"
+        },
+        "OlivOS_update_check": {
+            "enable": True,
+            "name": "OlivOS_update_check",
+            "type": "update_check",
             "logger_proc": "OlivOS_logger"
         },
         "OlivOS_multiLoginUI": {

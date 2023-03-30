@@ -134,6 +134,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if basic_conf_models_this['enable']:
                     if basic_conf_models_this['type'] == 'sleep':
                         time.sleep(10)
+                    elif basic_conf_models_this['type'] == 'update_check':
+                        threading.Thread(
+                            target = OlivOS.updateAPI.OlivOSUpdateGet,
+                            kwargs = {
+                                'logger_proc': Proc_dict[basic_conf_models_this['logger_proc']],
+                                'flagChackOnly': True
+                            }
+                        ).start()
                     elif basic_conf_models_this['type'] == 'logger':
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.diagnoseAPI.logger(
                             Proc_name=basic_conf_models_this['name'],

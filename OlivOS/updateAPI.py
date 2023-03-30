@@ -56,12 +56,16 @@ def OlivOSUpdateReplace(logger_proc):
         OlivOS.bootAPI.killMain()
 
 
-def OlivOSUpdateGet(logger_proc):
+def OlivOSUpdateGet(logger_proc, flagChackOnly = False):
     res = False
     architecture_num = platform.architecture()[0]
     if platform.system() == 'Windows':
         clear_bat()
-        exe_name = get_exe_name()
+        exe_name = 'OlivOS.exe'
+        if flagChackOnly:
+            time.sleep(10)
+        else:
+            exe_name = get_exe_name()
         if exe_name is not None:
             releaseDir('./tmp')
             down_file_name = './tmp/tmp.zip'
@@ -73,16 +77,21 @@ def OlivOSUpdateGet(logger_proc):
             down_url = None
             if down_url_obj is not None:
                 try:
-                    if type(down_url_obj['version']['OlivOS'][architecture_num]['svn']) == int and \
-                            down_url_obj['version']['OlivOS'][architecture_num]['svn'] > OlivOS.infoAPI.OlivOS_SVN:
+                    if type(down_url_obj['version']['OlivOS'][architecture_num]['svn']) == int \
+                    and down_url_obj['version']['OlivOS'][architecture_num]['svn'] > OlivOS.infoAPI.OlivOS_SVN:
                         down_url = down_url_obj['version']['OlivOS'][architecture_num]['path']
+                        if flagChackOnly:
+                            logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS update found, please try update.', [], modelName))
+                        else:
+                            logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS update found.', [], modelName))
                     else:
                         down_url_obj = None
                         logger_proc.log(2, OlivOS.L10NAPI.getTrans('OlivOS already latest.', [], modelName))
                 except:
                     down_url = None
                     logger_proc.log(3, OlivOS.L10NAPI.getTrans('check OlivOS update api error, skip update replace.', [], modelName))
-            if down_url is not None:
+            # flagChackOnly True时仅做检查，不进入后续流程
+            if not flagChackOnly and down_url is not None:
                 if GETHttpFile(
                         down_url,
                         down_file_name
