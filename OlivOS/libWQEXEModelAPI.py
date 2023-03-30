@@ -30,6 +30,8 @@ import shutil
 
 import OlivOS
 
+modelName = 'libWQEXEModelAPI'
+
 gCheckList = [
     'walleq',
     'walleq_hide',
@@ -119,7 +121,10 @@ class server(OlivOS.API.Proc_templet):
         while flag_run:
             releaseDir('./lib')
             if not os.path.exists('./lib/walle-q.exe'):
-                self.log(3, 'OlivOS libWQEXEModel server [' + self.Proc_name + '] can`t found target lib')
+                self.log(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libWQEXEModel server [{0}] can`t found target lib',
+                    [self.Proc_name], modelName
+                ))
                 break
             releaseDir('./conf')
             releaseDir('./conf/walleq')
@@ -134,7 +139,10 @@ class server(OlivOS.API.Proc_templet):
                 'walleq_show_iPad',
                 'walleq_show_Android_Pad'
             ]:
-                self.log(2, 'OlivOS libWQEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libWQEXEModel server [{0}] will run under visiable mode',
+                    [self.Proc_name], modelName
+                ))
                 self.clear_walleq()
                 self.Proc_data['check_qrcode_flag'] = False
                 self.Proc_data['check_stdin'] = False
@@ -162,12 +170,18 @@ class server(OlivOS.API.Proc_templet):
                 ).start()
                 self.get_model_stdout(model_Proc)
                 # model_Proc.communicate(timeout = None)
-                self.log(3, 'OlivOS libWQEXEModel server [' + self.Proc_name + '] will retry in 10s...')
+                self.log(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libWQEXEModel server [{0}] will retry in 10s...',
+                    [self.Proc_name], modelName
+                ))
                 time.sleep(8)
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'walleq_show_old'
             ]:
-                self.log(2, 'OlivOS libWQEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libWQEXEModel server [{0}] will run under visiable mode',
+                    [self.Proc_name], modelName
+                ))
                 tmp_env = dict(os.environ)
                 subprocess.call(
                     'start cmd /K "title WalleQ For OlivOS|..\\..\\..\\lib\\walle-q.exe"',
@@ -221,11 +235,12 @@ class server(OlivOS.API.Proc_templet):
                     ('onebot', 'default')
                 ])
             except Exception as e:
-                self.log(4, 'OlivOS libEXEModelAPI failed: %s\n%s' % (
+                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libWQEXEModel failed: %s\n%s' % [
                         str(e),
                         traceback.format_exc()
-                    )
-                )
+                    ],
+                    modelName
+                ))
 
     def send_init_event(self):
         self.sendControlEventSend(

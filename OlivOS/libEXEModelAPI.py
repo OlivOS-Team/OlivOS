@@ -30,6 +30,8 @@ import shutil
 
 import OlivOS
 
+modelName = 'libEXEModelAPI'
+
 gCheckList = [
     'gocqhttp',
     'gocqhttp_hide',
@@ -120,7 +122,10 @@ class server(OlivOS.API.Proc_templet):
         while flag_run:
             releaseDir('./lib')
             if not os.path.exists('./lib/go-cqhttp.exe'):
-                self.log(3, 'OlivOS libEXEModel server [' + self.Proc_name + '] can`t found target lib')
+                self.log(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] can`t found target lib',
+                    [self.Proc_name], modelName
+                ))
                 break
             releaseDir('./conf')
             releaseDir('./conf/gocqhttp')
@@ -140,9 +145,15 @@ class server(OlivOS.API.Proc_templet):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] is running')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] is running',
+                    [self.Proc_name], modelName
+                ))
                 model_Proc.communicate(timeout=None)
-                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] exited')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] exited',
+                    [self.Proc_name], modelName
+                ))
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp',
                 'gocqhttp_show',
@@ -152,7 +163,10 @@ class server(OlivOS.API.Proc_templet):
                 'gocqhttp_show_iPad',
                 'gocqhttp_show_Android_Pad'
             ]:
-                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] will run under visiable mode',
+                    [self.Proc_name], modelName
+                ))
                 self.clear_gocqhttp()
                 self.Proc_data['check_qrcode_flag'] = False
                 self.Proc_data['check_stdin'] = False
@@ -182,12 +196,18 @@ class server(OlivOS.API.Proc_templet):
                 ).start()
                 self.get_model_stdout(model_Proc)
                 # model_Proc.communicate(timeout = None)
-                self.log(3, 'OlivOS libEXEModel server [' + self.Proc_name + '] will retry in 10s...')
+                self.log(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] will retry in 10s...',
+                    [self.Proc_name], modelName
+                ))
                 time.sleep(8)
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp_show_old'
             ]:
-                self.log(2, 'OlivOS libEXEModel server [' + self.Proc_name + '] will run under visiable mode')
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] will run under visiable mode',
+                    [self.Proc_name], modelName
+                ))
                 tmp_env = dict(os.environ)
                 tmp_env['FORCE_TTY'] = ''
                 subprocess.call(
@@ -242,11 +262,12 @@ class server(OlivOS.API.Proc_templet):
                     ('onebot', 'default')
                 ])
             except Exception as e:
-                self.log(4, 'OlivOS libEXEModelAPI failed: %s\n%s' % (
-                    str(e),
-                    traceback.format_exc()
-                )
-                         )
+                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libEXEModel failed: %s\n%s' % [
+                        str(e),
+                        traceback.format_exc()
+                    ],
+                    modelName
+                ))
 
     def send_init_event(self):
         self.sendControlEventSend('send', {
