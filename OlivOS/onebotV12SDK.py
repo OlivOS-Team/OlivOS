@@ -37,6 +37,7 @@ class bot_info_T(object):
         self.host = host
         self.port = port
         self.access_token = access_token
+        self.platform = 'qq'
         self.debug_mode = False
         self.debug_logger = None
 
@@ -48,6 +49,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info:OlivOS.API.bot_info_T)
         port=plugin_bot_info.post_info.port,
         access_token=plugin_bot_info.post_info.access_token
     )
+    res.platform = plugin_bot_info.platform['platform']
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
@@ -60,7 +62,11 @@ def get_SDK_bot_info_from_Event(target_event:OlivOS.API.Event):
 class event(object):
     def __init__(self, raw:dict, bot_info:bot_info_T):
         self.json = self.event_load(raw)
-        self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'onebotV12'}
+        self.platform = {
+            'sdk': 'onebot',
+            'platform': bot_info.platform,
+            'model': 'onebotV12'
+        }
         self.base_info = {}
         self.active = False
         if self.json is not None:

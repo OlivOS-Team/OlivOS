@@ -22,6 +22,12 @@ import traceback
 
 # platform sdk model
 dictMessageType = {
+    'wechat': {
+        'onebot': {
+            'onebotV12': 'obv12_para',
+            'ComWeChatBotClient': 'obv12_para'
+        }
+    },
     'qq': {
         'onebot': {
             'default': 'old_string',

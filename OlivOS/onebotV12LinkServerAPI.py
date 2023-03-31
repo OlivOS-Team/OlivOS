@@ -36,6 +36,7 @@ gCheckList = [
     'walleq_show_Android_Watch',
     'walleq_show_iPad',
     'walleq_show_old',
+    'ComWeChatBotClient'
 ]
 
 class server(OlivOS.API.Proc_templet):

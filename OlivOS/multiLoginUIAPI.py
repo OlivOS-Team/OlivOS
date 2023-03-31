@@ -265,6 +265,7 @@ class TreeEditUI(object):
                     'QQ - Wq - 安卓手表',
                     'QQ - GoCq - 旧',
                     'QQ - Wq - 旧',
+                    '微信 - ComWeChat',
                     'Discord',
                     'Telegram',
                     '开黑啦 - KOOK',
@@ -285,6 +286,7 @@ class TreeEditUI(object):
                 'type_note_list': {
                     'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
                     'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
+                    '微信 - ComWeChat': '需要配合ComWeChatClient使用',
                     'Hack.Chat': '密码可以留空'
                 },
                 'type_clear_note_list': {
@@ -377,6 +379,11 @@ class TreeEditUI(object):
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
+                    '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'False', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '端口': 'edit_root_Entry_Server_port',
+                        }
+                    ],
                     '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
                             'Token': 'edit_root_Entry_Server_access_token'
                         }
@@ -447,6 +454,7 @@ class TreeEditUI(object):
                     ],
                 },
                 'platform_list': [
+                    'wechat',
                     'qq',
                     'qqGuild',
                     'kaiheila',
@@ -459,6 +467,9 @@ class TreeEditUI(object):
                     'biliLive'
                 ],
                 'platform_sdk_list': {
+                    'wechat': [
+                        'onebot'
+                    ],
                     'qq': [
                         'onebot'
                     ],
@@ -493,6 +504,12 @@ class TreeEditUI(object):
                     ]
                 },
                 'platform_sdk_model_list': {
+                    'wechat': {
+                        'onebot': [
+                            'onebotV12',
+                            'ComWeChatBotClient'
+                        ]
+                    },
                     'qq': {
                         'onebot': [
                             # 'gocqhttp',
@@ -744,11 +761,16 @@ class TreeEditUI(object):
                 tmp_platform_platform,
                 tmp_platform_model
             ]):
+                tmp_id_last = str(tmp_id)
+                try:
+                    tmp_id_last = int(tmp_id)
+                except:
+                    pass
                 self.UIData['Edit_res'] = [
                     tmp_action,
                     self.hash_key,
                     OlivOS.API.bot_info_T(
-                        id=int(tmp_id),
+                        id=tmp_id_last,
                         password=tmp_password,
                         server_auto=str2bool(tmp_server_auto),
                         server_type=tmp_server_type,
