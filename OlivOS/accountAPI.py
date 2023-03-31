@@ -120,6 +120,12 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                     Account_data_this.post_info.host = 'ws://127.0.0.1'
                     Account_data_this.post_info.port = get_free_port()
                     Account_data_this.post_info.access_token = bot_info_dict_this
+            if Account_data_this.platform['model'] in OlivOS.libCWCBEXEModelAPI.gCheckList:
+                if Account_data_this.post_info.auto == True:
+                    Account_data_this.post_info.type = 'websocket'
+                    Account_data_this.post_info.host = 'ws://127.0.0.1'
+                    Account_data_this.post_info.port = get_free_port()
+                    Account_data_this.post_info.access_token = bot_info_dict_this
         res[bot_info_dict_this] = Account_data_this
     return res
 

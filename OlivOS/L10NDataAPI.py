@@ -87,6 +87,12 @@ dictL10NSTR = {
         'libEXEModelAPI_0005': 'OlivOS libEXEModel server [{0}] is running',
         'libEXEModelAPI_0006': 'OlivOS libEXEModel server [{0}] exited',
         'flaskServerAPI_0001': 'OlivOS flask server [{0}] is running',
+        'libCWCBEXEModelAPI_0001': 'OlivOS libCWCBEXEModel server [{0}] can`t found target lib',
+        'libCWCBEXEModelAPI_0002': 'OlivOS libCWCBEXEModel server [{0}] will run under visiable mode',
+        'libCWCBEXEModelAPI_0003': 'OlivOS libCWCBEXEModel server [{0}] will retry in 10s...',
+        'libCWCBEXEModelAPI_0004': 'OlivOS libCWCBEXEModel failed: {0}\n{1}',
+        'libCWCBEXEModelAPI_0005': 'OlivOS libCWCBEXEModel server [{0}] is running',
+        'libCWCBEXEModelAPI_0006': 'OlivOS libCWCBEXEModel server [{0}] exited',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -154,5 +160,11 @@ dictL10NSTR = {
         'libEXEModelAPI_0005': 'OlivOS GoCq进程托管服务组件 [{0}] 正在运作',
         'libEXEModelAPI_0006': 'OlivOS GoCq进程托管服务组件 [{0}] 已经存在',
         'flaskServerAPI_0001': 'OlivOS onebotV11 flask POST服务组件 [{0}] 正在运作',
+        'libCWCBEXEModelAPI_0001': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 无法找到库文件',
+        'libCWCBEXEModelAPI_0002': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 将在前台模式下运行',
+        'libCWCBEXEModelAPI_0003': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 将在10秒后重试...',
+        'libCWCBEXEModelAPI_0004': 'OlivOS ComWeChatBotClient进程托管服务组件 错误: {0}\n{1}',
+        'libCWCBEXEModelAPI_0005': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 正在运作',
+        'libCWCBEXEModelAPI_0006': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 已经存在',
     }
 }

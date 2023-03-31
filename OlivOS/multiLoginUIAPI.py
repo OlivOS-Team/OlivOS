@@ -379,7 +379,7 @@ class TreeEditUI(object):
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'False', 'websocket', {
+                    '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '端口': 'edit_root_Entry_Server_port',
                         }

@@ -66,5 +66,6 @@ if platform.system() == 'Windows':
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
     from . import libWQEXEModelAPI
+    from . import libCWCBEXEModelAPI
     from . import nativeWinUIAPI
 from . import userModule
