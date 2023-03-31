@@ -286,7 +286,7 @@ class TreeEditUI(object):
                 'type_note_list': {
                     'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
                     'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
-                    '微信 - ComWeChat': '需要配合ComWeChatClient使用',
+                    '微信 - ComWeChat': '启动后需要再运行特定版本微信',
                     'Hack.Chat': '密码可以留空'
                 },
                 'type_clear_note_list': {
@@ -380,8 +380,7 @@ class TreeEditUI(object):
                         }
                     ],
                     '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '端口': 'edit_root_Entry_Server_port',
+                            '微信号': 'edit_root_Entry_ID'
                         }
                     ],
                     '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
@@ -627,7 +626,7 @@ class TreeEditUI(object):
                     tmp_port = '58000'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'qq' \
+            if tmp_platform_platform in ['qq', 'wechat'] \
             and tmp_platform_sdk == 'onebot' \
             and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList \
             and tmp_server_auto == 'True':
