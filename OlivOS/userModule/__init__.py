@@ -17,3 +17,4 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 # here put the import lib
 
 from . import JyunkoUserConf
+from . import IOStream
