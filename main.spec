@@ -20,7 +20,7 @@ a = Analysis(['main.py'],
              cipher=block_cipher,
              noarchive=False)
 splash = Splash(
-    './resource/OlivOS_EA_SIP.jpg',
+    './resource/intro.jpg',
     binaries=a.binaries,
     datas=a.datas,
     text_pos=None,

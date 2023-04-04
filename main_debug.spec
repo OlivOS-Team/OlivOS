@@ -22,7 +22,7 @@ a = Analysis(['main.py'],
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 splash = Splash(
-    './resource/OlivOS_EA_SIP.jpg',
+    './resource/intro.jpg',
     binaries=a.binaries,
     datas=a.datas,
     text_pos=None,
