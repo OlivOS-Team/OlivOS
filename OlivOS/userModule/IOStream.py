@@ -66,9 +66,9 @@ def IO_construct(self:API.Event,input_list:'list|tuple',plugin_name,mode:int = 2
         os.mkdir("plugin/tmp/Input/input_data")
     if not os.path.exists(data_path):   
         init_data = {}
-        with open(data_path,"w",encoding="utf-8") as file:
+        with open(data_path,"wb",encoding="utf-8") as file:
             pickle.dump(init_data, file ,indent=4 ,ensure_ascii=False)     
-    with open(data_path,"r",encoding='utf8') as f:      #导入输入流缓存数据
+    with open(data_path,"rb",encoding='utf8') as f:      #导入输入流缓存数据
         input_log:dict = pickle.load(f)
     if input_log.get(platform,None) == None:    #检查文件结构
         input_log[platform] = {}
@@ -127,9 +127,9 @@ def IO_construct(self:API.Event,input_list:'list|tuple',plugin_name,mode:int = 2
             return
         if not os.path.exists(cache_path):   
             init_data = {}
-            with open(cache_path,"w",encoding="utf-8") as file:
+            with open(cache_path,"wb",encoding="utf-8") as file:
                 pickle.dump(init_data, file,indent=4,ensure_ascii=False)     
-        with open(cache_path,"r",encoding='utf8') as f:      #导入输入流变量缓存数据
+        with open(cache_path,"rb",encoding='utf8') as f:      #导入输入流变量缓存数据
             input_cache_data:dict = pickle.load(f)
         if input_cache_data.get('input_history_data',None) == None:
             input_cache_data['input_history_data'] = []
@@ -150,9 +150,9 @@ def IO_construct(self:API.Event,input_list:'list|tuple',plugin_name,mode:int = 2
                 input_log_data['time'] = time.time()
                 input_log_data['index'] = new_index
                 input_log_data['cache_file_name'] = cache_file_name
-                with open(data_path, "w", encoding='utf8') as f:
+                with open(data_path, "wb", encoding='utf8') as f:
                     pickle.dump(input_log, f, indent=4, ensure_ascii=False)
-                with open(cache_path, "w", encoding='utf8') as f:
+                with open(cache_path, "wb", encoding='utf8') as f:
                     pickle.dump(cache_data, f, indent=4, ensure_ascii=False)
                 return
         #新序列不合法，结束输入流，删除缓存数据
@@ -165,7 +165,7 @@ def IO_construct(self:API.Event,input_list:'list|tuple',plugin_name,mode:int = 2
                 input_log[platform]['private'][user_id] = {}
         elif mode == 3 and group:       #群内User，接收群内指定用户信息，可理解为群聊接收
             input_log[platform]['group'][group][user_id] = {}
-        with open(data_path, "w", encoding='utf8') as f:
+        with open(data_path, "wb", encoding='utf8') as f:
             pickle.dump(input_log, f, indent=4, ensure_ascii=False)
         os.remove(cache_path)
         return
@@ -179,7 +179,7 @@ def IO_construct(self:API.Event,input_list:'list|tuple',plugin_name,mode:int = 2
                 input_log[platform]['private'][user_id] = {}
         elif mode == 3 and group:       #群内User，接收群内指定用户信息，可理解为群聊接收
             input_log[platform]['group'][group][user_id] = {}
-        with open(data_path, "w", encoding='utf8') as f:
+        with open(data_path, "wb", encoding='utf8') as f:
             pickle.dump(input_log, f, indent=4, ensure_ascii=False)
         os.remove(cache_path)
         return
