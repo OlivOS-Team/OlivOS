@@ -27,6 +27,7 @@ import platform
 import signal
 import psutil
 import atexit
+import importlib
 
 import OlivOS
 
@@ -54,6 +55,7 @@ class Entity(object):
         Proc_logger_name = []
         plugin_bot_info_dict = {}
 
+        preLoadPrint('OlivOS - Witness Union')
         start_up_show_str = ('''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -64,32 +66,32 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         print(start_up_show_str)
         print('･ﾟ( ﾉヮ´ )(`ヮ´ )σ`∀´) ﾟ∀ﾟ)σ' + ' [OlivOS - Witness Union]\n')
 
-        print('init config from [' + basic_conf_path + '] ... ', end='')
+        preLoadPrint('init config from [%s] ... ' % basic_conf_path)
         try:
             with open(basic_conf_path, 'r', encoding='utf-8') as basic_conf_f:
                 basic_conf = json.loads(basic_conf_f.read())
         except:
-            print('failed')
+            preLoadPrint('init config from [%s] ... failed' % basic_conf_path)
             releaseDir('./conf')
             basic_conf = OlivOS.bootDataAPI.default_Conf
-            print('init config from default ... done')
+            preLoadPrint('init config from default ... done')
         else:
-            print('done')
-        print('init models from config ... ', end='')
+            preLoadPrint('init config from [%s] ... done' % basic_conf_path)
+        preLoadPrint('init models from config ... ')
         if basic_conf is not None:
             basic_conf_models = basic_conf['models']
-            print('done')
+            preLoadPrint('init models from config ... done')
         else:
-            print('failed')
+            preLoadPrint('init models from config ... failed')
             sys.exit()
 
-        print('generate queue from config ... ')
+        preLoadPrint('generate queue from config ... ')
         multiprocessing_dict = {}
         for queue_name_this in basic_conf['queue']:
-            print('generate queue [' + queue_name_this + '] from config ... ', end='')
+            preLoadPrint('generate [%s] queue ...' % queue_name_this)
             multiprocessing_dict[queue_name_this] = multiprocessing.Queue()
-            print('done')
-        print('generate queue from config ... all done')
+            preLoadPrint('generate [%s] queue ... done' % queue_name_this)
+        preLoadPrint('generate queue from config ... all done')
 
         main_control = OlivOS.API.Control(
             name=basic_conf['system']['name'],
@@ -101,6 +103,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         for basic_conf_models_this_name in main_control.init_list:
             main_control.control_queue.put(main_control.packet('init', basic_conf_models_this_name), block=False)
 
+        preLoadPrint('get init args ...')
         # 判断启动参数
         basic_argv = []
         if len(sys.argv) >= 1:
@@ -108,6 +111,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         flag_noblock = False
         if '--noblock' in basic_argv:
             flag_noblock = True
+        preLoadPrint('get init args ... done')
+
+        preLoadPrint('basic init done!')
+        setSplashClose()
 
         while True:
             if main_control.control_queue.empty():
@@ -690,3 +697,19 @@ def kill_process_children(p):
                 kill_process_and_its_children(child)
             else:
                 kill_process(child)
+
+
+# 启动画面的操作
+def setSplashClose():
+    if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
+        import pyi_splash
+        pyi_splash.close()
+
+def setSplashText(text:str):
+    if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
+        import pyi_splash
+        pyi_splash.update_text(text)
+
+def preLoadPrint(text:str):
+    print(text)
+    #setSplashText(text)
