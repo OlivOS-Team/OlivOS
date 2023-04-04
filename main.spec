@@ -6,7 +6,7 @@ block_cipher = None
 a = Analysis(['main.py'],
              pathex=['./'],
              binaries=[],
-             datas=[],
+             datas=['./lib'],
              hiddenimports=[
                  'websockets.legacy.auth',
                  'websockets.legacy.client',
