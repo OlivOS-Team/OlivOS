@@ -6,7 +6,7 @@ block_cipher = None
 a = Analysis(['main.py'],
              pathex=['./'],
              binaries=[],
-             datas=['./lib'],
+             datas=[],
              hiddenimports=[
                  'websockets.legacy.auth',
                  'websockets.legacy.client',
@@ -19,6 +19,15 @@ a = Analysis(['main.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
+splash = Splash(
+    './resource/OlivOS_EA_SIP.jpg',
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=None,
+    text_size=12,
+    minify_script=True,
+    always_on_top=True,
+)
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,
