@@ -20,3 +20,8 @@ brotli
 pyjson5
 APScheduler==3.10.1
 js2py
+certifi
+httpx
+prompt_toolkit
+regex
+rich
