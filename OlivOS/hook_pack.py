@@ -42,3 +42,10 @@ import aiohttp
 
 # qrcode
 import qrcode
+
+# weblib
+import certifi
+import httpx
+import prompt_toolkit
+import regex
+import rich
