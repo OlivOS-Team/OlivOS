@@ -263,9 +263,11 @@ class TreeEditUI(object):
                     'QQ - GoCq - iPad',
                     'QQ - GoCq - iMac',
                     'QQ - Wq - 安卓手表',
+                    'QQ - Wq - 安卓手机',
+                    'QQ - Wq - 安卓平板',
+                    '微信 - ComWeChat',
                     'QQ - GoCq - 旧',
                     'QQ - Wq - 旧',
-                    '微信 - ComWeChat',
                     'Discord',
                     'Telegram',
                     '开黑啦 - KOOK',
@@ -286,6 +288,8 @@ class TreeEditUI(object):
                 'type_note_list': {
                     'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
                     'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
+                    'QQ - Wq - 安卓手表': '密码留空即尝试使用扫码登录',
+                    'QQ - Wq - 旧': '密码留空即尝试使用扫码登录',
                     '微信 - ComWeChat': '启动后需要再运行特定版本微信',
                     'Hack.Chat': '密码可以留空'
                 },
@@ -296,8 +300,10 @@ class TreeEditUI(object):
                     'QQ - GoCq - 安卓手表': './conf/gocqhttp/{bothash}',
                     'QQ - GoCq - iPad': './conf/gocqhttp/{bothash}',
                     'QQ - GoCq - iMac': './conf/gocqhttp/{bothash}',
-                    'QQ - Wq - 安卓手表': './conf/walleq/{bothash}',
                     'QQ - GoCq - 旧': './conf/gocqhttp/{bothash}',
+                    'QQ - Wq - 安卓手表': './conf/walleq/{bothash}',
+                    'QQ - Wq - 安卓手机': './conf/walleq/{bothash}',
+                    'QQ - Wq - 安卓平板': './conf/walleq/{bothash}',
                     'QQ - Wq - 旧': './conf/walleq/{bothash}'
                 },
                 'type_mapping_list': {
@@ -350,6 +356,12 @@ class TreeEditUI(object):
                         }
                     ],
                     'QQ - Wq - 安卓手机': ['qq', 'onebot', 'walleq_show_Android_Phone', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 安卓平板': ['qq', 'onebot', 'walleq_show_Android_Pad', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
