@@ -169,6 +169,16 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_count == self.Proc_config['step_to_restart']:
                         self.set_restart()
 
+    def on_control_rx(self, packet):
+        if type(packet) is OlivOS.API.Control.packet:
+            if 'send' == packet.action:
+                if type(packet.key) is dict \
+                and 'data' in packet.key \
+                and type(packet.key['data']) \
+                and 'action' in packet.key['data']:
+                    if 'account_update' == packet.key['data']['action']:
+                        self.set_restart()
+
     def set_restart(self):
         self.log(2, OlivOS.L10NAPI.getTrans(
             'OlivOS plugin shallow [{0}] call restart', [

@@ -1480,7 +1480,7 @@ class Proc_templet(object):
 
     def on_control_rx_init(self):
         while True:
-            if self.Proc_info.rx_queue.empty():
+            if self.Proc_info.control_rx_queue.empty():
                 time.sleep(0.02)
             else:
                 try:

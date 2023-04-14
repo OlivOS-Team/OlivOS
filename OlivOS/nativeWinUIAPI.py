@@ -42,7 +42,6 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
-
 class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(StoppableThread, self).__init__(*args, **kwargs)
@@ -156,6 +155,15 @@ class dock(OlivOS.API.Proc_templet):
                                             else:
                                                 self.updateShallow()
                                                 self.updatePluginEdit()
+                                        elif 'account_edit' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data'] \
+                                            and 'account_edit_on' == rx_packet_data.key['data']['event'] \
+                                            and 'bot_info' in rx_packet_data.key['data'] \
+                                            and type(rx_packet_data.key['data']['bot_info']) is dict:
+                                                OlivOS.multiLoginUIAPI.run_HostUI_asayc(
+                                                    plugin_bot_info_dict=rx_packet_data.key['data']['bot_info'],
+                                                    control_queue=self.Proc_info.control_queue
+                                                )
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
                                         elif 'logger' == rx_packet_data.key['data']['action']:
@@ -376,7 +384,7 @@ class dock(OlivOS.API.Proc_templet):
     def updateShallowMenuList(self):
         tmp_new = []
         self.UIData['shallow_menu_list'] = [
-            ['账号管理', False],
+            ['账号管理', self.startAccountEditSendFunc()],
             ['打开终端', self.startOlivOSTerminalUISend],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
             ['walleq管理', self.UIData['shallow_walleq_menu_list']],
@@ -395,6 +403,21 @@ class dock(OlivOS.API.Proc_templet):
             else:
                 tmp_new.append(data_this)
         self.UIData['shallow_menu_list'] = tmp_new
+
+    def startAccountEditSendFunc(self):
+        def resFunc():
+            self.startAccountEditSend()
+        return resFunc
+
+    def startAccountEditSend(self):
+        self.sendControlEventSend(
+            'call_system_event', {
+                'action': [
+                    'account_edit_asayc_start',
+                    'account_edit_asayc_do'
+                ]
+            }
+        )
 
     def startGoCqhttpTerminalUISendFunc(self, hash):
         def resFunc():

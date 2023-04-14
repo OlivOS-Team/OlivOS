@@ -20,6 +20,8 @@ import os
 import hashlib
 import random
 import shutil
+import platform
+import traceback
 
 from tkinter import ttk
 from tkinter import messagebox
@@ -35,15 +37,70 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
+def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
+    if platform.system() == 'Windows':
+        try:
+            tmp_callbackData = {'res': False}
+            tmp_t = OlivOS.multiLoginUIAPI.HostUI(
+                Model_name='OlivOS_multiLoginUI_asayc',
+                Account_data=plugin_bot_info_dict,
+                logger_proc=None,
+                callbackData=tmp_callbackData,
+                asaycMode=True,
+                rootMode=True,
+                control_queue=control_queue
+            )
+            tmp_res = tmp_t.start()
+            if tmp_res != True:
+                pass
+            if tmp_t.UIData['flag_commit']:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+
+def sendAccountUpdate(obj, control_queue, account_data):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_event',
+                {
+                    'action': [
+                        'account_edit_asayc_end'
+                    ]
+                }
+            ),
+            block=False
+        )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_account_update',
+                {
+                    'data': account_data
+                }
+            ),
+            block=False
+        )
 
 class HostUI(object):
-    def __init__(self, Model_name, Account_data, logger_proc=None, callbackData=None):
+    def __init__(
+        self,
+        Model_name,
+        Account_data,
+        logger_proc=None,
+        callbackData=None,
+        asaycMode=False,
+        rootMode=True,
+        control_queue=None
+    ):
         self.Model_name = Model_name
         self.UIObject = {}
         self.UIData = {}
         self.UIConfig = {}
         self.logger_proc = logger_proc
         self.callbackData = callbackData
+        self.asaycMode = asaycMode
+        self.rootMode = rootMode
+        self.control_queue = control_queue
         self.res = False
         self.UIData['Account_data'] = Account_data
         self.UIData['flag_commit'] = False
@@ -55,7 +112,10 @@ class HostUI(object):
             self.logger_proc.log(log_level, log_message)
 
     def start(self):
-        self.UIObject['root'] = tkinter.Tk()
+        if self.rootMode:
+            self.UIObject['root'] = tkinter.Tk()
+        else:
+            self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('OlivOS 登录管理器')
         self.UIObject['root'].geometry('518x400')
         self.UIObject['root'].resizable(
@@ -227,6 +287,7 @@ class HostUI(object):
         self.res = True
         if type(self.callbackData) == dict:
             self.callbackData['res'] = self.res
+        sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
 
 

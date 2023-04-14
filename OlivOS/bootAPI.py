@@ -28,6 +28,7 @@ import signal
 import psutil
 import atexit
 import importlib
+import traceback
 if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
     import pyi_splash
 
@@ -520,17 +521,35 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock:
                         if platform.system() == 'Windows':
                             tmp_callbackData = {'res': False}
-                            Proc_dict[basic_conf_models_this['name']] = OlivOS.multiLoginUIAPI.HostUI(
+                            HostUI_obj = OlivOS.multiLoginUIAPI.HostUI(
                                 Model_name=basic_conf_models_this['name'],
                                 Account_data=plugin_bot_info_dict,
                                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                                 callbackData=tmp_callbackData
                             )
-                            tmp_res = Proc_dict[basic_conf_models_this['name']].start()
+                            tmp_res = HostUI_obj.start()
                             if tmp_res != True:
                                 killMain()
-                            if Proc_dict[basic_conf_models_this['name']].UIData['flag_commit']:
-                                plugin_bot_info_dict = Proc_dict[basic_conf_models_this['name']].UIData['Account_data']
+                            if HostUI_obj.UIData['flag_commit']:
+                                plugin_bot_info_dict = HostUI_obj.UIData['Account_data']
+                    elif basic_conf_models_this['type'] == 'multiLoginUI_asayc' and not flag_noblock:
+                        if platform.system() == 'Windows':
+                            main_control.control_queue.put(
+                                main_control.packet(
+                                    'send',
+                                    {
+                                        'target': {
+                                            'type': 'nativeWinUI'
+                                        },
+                                        'data': {
+                                            'action': 'account_edit',
+                                            'event': 'account_edit_on',
+                                            'bot_info': plugin_bot_info_dict
+                                        }
+                                    }
+                                ),
+                                block=False
+                            )
                     elif basic_conf_models_this['type'] == 'nativeWinUI':
                         if platform.system() == 'Windows':
                             if basic_conf_models_this['name'] not in Proc_dict:
@@ -621,9 +640,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if type(rx_packet_data.key) == dict:
                     if 'target' in rx_packet_data.key:
                         if 'type' in rx_packet_data.key['target']:
+                            flag_target_all = (rx_packet_data.key['target']['type'] == 'all')
+                            flag_fliter = 'all'
+                            if 'fliter' in rx_packet_data.key['target']:
+                                flag_fliter = rx_packet_data.key['target']['fliter']
                             for tmp_Proc_name in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[tmp_Proc_name]
-                                if basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
+                                
+                                if flag_target_all or basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
                                     model_name = basic_conf_models_this['name']
                                     if 'hash' in rx_packet_data.key['target']:
                                         model_name = '%s=%s' % (
@@ -631,16 +655,55 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                             rx_packet_data.key['target']['hash']
                                         )
                                     if model_name in Proc_dict:
-                                        if Proc_dict[model_name].Proc_info.control_rx_queue is not None:
-                                            Proc_dict[model_name].Proc_info.control_rx_queue.put(
-                                                rx_packet_data,
-                                                block=False
-                                            )
-                                        if Proc_dict[model_name].Proc_info.rx_queue is not None:
-                                            Proc_dict[model_name].Proc_info.rx_queue.put(
-                                                rx_packet_data,
-                                                block=False
-                                            )
+                                        if flag_fliter in ['all', 'control_only']:
+                                            try:
+                                                if Proc_dict[model_name].Proc_info.control_rx_queue is not None:
+                                                    Proc_dict[model_name].Proc_info.control_rx_queue.put(
+                                                        rx_packet_data,
+                                                        block=False
+                                                    )
+                                            except Exception as e:
+                                                traceback.print_exc()
+                                        if flag_fliter in ['all', 'rx_only']:
+                                            try:
+                                                if Proc_dict[model_name].Proc_info.rx_queue is not None:
+                                                    Proc_dict[model_name].Proc_info.rx_queue.put(
+                                                        rx_packet_data,
+                                                        block=False
+                                                    )
+                                            except Exception as e:
+                                                traceback.print_exc()
+            elif rx_packet_data.action == 'call_system_event':
+                if type(rx_packet_data.key) is dict \
+                and 'action' in rx_packet_data.key \
+                and type(rx_packet_data.key['action']) is list:
+                    for event_this in rx_packet_data.key['action']:
+                        if event_this in basic_conf['system']['event']:
+                            for model_this in basic_conf['system']['event'][event_this]:
+                                main_control.control_queue.put(
+                                    main_control.packet('init', model_this),
+                                    block=False
+                                )
+            elif rx_packet_data.action == 'call_account_update':
+                if type(rx_packet_data.key) is dict \
+                and 'data' in rx_packet_data.key \
+                and type(rx_packet_data.key['data']) is dict:
+                    plugin_bot_info_dict = rx_packet_data.key['data']
+                    main_control.control_queue.put(
+                        main_control.packet(
+                            'send', {
+                                'target': {
+                                    'type': 'all',
+                                    'fliter': 'control_only'
+                                },
+                                'data': {
+                                    'action': 'account_update',
+                                    'data': plugin_bot_info_dict
+                                }
+                            }
+                        ),
+                        block=False
+                    )
             elif rx_packet_data.action == 'init_type':
                 for tmp_Proc_name in basic_conf_models:
                     basic_conf_models_this = basic_conf_models[tmp_Proc_name]

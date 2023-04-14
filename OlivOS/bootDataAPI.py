@@ -33,7 +33,6 @@ default_Conf = {
             "OlivOS_walleq_lib_exe_model",
             "OlivOS_cwcb_lib_exe_model",
             "OlivOS_hackChat_link",
-            "OlivOS_account_config_safe",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
@@ -47,6 +46,28 @@ default_Conf = {
             "OlivOS_biliLive_link",
             "OlivOS_update_check"
         ],
+        "event": {
+            "account_edit": [
+                "OlivOS_account_config",
+                "OlivOS_multiLoginUI",
+                "OlivOS_account_fix",
+                "OlivOS_account_config_save",
+                "OlivOS_account_config",
+                "OlivOS_account_config_update"
+            ],
+            "account_edit_asayc_start": [
+                "OlivOS_account_config"
+            ],
+            "account_edit_asayc_do": [
+                "OlivOS_multiLoginUI_asayc",
+            ],
+            "account_edit_asayc_end": [
+                "OlivOS_account_fix",
+                "OlivOS_account_config_save",
+                "OlivOS_account_config",
+                "OlivOS_account_config_update"
+            ],
+        },
         "control_queue": "OlivOS_control_queue",
         "interval": 0.2,
         "proc_mode": "auto"
@@ -82,6 +103,12 @@ default_Conf = {
             "enable": True,
             "name": "OlivOS_multiLoginUI",
             "type": "multiLoginUI",
+            "logger_proc": "OlivOS_logger"
+        },
+        "OlivOS_multiLoginUI_asayc": {
+            "enable": True,
+            "name": "OlivOS_multiLoginUI_asayc",
+            "type": "multiLoginUI_asayc",
             "logger_proc": "OlivOS_logger"
         },
         "OlivOS_nativeWinUIAPI": {
@@ -125,6 +152,15 @@ default_Conf = {
             "enable": True,
             "name": "OlivOS_account_config_safe",
             "type": "account_config_safe",
+            "logger_proc": "OlivOS_logger",
+            "data": {
+                "path": "./conf/account.json"
+            }
+        },
+        "OlivOS_account_config_update": {
+            "enable": True,
+            "name": "OlivOS_account_config_update",
+            "type": "account_config_update",
             "logger_proc": "OlivOS_logger",
             "data": {
                 "path": "./conf/account.json"
