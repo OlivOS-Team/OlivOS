@@ -129,6 +129,7 @@ class shallow(OlivOS.API.Proc_templet):
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.load_plugin_list()
         self.check_plugin_list()
+        self.run_plugin_data_release()
         self.run_plugin_func(None, 'init_after')
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS plugin shallow [{0}] is running', [self.Proc_name], modelName))
         self.sendPluginList()
@@ -348,6 +349,40 @@ class shallow(OlivOS.API.Proc_templet):
                     modelName
                 ))
         self.plugin_models_call_list = new_list
+
+    def run_plugin_data_release(self):
+        func_name = 'release_data'
+        for plugin_models_index_this in self.plugin_models_call_list:
+            if plugin_models_index_this in self.plugin_models_dict:
+                dataPath = './plugin/data/%s/data' % plugin_models_index_this
+                dataPathFromList = [
+                    './plugin/app/%s/data' % plugin_models_index_this,
+                    './plugin/tmp/%s/data' % plugin_models_index_this
+                ]
+                for dataPathFrom in dataPathFromList:
+                    if os.path.exists(dataPathFrom) \
+                    and os.path.isdir(dataPathFrom):
+                        try:
+                            removeDir(dataPath)
+                            shutil.copytree(dataPathFrom, dataPath)
+                            self.log(2, OlivOS.L10NAPI.getTrans(
+                                'OlivOS plugin [{0}] call [{1}] done', [
+                                    self.plugin_models_dict[plugin_models_index_this]['name'],
+                                    func_name
+                                ],
+                                modelName
+                            ))
+                        except Exception as e:
+                            self.log(4, OlivOS.L10NAPI.getTrans(
+                                'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
+                                    self.plugin_models_dict[plugin_models_index_this]['name'],
+                                    func_name,
+                                    str(e),
+                                    traceback.format_exc()
+                                ],
+                                modelName
+                            ))
+                        break
 
     def run_plugin_func(self, plugin_event, func_name):
         for plugin_models_index_this in self.plugin_models_call_list:
