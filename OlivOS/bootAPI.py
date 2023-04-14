@@ -631,6 +631,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                             rx_packet_data.key['target']['hash']
                                         )
                                     if model_name in Proc_dict:
+                                        if Proc_dict[model_name].Proc_info.control_rx_queue is not None:
+                                            Proc_dict[model_name].Proc_info.control_rx_queue.put(
+                                                rx_packet_data,
+                                                block=False
+                                            )
                                         if Proc_dict[model_name].Proc_info.rx_queue is not None:
                                             Proc_dict[model_name].Proc_info.rx_queue.put(
                                                 rx_packet_data,

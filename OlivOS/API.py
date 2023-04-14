@@ -1460,6 +1460,7 @@ class Proc_templet(object):
             self.rx_queue = rx_queue
             self.tx_queue = tx_queue
             self.control_queue = control_queue
+            self.control_rx_queue = multiprocessing.Queue()
             self.logger_proc = logger_proc
             self.scan_interval = scan_interval
             self.dead_interval = dead_interval
@@ -1467,15 +1468,40 @@ class Proc_templet(object):
     def run(self):
         pass
 
+    def run_total(self):
+        t_this = StoppableThread(
+            name=self.Proc_name + '+on_control_rx',
+            target=self.on_control_rx_init,
+            args=()
+        )
+        t_this.daemon = self.deamon
+        t_this.start()
+        self.run()
+
+    def on_control_rx_init(self):
+        while True:
+            if self.Proc_info.rx_queue.empty():
+                time.sleep(0.02)
+            else:
+                try:
+                    packet = self.Proc_info.control_rx_queue.get(block=False)
+                except:
+                    continue
+                self.on_control_rx(packet)
+
+    def on_control_rx(self, packet):
+        #print("!!!! " + self.Proc_name + str(packet.__dict__))
+        pass
+
     def start(self):
-        proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run, args=())
+        proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run_total, args=())
         proc_this.daemon = self.deamon
         proc_this.start()
         # self.Proc = proc_this
         return proc_this
 
     def start_lite(self):
-        proc_this = StoppableThread(name=self.Proc_name, target=self.run, args=())
+        proc_this = StoppableThread(name=self.Proc_name, target=self.run_total, args=())
         proc_this.daemon = self.deamon
         proc_this.start()
         # self.Proc = proc_this
