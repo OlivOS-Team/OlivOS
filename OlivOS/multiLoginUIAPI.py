@@ -80,6 +80,28 @@ def sendAccountUpdate(obj, control_queue, account_data):
             ),
             block=False
         )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_stop_type_event',
+                {
+                    'action': [
+                        'account_update'
+                    ]
+                }
+            ),
+            block=False
+        )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_event',
+                {
+                    'action': [
+                        'account_update'
+                    ]
+                }
+            ),
+            block=False
+        )
 
 class HostUI(object):
     def __init__(

@@ -21,6 +21,8 @@ import threading
 import hashlib
 import time
 import traceback
+import inspect
+import ctypes
 
 from functools import wraps
 
@@ -1423,18 +1425,42 @@ class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(StoppableThread, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+        self.root = None
 
     def terminate(self):
+        if self.root is not None:
+            try:
+                self.root.on_terminate()
+            except Exception as e:
+                traceback.print_exc()
         self._stop_event.set()
+        self.stop_thread()
 
     def stop(self):
-        self._stop_event.set()
+        self.terminate()
 
     def join(self):
         pass
 
     def stopped(self):
         return self._stop_event.is_set()
+ 
+    def _async_raise(self, tid, exctype):
+        """raises the exception, performs cleanup if needed"""
+        tid = ctypes.c_long(tid)
+        if not inspect.isclass(exctype):
+            exctype = type(exctype)
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+        if res == 0:
+            raise ValueError("invalid thread id")
+        elif res != 1:
+            # """if it returns a number greater than one, you're in trouble,
+            # and you should call it again with exc=NULL to revert the effect"""
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+            raise SystemError("PyThreadState_SetAsyncExc failed")
+
+    def stop_thread(self):
+        self._async_raise(self.ident, SystemExit)
 
 
 class Proc_templet(object):
@@ -1493,6 +1519,9 @@ class Proc_templet(object):
         #print("!!!! " + self.Proc_name + str(packet.__dict__))
         pass
 
+    def on_terminate(self):
+        pass
+
     def start(self):
         proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run_total, args=())
         proc_this.daemon = self.deamon
@@ -1502,6 +1531,7 @@ class Proc_templet(object):
 
     def start_lite(self):
         proc_this = StoppableThread(name=self.Proc_name, target=self.run_total, args=())
+        proc_this.root = self
         proc_this.daemon = self.deamon
         proc_this.start()
         # self.Proc = proc_this

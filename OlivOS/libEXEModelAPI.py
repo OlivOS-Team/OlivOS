@@ -107,9 +107,10 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['target_proc'] = target_proc
         self.Proc_data['check_qrcode_flag'] = False
         self.Proc_data['check_stdin'] = False
+        self.Proc_data['model_Proc'] = None
+        self.flag_run = True
 
     def run(self):
-        flag_run = True
         if self.Proc_data['bot_info_dict'].platform['model'] in [
             'gocqhttp_show',
             'gocqhttp_show_Android_Phone',
@@ -119,7 +120,7 @@ class server(OlivOS.API.Proc_templet):
             'gocqhttp_show_Android_Pad'
         ]:
             self.send_init_event()
-        while flag_run:
+        while self.flag_run:
             releaseDir('./lib')
             if not os.path.exists('./lib/go-cqhttp.exe'):
                 self.log(3, OlivOS.L10NAPI.getTrans(
@@ -175,7 +176,8 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_data['check_stdin'] = True
                 threading.Thread(
                     target=self.check_qrcode,
-                    args=()
+                    args=(),
+                    daemon=self.deamon
                 ).start()
                 tmp_env = dict(os.environ)
                 # 依据 https://github.com/Mrs4s/go-cqhttp/pull/1772 的改动
@@ -190,9 +192,11 @@ class server(OlivOS.API.Proc_templet):
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                     env=tmp_env
                 )
+                self.Proc_data['model_Proc'] = model_Proc
                 threading.Thread(
                     target=self.check_stdin,
-                    args=(model_Proc,)
+                    args=(model_Proc,),
+                    daemon=self.deamon
                 ).start()
                 self.get_model_stdout(model_Proc)
                 # model_Proc.communicate(timeout = None)
@@ -200,6 +204,7 @@ class server(OlivOS.API.Proc_templet):
                     'OlivOS libEXEModel server [{0}] will retry in 10s...',
                     [self.Proc_name], modelName
                 ))
+                self.Proc_data['model_Proc'] = None
                 time.sleep(8)
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp_show_old'
@@ -216,7 +221,13 @@ class server(OlivOS.API.Proc_templet):
                     cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
                     env=tmp_env
                 )
-                flag_run = False
+                self.flag_run = False
+
+    def on_terminate(self):
+        self.flag_run = False
+        if 'model_Proc' in self.Proc_data \
+        and self.Proc_data['model_Proc'] is not None:
+            OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
         tmp_self_data = self.Proc_data['bot_info_dict'].platform['platform']

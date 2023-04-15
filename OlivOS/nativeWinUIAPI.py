@@ -126,6 +126,23 @@ class dock(OlivOS.API.Proc_templet):
         self.process_msg()
         self.UIObject['main_tk'].mainloop()
 
+    def on_control_rx(self, packet):
+        if type(packet) is OlivOS.API.Control.packet:
+            if 'send' == packet.action:
+                if type(packet.key) is dict \
+                and 'data' in packet.key \
+                and type(packet.key['data']) \
+                and 'action' in packet.key['data']:
+                    if 'account_update' == packet.key['data']['action']:
+                        if 'data' in packet.key['data'] \
+                        and type(packet.key['data']['data']) is dict:
+                            self.bot_info = packet.key['data']['data']
+                        self.UIData['shallow_gocqhttp_menu_list'] = None
+                        self.UIData['shallow_walleq_menu_list'] = None
+                        self.UIData['shallow_cwcb_menu_list'] = None
+                        self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.updateShallowMenuList()
+
     def process_msg(self):
         self.UIObject['main_tk'].after(50, self.process_msg)
         self.mainrun()

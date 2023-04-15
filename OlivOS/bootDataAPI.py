@@ -36,7 +36,7 @@ default_Conf = {
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
-            "OlivOS_onebotv12_link",
+            "OlivOS_onebotV12_link",
             "OlivOS_qqGuild_link",
             "OlivOS_discord_link",
             "OlivOS_telegram_poll",
@@ -67,6 +67,40 @@ default_Conf = {
                 "OlivOS_account_config",
                 "OlivOS_account_config_update"
             ],
+            "account_update": [
+                "OlivOS_gocqhttp_lib_exe_model",
+                "OlivOS_walleq_lib_exe_model",
+                "OlivOS_cwcb_lib_exe_model",
+                "OlivOS_hackChat_link",
+                "OlivOS_virtual_terminal_link",
+                "OlivOS_flask_post_rx",
+                "OlivOS_onebotV12_link",
+                "OlivOS_qqGuild_link",
+                "OlivOS_discord_link",
+                "OlivOS_telegram_poll",
+                "OlivOS_fanbook_poll",
+                "OlivOS_kaiheila_link",
+                "OlivOS_dodo_link",
+                "OlivOS_biliLive_link",
+            ]
+        },
+        "type_event": {
+            "account_update": [
+                "gocqhttp_lib_exe_model",
+                "walleq_lib_exe_model",
+                "cwcb_lib_exe_model",
+                "hackChat_link",
+                "terminal_link",
+                "flask_post_rx",
+                "onebotV12_link",
+                "qqGuild_link",
+                "discord_link",
+                "telegram_poll",
+                "fanbook_poll",
+                "kaiheila_link",
+                "dodo_link",
+                "biliLive_link",
+            ]
         },
         "control_queue": "OlivOS_control_queue",
         "interval": 0.2,
@@ -226,9 +260,9 @@ default_Conf = {
                 "port": 55001
             }
         },
-        "OlivOS_onebotv12_link": {
+        "OlivOS_onebotV12_link": {
             "enable": True,
-            "name": "OlivOS_onebotv12_link",
+            "name": "OlivOS_onebotV12_link",
             "type": "onebotV12_link",
             "interval": 0.002,
             "dead_interval": 1,

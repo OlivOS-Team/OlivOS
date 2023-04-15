@@ -214,7 +214,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'post':
                         flag_need_enable = False
@@ -262,7 +262,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                         debug_mode=False
                                     )
-                                    Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                         tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config':
                         plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
@@ -318,7 +318,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'discord_link':
                         flag_need_enable = False
@@ -340,7 +340,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'kaiheila_link':
                         flag_need_enable = False
@@ -362,7 +362,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'biliLive_link':
                         flag_need_enable = False
@@ -387,7 +387,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'hackChat_link':
                         flag_need_enable = False
@@ -411,7 +411,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'telegram_poll':
                         flag_need_enable = False
@@ -471,7 +471,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                                     debug_mode=False
                                 )
-                                Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[tmp_Proc_name].start_unity(
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'dodo_poll':
                         flag_need_enable = False
@@ -678,10 +678,23 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 and 'action' in rx_packet_data.key \
                 and type(rx_packet_data.key['action']) is list:
                     for event_this in rx_packet_data.key['action']:
-                        if event_this in basic_conf['system']['event']:
+                        if 'event' in basic_conf['system'] \
+                        and event_this in basic_conf['system']['event']:
                             for model_this in basic_conf['system']['event'][event_this]:
                                 main_control.control_queue.put(
                                     main_control.packet('init', model_this),
+                                    block=False
+                                )
+            elif rx_packet_data.action == 'call_system_stop_type_event':
+                if type(rx_packet_data.key) is dict \
+                and 'action' in rx_packet_data.key \
+                and type(rx_packet_data.key['action']) is list:
+                    for event_this in rx_packet_data.key['action']:
+                        if 'type_event' in basic_conf['system'] \
+                        and event_this in basic_conf['system']['type_event']:
+                            for model_this in basic_conf['system']['type_event'][event_this]:
+                                main_control.control_queue.put(
+                                    main_control.packet('stop_type', model_this),
                                     block=False
                                 )
             elif rx_packet_data.action == 'call_account_update':
@@ -712,6 +725,20 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             main_control.packet('init', basic_conf_models_this['name']),
                             block=False
                         )
+            elif rx_packet_data.action == 'stop_type':
+                list_stop = []
+                for tmp_Proc_name in Proc_Proc_dict:
+                    try:
+                        if tmp_Proc_name in Proc_dict \
+                        and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type:
+                            Proc_Proc_dict[tmp_Proc_name].terminate()
+                            Proc_Proc_dict[tmp_Proc_name].join()
+                            list_stop.append(tmp_Proc_name)
+                    except Exception as e:
+                        traceback.print_exc()
+                for tmp_Proc_name in list_stop:
+                    Proc_dict.pop(tmp_Proc_name)
+                    Proc_Proc_dict.pop(tmp_Proc_name)
             elif rx_packet_data.action == 'exit_total':
                 killMain()
 
@@ -734,11 +761,13 @@ def update_get_func(
                         block=False
                     )
 
+def killByPid(pid):
+    parent = psutil.Process(pid)
+    kill_process_and_its_children(parent)
 
 def killMain():
     parent = psutil.Process(os.getpid())
     kill_process_and_its_children(parent)
-
 
 def kill_process(p):
     try:
