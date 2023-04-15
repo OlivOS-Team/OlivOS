@@ -811,4 +811,4 @@ def setSplashText(text:str):
 
 def preLoadPrint(text:str):
     print(text)
-    #setSplashText(text)
+    setSplashText(text)
