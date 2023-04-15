@@ -29,8 +29,6 @@ import psutil
 import atexit
 import importlib
 import traceback
-if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
-    import pyi_splash
 
 import OlivOS
 
@@ -801,14 +799,14 @@ def kill_process_children(p):
 # 启动画面的操作
 def setSplashClose():
     if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
-        #import pyi_splash
+        import pyi_splash
         pyi_splash.close()
 
 def setSplashText(text:str):
     if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
-        #import pyi_splash
+        import pyi_splash
         pyi_splash.update_text(text)
 
 def preLoadPrint(text:str):
     print(text)
-    setSplashText(text)
+    #setSplashText(text)
