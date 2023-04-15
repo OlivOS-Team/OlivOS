@@ -370,7 +370,6 @@ interval = 5
         self.config_file_format['password'] = ''
         if self.bot_info_dict.password != '':
             self.config_file_format['password'] = 'password = "%s"' % self.bot_info_dict.password
-        self.config_file_format['password'] = self.bot_info_dict.password
         self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
         self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
         self.config_file_format['host'] = '127.0.0.1'
