@@ -29,9 +29,14 @@ import psutil
 import atexit
 import importlib
 import traceback
+import copy
 
 import OlivOS
 
+modelName = 'bootAPI'
+
+gMonitorReg = {}
+gLoggerProc = None
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -45,6 +50,7 @@ class Entity(object):
             self.Config['basic_conf_path'] = basic_conf
 
     def start(self):
+        global gLoggerProc
         # 兼容Win平台多进程，避免形成fork-bomb
         multiprocessing.freeze_support()
         atexit.register(killMain)
@@ -55,6 +61,7 @@ class Entity(object):
         Proc_Proc_dict = {}
         Proc_logger_name = []
         plugin_bot_info_dict = {}
+        logger_proc = None
 
         preLoadPrint('OlivOS - Witness Union')
         start_up_show_str = ('''
@@ -140,6 +147,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if 'auto' == tmp_proc_mode_raw:
                     tmp_proc_mode = 'threading'
                 if basic_conf_models_this['enable']:
+                    logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will init', [
+                            basic_conf_models_this['name']
+                        ],
+                        modelName
+                    ))
                     if basic_conf_models_this['type'] == 'sleep':
                         time.sleep(10)
                     elif basic_conf_models_this['type'] == 'update_check':
@@ -164,6 +176,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                         for this_bot_info in plugin_bot_info_dict:
                             plugin_bot_info_dict[this_bot_info].debug_logger = Proc_dict[basic_conf_models_this['name']]
+                        logger_proc = Proc_dict[basic_conf_models_this['name']]
+                        gLoggerProc = Proc_dict[basic_conf_models_this['name']]
                     elif basic_conf_models_this['type'] == 'plugin':
                         proc_plugin_func_dict = {}
                         tmp_tx_queue_list = []
@@ -723,6 +737,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             main_control.packet('init', basic_conf_models_this['name']),
                             block=False
                         )
+                        logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] type init', [
+                                tmp_Proc_name
+                            ],
+                            modelName
+                        ))
             elif rx_packet_data.action == 'stop_type':
                 list_stop = []
                 for tmp_Proc_name in Proc_Proc_dict:
@@ -732,6 +751,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             Proc_Proc_dict[tmp_Proc_name].terminate()
                             Proc_Proc_dict[tmp_Proc_name].join()
                             list_stop.append(tmp_Proc_name)
+                            logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
+                                    tmp_Proc_name
+                                ],
+                                modelName
+                            ))
                     except Exception as e:
                         traceback.print_exc()
                 for tmp_Proc_name in list_stop:
@@ -739,6 +763,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     Proc_Proc_dict.pop(tmp_Proc_name)
             elif rx_packet_data.action == 'exit_total':
                 killMain()
+            bootMonitor(varDict=locals())
 
 
 def update_get_func(
@@ -759,6 +784,36 @@ def update_get_func(
                         block=False
                     )
 
+# 进程监控
+def bootMonitor(varDict:dict):
+    global gMonitorReg
+    try:
+        gMonitorReg.setdefault('Proc_dict', {'keys': []})
+        if 'Proc_dict' in varDict \
+        and type(varDict['Proc_dict']) is dict:
+            flagNeedRefresh = False
+            for Proc_name in gMonitorReg['Proc_dict']['keys']:
+                if Proc_name not in varDict['Proc_dict']:
+                    flagNeedRefresh = True
+                    logG(2, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] stopped', [
+                            Proc_name
+                        ],
+                        modelName
+                    ))
+            for Proc_name in varDict['Proc_dict']:
+                if Proc_name not in gMonitorReg['Proc_dict']['keys']:
+                    flagNeedRefresh = True
+                    logG(2, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] init', [
+                            Proc_name
+                        ],
+                        modelName
+                    ))
+            if flagNeedRefresh:
+                gMonitorReg['Proc_dict']['keys'] = copy.deepcopy(list(varDict['Proc_dict'].keys()))
+    except Exception as e:
+        traceback.print_exc()
+
+# 进程管理
 def killByPid(pid):
     parent = psutil.Process(pid)
     kill_process_and_its_children(parent)
@@ -795,6 +850,24 @@ def kill_process_children(p):
             else:
                 kill_process(child)
 
+# 日志工具
+def log(logger_proc, log_level, log_message, log_segment=None):
+    if log_segment is None:
+        log_segment = []
+    try:
+        if logger_proc is not None:
+            logger_proc.log(log_level, log_message, log_segment)
+    except Exception as e:
+        traceback.print_exc()
+
+def logG(log_level, log_message, log_segment=None):
+    global gLoggerProc
+    log(
+        logger_proc=gLoggerProc,
+        log_level=log_level,
+        log_message=log_message,
+        log_segment=log_segment
+    )
 
 # 启动画面的操作
 def setSplashClose():
