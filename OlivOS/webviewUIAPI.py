@@ -65,12 +65,12 @@ class page(OlivOS.API.Proc_templet):
             pass
 
 def sendOpenWebviewPage(
-    control_queue:multiprocessing.Queue,
+    control_queue,
     name:str,
     title:str,
     url:str
 ):
-    if type(control_queue) is multiprocessing.Queue:
+    if control_queue is not None:
         control_queue.put(
             OlivOS.API.Control.packet(
                 'init_type_open_webview_page',
