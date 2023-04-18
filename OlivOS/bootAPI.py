@@ -877,11 +877,11 @@ def setSplashClose():
         import pyi_splash
         pyi_splash.close()
 
-def setSplashText(text:str):
+def setSplashText(msg:str):
     if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
         import pyi_splash
-        pyi_splash.update_text(text)
+        pyi_splash.update_text(msg)
 
-def preLoadPrint(text:str):
-    print(text)
+def preLoadPrint(msg:str):
+    print(msg)
     #setSplashText(text)
