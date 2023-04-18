@@ -26,6 +26,7 @@ import sqlite3
 if platform.system() == 'Windows':
     import win32com.client
     import pythoncom
+    import webview
 
 # ext pack
 # lxml
