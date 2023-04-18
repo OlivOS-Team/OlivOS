@@ -18,6 +18,7 @@ import OlivOS
 
 import webview
 import time
+import multiprocessing
 
 class page(OlivOS.API.Proc_templet):
     def __init__(
@@ -62,3 +63,27 @@ class page(OlivOS.API.Proc_templet):
             )
         else:
             pass
+
+def sendOpenWebviewPage(
+    control_queue:multiprocessing.Queue,
+    name:str,
+    title:str,
+    url:str
+):
+    if type(control_queue) is multiprocessing.Queue:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'init_type_open_webview_page',
+                {
+                    'target': {
+                        'action': 'init',
+                        'name': name
+                    },
+                    'data': {
+                        'title': title,
+                        'url': url
+                    }
+                }
+            ),
+            block=False
+        )

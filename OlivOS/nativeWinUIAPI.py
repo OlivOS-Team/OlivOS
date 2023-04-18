@@ -758,23 +758,12 @@ class dock(OlivOS.API.Proc_templet):
         title:str,
         url:str
     ):
-        if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
-                    'init_type_open_webview_page',
-                    {
-                        'target': {
-                            'action': 'init',
-                            'name': name
-                        },
-                        'data': {
-                            'title': title,
-                            'url': url
-                        }
-                    }
-                ),
-                block=False
-            )
+        OlivOS.webviewUIAPI.sendOpenWebviewPage(
+            self.Proc_info.control_queue,
+            name,
+            title,
+            url
+        )
 
     def startShallowSend(self):
         self.sendRxEvent('send', {
@@ -1041,7 +1030,16 @@ class gocqhttpTerminalUI(object):
         res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
         try:
             if res == 'yes':
-                webbrowser.open(url)
+                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
+                if res == 'yes':
+                    OlivOS.webviewUIAPI.sendOpenWebviewPage(
+                        control_queue=self.root.Proc_info.control_queue,
+                        name='slider_verification_code=%s' % self.bot.hash,
+                        title='请完成验证',
+                        url=url
+                    )
+                else:
+                    webbrowser.open(url)
         except webbrowser.Error as error_info:
             tkinter.messagebox.showerror("webbrowser.Error", error_info)
 
