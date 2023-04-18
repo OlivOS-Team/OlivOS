@@ -25,3 +25,4 @@ httpx
 prompt_toolkit
 regex
 rich
+pywebview
