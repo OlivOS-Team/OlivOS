@@ -68,4 +68,5 @@ if platform.system() == 'Windows':
     from . import libWQEXEModelAPI
     from . import libCWCBEXEModelAPI
     from . import nativeWinUIAPI
+    from . import webviewUIAPI
 from . import userModule

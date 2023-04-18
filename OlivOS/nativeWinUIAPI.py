@@ -42,24 +42,6 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
-class StoppableThread(threading.Thread):
-    def __init__(self, *args, **kwargs):
-        super(StoppableThread, self).__init__(*args, **kwargs)
-        self._stop_event = threading.Event()
-
-    def terminate(self):
-        self._stop_event.set()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def join(self):
-        pass
-
-    def stopped(self):
-        return self._stop_event.is_set()
-
-
 class dock(OlivOS.API.Proc_templet):
     def __init__(
             self,
@@ -410,6 +392,7 @@ class dock(OlivOS.API.Proc_templet):
             ['插件管理', self.startPluginEditSend],
             ['插件菜单', self.UIData['shallow_plugin_menu_list']],
             ['重载插件', self.sendPluginRestart],
+            ['社区论坛', self.sendOpenForum],
             ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
         ]
@@ -759,6 +742,37 @@ class dock(OlivOS.API.Proc_templet):
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet('init_type', 'update_get'),
+                block=False
+            )
+
+    def sendOpenForum(self):
+        if self.UIObject['root_shallow'] is not None:
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '正在前往社区论坛……'
+            )
+        self.sendOpenWebviewEvent('forum_page', 'OlivOS论坛', 'https://forum.olivos.run/')
+
+    def sendOpenWebviewEvent(
+        self,
+        name:str,
+        title:str,
+        url:str
+    ):
+        if self.Proc_info.control_queue is not None:
+            self.Proc_info.control_queue.put(
+                OlivOS.API.Control.packet(
+                    'init_type_open_webview_page',
+                    {
+                        'target': {
+                            'action': 'init',
+                            'name': name
+                        },
+                        'data': {
+                            'title': title,
+                            'url': url
+                        }
+                    }
+                ),
                 block=False
             )
 

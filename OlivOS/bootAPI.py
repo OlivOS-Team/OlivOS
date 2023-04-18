@@ -687,6 +687,39 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                                     )
                                             except Exception as e:
                                                 traceback.print_exc()
+            elif rx_packet_data.action == 'init_type_open_webview_page':
+                if platform.system() == 'Windows':
+                    if type(rx_packet_data.key) is dict \
+                    and 'target' in rx_packet_data.key \
+                    and type(rx_packet_data.key['target']) is dict \
+                    and 'data' in rx_packet_data.key \
+                    and type(rx_packet_data.key['data']) is dict \
+                    and 'action' in rx_packet_data.key['target'] \
+                    and 'name' in rx_packet_data.key['target'] \
+                    and 'title' in rx_packet_data.key['data'] \
+                    and 'url' in rx_packet_data.key['data']:
+                        if 'init' == rx_packet_data.key['target']['action']:
+                            for basic_conf_models_this_key in basic_conf_models:
+                                basic_conf_models_this = basic_conf_models[basic_conf_models_this_key]
+                                if 'webview_page' == basic_conf_models_this['type']:
+                                    if basic_conf_models_this['name'] not in Proc_dict:
+                                        model_name = '%s+%s' % (
+                                            basic_conf_models_this['name'],
+                                            rx_packet_data.key['target']['name']
+                                        )
+                                        Proc_dict[model_name] = OlivOS.webviewUIAPI.page(
+                                            Proc_name=model_name,
+                                            scan_interval=basic_conf_models_this['interval'],
+                                            dead_interval=basic_conf_models_this['dead_interval'],
+                                            rx_queue=None,
+                                            tx_queue=None,
+                                            control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
+                                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                            title=rx_packet_data.key['data']['title'],
+                                            url=rx_packet_data.key['data']['url']
+                                        )
+                                    if model_name not in Proc_Proc_dict:
+                                        Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('processing')
             elif rx_packet_data.action == 'call_system_event':
                 if type(rx_packet_data.key) is dict \
                 and 'action' in rx_packet_data.key \
@@ -763,6 +796,22 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 for tmp_Proc_name in list_stop:
                     Proc_dict.pop(tmp_Proc_name)
                     Proc_Proc_dict.pop(tmp_Proc_name)
+            elif rx_packet_data.action == 'stop':
+                tmp_Proc_name = rx_packet_data.key
+                try:
+                    if tmp_Proc_name in Proc_Proc_dict:
+                        Proc_Proc_dict[tmp_Proc_name].terminate()
+                        Proc_Proc_dict[tmp_Proc_name].join()
+                        logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
+                                tmp_Proc_name
+                            ],
+                            modelName
+                        ))
+                        Proc_Proc_dict.pop(tmp_Proc_name)
+                    if tmp_Proc_name in Proc_dict:
+                        Proc_dict.pop(tmp_Proc_name)
+                except Exception as e:
+                    traceback.print_exc()
             elif rx_packet_data.action == 'exit_total':
                 killMain()
             bootMonitor(varDict=locals())
