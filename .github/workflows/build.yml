@@ -59,7 +59,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -137,7 +137,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -176,7 +176,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -244,7 +244,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -322,7 +322,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -361,7 +361,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_debug.spec
     - name: Run artifact
       run: |
@@ -390,7 +390,7 @@ jobs:
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./main_mac.spec
     - name: Run artifact
       run: |

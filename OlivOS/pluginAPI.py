@@ -169,6 +169,16 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_count == self.Proc_config['step_to_restart']:
                         self.set_restart()
 
+    def on_control_rx(self, packet):
+        if type(packet) is OlivOS.API.Control.packet:
+            if 'send' == packet.action:
+                if type(packet.key) is dict \
+                and 'data' in packet.key \
+                and type(packet.key['data']) \
+                and 'action' in packet.key['data']:
+                    if 'account_update' == packet.key['data']['action']:
+                        self.set_restart()
+
     def set_restart(self):
         self.log(2, OlivOS.L10NAPI.getTrans(
             'OlivOS plugin shallow [{0}] call restart', [
@@ -348,6 +358,43 @@ class shallow(OlivOS.API.Proc_templet):
                     modelName
                 ))
         self.plugin_models_call_list = new_list
+
+    def run_plugin_data_release(self):
+        for plugin_models_index_this in self.plugin_models_call_list:
+            if plugin_models_index_this in self.plugin_models_dict:
+                self.run_plugin_data_release_by_name(plugin_models_index_this)
+
+    def run_plugin_data_release_by_name(self, plugin_models_index_this):
+        func_name = 'release_data'
+        dataPath = './plugin/data/%s/data' % plugin_models_index_this
+        dataPathFromList = [
+            './plugin/app/%s/data' % plugin_models_index_this,
+            './plugin/tmp/%s/data' % plugin_models_index_this
+        ]
+        for dataPathFrom in dataPathFromList:
+            if os.path.exists(dataPathFrom) \
+            and os.path.isdir(dataPathFrom):
+                try:
+                    removeDir(dataPath)
+                    shutil.copytree(dataPathFrom, dataPath)
+                    self.log(2, OlivOS.L10NAPI.getTrans(
+                        'OlivOS plugin [{0}] call [{1}] done', [
+                            self.plugin_models_dict[plugin_models_index_this]['name'],
+                            func_name
+                        ],
+                        modelName
+                    ))
+                except Exception as e:
+                    self.log(4, OlivOS.L10NAPI.getTrans(
+                        'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
+                            self.plugin_models_dict[plugin_models_index_this]['name'],
+                            func_name,
+                            str(e),
+                            traceback.format_exc()
+                        ],
+                        modelName
+                    ))
+                break
 
     def run_plugin_func(self, plugin_event, func_name):
         for plugin_models_index_this in self.plugin_models_call_list:
@@ -673,6 +720,7 @@ class shallow(OlivOS.API.Proc_templet):
                             modelName
                         ))
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
+                        self.run_plugin_data_release_by_name(plugin_models_dict_this_key)
                         continue
                     else:
                         skip_result = plugin_dir_this + '.main.Event' + ' not found'

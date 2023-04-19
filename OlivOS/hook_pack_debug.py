@@ -52,16 +52,3 @@ import regex
 import rich
 
 import sys
-
-# Are we running in a PyInstaller bundle
-# https://pyinstaller.org/en/stable/runtime-information.html#run-time-information
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    class NullOutput(object):
-        def write(self, string):
-            pass
-
-        def isatty(self):
-            return False
-
-    sys.stdout = NullOutput()
-    sys.stderr = NullOutput()

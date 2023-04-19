@@ -42,25 +42,6 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
-
-class StoppableThread(threading.Thread):
-    def __init__(self, *args, **kwargs):
-        super(StoppableThread, self).__init__(*args, **kwargs)
-        self._stop_event = threading.Event()
-
-    def terminate(self):
-        self._stop_event.set()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def join(self):
-        pass
-
-    def stopped(self):
-        return self._stop_event.is_set()
-
-
 class dock(OlivOS.API.Proc_templet):
     def __init__(
             self,
@@ -127,6 +108,23 @@ class dock(OlivOS.API.Proc_templet):
         self.process_msg()
         self.UIObject['main_tk'].mainloop()
 
+    def on_control_rx(self, packet):
+        if type(packet) is OlivOS.API.Control.packet:
+            if 'send' == packet.action:
+                if type(packet.key) is dict \
+                and 'data' in packet.key \
+                and type(packet.key['data']) \
+                and 'action' in packet.key['data']:
+                    if 'account_update' == packet.key['data']['action']:
+                        if 'data' in packet.key['data'] \
+                        and type(packet.key['data']['data']) is dict:
+                            self.bot_info = packet.key['data']['data']
+                        self.UIData['shallow_gocqhttp_menu_list'] = None
+                        self.UIData['shallow_walleq_menu_list'] = None
+                        self.UIData['shallow_cwcb_menu_list'] = None
+                        self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.updateShallowMenuList()
+
     def process_msg(self):
         self.UIObject['main_tk'].after(50, self.process_msg)
         self.mainrun()
@@ -156,6 +154,15 @@ class dock(OlivOS.API.Proc_templet):
                                             else:
                                                 self.updateShallow()
                                                 self.updatePluginEdit()
+                                        elif 'account_edit' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data'] \
+                                            and 'account_edit_on' == rx_packet_data.key['data']['event'] \
+                                            and 'bot_info' in rx_packet_data.key['data'] \
+                                            and type(rx_packet_data.key['data']['bot_info']) is dict:
+                                                OlivOS.multiLoginUIAPI.run_HostUI_asayc(
+                                                    plugin_bot_info_dict=rx_packet_data.key['data']['bot_info'],
+                                                    control_queue=self.Proc_info.control_queue
+                                                )
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
                                         elif 'logger' == rx_packet_data.key['data']['action']:
@@ -376,8 +383,8 @@ class dock(OlivOS.API.Proc_templet):
     def updateShallowMenuList(self):
         tmp_new = []
         self.UIData['shallow_menu_list'] = [
-            ['账号管理', False],
             ['打开终端', self.startOlivOSTerminalUISend],
+            ['账号管理', self.startAccountEditSendFunc()],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
             ['walleq管理', self.UIData['shallow_walleq_menu_list']],
             ['ComWeChat管理', self.UIData['shallow_cwcb_menu_list']],
@@ -385,6 +392,7 @@ class dock(OlivOS.API.Proc_templet):
             ['插件管理', self.startPluginEditSend],
             ['插件菜单', self.UIData['shallow_plugin_menu_list']],
             ['重载插件', self.sendPluginRestart],
+            ['社区论坛', self.sendOpenForum],
             ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
         ]
@@ -395,6 +403,21 @@ class dock(OlivOS.API.Proc_templet):
             else:
                 tmp_new.append(data_this)
         self.UIData['shallow_menu_list'] = tmp_new
+
+    def startAccountEditSendFunc(self):
+        def resFunc():
+            self.startAccountEditSend()
+        return resFunc
+
+    def startAccountEditSend(self):
+        self.sendControlEventSend(
+            'call_system_event', {
+                'action': [
+                    'account_edit_asayc_start',
+                    'account_edit_asayc_do'
+                ]
+            }
+        )
 
     def startGoCqhttpTerminalUISendFunc(self, hash):
         def resFunc():
@@ -722,6 +745,26 @@ class dock(OlivOS.API.Proc_templet):
                 block=False
             )
 
+    def sendOpenForum(self):
+        if self.UIObject['root_shallow'] is not None:
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '正在前往社区论坛……'
+            )
+        self.sendOpenWebviewEvent('forum_page', 'OlivOS论坛', 'https://forum.olivos.run/')
+
+    def sendOpenWebviewEvent(
+        self,
+        name:str,
+        title:str,
+        url:str
+    ):
+        OlivOS.webviewUIAPI.sendOpenWebviewPage(
+            self.Proc_info.control_queue,
+            name,
+            title,
+            url
+        )
+
     def startShallowSend(self):
         self.sendRxEvent('send', {
             'target': {
@@ -987,7 +1030,16 @@ class gocqhttpTerminalUI(object):
         res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
         try:
             if res == 'yes':
-                webbrowser.open(url)
+                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
+                if res == 'yes':
+                    OlivOS.webviewUIAPI.sendOpenWebviewPage(
+                        control_queue=self.root.Proc_info.control_queue,
+                        name='slider_verification_code=%s' % self.bot.hash,
+                        title='请完成验证',
+                        url=url
+                    )
+                else:
+                    webbrowser.open(url)
         except webbrowser.Error as error_info:
             tkinter.messagebox.showerror("webbrowser.Error", error_info)
 

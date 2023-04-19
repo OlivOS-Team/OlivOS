@@ -93,6 +93,12 @@ dictL10NSTR = {
         'libCWCBEXEModelAPI_0004': 'OlivOS libCWCBEXEModel failed: {0}\n{1}',
         'libCWCBEXEModelAPI_0005': 'OlivOS libCWCBEXEModel server [{0}] is running',
         'libCWCBEXEModelAPI_0006': 'OlivOS libCWCBEXEModel server [{0}] exited',
+        'bootAPI_0001': 'OlivOS model [{0}] will init',
+        'bootAPI_0002': 'OlivOS model [{0}] init',
+        'bootAPI_0003': 'OlivOS model [{0}] will try init',
+        'bootAPI_0004': 'OlivOS model [{0}] type init',
+        'bootAPI_0005': 'OlivOS model [{0}] stopped',
+        'bootAPI_0006': 'OlivOS model [{0}] will stop',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -166,5 +172,11 @@ dictL10NSTR = {
         'libCWCBEXEModelAPI_0004': 'OlivOS ComWeChatBotClient进程托管服务组件 错误: {0}\n{1}',
         'libCWCBEXEModelAPI_0005': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 正在运作',
         'libCWCBEXEModelAPI_0006': 'OlivOS ComWeChatBotClient进程托管服务组件 [{0}] 已经存在',
+        'bootAPI_0001': 'OlivOS 组件 [{0}] 即将初始化',
+        'bootAPI_0002': 'OlivOS 组件 [{0}] 初始化',
+        'bootAPI_0003': 'OlivOS 组件 [{0}] 即将尝试初始化',
+        'bootAPI_0004': 'OlivOS 组件 [{0}] 类型 即将初始化',
+        'bootAPI_0005': 'OlivOS 组件 [{0}] 已被停止',
+        'bootAPI_0006': 'OlivOS 组件 [{0}] 即将停止',
     }
 }
