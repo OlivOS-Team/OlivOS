@@ -544,7 +544,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 killMain()
                             if HostUI_obj.UIData['flag_commit']:
                                 plugin_bot_info_dict = HostUI_obj.UIData['Account_data']
-                    elif basic_conf_models_this['type'] == 'multiLoginUI_asayc' and not flag_noblock:
+                    elif basic_conf_models_this['type'] == 'multiLoginUI_asayc':
                         if platform.system() == 'Windows':
                             main_control.control_queue.put(
                                 main_control.packet(
