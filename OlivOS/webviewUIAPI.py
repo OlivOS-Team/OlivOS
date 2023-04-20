@@ -17,8 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 import webview
-import time
-import multiprocessing
+import os
 
 class page(OlivOS.API.Proc_templet):
     def __init__(
@@ -51,9 +50,19 @@ class page(OlivOS.API.Proc_templet):
         }
 
     def run(self):
+        releaseDir('./data')
+        releaseDir('./data/webview')
+        releaseDir('./data/webview/%s' % self.Proc_name)
         if self.UIData['url'] != None:
-            webview.create_window(self.UIData['title'], self.UIData['url'])
-            webview.start()
+            webview.create_window(
+                title=self.UIData['title'],
+                url=self.UIData['url'],
+                background_color='#00A0EA'
+            )
+            webview.start(
+                private_mode=False,
+                storage_path='./data/webview/%s' % self.Proc_name
+            )
 
         # 发送并等待结束
         if self.Proc_info.control_queue is not None:
@@ -87,3 +96,8 @@ def sendOpenWebviewPage(
             ),
             block=False
         )
+
+
+def releaseDir(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
