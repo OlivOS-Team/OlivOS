@@ -26,6 +26,7 @@ import re
 import datetime
 import webbrowser
 import platform
+import traceback
 
 from PIL import Image
 from PIL import ImageTk
@@ -2142,7 +2143,8 @@ class shallow(object):
                                 pystray.MenuItem(
                                     item_this[0],
                                     tmp_sub_menu,
-                                    enabled=(tmp_sub_menu not in [None, False])
+                                    enabled=(tmp_sub_menu not in [None, False]),
+                                    default=(item_this[0] in ['打开终端'])
                                 )
                             )
                         elif len(item_this) == 3:

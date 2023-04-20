@@ -54,6 +54,7 @@ class Entity(object):
         # 兼容Win平台多进程，避免形成fork-bomb
         multiprocessing.freeze_support()
         atexit.register(killMain)
+        sys.setrecursionlimit(100000)
         basic_conf_path = self.Config['basic_conf_path']
         basic_conf = None
         basic_conf_models = None
