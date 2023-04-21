@@ -56,7 +56,11 @@ def OlivOSUpdateReplace(logger_proc):
         OlivOS.bootAPI.killMain()
 
 
-def OlivOSUpdateGet(logger_proc, flagChackOnly = False):
+def OlivOSUpdateGet(
+    logger_proc,
+    flagChackOnly=False,
+    control_queue=None
+):
     res = False
     architecture_num = platform.architecture()[0]
     if platform.system() == 'Windows':
@@ -82,6 +86,20 @@ def OlivOSUpdateGet(logger_proc, flagChackOnly = False):
                         down_url = down_url_obj['version']['OlivOS'][architecture_num]['path']
                         if flagChackOnly:
                             logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS update found, please try update.', [], modelName))
+                            if control_queue is not None:
+                                control_queue.put(
+                                    OlivOS.API.Control.packet(
+                                        'send', {
+                                            'target': {
+                                                'type': 'nativeWinUI'
+                                            },
+                                            'data': {
+                                                'action': 'show_update'
+                                            }
+                                        }
+                                    ),
+                                    block=False
+                                )
                         else:
                             logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS update found.', [], modelName))
                     else:

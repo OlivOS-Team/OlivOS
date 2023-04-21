@@ -154,7 +154,7 @@ dictL10NSTR = {
         'updateAPI_0017': '检查 OlivOS 更新文件未命中, 跳过更新',
         'updateAPI_0018': '检测到 OlivOS 在源码模式下运行, 跳过更新',
         'updateAPI_0019': '发现 OlivOS 版本更新',
-        'updateAPI_0019': '发现 OlivOS 版本更新，请尝试进行一键更新',
+        'updateAPI_0020': '发现 OlivOS 版本更新，请尝试进行一键更新',
         'libWQEXEModelAPI_0001': 'OlivOS WQ进程托管服务组件 [{0}] 无法找到库文件',
         'libWQEXEModelAPI_0002': 'OlivOS WQ进程托管服务组件 [{0}] 将在前台模式下运行',
         'libWQEXEModelAPI_0003': 'OlivOS WQ进程托管服务组件 [{0}] 将在10秒后重试...',

@@ -93,6 +93,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_plugin_edit'] = {}
         self.UIObject['root_plugin_edit_enable'] = False
         self.UIObject['root_plugin_edit_count'] = 0
+        self.UIObject['flag_have_update'] = False
         self.UIData['shallow_plugin_menu_list'] = None
         self.UIData['shallow_gocqhttp_menu_list'] = None
         self.UIData['shallow_walleq_menu_list'] = None
@@ -155,6 +156,11 @@ class dock(OlivOS.API.Proc_templet):
                                             else:
                                                 self.updateShallow()
                                                 self.updatePluginEdit()
+                                        elif 'show_update' == rx_packet_data.key['data']['action']:
+                                            self.UIObject['flag_have_update'] = True
+                                            self.updateShallowMenuList()
+                                            if self.UIObject['root_shallow'] is not None:
+                                                self.updateShallow()
                                         elif 'account_edit' == rx_packet_data.key['data']['action']:
                                             if 'event' in rx_packet_data.key['data'] \
                                             and 'account_edit_on' == rx_packet_data.key['data']['event'] \
@@ -401,6 +407,10 @@ class dock(OlivOS.API.Proc_templet):
             if data_this[0] in ['gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
                 if data_this[1] is not None:
                     tmp_new.append(data_this)
+            elif data_this[0] in ['更新OlivOS']:
+                if self.UIObject['flag_have_update']:
+                    data_this[0] = data_this[0] + '[有更新!]'
+                tmp_new.append(data_this)
             else:
                 tmp_new.append(data_this)
         self.UIData['shallow_menu_list'] = tmp_new

@@ -160,7 +160,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             target = OlivOS.updateAPI.OlivOSUpdateGet,
                             kwargs = {
                                 'logger_proc': Proc_dict[basic_conf_models_this['logger_proc']],
-                                'flagChackOnly': True
+                                'flagChackOnly': True,
+                                'control_queue': main_control.control_queue
                             }
                         ).start()
                     elif basic_conf_models_this['type'] == 'logger':
