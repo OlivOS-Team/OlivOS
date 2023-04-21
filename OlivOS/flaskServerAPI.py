@@ -20,11 +20,6 @@ from flask import current_app
 from flask import request
 from flask import g
 
-import logging
-import json
-import multiprocessing
-import threading
-
 import OlivOS
 
 modelName = 'flaskServerAPI'
