@@ -36,6 +36,7 @@
 </div>
 
 ## 兼容
+[![QQ](https://img.shields.io/badge/-QQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://im.qq.com/index/)
 [![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
 [![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
