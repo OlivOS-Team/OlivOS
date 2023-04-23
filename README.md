@@ -37,10 +37,10 @@
 
 ## 兼容
 [![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
-[![OnebotV11](https://img.shields.io/badge/-OnebotV11-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/botuniverse/onebot)
-[![OnebotV12](https://img.shields.io/badge/-OnebotV12-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/botuniverse/onebot)
 [![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
 [![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
+[![WeChat](https://img.shields.io/badge/-WeChat-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
+[![ComWeChatBotClient](https://img.shields.io/badge/-ComWeChatBotClient-07C160?style=flat-square&logo=wechat&logoColor=white)](https://github.com/JustUndertaker/ComWeChatBotClient)
 [![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://discord.com/)
 [![Bilibili](https://img.shields.io/badge/-Bilibili-FB7299?style=flat-square&logo=Bilibili&logoColor=white)](http://www.bilibili.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
