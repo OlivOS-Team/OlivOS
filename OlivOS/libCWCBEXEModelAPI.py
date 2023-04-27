@@ -361,11 +361,11 @@ event_enabled = true
 event_buffer_size = 0
 
 enable_http_webhook = false
-webhook_url = ""
+webhook_url = []
 webhook_timeout = 5000
 
 websocekt_type = "Forward"
-websocket_url = "ws://127.0.0.1:8080/onebot/v12/ws/"
+websocket_url = []
 reconnect_interval = 5000
 
 log_level = "INFO"
