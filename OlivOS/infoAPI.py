@@ -10,15 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
 import OlivOS
 
 
-OlivOS_Version = '0.10.17'
-OlivOS_SVN = 117
+OlivOS_Version = '0.11.9'
+OlivOS_SVN = 129
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
 # OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn

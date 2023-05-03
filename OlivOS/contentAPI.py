@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -18,6 +18,8 @@ import OlivOS
 
 from enum import Enum
 import time
+import os
+import sys
 
 
 class api_result_error_template(object):
@@ -252,3 +254,24 @@ class fake_sdk_event(object):
         except:
             res = None
         return res
+
+# 通过路径转换与拼接将提供的路径重定向至指定目录
+def resourcePathTransform(ftype:str, path:str):
+    releaseDir('data')
+    releaseDir(os.path.join('data', ftype))
+    exePath = os.path.realpath('.')
+    res = None
+    if os.path.isabs(path):
+        res = path
+    else:
+        res = os.path.join(
+            exePath,
+            'data',
+            ftype,
+            os.path.relpath(os.path.realpath(path), exePath)
+        )
+    return res
+
+def releaseDir(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)

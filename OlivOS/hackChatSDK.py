@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -22,11 +22,13 @@ import uuid
 
 import OlivOS
 
+gBotIdDict = {}
 
 class bot_info_T(object):
-    def __init__(self, id=-1, nickname=None, chatroom=None):
+    def __init__(self, id=-1, nickname=None, password='', chatroom=None):
         self.id = id
         self.nickname = nickname
+        self.password = password
         self.chatroom = chatroom
         self.debug_mode = False
         self.debug_logger = None
@@ -35,6 +37,7 @@ class bot_info_T(object):
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
         id=plugin_bot_info.id,
+        password=plugin_bot_info.password,
         nickname=plugin_bot_info.post_info.access_token,
         chatroom=plugin_bot_info.post_info.host
     )
@@ -78,26 +81,43 @@ def get_Event_from_SDK(target_event):
         platform_model=target_event.platform['model']
     )
     if target_event.sdk_event.payload.active:
-        if target_event.sdk_event.payload.cmd == 'chat':
-            if (
-                    'nick' in target_event.sdk_event.payload.data
-            ) and (
-                    'userid' in target_event.sdk_event.payload.data
-            ) and (
-                    'text' in target_event.sdk_event.payload.data
-            ):
+        if target_event.sdk_event.payload.cmd == 'onlineSet':
+            target_event.active = False
+            if 'users' in target_event.sdk_event.payload.data \
+            and type(target_event.sdk_event.payload.data['users']) is list:
+                for user_this in target_event.sdk_event.payload.data['users']:
+                    if type(user_this) is dict \
+                    and 'isme' in user_this \
+                    and 'userid' in user_this \
+                    and user_this['isme'] == True:
+                        gBotIdDict[plugin_event_bot_hash] = str(user_this['userid'])
+        elif target_event.sdk_event.payload.cmd == 'chat':
+            if 'nick' in target_event.sdk_event.payload.data \
+            and 'userid' in target_event.sdk_event.payload.data \
+            and 'text' in target_event.sdk_event.payload.data:
                 target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_message'
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     target_event.sdk_event.payload.data['text']
                 )
-                target_event.data = target_event.group_message(
-                    str(0),
-                    str(target_event.sdk_event.payload.data['userid']),
-                    message_obj,
-                    'group'
-                )
+                tmp_user_id = str(target_event.sdk_event.payload.data['userid'])
+                if plugin_event_bot_hash in gBotIdDict \
+                and tmp_user_id == gBotIdDict[plugin_event_bot_hash]:
+                    target_event.plugin_info['func_type'] = 'group_message_sent'
+                    target_event.data = target_event.group_message_sent(
+                        str(0),
+                        str(target_event.sdk_event.payload.data['userid']),
+                        message_obj,
+                        'group'
+                    )
+                else:
+                    target_event.plugin_info['func_type'] = 'group_message'
+                    target_event.data = target_event.group_message(
+                        str(0),
+                        str(target_event.sdk_event.payload.data['userid']),
+                        message_obj,
+                        'group'
+                    )
                 target_event.data.message_sdk = message_obj
                 target_event.data.message_id = str(-1)
                 target_event.data.raw_message = message_obj
@@ -111,10 +131,26 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['age'] = 0
                 target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
-                # if plugin_event_bot_hash in sdkSubSelfInfo:
-                #    target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                # if str(target_event.data.user_id) == str(target_event.base_info['self_id']):
-                #    target_event.active = False
+        elif target_event.sdk_event.payload.cmd == 'onlineAdd':
+            if 'userid' in target_event.sdk_event.payload.data:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_member_increase'
+                target_event.data = target_event.group_member_increase(
+                    str(0),
+                    str(0),
+                    str(target_event.sdk_event.payload.data['userid']),
+                    'approve'
+                )
+        elif target_event.sdk_event.payload.cmd == 'onlineRemove':
+            if 'userid' in target_event.sdk_event.payload.data:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_member_decrease'
+                target_event.data = target_event.group_member_decrease(
+                    str(0),
+                    str(0),
+                    str(target_event.sdk_event.payload.data['userid']),
+                    'leave'
+                )
 
 
 '''
@@ -152,7 +188,7 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class join(payload_template):
-        def __init__(self, nickname: str, chatroom: str):
+        def __init__(self, nickname: str, chatroom: str, password:str=None):
             payload_template.__init__(self)
             self.cmd = 'join'
             self.data = {
@@ -160,6 +196,9 @@ class PAYLOAD(object):
                 "channel": chatroom,
                 "nick": nickname
             }
+            if type(password) is str \
+            and len(password) > 0:
+                self.data['password'] = password
 
     class chat(payload_template):
         def __init__(self, message: str):

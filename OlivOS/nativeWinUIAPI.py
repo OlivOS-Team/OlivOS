@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -24,6 +24,9 @@ import pystray
 import tkinter
 import re
 import datetime
+import webbrowser
+import platform
+import traceback
 
 from PIL import Image
 from PIL import ImageTk
@@ -39,25 +42,6 @@ dictColorContext = {
     'color_005': '#000000',
     'color_006': '#80D7FF'
 }
-
-
-class StoppableThread(threading.Thread):
-    def __init__(self, *args, **kwargs):
-        super(StoppableThread, self).__init__(*args, **kwargs)
-        self._stop_event = threading.Event()
-
-    def terminate(self):
-        self._stop_event.set()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def join(self):
-        pass
-
-    def stopped(self):
-        return self._stop_event.is_set()
-
 
 class dock(OlivOS.API.Proc_templet):
     def __init__(
@@ -94,6 +78,12 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_gocqhttp_terminal'] = {}
         self.UIObject['root_gocqhttp_terminal_data'] = {}
         self.UIObject['root_gocqhttp_terminal_data_max'] = 500
+        self.UIObject['root_walleq_terminal'] = {}
+        self.UIObject['root_walleq_terminal_data'] = {}
+        self.UIObject['root_walleq_terminal_data_max'] = 500
+        self.UIObject['root_cwcb_terminal'] = {}
+        self.UIObject['root_cwcb_terminal_data'] = {}
+        self.UIObject['root_cwcb_terminal_data_max'] = 500
         self.UIObject['root_virtual_terminal_terminal'] = {}
         self.UIObject['root_virtual_terminal_terminal_data'] = {}
         self.UIObject['root_virtual_terminal_terminal_data_max'] = 150
@@ -103,8 +93,11 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_plugin_edit'] = {}
         self.UIObject['root_plugin_edit_enable'] = False
         self.UIObject['root_plugin_edit_count'] = 0
+        self.UIObject['flag_have_update'] = False
         self.UIData['shallow_plugin_menu_list'] = None
         self.UIData['shallow_gocqhttp_menu_list'] = None
+        self.UIData['shallow_walleq_menu_list'] = None
+        self.UIData['shallow_cwcb_menu_list'] = None
         self.UIData['shallow_virtual_terminal_menu_list'] = None
         self.UIData['shallow_plugin_data_dict'] = None
         self.updateShallowMenuList()
@@ -113,8 +106,26 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['main_tk'] = tkinter.Tk()
         self.UIObject['main_tk'].withdraw()
         self.UIObject['main_tk'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.startShallowSend()
         self.process_msg()
         self.UIObject['main_tk'].mainloop()
+
+    def on_control_rx(self, packet):
+        if type(packet) is OlivOS.API.Control.packet:
+            if 'send' == packet.action:
+                if type(packet.key) is dict \
+                and 'data' in packet.key \
+                and type(packet.key['data']) \
+                and 'action' in packet.key['data']:
+                    if 'account_update' == packet.key['data']['action']:
+                        if 'data' in packet.key['data'] \
+                        and type(packet.key['data']['data']) is dict:
+                            self.bot_info = packet.key['data']['data']
+                        self.UIData['shallow_gocqhttp_menu_list'] = None
+                        self.UIData['shallow_walleq_menu_list'] = None
+                        self.UIData['shallow_cwcb_menu_list'] = None
+                        self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.updateShallowMenuList()
 
     def process_msg(self):
         self.UIObject['main_tk'].after(50, self.process_msg)
@@ -145,6 +156,20 @@ class dock(OlivOS.API.Proc_templet):
                                             else:
                                                 self.updateShallow()
                                                 self.updatePluginEdit()
+                                        elif 'show_update' == rx_packet_data.key['data']['action']:
+                                            self.UIObject['flag_have_update'] = True
+                                            self.updateShallowMenuList()
+                                            if self.UIObject['root_shallow'] is not None:
+                                                self.updateShallow()
+                                        elif 'account_edit' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data'] \
+                                            and 'account_edit_on' == rx_packet_data.key['data']['event'] \
+                                            and 'bot_info' in rx_packet_data.key['data'] \
+                                            and type(rx_packet_data.key['data']['bot_info']) is dict:
+                                                OlivOS.multiLoginUIAPI.run_HostUI_asayc(
+                                                    plugin_bot_info_dict=rx_packet_data.key['data']['bot_info'],
+                                                    control_queue=self.Proc_info.control_queue
+                                                )
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
                                         elif 'logger' == rx_packet_data.key['data']['action']:
@@ -215,6 +240,105 @@ class dock(OlivOS.API.Proc_templet):
                                                 elif 'gocqhttp_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startGoCqhttpTerminalUI(rx_packet_data.key['data']['hash'])
+                                        elif 'walleq' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data']:
+                                                if 'init' == rx_packet_data.key['data']['event']:
+                                                    if self.UIData['shallow_walleq_menu_list'] is None:
+                                                        self.UIData['shallow_walleq_menu_list'] = []
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                                            tmp_title = '%s' % (
+                                                                str(self.bot_info[
+                                                                        rx_packet_data.key['data']['hash']].id)
+                                                            )
+                                                            self.UIData['shallow_walleq_menu_list'].append(
+                                                                [
+                                                                    tmp_title,
+                                                                    rx_packet_data.key['data']['hash'],
+                                                                    '',
+                                                                    'walleq'
+                                                                ]
+                                                            )
+                                                            self.updateShallowMenuList()
+                                                    if self.UIObject['root_shallow'] is not None:
+                                                        self.updateShallow()
+                                                    self.startWalleQTerminalUISend(rx_packet_data.key['data']['hash'])
+                                                elif 'log' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
+                                                            rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash not in self.UIObject['root_walleq_terminal_data']:
+                                                            self.UIObject['root_walleq_terminal_data'][hash] = []
+                                                        self.UIObject['root_walleq_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_walleq_terminal_data'][hash]) > \
+                                                                self.UIObject['root_walleq_terminal_data_max']:
+                                                            self.UIObject['root_walleq_terminal_data'][hash].pop(0)
+                                                        if hash in self.UIObject['root_walleq_terminal']:
+                                                            self.UIObject['root_walleq_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data'])
+                                                elif 'qrcode' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'path' in \
+                                                            rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash in self.bot_info:
+                                                            if hash in self.UIObject['root_qrcode_window']:
+                                                                try:
+                                                                    self.UIObject['root_qrcode_window'][hash].stop()
+                                                                except:
+                                                                    pass
+                                                            self.UIObject['root_qrcode_window'][hash] = QRcodeUI(
+                                                                Model_name='qrcode_window',
+                                                                logger_proc=self.Proc_info.logger_proc.log,
+                                                                root=self,
+                                                                root_tk=None,
+                                                                bot=self.bot_info[hash],
+                                                                path=rx_packet_data.key['data']['path']
+                                                            )
+                                                            self.UIObject['root_qrcode_window'][hash].start()
+                                                elif 'walleq_terminal_on' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        self.startWalleQTerminalUI(rx_packet_data.key['data']['hash'])
+                                        elif 'ComWeChatBotClient' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data']:
+                                                if 'init' == rx_packet_data.key['data']['event']:
+                                                    if self.UIData['shallow_cwcb_menu_list'] is None:
+                                                        self.UIData['shallow_cwcb_menu_list'] = []
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                                            tmp_title = '%s' % (
+                                                                str(self.bot_info[
+                                                                        rx_packet_data.key['data']['hash']].id)
+                                                            )
+                                                            self.UIData['shallow_cwcb_menu_list'].append(
+                                                                [
+                                                                    tmp_title,
+                                                                    rx_packet_data.key['data']['hash'],
+                                                                    '',
+                                                                    'ComWeChatBotClient'
+                                                                ]
+                                                            )
+                                                            self.updateShallowMenuList()
+                                                    if self.UIObject['root_shallow'] is not None:
+                                                        self.updateShallow()
+                                                    self.startCWCBTerminalUISend(rx_packet_data.key['data']['hash'])
+                                                elif 'log' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
+                                                            rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash not in self.UIObject['root_cwcb_terminal_data']:
+                                                            self.UIObject['root_cwcb_terminal_data'][hash] = []
+                                                        self.UIObject['root_cwcb_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_cwcb_terminal_data'][hash]) > \
+                                                                self.UIObject['root_cwcb_terminal_data_max']:
+                                                            self.UIObject['root_cwcb_terminal_data'][hash].pop(0)
+                                                        if hash in self.UIObject['root_cwcb_terminal']:
+                                                            self.UIObject['root_cwcb_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data'])
+                                                elif 'cwcb_terminal_on' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        self.startCWCBTerminalUI(rx_packet_data.key['data']['hash'])
                                         elif 'virtual_terminal' == rx_packet_data.key['data']['action']:
                                             if 'event' in rx_packet_data.key['data']:
                                                 if 'init' == rx_packet_data.key['data']['event']:
@@ -266,42 +390,102 @@ class dock(OlivOS.API.Proc_templet):
     def updateShallowMenuList(self):
         tmp_new = []
         self.UIData['shallow_menu_list'] = [
-            ['账号管理', False],
             ['打开终端', self.startOlivOSTerminalUISend],
+            ['账号管理', self.startAccountEditSendFunc()],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
+            ['walleq管理', self.UIData['shallow_walleq_menu_list']],
+            ['ComWeChat管理', self.UIData['shallow_cwcb_menu_list']],
             ['虚拟终端', self.UIData['shallow_virtual_terminal_menu_list']],
             ['插件管理', self.startPluginEditSend],
             ['插件菜单', self.UIData['shallow_plugin_menu_list']],
             ['重载插件', self.sendPluginRestart],
+            ['社区论坛', self.sendOpenForum],
             ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
         ]
         for data_this in self.UIData['shallow_menu_list']:
-            if data_this[0] in ['gocqhttp管理', '虚拟终端']:
+            if data_this[0] in ['gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
                 if data_this[1] is not None:
                     tmp_new.append(data_this)
+            elif data_this[0] in ['更新OlivOS']:
+                if self.UIObject['flag_have_update']:
+                    data_this[0] = data_this[0] + '[有更新!]'
+                tmp_new.append(data_this)
             else:
                 tmp_new.append(data_this)
         self.UIData['shallow_menu_list'] = tmp_new
 
+    def startAccountEditSendFunc(self):
+        def resFunc():
+            self.startAccountEditSend()
+        return resFunc
+
+    def startAccountEditSend(self):
+        self.sendControlEventSend(
+            'call_system_event', {
+                'action': [
+                    'account_edit_asayc_start',
+                    'account_edit_asayc_do'
+                ]
+            }
+        )
+
     def startGoCqhttpTerminalUISendFunc(self, hash):
         def resFunc():
             self.startGoCqhttpTerminalUISend(hash)
+        return resFunc
 
+    def startWalleQTerminalUISendFunc(self, hash):
+        def resFunc():
+            self.startWalleQTerminalUISend(hash)
+        return resFunc
+
+    def startCWCBTerminalUISendFunc(self, hash):
+        def resFunc():
+            self.startCWCBTerminalUISend(hash)
         return resFunc
 
     def startGoCqhttpTerminalUISend(self, hash):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'gocqhttp',
-                'event': 'gocqhttp_terminal_on',
-                'hash': hash,
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'gocqhttp',
+                    'event': 'gocqhttp_terminal_on',
+                    'hash': hash,
+                }
             }
-        }
-                                  )
+        )
+
+    def startWalleQTerminalUISend(self, hash):
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'walleq',
+                    'event': 'walleq_terminal_on',
+                    'hash': hash,
+                }
+            }
+        )
+
+    def startCWCBTerminalUISend(self, hash):
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'ComWeChatBotClient',
+                    'event': 'cwcb_terminal_on',
+                    'hash': hash,
+                }
+            }
+        )
 
     def startGoCqhttpTerminalUI(self, hash):
         if hash in self.bot_info:
@@ -319,6 +503,38 @@ class dock(OlivOS.API.Proc_templet):
             )
             self.UIObject['root_gocqhttp_terminal'][hash].start()
 
+    def startWalleQTerminalUI(self, hash):
+        if hash in self.bot_info:
+            if hash in self.UIObject['root_walleq_terminal']:
+                try:
+                    self.UIObject['root_walleq_terminal'][hash].stop()
+                except:
+                    pass
+            self.UIObject['root_walleq_terminal'][hash] = walleqTerminalUI(
+                Model_name='walleq_terminal',
+                logger_proc=self.Proc_info.logger_proc.log,
+                root=self,
+                root_tk=None,
+                bot=self.bot_info[hash]
+            )
+            self.UIObject['root_walleq_terminal'][hash].start()
+
+    def startCWCBTerminalUI(self, hash):
+        if hash in self.bot_info:
+            if hash in self.UIObject['root_cwcb_terminal']:
+                try:
+                    self.UIObject['root_cwcb_terminal'][hash].stop()
+                except:
+                    pass
+            self.UIObject['root_cwcb_terminal'][hash] = CWCBTerminalUI(
+                Model_name='cwcb_terminal',
+                logger_proc=self.Proc_info.logger_proc.log,
+                root=self,
+                root_tk=None,
+                bot=self.bot_info[hash]
+            )
+            self.UIObject['root_cwcb_terminal'][hash].start()
+
     def startVirtualTerminalUISendFunc(self, hash):
         def resFunc():
             self.startVirtualTerminalUISend(hash)
@@ -326,7 +542,7 @@ class dock(OlivOS.API.Proc_templet):
         return resFunc
 
     def startVirtualTerminalUISend(self, hash):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -355,7 +571,7 @@ class dock(OlivOS.API.Proc_templet):
             self.UIObject['root_virtual_terminal_terminal'][hash].start()
 
     def startOlivOSTerminalUISend(self):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -392,6 +608,32 @@ class dock(OlivOS.API.Proc_templet):
         }
                                   )
 
+    def setWalleQModelSend(self, hash, data):
+        self.sendControlEventSend('send', {
+            'target': {
+                'type': 'walleq_lib_exe_model',
+                'hash': hash
+            },
+            'data': {
+                'action': 'input',
+                'data': data
+            }
+        }
+                                  )
+
+    def setCWCBModelSend(self, hash, data):
+        self.sendControlEventSend('send', {
+            'target': {
+                'type': 'walleq_lib_exe_model',
+                'hash': hash
+            },
+            'data': {
+                'action': 'input',
+                'data': data
+            }
+        }
+                                  )
+
     def setVirtualModelSend(self, hash, data):
         self.sendControlEventSend('send', {
             'target': {
@@ -406,7 +648,7 @@ class dock(OlivOS.API.Proc_templet):
                                   )
 
     def startPluginEditSend(self):
-        self.sendControlEventSend('send', {
+        self.sendRxEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
             },
@@ -415,6 +657,16 @@ class dock(OlivOS.API.Proc_templet):
             }
         }
                                   )
+
+    def sendRxEvent(self, action, data):
+        if self.Proc_info.rx_queue is not None:
+            self.Proc_info.rx_queue.put(
+                OlivOS.API.Control.packet(
+                    action,
+                    data
+                ),
+                block=False
+            )
 
     def startPluginEdit(self):
         count_str = str(self.UIObject['root_plugin_edit_count'])
@@ -504,6 +756,36 @@ class dock(OlivOS.API.Proc_templet):
                 block=False
             )
 
+    def sendOpenForum(self):
+        if self.UIObject['root_shallow'] is not None:
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '正在前往社区论坛……'
+            )
+        self.sendOpenWebviewEvent('forum_page', 'OlivOS论坛', 'https://forum.olivos.run/')
+
+    def sendOpenWebviewEvent(
+        self,
+        name:str,
+        title:str,
+        url:str
+    ):
+        OlivOS.webviewUIAPI.sendOpenWebviewPage(
+            self.Proc_info.control_queue,
+            name,
+            title,
+            url
+        )
+
+    def startShallowSend(self):
+        self.sendRxEvent('send', {
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'start_shallow'
+            }
+        })
+
     def startShallow(self):
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
         if self.UIObject['root_shallow'] is None:
@@ -553,6 +835,7 @@ class QRcodeUI(object):
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
 
+        self.UIObject['root'].after(180 * 1000, self.sleepExit)
         self.UIObject['root'].mainloop()
 
         self.exit()
@@ -560,8 +843,12 @@ class QRcodeUI(object):
     def exit(self):
         pass
 
+    def sleepExit(self):
+        self.stop()
+
     def stop(self):
         self.UIObject['root'].quit()
+        self.UIObject['root'].destroy()
 
 
 class gocqhttpTerminalUI(object):
@@ -706,7 +993,7 @@ class gocqhttpTerminalUI(object):
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) > 0 and len(input) < 1000:
+            if len(input) >= 0 and len(input) < 1000:
                 self.root.setGoCqhttpModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
@@ -750,13 +1037,31 @@ class gocqhttpTerminalUI(object):
         #    height = height
         # )
 
+    def show_url_webbrowser(self, url):
+        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        try:
+            if res == 'yes':
+                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
+                if res == 'yes':
+                    OlivOS.webviewUIAPI.sendOpenWebviewPage(
+                        control_queue=self.root.Proc_info.control_queue,
+                        name='slider_verification_code=%s' % self.bot.hash,
+                        title='请完成验证',
+                        url=url
+                    )
+                else:
+                    webbrowser.open(url)
+        except webbrowser.Error as error_info:
+            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_gocqhttp_terminal_data']:
             for line in self.root.UIObject['root_gocqhttp_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line)
+                self.tree_add_line(line, flagInit = True)
 
-    def tree_add_line(self, data):
-        res_data = re.sub('\033\[[\d;]*m?', '', data)
+    def tree_add_line(self, data, flagInit = False):
+        res_data = re.sub(r'\033\[[\d;]*m?', '', data)
+        res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace(' ', '\ ')
@@ -775,12 +1080,513 @@ class gocqhttpTerminalUI(object):
             except:
                 pass
 
+        if not flagInit and platform.system() == 'Windows':
+            try:
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    matchResList = list(matchRes.groups())
+                    if len(matchResList) == 1:
+                        matchResUrl = matchResList[0]
+                        self.show_url_webbrowser(matchResUrl)
+            except:
+                pass
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
 
     def exit(self):
         self.root.UIObject['root_gocqhttp_terminal'].pop(self.bot.hash)
+
+
+class walleqTerminalUI(object):
+    def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
+        self.Model_name = Model_name
+        self.root = root
+        self.root_tk = root_tk
+        self.bot = bot
+        self.UIObject = {}
+        self.UIData = {}
+        self.UIConfig = {}
+        self.logger_proc = logger_proc
+        self.UIConfig.update(dictColorContext)
+
+    def start(self):
+        self.UIObject['root'] = tkinter.Toplevel()
+        self.UIObject['root'].title('WalleQ 终端 - %s' % str(self.bot.id))
+        self.UIObject['root'].geometry('800x600')
+        self.UIObject['root'].minsize(800, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight=15)
+        self.UIObject['root'].grid_rowconfigure(1, weight=0)
+        self.UIObject['root'].grid_columnconfigure(0, weight=0)
+        self.UIObject['root'].grid_columnconfigure(1, weight=2)
+        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].resizable(
+            width=True,
+            height=True
+        )
+        self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
+
+        self.UIObject['style'] = ttk.Style()
+        fix_Treeview_color(self.UIObject['style'])
+
+        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree']['show'] = 'headings'
+        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
+        self.UIObject['tree'].heading('DATA', text='日志')
+        self.UIObject['tree']['selectmode'] = 'browse'
+        self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
+        # self.tree_load()
+        # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        self.UIObject['tree'].grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            rowspan=1,
+            columnspan=2,
+            padx=(15, 0),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree_yscroll'] = ttk.Scrollbar(
+            self.UIObject['root'],
+            orient="vertical",
+            command=self.UIObject['tree'].yview
+        )
+        # self.UIObject['tree_yscroll'].place(
+        #    x = 800 - 15 - 18,
+        #    y = 15,
+        #    width = 18,
+        #    height = 600 - 15 * 2 - 24 - 8
+        # )
+        self.UIObject['tree_yscroll'].grid(
+            row=0,
+            column=2,
+            sticky="nsw",
+            rowspan=1,
+            columnspan=1,
+            padx=(0, 15),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree'].configure(
+            yscrollcommand=self.UIObject['tree_yscroll'].set
+        )
+
+        self.root_Entry_init(
+            obj_root='root',
+            obj_name='root_input',
+            str_name='root_input_StringVar',
+            x=15,
+            y=600 - 15 * 1 - 24,
+            width_t=0,
+            width=800 - 15 * 2,
+            height=24,
+            action=None,
+            title='输入'
+        )
+        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].grid(
+            row=1,
+            column=1,
+            sticky="s",
+            rowspan=1,
+            columnspan=3,
+            padx=(15, 15),
+            pady=(8, 15),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+
+        self.tree_init_line()
+
+        self.UIObject['root'].mainloop()
+
+        self.exit()
+
+    def tree_rightKey(self, event):
+        # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
+        # iid = self.UIObject['tree'].identify_row(event.y)
+        # self.UIObject['tree'].selection_set(iid)
+        # self.UIObject['tree'].update()
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label='查看', command=lambda: self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label='复制', command=lambda: self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action: str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
+    def root_Entry_enter_Func(self, name):
+        def resFunc(event):
+            self.root_Entry_enter(name, event)
+
+        return resFunc
+
+    def root_Entry_enter(self, name, event):
+        if name == 'root_input':
+            input = self.UIData['root_input_StringVar'].get()
+            if len(input) >= 0 and len(input) < 1000:
+                self.root.setWalleQModelSend(self.bot.hash, input)
+            self.UIData['root_input_StringVar'].set('')
+
+    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
+                        mode='NONE'):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(
+            self.UIObject[obj_root],
+            text=title
+        )
+        self.UIObject[obj_name + '=Label'].configure(
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004']
+        )
+        # self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        # )
+        self.UIData[str_name] = tkinter.StringVar()
+        self.UIObject[obj_name] = tkinter.Entry(
+            self.UIObject[obj_root],
+            textvariable=self.UIData[str_name]
+        )
+        self.UIObject[obj_name].configure(
+            bg=self.UIConfig['color_004'],
+            fg=self.UIConfig['color_005'],
+            bd=0
+        )
+        if mode == 'SAFE':
+            self.UIObject[obj_name].configure(
+                show='●'
+            )
+        self.UIObject[obj_name].configure(
+            width=width
+        )
+        # self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        # )
+
+    def show_url_webbrowser(self, url):
+        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        try:
+            if res == 'yes':
+                webbrowser.open(url)
+        except webbrowser.Error as error_info:
+            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+
+    def tree_init_line(self):
+        if self.bot.hash in self.root.UIObject['root_walleq_terminal_data']:
+            for line in self.root.UIObject['root_walleq_terminal_data'][self.bot.hash]:
+                self.tree_add_line(line, flagInit = True)
+
+    def tree_add_line(self, data, flagInit = False):
+        res_data = re.sub(r'\033\[[\d;]*m?', '', data)
+        res_data_raw = res_data
+        res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
+        res_data_1 = res_data
+        res_data = res_data.replace(' ', '\ ')
+        if len(res_data.replace('\ ', '')) > 0:
+            try:
+                iid = self.UIObject['tree'].insert(
+                    '',
+                    tkinter.END,
+                    text=res_data_1,
+                    values=(
+                        res_data
+                    )
+                )
+                self.UIObject['tree'].see(iid)
+                self.UIObject['tree'].update()
+            except:
+                pass
+
+        if not flagInit and platform.system() == 'Windows':
+            try:
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    matchResList = list(matchRes.groups())
+                    if len(matchResList) == 1:
+                        matchResUrl = matchResList[0]
+                        self.show_url_webbrowser(matchResUrl)
+            except:
+                pass
+
+    def stop(self):
+        self.exit()
+        self.UIObject['root'].destroy()
+
+    def exit(self):
+        self.root.UIObject['root_walleq_terminal'].pop(self.bot.hash)
+
+
+
+class CWCBTerminalUI(object):
+    def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
+        self.Model_name = Model_name
+        self.root = root
+        self.root_tk = root_tk
+        self.bot = bot
+        self.UIObject = {}
+        self.UIData = {}
+        self.UIConfig = {}
+        self.logger_proc = logger_proc
+        self.UIConfig.update(dictColorContext)
+
+    def start(self):
+        self.UIObject['root'] = tkinter.Toplevel()
+        self.UIObject['root'].title('ComWeChatBotClient 终端 - %s' % str(self.bot.id))
+        self.UIObject['root'].geometry('800x600')
+        self.UIObject['root'].minsize(800, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight=15)
+        self.UIObject['root'].grid_rowconfigure(1, weight=0)
+        self.UIObject['root'].grid_columnconfigure(0, weight=0)
+        self.UIObject['root'].grid_columnconfigure(1, weight=2)
+        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].resizable(
+            width=True,
+            height=True
+        )
+        self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
+
+        self.UIObject['style'] = ttk.Style()
+        fix_Treeview_color(self.UIObject['style'])
+
+        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree']['show'] = 'headings'
+        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
+        self.UIObject['tree'].heading('DATA', text='日志')
+        self.UIObject['tree']['selectmode'] = 'browse'
+        self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
+        # self.tree_load()
+        # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        self.UIObject['tree'].grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            rowspan=1,
+            columnspan=2,
+            padx=(15, 0),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree_yscroll'] = ttk.Scrollbar(
+            self.UIObject['root'],
+            orient="vertical",
+            command=self.UIObject['tree'].yview
+        )
+        # self.UIObject['tree_yscroll'].place(
+        #    x = 800 - 15 - 18,
+        #    y = 15,
+        #    width = 18,
+        #    height = 600 - 15 * 2 - 24 - 8
+        # )
+        self.UIObject['tree_yscroll'].grid(
+            row=0,
+            column=2,
+            sticky="nsw",
+            rowspan=1,
+            columnspan=1,
+            padx=(0, 15),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree'].configure(
+            yscrollcommand=self.UIObject['tree_yscroll'].set
+        )
+
+        self.root_Entry_init(
+            obj_root='root',
+            obj_name='root_input',
+            str_name='root_input_StringVar',
+            x=15,
+            y=600 - 15 * 1 - 24,
+            width_t=0,
+            width=800 - 15 * 2,
+            height=24,
+            action=None,
+            title='输入'
+        )
+        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].grid(
+            row=1,
+            column=1,
+            sticky="s",
+            rowspan=1,
+            columnspan=3,
+            padx=(15, 15),
+            pady=(8, 15),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+
+        self.tree_init_line()
+
+        self.UIObject['root'].mainloop()
+
+        self.exit()
+
+    def tree_rightKey(self, event):
+        # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
+        # iid = self.UIObject['tree'].identify_row(event.y)
+        # self.UIObject['tree'].selection_set(iid)
+        # self.UIObject['tree'].update()
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label='查看', command=lambda: self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label='复制', command=lambda: self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action: str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
+    def root_Entry_enter_Func(self, name):
+        def resFunc(event):
+            self.root_Entry_enter(name, event)
+
+        return resFunc
+
+    def root_Entry_enter(self, name, event):
+        if name == 'root_input':
+            input = self.UIData['root_input_StringVar'].get()
+            if len(input) >= 0 and len(input) < 1000:
+                self.root.setCWCBModelSend(self.bot.hash, input)
+            self.UIData['root_input_StringVar'].set('')
+
+    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
+                        mode='NONE'):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(
+            self.UIObject[obj_root],
+            text=title
+        )
+        self.UIObject[obj_name + '=Label'].configure(
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004']
+        )
+        # self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        # )
+        self.UIData[str_name] = tkinter.StringVar()
+        self.UIObject[obj_name] = tkinter.Entry(
+            self.UIObject[obj_root],
+            textvariable=self.UIData[str_name]
+        )
+        self.UIObject[obj_name].configure(
+            bg=self.UIConfig['color_004'],
+            fg=self.UIConfig['color_005'],
+            bd=0
+        )
+        if mode == 'SAFE':
+            self.UIObject[obj_name].configure(
+                show='●'
+            )
+        self.UIObject[obj_name].configure(
+            width=width
+        )
+        # self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        # )
+
+    def show_url_webbrowser(self, url):
+        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        try:
+            if res == 'yes':
+                webbrowser.open(url)
+        except webbrowser.Error as error_info:
+            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+
+    def tree_init_line(self):
+        if self.bot.hash in self.root.UIObject['root_cwcb_terminal_data']:
+            for line in self.root.UIObject['root_cwcb_terminal_data'][self.bot.hash]:
+                self.tree_add_line(line, flagInit = True)
+
+    def tree_add_line(self, data, flagInit = False):
+        res_data = re.sub(r'\033\[[\d;]*m?', '', data)
+        res_data_raw = res_data
+        res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
+        res_data_1 = res_data
+        res_data = res_data.replace(' ', '\ ')
+        if len(res_data.replace('\ ', '')) > 0:
+            try:
+                iid = self.UIObject['tree'].insert(
+                    '',
+                    tkinter.END,
+                    text=res_data_1,
+                    values=(
+                        res_data
+                    )
+                )
+                self.UIObject['tree'].see(iid)
+                self.UIObject['tree'].update()
+            except:
+                pass
+
+        if not flagInit and platform.system() == 'Windows':
+            try:
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    matchResList = list(matchRes.groups())
+                    if len(matchResList) == 1:
+                        matchResUrl = matchResList[0]
+                        self.show_url_webbrowser(matchResUrl)
+            except:
+                pass
+
+    def stop(self):
+        self.exit()
+        self.UIObject['root'].destroy()
+
+    def exit(self):
+        self.root.UIObject['root_cwcb_terminal'].pop(self.bot.hash)
+
+
 
 
 class OlivOSTerminalUI(object):
@@ -932,7 +1738,7 @@ class OlivOSTerminalUI(object):
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stopManual)
 
         self.tree_init_line()
 
@@ -1099,6 +1905,16 @@ class OlivOSTerminalUI(object):
                 except:
                     pass
 
+    def stopManual(self):
+        # 手动关闭时要给用户气泡，不然有些用户不知道自己还开着
+        try:
+            self.root.UIObject['root_shallow'].UIObject['shallow_root'].notify(
+                '已最小化至托盘'
+            )
+        except:
+            pass
+        self.stop()
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
@@ -1237,7 +2053,7 @@ class VirtualTerminalUI(object):
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) > 0 and len(input) < 1000:
+            if len(input) >= 0 and len(input) < 1000:
                 self.root.setVirtualModelSend(self.bot.hash, input)
                 pass
             self.UIData['root_input_StringVar'].set('')
@@ -1337,7 +2153,8 @@ class shallow(object):
                                 pystray.MenuItem(
                                     item_this[0],
                                     tmp_sub_menu,
-                                    enabled=(tmp_sub_menu not in [None, False])
+                                    enabled=(tmp_sub_menu not in [None, False]),
+                                    default=(item_this[0] in ['打开终端'])
                                 )
                             )
                         elif len(item_this) == 3:
@@ -1358,6 +2175,24 @@ class shallow(object):
                                         pystray.MenuItem(
                                             item_this[0],
                                             self.root.startGoCqhttpTerminalUISendFunc(
+                                                item_this[1]
+                                            )
+                                        )
+                                    )
+                                elif item_this[3] == 'walleq':
+                                    list_new.append(
+                                        pystray.MenuItem(
+                                            item_this[0],
+                                            self.root.startWalleQTerminalUISendFunc(
+                                                item_this[1]
+                                            )
+                                        )
+                                    )
+                                elif item_this[3] == 'ComWeChatBotClient':
+                                    list_new.append(
+                                        pystray.MenuItem(
+                                            item_this[0],
+                                            self.root.startCWCBTerminalUISendFunc(
                                                 item_this[1]
                                             )
                                         )

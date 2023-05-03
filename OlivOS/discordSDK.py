@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -617,6 +617,7 @@ class event_action(object):
                             pic_file = msg_res.content
                         else:
                             file_path = url_parsed.path
+                            file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
                             with open(file_path, "rb") as f:
                                 pic_file = f.read()
                 except Exception as e:

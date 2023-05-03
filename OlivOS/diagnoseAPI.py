@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -22,6 +22,8 @@ import datetime
 import os
 
 import OlivOS
+
+modelName = 'diagnoseAPI'
 
 logfile_dir = './logfile'
 logfile_file = 'OlivOS_logfile_%s.log'
@@ -186,10 +188,10 @@ class logger(OlivOS.API.Proc_templet):
     def run(self):
         releaseDir(logfile_dir)
         self.log_output_shader_init()
-        self.log(2, 'Welcome to OlivOS %s' % OlivOS.infoAPI.OlivOS_Version_Short)
+        self.log(2, OlivOS.L10NAPI.getTrans('Welcome to OlivOS {0}', [OlivOS.infoAPI.OlivOS_Version_Short], modelName))
         with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding='utf-8') as logfile_f:
             pass
-        self.log(2, 'OlivOS diagnose logger [' + self.Proc_name + '] is running')
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS diagnose logger [{0}] is running', [self.Proc_name], modelName))
         flag_need_refresh = False
         while True:
             if self.Proc_data['logfile_count_out'] >= 0:

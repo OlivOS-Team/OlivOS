@@ -14,6 +14,9 @@
   <a href="https://github.com/botuniverse/onebot">
     <img src="https://img.shields.io/badge/OneBot-v11-black?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAABwCAMAAADxPgR5AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAxQTFRF////29vbr6+vAAAAk1hCcwAAAAR0Uk5T////AEAqqfQAAAKcSURBVHja7NrbctswDATQXfD//zlpO7FlmwAWIOnOtNaTM5JwDMa8E+PNFz7g3waJ24fviyDPgfhz8fHP39cBcBL9KoJbQUxjA2iYqHL3FAnvzhL4GtVNUcoSZe6eSHizBcK5LL7dBr2AUZlev1ARRHCljzRALIEog6H3U6bCIyqIZdAT0eBuJYaGiJaHSjmkYIZd+qSGWAQnIaz2OArVnX6vrItQvbhZJtVGB5qX9wKqCMkb9W7aexfCO/rwQRBzsDIsYx4AOz0nhAtWu7bqkEQBO0Pr+Ftjt5fFCUEbm0Sbgdu8WSgJ5NgH2iu46R/o1UcBXJsFusWF/QUaz3RwJMEgngfaGGdSxJkE/Yg4lOBryBiMwvAhZrVMUUvwqU7F05b5WLaUIN4M4hRocQQRnEedgsn7TZB3UCpRrIJwQfqvGwsg18EnI2uSVNC8t+0QmMXogvbPg/xk+Mnw/6kW/rraUlvqgmFreAA09xW5t0AFlHrQZ3CsgvZm0FbHNKyBmheBKIF2cCA8A600aHPmFtRB1XvMsJAiza7LpPog0UJwccKdzw8rdf8MyN2ePYF896LC5hTzdZqxb6VNXInaupARLDNBWgI8spq4T0Qb5H4vWfPmHo8OyB1ito+AysNNz0oglj1U955sjUN9d41LnrX2D/u7eRwxyOaOpfyevCWbTgDEoilsOnu7zsKhjRCsnD/QzhdkYLBLXjiK4f3UWmcx2M7PO21CKVTH84638NTplt6JIQH0ZwCNuiWAfvuLhdrcOYPVO9eW3A67l7hZtgaY9GZo9AFc6cryjoeFBIWeU+npnk/nLE0OxCHL1eQsc1IciehjpJv5mqCsjeopaH6r15/MrxNnVhu7tmcslay2gO2Z1QfcfX0JMACG41/u0RrI9QAAAABJRU5ErkJggg==" alt="action">
   </a>
+  <a href="https://github.com/botuniverse/onebot">
+    <img src="https://img.shields.io/badge/OneBot-v12-black?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAABwCAMAAADxPgR5AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAxQTFRF////29vbr6+vAAAAk1hCcwAAAAR0Uk5T////AEAqqfQAAAKcSURBVHja7NrbctswDATQXfD//zlpO7FlmwAWIOnOtNaTM5JwDMa8E+PNFz7g3waJ24fviyDPgfhz8fHP39cBcBL9KoJbQUxjA2iYqHL3FAnvzhL4GtVNUcoSZe6eSHizBcK5LL7dBr2AUZlev1ARRHCljzRALIEog6H3U6bCIyqIZdAT0eBuJYaGiJaHSjmkYIZd+qSGWAQnIaz2OArVnX6vrItQvbhZJtVGB5qX9wKqCMkb9W7aexfCO/rwQRBzsDIsYx4AOz0nhAtWu7bqkEQBO0Pr+Ftjt5fFCUEbm0Sbgdu8WSgJ5NgH2iu46R/o1UcBXJsFusWF/QUaz3RwJMEgngfaGGdSxJkE/Yg4lOBryBiMwvAhZrVMUUvwqU7F05b5WLaUIN4M4hRocQQRnEedgsn7TZB3UCpRrIJwQfqvGwsg18EnI2uSVNC8t+0QmMXogvbPg/xk+Mnw/6kW/rraUlvqgmFreAA09xW5t0AFlHrQZ3CsgvZm0FbHNKyBmheBKIF2cCA8A600aHPmFtRB1XvMsJAiza7LpPog0UJwccKdzw8rdf8MyN2ePYF896LC5hTzdZqxb6VNXInaupARLDNBWgI8spq4T0Qb5H4vWfPmHo8OyB1ito+AysNNz0oglj1U955sjUN9d41LnrX2D/u7eRwxyOaOpfyevCWbTgDEoilsOnu7zsKhjRCsnD/QzhdkYLBLXjiK4f3UWmcx2M7PO21CKVTH84638NTplt6JIQH0ZwCNuiWAfvuLhdrcOYPVO9eW3A67l7hZtgaY9GZo9AFc6cryjoeFBIWeU+npnk/nLE0OxCHL1eQsc1IciehjpJv5mqCsjeopaH6r15/MrxNnVhu7tmcslay2gO2Z1QfcfX0JMACG41/u0RrI9QAAAABJRU5ErkJggg==" alt="action">
+  </a>
   <a href="https://github.com/OlivOS-Team/OlivOS/actions">
     <img src="https://github.com/OlivOS-Team/OlivOS/workflows/CI-Packing/badge.svg" alt="action">
   </a>
@@ -33,9 +36,14 @@
 </div>
 
 ## 兼容
+[![OnebotV11](https://img.shields.io/badge/-OnebotV11-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
+[![OnebotV12](https://img.shields.io/badge/-OnebotV12-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
+[![QQ](https://img.shields.io/badge/-QQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://im.qq.com/index/)
 [![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
-[![Onebot](https://img.shields.io/badge/-Onebot-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/botuniverse/onebot)
 [![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
+[![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
+[![WeChat](https://img.shields.io/badge/-WeChat-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
+[![ComWeChatBotClient](https://img.shields.io/badge/-ComWeChatBotClient-07C160?style=flat-square&logo=wechat&logoColor=white)](https://github.com/JustUndertaker/ComWeChatBotClient)
 [![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://discord.com/)
 [![Bilibili](https://img.shields.io/badge/-Bilibili-FB7299?style=flat-square&logo=Bilibili&logoColor=white)](http://www.bilibili.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
@@ -43,6 +51,7 @@
 [![Dodo](https://img.shields.io/badge/-Dodo-00B8AA?style=flat-square&logo=%2Fe%2F&logoColor=white)](https://dodo.link/)
 [![Fanbook](https://img.shields.io/badge/-Fanbook-1A52F3?style=flat-square&logo=sharp&logoColor=white)](https://fanbook.mobi/)
 [![Hack.Chat](https://img.shields.io/badge/-Hack.Chat-20201D?style=flat-square&logo=Hetzner&logoColor=white)](https://hack.chat/)
+[![FF14ACT](https://img.shields.io/badge/-FF14ACT-ED1C24?style=flat-square&logo=squareenix&logoColor=white)](https://advancedcombattracker.com/download.php)
 
 > *排名不分先后*
 
@@ -51,6 +60,47 @@
 
 ## 方针
 技术路线上，基于Python、采用模块化框架、进程分离、消息队列通信、前后端分离、响应式布局、渐进式渲染的基本思路，实现一个高并发性、高可靠性、高适应性的整体方案。
+
+## 开始使用
+### 发布版本
+#### Windows
+我们推荐`Windows`用户直接使用经过二进制编译的发布版本，你可以在这里获取最新版本：[releases](https://github.com/OlivOS-Team/OlivOS/releases)
+
+### 源码版本
+请确保你已经安装了Python3以及git，当前我们主要使用`3.7.5`以及`3.11.0`两个版本的Python。  
+
++ 首先，克隆本项目的源码  
+```bash
+git clone https://github.com/OlivOS-Team/OlivOS
+cd OlivOS
+```
++ 安装依赖环境
+```bash
+pip install -r requirements310_pure.txt
+```
+对于`3.7.5`版本的Python，有单独提供的依赖描述文件
+```bash
+pip install -r requirements_pure.txt
+```
++ 启动环境
+```
+python main.py
+```
+
+### Pypi版本
+OlivOS的核心组件部分已经被充分集成，并作为Pypi库进行了发布，你同样也可以使用`pip`来获取这个版本并将OlivOS作为库加以使用。  
+要获取最新版本的OlivOS库，你需要
+```bash
+pip install olivos
+```
+以下是一个简单的OlivOS启动示例代码
+```python
+import OlivOS
+
+if __name__ == '__main__':
+    OlivOSTarget = OlivOS.bootAPI.Entity()
+    OlivOSTarget.start()
+```
 
 ## 插件
 请参考插件默认模板[OlivOSPluginTemplate](https://github.com/OlivOS-Team/OlivOSPluginTemplate)和[官方文档](https://doc.olivos.wiki)进行插件开发。

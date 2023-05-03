@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -21,6 +21,8 @@ import threading
 import hashlib
 import time
 import traceback
+import inspect
+import ctypes
 
 from functools import wraps
 
@@ -109,19 +111,41 @@ def getMenuEvent(target_event):
 
 
 class Event(object):
-    def __init__(self, sdk_event=None, log_func=None):
+    def __init__(self, sdk_event=None, log_func=None, Proc=None):
         self.bot_info = None
-        self.platform = {'sdk': None, 'platform': None, 'model': None}
+        self.platform = {
+            'sdk': None,
+            'platform': None,
+            'model': None
+        }
         self.data = None
         self.active = False
         self.blocked = False
         self.log_func = log_func
-        self.base_info = {'time': None, 'self_id': None, 'type': None}
-        self.plugin_info = {'func_type': None, 'message_mode_rx': OlivOS.infoAPI.OlivOS_message_mode_rx_default,
-                            'message_mode_tx': OlivOS.infoAPI.OlivOS_message_mode_tx_unity, 'name': 'unity',
-                            'namespace': 'unity', 'tx_queue': [], 'control_queue': None}
+        self.base_info = {
+            'time': None,
+            'self_id': None,
+            'type': None
+        }
+        self.plugin_info = {
+            'func_type': None,
+            'message_mode_rx': OlivOS.infoAPI.OlivOS_message_mode_rx_default,
+            'message_mode_tx': OlivOS.infoAPI.OlivOS_message_mode_tx_unity,
+            'name': 'unity',
+            'namespace': 'unity',
+            'tx_queue': [],
+            'control_queue': None
+        }
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
+        if type(OlivOS.pluginAPI.gProc) is OlivOS.pluginAPI.shallow:
+            self.plugin_info['control_queue'] = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+            self.log_func = OlivOS.pluginAPI.gProc.log
+        if self.plugin_info['control_queue'] is None \
+        and type(Proc) is OlivOS.pluginAPI.shallow:
+            self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
+        if type(self.log_func) is None:
+            self.log_func = Proc.log
         self.get_Event_from_SDK()
         self.get_Event_on_Plugin()
         self.do_init_log()
@@ -129,6 +153,8 @@ class Event(object):
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.virtualTerminalSDK.event:
             OlivOS.virtualTerminalSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.onebotV12SDK.event:
+            OlivOS.onebotV12SDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.onebotSDK.event:
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
@@ -159,7 +185,9 @@ class Event(object):
     def get_Event_on_Plugin(self):
         if self.plugin_info['func_type'] in [
             'private_message',
-            'group_message'
+            'private_message_sent',
+            'group_message',
+            'group_message_sent'
         ]:
             if self.plugin_info['message_mode_tx'] == 'olivos_para' or self.data.message_sdk.mode_rx != \
                     self.plugin_info['message_mode_tx']:
@@ -185,7 +213,24 @@ class Event(object):
                     ['user_id', self.data.user_id],
                     ['message', self.data.message]
                 ])
+            elif self.plugin_info['func_type'] == 'private_message_sent':
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['nickname', self.data.sender['nickname']],
+                    ['user_id', self.data.user_id],
+                    ['message', self.data.message]
+                ])
             elif self.plugin_info['func_type'] == 'group_message':
+                tmp_host_id = '-'
+                if self.data.host_id is not None:
+                    tmp_host_id = str(self.data.host_id)
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['host_id', tmp_host_id],
+                    ['group_id', self.data.group_id],
+                    ['nickname', self.data.sender['nickname']],
+                    ['user_id', self.data.user_id],
+                    ['message', self.data.message]
+                ])
+            elif self.plugin_info['func_type'] == 'group_message_sent':
                 tmp_host_id = '-'
                 if self.data.host_id is not None:
                     tmp_host_id = str(self.data.host_id)
@@ -339,8 +384,43 @@ class Event(object):
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
+    
+    class private_message_sent(object):
+        def __init__(self, user_id, message, sub_type, flag_lazy=True):
+            self.sub_type = sub_type
+            self.message = message
+            self.message_sdk = message
+            self.message_id = None
+            self.raw_message = None
+            self.raw_message_sdk = None
+            self.user_id = user_id
+            self.font = None
+            self.sender = {}
+            self.extend = {}
+            if flag_lazy:
+                self.sender['nickname'] = 'Nobody'
+                self.extend['host_group_id'] = None
 
     class group_message(object):
+        def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
+            self.sub_type = sub_type
+            self.host_id = None
+            self.group_id = group_id
+            self.message = message
+            self.message_sdk = message
+            self.message_id = None
+            self.raw_message = None
+            self.raw_message_sdk = None
+            self.user_id = user_id
+            self.font = None
+            self.sender = {}
+            self.extend = {}
+            if flag_lazy:
+                self.sender['nickname'] = 'Nobody'
+                self.sender['name'] = 'Nobody'
+                self.extend['host_group_id'] = None
+    
+    class group_message_sent(object):
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.host_id = None
@@ -414,7 +494,7 @@ class Event(object):
             self.message_id = message_id
 
     class poke(object):
-        def __init__(self, user_id, target_id, group_id=-1, flag_lazy=True):
+        def __init__(self, user_id, target_id, group_id='-1', flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.target_id = target_id
@@ -539,27 +619,20 @@ class Event(object):
     def __message_router(self, message):
         tmp_message_obj = None
         tmp_message = None
-        if type(message) == str and self.plugin_info['message_mode_tx'] == self.plugin_info['message_mode_rx']:
-            tmp_message = message
+        if type(message) == str or type(message) == list:
             tmp_message_obj = OlivOS.messageAPI.Message_templet(
                 self.plugin_info['message_mode_tx'],
                 message
             )
+        elif type(message) == OlivOS.messageAPI.Message_templet:
+            tmp_message_obj = message
         else:
-            if type(message) == str or type(message) == list:
-                tmp_message_obj = OlivOS.messageAPI.Message_templet(
-                    self.plugin_info['message_mode_tx'],
-                    message
-                )
-            elif type(message) == OlivOS.messageAPI.Message_templet:
-                tmp_message_obj = message
-            else:
-                error_note = 'Wrong message type from plugin, please check your plugin first'
-                error_obj = OlivOS.contentAPI.api_result_error_template.OlivOSTypeError(error_note)
-                self.__errorCatchLogger(error_obj)
-                raise error_obj
-            if tmp_message_obj.active:
-                tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
+            error_note = 'Wrong message type from plugin, please check your plugin first'
+            error_obj = OlivOS.contentAPI.api_result_error_template.OlivOSTypeError(error_note)
+            self.__errorCatchLogger(error_obj)
+            raise error_obj
+        if tmp_message_obj.active:
+            tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
         return [tmp_message, tmp_message_obj]
 
     def __reply(self, message, flag_log=True):
@@ -568,11 +641,13 @@ class Event(object):
         tmp_message_obj = None
         tmp_message_log = None
         [tmp_message, tmp_message_obj] = self.__message_router(message)
+        tmp_message = message
         if tmp_message is None:
             return
         if checkByListOrEqual(
                 self.plugin_info['func_type'],
                 [
+                    'private_message_sent',
                     'private_message',
                     'friend_add',
                     'private_message_recall',
@@ -588,6 +663,7 @@ class Event(object):
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
                 [
+                    'group_message_sent',
                     'group_message'
                 ]
         ):
@@ -616,7 +692,7 @@ class Event(object):
                     'poke'
                 ]
         ):
-            if self.data.group_id == -1:
+            if self.data.group_id in [-1, '-1', None]:
                 self.__send('private', self.data.user_id, tmp_message, flag_log=False)
                 flag_type = 'private'
             else:
@@ -638,6 +714,7 @@ class Event(object):
                 if checkByListOrEqual(
                         self.plugin_info['func_type'],
                         [
+                            'group_message_sent',
                             'group_message'
                         ]
                 ):
@@ -679,20 +756,32 @@ class Event(object):
         if self.platform['sdk'] == 'terminal_link':
             OlivOS.virtualTerminalSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'onebot':
-            if flag_type == 'private':
-                if 'host_id' in self.data.__dict__:
-                    if self.data.host_id is not None:
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if flag_type == 'private':
+                    if 'host_id' in self.data.__dict__ \
+                    and self.data.host_id is not None:
+                        # 此处缺少接口
+                        pass
+                    else:
+                        OlivOS.onebotV12SDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    if host_id is not None:
+                        OlivOS.onebotV12SDK.event_action.send_host_msg(self, host_id, target_id, tmp_message)
+                    else:
+                        OlivOS.onebotV12SDK.event_action.send_group_msg(self, target_id, tmp_message)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if flag_type == 'private':
+                    if 'host_id' in self.data.__dict__ \
+                    and self.data.host_id is not None:
                         # 此处缺少接口
                         pass
                     else:
                         OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
-                else:
-                    OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
-            elif flag_type == 'group':
-                if host_id is not None:
-                    OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
-                else:
-                    OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    if host_id is not None:
+                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                    else:
+                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
                 if 'reply_msg_id' in self.data.extend:
@@ -790,7 +879,10 @@ class Event(object):
     @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                OlivOS.onebotV12SDK.event_action.delete_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -804,7 +896,10 @@ class Event(object):
     def __get_msg(self, message_id, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -820,7 +915,10 @@ class Event(object):
     @callbackLogger('send_like')
     def __send_like(self, user_id, times, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -833,8 +931,12 @@ class Event(object):
     @callbackLogger('set_group_kick')
     def __set_group_kick(self, group_id, user_id, host_id, rehect_add_request, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotV12SDK.event_action.set_group_kick(self, group_id, user_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -848,8 +950,12 @@ class Event(object):
     @callbackLogger('set_group_ban')
     def __set_group_ban(self, group_id, user_id, host_id, duration, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotV12SDK.event_action.set_group_ban(self, group_id, user_id, duration)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -863,9 +969,12 @@ class Event(object):
     @callbackLogger('set_group_anonymous_ban')
     def __set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag, host_id, duration, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_anonymous_ban(self, group_id, anonymous, anonymous_flag,
-                                                                      duration)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous_ban(
+                        self, group_id, anonymous, anonymous_flag, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -880,8 +989,11 @@ class Event(object):
     @callbackLogger('set_group_whole_ban')
     def __set_group_whole_ban(self, group_id, enable, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -895,8 +1007,12 @@ class Event(object):
     @callbackLogger('set_group_admin')
     def __set_group_admin(self, group_id, user_id, enable, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotV12SDK.event_action.set_group_admin(self, group_id, user_id, enable)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -910,8 +1026,11 @@ class Event(object):
     @callbackLogger('set_group_anonymous')
     def __set_group_anonymous(self, group_id, enable, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -925,8 +1044,11 @@ class Event(object):
     @callbackLogger('set_group_card')
     def __set_group_card(self, group_id, user_id, card, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -940,8 +1062,12 @@ class Event(object):
     @callbackLogger('set_group_name')
     def __set_group_name(self, group_id, group_name, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotV12SDK.event_action.set_group_name(self, group_id, group_name)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -955,8 +1081,12 @@ class Event(object):
     @callbackLogger('set_group_leave')
     def __set_group_leave(self, group_id, host_id, is_dismiss, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotV12SDK.event_action.set_group_leave(self, group_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
@@ -970,8 +1100,11 @@ class Event(object):
     @callbackLogger('set_group_special_title')
     def __set_group_special_title(self, group_id, user_id, special_title, duration, host_id, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -985,7 +1118,10 @@ class Event(object):
     @callbackLogger('set_friend_add_request')
     def __set_friend_add_request(self, flag, approve, remark, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                OlivOS.onebotV12SDK.event_action.set_friend_add_request(self, flag, approve, remark)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -999,7 +1135,10 @@ class Event(object):
     @callbackLogger('set_group_add_request')
     def __set_group_add_request(self, flag, sub_type, approve, reason, flag_log=True):
         if self.platform['sdk'] == 'onebot':
-            OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                OlivOS.onebotV12SDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1013,7 +1152,10 @@ class Event(object):
     def __get_login_info(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotV12SDK.event_action.get_login_info(self)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'discord_link':
@@ -1064,7 +1206,10 @@ class Event(object):
     def __get_stranger_info(self, user_id, no_cache, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotV12SDK.event_action.get_stranger_info(self, user_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         elif self.platform['sdk'] == 'kaiheila_link':
@@ -1084,7 +1229,10 @@ class Event(object):
     def __get_friend_list(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotV12SDK.event_action.get_friend_list(self)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1101,8 +1249,12 @@ class Event(object):
     def __get_group_info(self, group_id, host_id, no_cache, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotV12SDK.event_action.get_group_info(self, group_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
         return res_data
@@ -1120,7 +1272,10 @@ class Event(object):
     def __get_group_list(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotV12SDK.event_action.get_group_list(self)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1137,10 +1292,16 @@ class Event(object):
     def __get_group_member_info(self, group_id, user_id, host_id, no_cache, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
-            else:
-                res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotV12SDK.event_action.get_group_member_info(self, group_id, user_id)
+                else:
+                    pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+                else:
+                    res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
         elif self.platform['sdk'] == 'kaiheila_link':
@@ -1160,8 +1321,12 @@ class Event(object):
     def __get_group_member_list(self, group_id, host_id, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            if host_id is None:
-                res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotV12SDK.event_action.get_group_member_list(self, group_id)
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1179,7 +1344,10 @@ class Event(object):
     def __can_send_image(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1196,7 +1364,10 @@ class Event(object):
     def __can_send_record(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1213,7 +1384,10 @@ class Event(object):
     def __get_status(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_status(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_status(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1230,7 +1404,10 @@ class Event(object):
     def __get_version_info(self, flag_log=True):
         res_data = None
         if self.platform['sdk'] == 'onebot':
-            res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
+            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                pass
+            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1248,18 +1425,42 @@ class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(StoppableThread, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+        self.root = None
 
     def terminate(self):
+        if self.root is not None:
+            try:
+                self.root.on_terminate()
+            except Exception as e:
+                traceback.print_exc()
         self._stop_event.set()
+        self.stop_thread()
 
     def stop(self):
-        self._stop_event.set()
+        self.terminate()
 
     def join(self):
         pass
 
     def stopped(self):
         return self._stop_event.is_set()
+ 
+    def _async_raise(self, tid, exctype):
+        """raises the exception, performs cleanup if needed"""
+        tid = ctypes.c_long(tid)
+        if not inspect.isclass(exctype):
+            exctype = type(exctype)
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+        if res == 0:
+            raise ValueError("invalid thread id")
+        elif res != 1:
+            # """if it returns a number greater than one, you're in trouble,
+            # and you should call it again with exc=NULL to revert the effect"""
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+            raise SystemError("PyThreadState_SetAsyncExc failed")
+
+    def stop_thread(self):
+        self._async_raise(self.ident, SystemExit)
 
 
 class Proc_templet(object):
@@ -1285,6 +1486,7 @@ class Proc_templet(object):
             self.rx_queue = rx_queue
             self.tx_queue = tx_queue
             self.control_queue = control_queue
+            self.control_rx_queue = multiprocessing.Queue()
             self.logger_proc = logger_proc
             self.scan_interval = scan_interval
             self.dead_interval = dead_interval
@@ -1292,15 +1494,44 @@ class Proc_templet(object):
     def run(self):
         pass
 
+    def run_total(self):
+        t_this = StoppableThread(
+            name=self.Proc_name + '+on_control_rx',
+            target=self.on_control_rx_init,
+            args=()
+        )
+        t_this.daemon = self.deamon
+        t_this.start()
+        self.run()
+
+    def on_control_rx_init(self):
+        while True:
+            if self.Proc_info.control_rx_queue.empty():
+                time.sleep(0.02)
+            else:
+                try:
+                    packet = self.Proc_info.control_rx_queue.get(block=False)
+                except:
+                    continue
+                self.on_control_rx(packet)
+
+    def on_control_rx(self, packet):
+        #print("!!!! " + self.Proc_name + str(packet.__dict__))
+        pass
+
+    def on_terminate(self):
+        pass
+
     def start(self):
-        proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run, args=())
+        proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run_total, args=())
         proc_this.daemon = self.deamon
         proc_this.start()
         # self.Proc = proc_this
         return proc_this
 
     def start_lite(self):
-        proc_this = StoppableThread(name=self.Proc_name, target=self.run, args=())
+        proc_this = StoppableThread(name=self.Proc_name, target=self.run_total, args=())
+        proc_this.root = self
         proc_this.daemon = self.deamon
         proc_this.start()
         # self.Proc = proc_this

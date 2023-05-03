@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,13 +20,22 @@ from flask import current_app
 from flask import request
 from flask import g
 
-import logging
-import json
-import multiprocessing
-import threading
-
 import OlivOS
 
+modelName = 'flaskServerAPI'
+
+gCheckList = [
+    'default',
+    'gocqhttp',
+    'gocqhttp_hide',
+    'gocqhttp_show',
+    'gocqhttp_show_Android_Phone',
+    'gocqhttp_show_Android_Pad',
+    'gocqhttp_show_Android_Watch',
+    'gocqhttp_show_iPad',
+    'gocqhttp_show_iMac',
+    'gocqhttp_show_old'
+]
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port, tx_queue=None,
@@ -72,7 +81,10 @@ class server(OlivOS.API.Proc_templet):
         self.app()
         self.set_config()
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
-        self.log(2, 'OlivOS flask server [' + self.Proc_config['Flask_name'] + '] is running')
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running', [
+                self.Proc_config['Flask_name']
+            ], modelName
+        ))
         if self.Proc_config['config'].debug_mode:
             self.Proc_config['Flask_app'].run(host=self.Proc_config['Flask_server_host'],
                                               port=self.Proc_config['Flask_server_port'])

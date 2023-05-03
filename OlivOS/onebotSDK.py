@@ -10,13 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
 import sys
 import json
 import requests as req
+from urllib import parse
+import os
 import OlivOS
 
 
@@ -143,7 +145,56 @@ def get_Event_from_SDK(target_event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'old_string'
-    if target_event.base_info['type'] == 'message':
+    if target_event.base_info['type'] == 'message_sent':
+        """_自身消息事件_
+        添加`message_sent`事件,详见:https://docs.go-cqhttp.org/event/#%E6%89%80%E6%9C%89%E4%B8%8A%E6%8A%A5
+        """
+        if target_event.sdk_event.json['message_type'] == 'private':
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'private_message_sent'
+            target_event.data = target_event.private_message_sent(
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['message'],
+                target_event.sdk_event.json['sub_type']
+            )
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                              target_event.sdk_event.json['message'])
+            target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
+            target_event.data.raw_message = target_event.sdk_event.json['raw_message']
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'raw_message'])
+            target_event.data.font = target_event.sdk_event.json['font']
+            target_event.data.sender.update(target_event.sdk_event.json['sender'])
+            if 'user_id' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
+            if 'nickname' in target_event.sdk_event.json['sender']:
+                target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
+        elif target_event.sdk_event.json['message_type'] == 'group':
+            if target_event.sdk_event.json['sub_type'] == 'normal':
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_message_sent'
+                target_event.data = target_event.group_message_sent(
+                    str(target_event.sdk_event.json['group_id']),
+                    str(target_event.sdk_event.json['user_id']),
+                    target_event.sdk_event.json['message'],
+                    target_event.sdk_event.json['sub_type']
+                )
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                  target_event.sdk_event.json[
+                                                                                      'message'])
+                target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
+                target_event.data.raw_message = target_event.sdk_event.json['raw_message']
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
+                                                                                      target_event.sdk_event.json[
+                                                                                          'raw_message'])
+                target_event.data.font = target_event.sdk_event.json['font']
+                target_event.data.sender.update(target_event.sdk_event.json['sender'])
+                if 'user_id' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['id'] = str(target_event.sdk_event.json['sender']['user_id'])
+                if 'nickname' in target_event.sdk_event.json['sender']:
+                    target_event.data.sender['name'] = target_event.sdk_event.json['sender']['nickname']
+    elif target_event.base_info['type'] == 'message':
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
@@ -381,40 +432,62 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.json['interval']
             )
 
+def formatMessage(data:str):
+    res = data
+    data_obj = OlivOS.messageAPI.Message_templet(
+        mode_rx = 'old_string',
+        data_raw = data
+    )
+    for data_obj_this in data_obj.data:
+        if type(data_obj_this) is OlivOS.messageAPI.PARA.image:
+            if data_obj_this.data['url'] != None:
+                data_obj_this.data['file'] = data_obj_this.data['url']
+                data_obj_this.data['url'] = None
+            url_path = data_obj_this.data['file']
+            if not url_path.startswith("base64://"):
+                url_parsed = parse.urlparse(url_path)
+                if url_parsed.scheme not in ["http", "https"]:
+                    file_path = url_parsed.path
+                    if not os.path.isabs(file_path):
+                        file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+                        if os.path.exists(file_path):
+                            data_obj_this.data['file'] = 'file:///%s' % file_path
+                            res = data_obj.get('old_string')
+    return res
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
     def reply_private_msg(target_event, message):
-        this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_type = 'private'
-        this_msg.data.user_id = int(target_event.data.user_id)
-        this_msg.data.message = message
-        this_msg.do_api()
+        event_action.send_private_msg(
+            target_event = target_event,
+            user_id = target_event.data.user_id,
+            message = message
+        )
 
     def reply_group_msg(target_event, message):
-        this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_type = 'group'
-        this_msg.data.group_id = int(target_event.data.group_id)
-        this_msg.data.message = message
-        this_msg.do_api()
+        event_action.send_group_msg(
+            target_event = target_event,
+            user_id = target_event.data.group_id,
+            message = message
+        )
 
     def send_private_msg(target_event, user_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
-        this_msg.data.user_id = int(user_id)
-        this_msg.data.message = message
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.message = formatMessage(message)
         this_msg.do_api()
 
     def send_group_msg(target_event, group_id, message):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
-        this_msg.data.group_id = int(group_id)
-        this_msg.data.message = message
+        this_msg.data.group_id = str(group_id)
+        this_msg.data.message = formatMessage(message)
         this_msg.do_api()
 
     def delete_msg(target_event, message_id):
         this_msg = api.delete_msg(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.message_id = int(message_id)
+        this_msg.data.message_id = str(message_id)
         this_msg.do_api()
 
     def get_msg(target_event, message_id):

@@ -13,3 +13,5 @@ pystray
 aiohttp
 qrcode
 brotli
+pyjson5
+pywebview

@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -19,6 +19,9 @@ import base64
 import os
 import hashlib
 import random
+import shutil
+import platform
+import traceback
 
 from tkinter import ttk
 from tkinter import messagebox
@@ -34,15 +37,92 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
+def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
+    if platform.system() == 'Windows':
+        try:
+            tmp_callbackData = {'res': False}
+            tmp_t = OlivOS.multiLoginUIAPI.HostUI(
+                Model_name='OlivOS_multiLoginUI_asayc',
+                Account_data=plugin_bot_info_dict,
+                logger_proc=None,
+                callbackData=tmp_callbackData,
+                asaycMode=True,
+                rootMode=True,
+                control_queue=control_queue
+            )
+            tmp_res = tmp_t.start()
+            if tmp_res != True:
+                pass
+            if tmp_t.UIData['flag_commit']:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+
+def sendAccountUpdate(obj, control_queue, account_data):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_event',
+                {
+                    'action': [
+                        'account_edit_asayc_end'
+                    ]
+                }
+            ),
+            block=False
+        )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_account_update',
+                {
+                    'data': account_data
+                }
+            ),
+            block=False
+        )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_stop_type_event',
+                {
+                    'action': [
+                        'account_update'
+                    ]
+                }
+            ),
+            block=False
+        )
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'call_system_event',
+                {
+                    'action': [
+                        'account_update'
+                    ]
+                }
+            ),
+            block=False
+        )
 
 class HostUI(object):
-    def __init__(self, Model_name, Account_data, logger_proc=None, callbackData=None):
+    def __init__(
+        self,
+        Model_name,
+        Account_data,
+        logger_proc=None,
+        callbackData=None,
+        asaycMode=False,
+        rootMode=True,
+        control_queue=None
+    ):
         self.Model_name = Model_name
         self.UIObject = {}
         self.UIData = {}
         self.UIConfig = {}
         self.logger_proc = logger_proc
         self.callbackData = callbackData
+        self.asaycMode = asaycMode
+        self.rootMode = rootMode
+        self.control_queue = control_queue
         self.res = False
         self.UIData['Account_data'] = Account_data
         self.UIData['flag_commit'] = False
@@ -54,7 +134,10 @@ class HostUI(object):
             self.logger_proc.log(log_level, log_message)
 
     def start(self):
-        self.UIObject['root'] = tkinter.Tk()
+        if self.rootMode:
+            self.UIObject['root'] = tkinter.Tk()
+        else:
+            self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('OlivOS 登录管理器')
         self.UIObject['root'].geometry('518x400')
         self.UIObject['root'].resizable(
@@ -226,6 +309,7 @@ class HostUI(object):
         self.res = True
         if type(self.callbackData) == dict:
             self.callbackData['res'] = self.res
+        sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
 
 
@@ -255,8 +339,18 @@ class TreeEditUI(object):
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_dict': {
                 'type_list': [
-                    '传统QQ',
-                    '传统QQ - 旧',
+                    'QQ - GoCq - 默认',
+                    'QQ - GoCq - 安卓手机',
+                    'QQ - GoCq - 安卓平板',
+                    'QQ - GoCq - 安卓手表',
+                    'QQ - GoCq - iPad',
+                    'QQ - GoCq - iMac',
+                    'QQ - Wq - 安卓手表',
+                    'QQ - Wq - 安卓手机',
+                    'QQ - Wq - 安卓平板',
+                    '微信 - ComWeChat',
+                    'QQ - GoCq - 旧',
+                    'QQ - Wq - 旧',
                     'Discord',
                     'Telegram',
                     '开黑啦 - KOOK',
@@ -274,88 +368,187 @@ class TreeEditUI(object):
                 ],
                 # 各类账号组合的匹配与注册表
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+                'type_note_list': {
+                    'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
+                    'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
+                    'QQ - Wq - 安卓手表': '密码留空即尝试使用扫码登录',
+                    'QQ - Wq - 旧': '密码留空即尝试使用扫码登录',
+                    '微信 - ComWeChat': '启动后需要再运行特定版本微信',
+                    'Hack.Chat': '密码可以留空'
+                },
+                'type_clear_note_list': {
+                    'QQ - GoCq - 默认': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - 安卓手机': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - 安卓平板': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - 安卓手表': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - iPad': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - iMac': './conf/gocqhttp/{bothash}',
+                    'QQ - GoCq - 旧': './conf/gocqhttp/{bothash}',
+                    'QQ - Wq - 安卓手表': './conf/walleq/{bothash}',
+                    'QQ - Wq - 安卓手机': './conf/walleq/{bothash}',
+                    'QQ - Wq - 安卓平板': './conf/walleq/{bothash}',
+                    'QQ - Wq - 旧': './conf/walleq/{bothash}'
+                },
                 'type_mapping_list': {
-                    '传统QQ': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID'
-                        # '密码': 'edit_root_Entry_Password',
-                        # 推荐使用扫码登录，所以隐藏密码栏
-                    }
-                             ],
-                    '传统QQ - 旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID'
-                        # '密码': 'edit_root_Entry_Password',
-                        # 推荐使用扫码登录，所以隐藏密码栏
-                    }
-                                 ],
+                    'QQ - GoCq - 默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - 安卓手机': ['qq', 'onebot', 'gocqhttp_show_Android_Phone', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - 安卓平板': ['qq', 'onebot', 'gocqhttp_show_Android_Pad', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - 安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - iMac': ['qq', 'onebot', 'gocqhttp_show_iMac', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - GoCq - 旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 默认': ['qq', 'onebot', 'walleq_show', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 安卓手机': ['qq', 'onebot', 'walleq_show_Android_Phone', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 安卓平板': ['qq', 'onebot', 'walleq_show_Android_Pad', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 安卓手表': ['qq', 'onebot', 'walleq_show_Android_Watch', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - iPad': ['qq', 'onebot', 'walleq_show_iPad', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - iMac': ['qq', 'onebot', 'walleq_show_iMac', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    'QQ - Wq - 旧': ['qq', 'onebot', 'walleq_show_old', 'True', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '密码': 'edit_root_Entry_Password',
+                            # 推荐使用扫码登录时，可以隐藏密码栏
+                        }
+                    ],
+                    '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
+                            '微信号': 'edit_root_Entry_ID'
+                        }
+                    ],
                     '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            'Token': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'B站直播间 - 游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            '直播间ID': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'B站直播间 - 登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    }
-                                   ],
+                            '直播间ID': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'QQ频道 - 公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
-                        'BotAppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            'BotAppID': 'edit_root_Entry_ID',
+                            '机器人令牌': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'QQ频道 - 私域': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
-                        'BotAppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            'BotAppID': 'edit_root_Entry_ID',
+                            '机器人令牌': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                                 ],
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Discord': ['discord', 'discord_link', 'default', 'True', 'websocket', {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                                ],
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     '渡渡语音 - Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
-                        'BotID': 'edit_root_Entry_ID',
-                        'Bot私钥': 'edit_root_Entry_Server_access_token'
-                    }
-                                    ],
+                            'BotID': 'edit_root_Entry_ID',
+                            'Bot私钥': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Fanbook': ['fanbook', 'fanbook_poll', 'default', 'True', 'post', {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    }
-                                ],
+                            'Token': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
-                        '房间名称': 'edit_root_Entry_Server_host',
-                        'Bot名称': 'edit_root_Entry_Server_access_token'
-                    }
-                                  ],
+                            '房间名称': 'edit_root_Entry_Server_host',
+                            'Bot名称': 'edit_root_Entry_Server_access_token',
+                            '密码': 'edit_root_Entry_Password'
+                        }
+                    ],
                     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {
-                        '账号': 'edit_root_Entry_ID'
-                    }
-                             ],
+                            '账号': 'edit_root_Entry_ID'
+                        }
+                    ],
                     '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port'
-                    }
-                             ],
+                            '账号': 'edit_root_Entry_ID',
+                            '端口': 'edit_root_Entry_Server_port'
+                        }
+                    ],
                     'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post', {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port',
-                        '回调端口': 'edit_root_Entry_Server_access_token'
-                    }
-                               ],
+                            '账号': 'edit_root_Entry_ID',
+                            '端口': 'edit_root_Entry_Server_port',
+                            '回调端口': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     '自定义': ['qq', 'default', 'default', 'True', 'post', {
-                        'ID': 'edit_root_Entry_ID',
-                        'PASSWORD': 'edit_root_Entry_Password',
-                        'HOST': 'edit_root_Entry_Server_host',
-                        'PORT': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    }
-                            ],
+                            'ID': 'edit_root_Entry_ID',
+                            'PASSWORD': 'edit_root_Entry_Password',
+                            'HOST': 'edit_root_Entry_Server_host',
+                            'PORT': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                 },
                 'platform_list': [
+                    'wechat',
                     'qq',
                     'qqGuild',
                     'kaiheila',
@@ -368,6 +561,9 @@ class TreeEditUI(object):
                     'biliLive'
                 ],
                 'platform_sdk_list': {
+                    'wechat': [
+                        'onebot'
+                    ],
                     'qq': [
                         'onebot'
                     ],
@@ -402,13 +598,34 @@ class TreeEditUI(object):
                     ]
                 },
                 'platform_sdk_model_list': {
+                    'wechat': {
+                        'onebot': [
+                            'onebotV12',
+                            'ComWeChatBotClient'
+                        ]
+                    },
                     'qq': {
                         'onebot': [
                             # 'gocqhttp',
                             # 'gocqhttp_hide',
+                            'default',
+                            'onebotV12',
                             'gocqhttp_show',
+                            'gocqhttp_show_Android_Phone',
+                            'gocqhttp_show_Android_Pad',
+                            'gocqhttp_show_Android_Watch',
+                            'gocqhttp_show_iPad',
+                            'gocqhttp_show_iMac',
                             'gocqhttp_show_old',
-                            'default'
+                            'walleq',
+                            'walleq_hide',
+                            'walleq_show',
+                            'walleq_show_Android_Phone',
+                            #'walleq_show_Android_Pad',
+                            'walleq_show_Android_Watch',
+                            'walleq_show_iPad',
+                            'walleq_show_iMac',
+                            'walleq_show_old'
                         ]
                     },
                     'qqGuild': {
@@ -477,6 +694,220 @@ class TreeEditUI(object):
                 'websocket'
             ]}
 
+    def tree_edit_commit(self):
+        miss_key_list = None
+        if self.action == 'create' or self.action == 'update':
+            if self.action == 'create':
+                tmp_action = 'create'
+            elif self.action == 'update':
+                tmp_action = 'update'
+            tmp_id = self.UIData['edit_root_Entry_ID_StringVar'].get()
+            tmp_password = self.UIData['edit_root_Entry_Password_StringVar'].get()
+            tmp_server_auto = self.UIData['edit_root_Combobox_Server_auto_StringVar'].get()
+            tmp_server_type = self.UIData['edit_root_Combobox_Server_type_StringVar'].get()
+            tmp_host = self.UIData['edit_root_Entry_Server_host_StringVar'].get()
+            tmp_port = self.UIData['edit_root_Entry_Server_port_StringVar'].get()
+            tmp_access_token = self.UIData['edit_root_Entry_Server_access_token_StringVar'].get()
+            tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
+            tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
+            tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
+            if tmp_platform_platform == 'qq' \
+            and tmp_platform_sdk == 'onebot' \
+            and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList \
+            and tmp_server_auto == 'True':
+                if tmp_host == '':
+                    tmp_host = 'http://127.0.0.1'
+                if tmp_port == '':
+                    tmp_port = '58000'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform in ['qq', 'wechat'] \
+            and tmp_platform_sdk == 'onebot' \
+            and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList \
+            and tmp_server_auto == 'True':
+                if tmp_host == '':
+                    tmp_host = 'ws://127.0.0.1'
+                if tmp_port == '':
+                    tmp_port = '58001'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'qqGuild' \
+            and tmp_platform_sdk == 'qqGuild_link':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'telegram' \
+            and tmp_platform_sdk == 'telegram_poll':
+                if tmp_id == '':
+                    if len(tmp_access_token.split('.')) > 0:
+                        tmp_id = tmp_access_token.split('.')[0]
+                    if len(tmp_id) <= 0 or not tmp_id.isdigit():
+                        tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'https://api.telegram.org'
+                if tmp_port == '':
+                    tmp_port = '443'
+            if tmp_platform_platform == 'discord' \
+            and tmp_platform_sdk == 'discord_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'kaiheila' \
+            and tmp_platform_sdk == 'kaiheila_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'biliLive' \
+            and tmp_platform_sdk == 'biliLive_link':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16) % 100000000000000
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'fanbook' \
+            and tmp_platform_sdk == 'fanbook_poll':
+                if tmp_id == '':
+                    tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'dodo' \
+            and tmp_platform_sdk == 'dodo_poll':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'dodo' \
+            and tmp_platform_sdk == 'dodo_link':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'terminal' \
+            and tmp_platform_sdk == 'terminal_link' \
+            and tmp_platform_model == 'default':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'terminal' \
+            and tmp_platform_sdk == 'terminal_link' \
+            and tmp_platform_model == 'postapi':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'terminal' \
+            and tmp_platform_sdk == 'terminal_link' \
+            and tmp_platform_model == 'ff14':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+            if tmp_platform_platform == 'hackChat' \
+            and tmp_platform_sdk == 'hackChat_link' \
+            and tmp_platform_model == 'default':
+                if tmp_id == '':
+                    tmp_id = random.randint(1000000000, 9999999999)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if not checkByListEmptyOr([
+                tmp_id,
+                tmp_server_auto,
+                tmp_server_type,
+                tmp_host,
+                tmp_port,
+                tmp_access_token,
+                tmp_platform_sdk,
+                tmp_platform_platform,
+                tmp_platform_model
+            ]):
+                tmp_id_last = str(tmp_id)
+                try:
+                    tmp_id_last = int(tmp_id)
+                except:
+                    pass
+                self.UIData['Edit_res'] = [
+                    tmp_action,
+                    self.hash_key,
+                    OlivOS.API.bot_info_T(
+                        id=tmp_id_last,
+                        password=tmp_password,
+                        server_auto=str2bool(tmp_server_auto),
+                        server_type=tmp_server_type,
+                        host=tmp_host,
+                        port=int(tmp_port),
+                        access_token=tmp_access_token,
+                        platform_sdk=tmp_platform_sdk,
+                        platform_platform=tmp_platform_platform,
+                        platform_model=tmp_platform_model
+                    )
+                ]
+            else:
+                miss_key_list = []
+                tmp_check_list = [
+                    ['ID', tmp_id],
+                    ['SDK', tmp_platform_sdk],
+                    ['PLATFORM', tmp_platform_platform],
+                    ['MODEL', tmp_platform_model],
+                    ['AUTO', tmp_server_auto],
+                    ['TYPE', tmp_server_type],
+                    ['HOST', tmp_host],
+                    ['PORT', tmp_port],
+                    ['TOKEN', tmp_access_token]
+                ]
+                for tmp_check_list_this in tmp_check_list:
+                    if tmp_check_list_this[1] == '':
+                        miss_key_list.append(tmp_check_list_this[0])
+        elif self.action == 'delete':
+            self.UIData['Edit_res'] = [
+                'delete',
+                self.hash_key,
+                None
+            ]
+        self.edit_commit_callback(self.UIData['Edit_res'])
+        if self.action == 'create' or self.action == 'update':
+            if miss_key_list is not None:
+                if type(miss_key_list) == list:
+                    # tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(miss_key_list)
+                    tmp_messagebox_str = '发现未填写条目！请确认完成填写。'
+                    messagebox.showwarning('警告', tmp_messagebox_str)
+            else:
+                self.UIObject['edit_root'].destroy()
+
     def start(self):
         if self.action == 'create' or self.action == 'update':
             self.tree_edit_UI()
@@ -544,6 +975,22 @@ class TreeEditUI(object):
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
         self.UIObject[name].place(
+            x=x,
+            y=y,
+            width=width,
+            height=height
+        )
+
+    def tree_edit_UI_Label_init(self, obj_root, obj_name, x, y, width, height, title=''):
+        self.UIObject[obj_name] = tkinter.Label(
+            self.UIObject[obj_root],
+            text=title
+        )
+        self.UIObject[obj_name].configure(
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004']
+        )
+        self.UIObject[obj_name].place(
             x=x,
             y=y,
             width=width,
@@ -624,6 +1071,16 @@ class TreeEditUI(object):
         elif target == 'edit_root_Combobox_model':
             self.tree_edit_UI_Combobox_update(action, 'model')
 
+    def tree_edit_UI_type_clear_note_GEN(self, tmp_type:str):
+        def tree_edit_UI_type_clear_note():
+            if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
+                valDict = {
+                    'bothash': self.hash_key
+                }
+                dirPath = self.UIData['edit_root_Combobox_dict']['type_clear_note_list'][tmp_type].format(**valDict)
+                removeDir(dirPath)
+        return tree_edit_UI_type_clear_note
+
     def tree_edit_UI_Combobox_update(self, action, con_action):
         for item_this in [
             'edit_root_Entry_ID',
@@ -635,7 +1092,9 @@ class TreeEditUI(object):
             'edit_root_Combobox_sdk',
             'edit_root_Combobox_model',
             'edit_root_Combobox_Server_auto',
-            'edit_root_Combobox_Server_type'
+            'edit_root_Combobox_Server_type',
+            'edit_root_Label_type_note',
+            'edit_root_Button_type_clear_note'
         ]:
             try:
                 self.UIObject[item_this].place_forget()
@@ -734,6 +1193,32 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_note_list']:
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note',
+                        x=100,
+                        y=40 + count * (24 + 6),
+                        width=200,
+                        height=24,
+                        title=self.UIData['edit_root_Combobox_dict']['type_note_list'][tmp_type]
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
+                    self.tree_UI_Button_init(
+                        name='edit_root_Button_type_clear_note',
+                        text='重置数据',
+                        command=self.tree_edit_UI_type_clear_note_GEN(tmp_type),
+                        x=310,
+                        y=40 + 2 * (24 + 6),
+                        width=70,
+                        height=24
+                    )
+                    if count < 1:
+                        count = 1
+                        self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                        count += 1
         if tmp_type == '自定义':
             if action == 'update':
                 if self.hash_key in self.UIData['Account_data']:
@@ -804,186 +1289,6 @@ class TreeEditUI(object):
                         str(self.UIData['Account_data'][self.hash_key].post_info.port))
                     self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(
                         self.UIData['Account_data'][self.hash_key].post_info.access_token)
-
-    def tree_edit_commit(self):
-        miss_key_list = None
-        if self.action == 'create' or self.action == 'update':
-            if self.action == 'create':
-                tmp_action = 'create'
-            elif self.action == 'update':
-                tmp_action = 'update'
-            tmp_id = self.UIData['edit_root_Entry_ID_StringVar'].get()
-            tmp_password = self.UIData['edit_root_Entry_Password_StringVar'].get()
-            tmp_server_auto = self.UIData['edit_root_Combobox_Server_auto_StringVar'].get()
-            tmp_server_type = self.UIData['edit_root_Combobox_Server_type_StringVar'].get()
-            tmp_host = self.UIData['edit_root_Entry_Server_host_StringVar'].get()
-            tmp_port = self.UIData['edit_root_Entry_Server_port_StringVar'].get()
-            tmp_access_token = self.UIData['edit_root_Entry_Server_access_token_StringVar'].get()
-            tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
-            tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
-            tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
-            if tmp_platform_platform == 'qq' and tmp_platform_sdk == 'onebot' and tmp_server_auto == 'True':
-                if tmp_host == '':
-                    tmp_host = 'http://127.0.0.1'
-                if tmp_port == '':
-                    tmp_port = '58000'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'qqGuild' and tmp_platform_sdk == 'qqGuild_link':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'telegram' and tmp_platform_sdk == 'telegram_poll':
-                if tmp_id == '':
-                    if len(tmp_access_token.split('.')) > 0:
-                        tmp_id = tmp_access_token.split('.')[0]
-                    if len(tmp_id) <= 0 or not tmp_id.isdigit():
-                        tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'https://api.telegram.org'
-                if tmp_port == '':
-                    tmp_port = '443'
-            if tmp_platform_platform == 'discord' and tmp_platform_sdk == 'discord_link':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'biliLive' and tmp_platform_sdk == 'biliLive_link':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16) % 100000000000000
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'fanbook' and tmp_platform_sdk == 'fanbook_poll':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_poll':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_link':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'default':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'postapi':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'terminal' and tmp_platform_sdk == 'terminal_link' and tmp_platform_model == 'ff14':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-            if tmp_platform_platform == 'hackChat' and tmp_platform_sdk == 'hackChat_link' and tmp_platform_model == 'default':
-                if tmp_id == '':
-                    tmp_id = random.randint(1000000000, 9999999999)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if not checkByListEmptyOr([
-                tmp_id,
-                tmp_server_auto,
-                tmp_server_type,
-                tmp_host,
-                tmp_port,
-                tmp_access_token,
-                tmp_platform_sdk,
-                tmp_platform_platform,
-                tmp_platform_model
-            ]):
-                self.UIData['Edit_res'] = [
-                    tmp_action,
-                    self.hash_key,
-                    OlivOS.API.bot_info_T(
-                        id=int(tmp_id),
-                        password=tmp_password,
-                        server_auto=str2bool(tmp_server_auto),
-                        server_type=tmp_server_type,
-                        host=tmp_host,
-                        port=int(tmp_port),
-                        access_token=tmp_access_token,
-                        platform_sdk=tmp_platform_sdk,
-                        platform_platform=tmp_platform_platform,
-                        platform_model=tmp_platform_model
-                    )
-                ]
-            else:
-                miss_key_list = []
-                tmp_check_list = [
-                    ['ID', tmp_id],
-                    ['SDK', tmp_platform_sdk],
-                    ['PLATFORM', tmp_platform_platform],
-                    ['MODEL', tmp_platform_model],
-                    ['AUTO', tmp_server_auto],
-                    ['TYPE', tmp_server_type],
-                    ['HOST', tmp_host],
-                    ['PORT', tmp_port],
-                    ['TOKEN', tmp_access_token]
-                ]
-                for tmp_check_list_this in tmp_check_list:
-                    if tmp_check_list_this[1] == '':
-                        miss_key_list.append(tmp_check_list_this[0])
-        elif self.action == 'delete':
-            self.UIData['Edit_res'] = [
-                'delete',
-                self.hash_key,
-                None
-            ]
-        self.edit_commit_callback(self.UIData['Edit_res'])
-        if self.action == 'create' or self.action == 'update':
-            if miss_key_list is not None:
-                if type(miss_key_list) == list:
-                    # tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(miss_key_list)
-                    tmp_messagebox_str = '发现未填写条目！请确认完成填写。'
-                    messagebox.showwarning('警告', tmp_messagebox_str)
-            else:
-                self.UIObject['edit_root'].destroy()
 
 
 class TreeEditUI_old(object):
@@ -1568,3 +1873,11 @@ def getHash(key):
     hash_tmp = hashlib.new('md5')
     hash_tmp.update(str(key).encode(encoding='UTF-8'))
     return hash_tmp.hexdigest()
+
+
+def removeDir(dir_path):
+    try:
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
+    except:
+        pass

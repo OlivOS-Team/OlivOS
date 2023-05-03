@@ -16,3 +16,11 @@ websockets==10.1
 aiohttp==3.7.4
 qrcode==7.3.1
 brotli
+pyjson5
+APScheduler==3.10.1
+js2py
+certifi
+httpx
+prompt_toolkit
+regex
+rich

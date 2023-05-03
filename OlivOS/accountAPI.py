@@ -10,13 +10,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
 import json
 import socket
 from contextlib import closing
+import platform
 
 import OlivOS
 
@@ -24,6 +25,7 @@ default_account_conf = {
     'account': []
 }
 
+modelName = 'accountAPI'
 
 class Account(object):
     def load(path, logger_proc, safe_mode=False):
@@ -34,11 +36,11 @@ class Account(object):
         except:
             pass
         if account_conf is None:
-            logger_proc.log(3, 'init account from [' + path + '] ... failed')
+            logger_proc.log(3, OlivOS.L10NAPI.getTrans('init account from [{0}] ... failed', [path], modelName))
             account_conf = default_account_conf
-            logger_proc.log(2, 'init account from default ... done')
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('init account from default ... done', [], modelName))
         else:
-            logger_proc.log(2, 'init account from [' + path + '] ... done')
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('init account from [{0}] ... done', [path], modelName))
         plugin_bot_info_dict = {}
         for account_conf_account_this in account_conf['account']:
             if safe_mode and account_conf_account_this['sdk_type'] not in [
@@ -61,9 +63,12 @@ class Account(object):
             )
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
-            logger_proc.log(2, 'generate [' + str(account_conf_account_this['platform_type']) + '] account [' + str(
-                account_conf_account_this['id']) + '] as [' + bot_info_tmp.hash + '] ... done')
-        logger_proc.log(2, 'generate account ... all done')
+            logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
+                str(account_conf_account_this['platform_type']),
+                str(account_conf_account_this['id']),
+                bot_info_tmp.hash
+            ], modelName))
+        logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate account ... all done', [], modelName))
         return plugin_bot_info_dict
 
     def save(path, logger_proc, Account_data, safe_mode=False):
@@ -102,12 +107,25 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = get_free_port()
     for bot_info_dict_this in bot_info_dict:
         Account_data_this = bot_info_dict[bot_info_dict_this]
-        if Account_data_this.platform['model'] == 'gocqhttp_show':
-            if Account_data_this.post_info.auto == True:
-                Account_data_this.post_info.type = 'post'
-                Account_data_this.post_info.host = 'http://127.0.0.1'
-                Account_data_this.post_info.port = get_free_port()
-                Account_data_this.post_info.access_token = bot_info_dict_this
+        if platform.system() == 'Windows':
+            if Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList:
+                if Account_data_this.post_info.auto == True:
+                    Account_data_this.post_info.type = 'post'
+                    Account_data_this.post_info.host = 'http://127.0.0.1'
+                    Account_data_this.post_info.port = get_free_port()
+                    Account_data_this.post_info.access_token = bot_info_dict_this
+            if Account_data_this.platform['model'] in OlivOS.libWQEXEModelAPI.gCheckList:
+                if Account_data_this.post_info.auto == True:
+                    Account_data_this.post_info.type = 'websocket'
+                    Account_data_this.post_info.host = 'ws://127.0.0.1'
+                    Account_data_this.post_info.port = get_free_port()
+                    Account_data_this.post_info.access_token = bot_info_dict_this
+            if Account_data_this.platform['model'] in OlivOS.libCWCBEXEModelAPI.gCheckList:
+                if Account_data_this.post_info.auto == True:
+                    Account_data_this.post_info.type = 'websocket'
+                    Account_data_this.post_info.host = 'ws://127.0.0.1'
+                    Account_data_this.post_info.port = get_free_port()
+                    Account_data_this.post_info.access_token = bot_info_dict_this
         res[bot_info_dict_this] = Account_data_this
     return res
 

@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2021, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -19,6 +19,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import platform
 
 from . import infoAPI
+from . import L10NAPI
+from . import L10NDataAPI
 from . import bootAPI
 from . import bootDataAPI
 from . import data
@@ -31,6 +33,8 @@ from . import thirdPartyModule
 from . import accountAPI
 from . import diagnoseAPI
 from . import flaskServerAPI
+from . import onebotV12SDK
+from . import onebotV12LinkServerAPI
 from . import pluginAPI
 from . import onebotSDK
 from . import virtualTerminalSDK
@@ -61,5 +65,8 @@ from . import webTool
 if platform.system() == 'Windows':
     from . import multiLoginUIAPI
     from . import libEXEModelAPI
+    from . import libWQEXEModelAPI
+    from . import libCWCBEXEModelAPI
     from . import nativeWinUIAPI
+    from . import webviewUIAPI
 from . import userModule
