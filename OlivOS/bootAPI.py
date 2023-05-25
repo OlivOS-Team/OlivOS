@@ -638,11 +638,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
             elif rx_packet_data.action == 'restart_do':
+                Proc_type_this = Proc_dict[rx_packet_data.key].Proc_type
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
                 Proc_Proc_dict[rx_packet_data.key].join()
                 Proc_dict.pop(rx_packet_data.key)
                 Proc_Proc_dict.pop(rx_packet_data.key)
+                main_control.control_queue.put(
+                    OlivOS.API.Control.packet('init_type', Proc_type_this),
+                    block=False
+                )
             elif rx_packet_data.action == 'restart_send':
                 for tmp_Proc_name in basic_conf_models:
                     basic_conf_models_this = basic_conf_models[tmp_Proc_name]

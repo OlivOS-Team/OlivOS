@@ -71,7 +71,7 @@ class shallow(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
                  treading_mode='full', restart_gate=10000, enable_auto_restart=False):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='shallow', scan_interval=scan_interval,
+        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='plugin', scan_interval=scan_interval,
                                          dead_interval=dead_interval, rx_queue=rx_queue, tx_queue=tx_queue,
                                          control_queue=control_queue, logger_proc=logger_proc)
         if bot_info_dict is None:
@@ -145,9 +145,8 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
-                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name),
-                                                         block=False)
-                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init', self.Proc_name), block=False)
+                        self.Proc_info.control_queue.put(
+                            OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
