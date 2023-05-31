@@ -840,8 +840,6 @@ class TreeEditUI(object):
             and tmp_platform_model == 'default':
                 if tmp_id == '':
                     tmp_id = random.randint(1000000000, 9999999999)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
             if not checkByListEmptyOr([

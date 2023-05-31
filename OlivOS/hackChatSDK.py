@@ -80,7 +80,17 @@ def get_Event_from_SDK(target_event):
         platform_platform=target_event.platform['platform'],
         platform_model=target_event.platform['model']
     )
+    user_hash = None
     if target_event.sdk_event.payload.active:
+        if 'nick' in target_event.sdk_event.payload.data:
+            user_hash = OlivOS.API.getBotHash(
+                bot_id=target_event.sdk_event.payload.data['nick'],
+                platform_sdk=target_event.platform['sdk'],
+                platform_platform=target_event.platform['platform'],
+                platform_model=target_event.platform['model']
+            )
+        if 'userid' in target_event.sdk_event.payload.data:
+            user_hash = target_event.sdk_event.payload.data['userid']
         if target_event.sdk_event.payload.cmd == 'onlineSet':
             target_event.active = False
             if 'users' in target_event.sdk_event.payload.data \
@@ -93,20 +103,19 @@ def get_Event_from_SDK(target_event):
                         gBotIdDict[plugin_event_bot_hash] = str(user_this['userid'])
         elif target_event.sdk_event.payload.cmd == 'chat':
             if 'nick' in target_event.sdk_event.payload.data \
-            and 'userid' in target_event.sdk_event.payload.data \
             and 'text' in target_event.sdk_event.payload.data:
                 target_event.active = True
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     target_event.sdk_event.payload.data['text']
                 )
-                tmp_user_id = str(target_event.sdk_event.payload.data['userid'])
+                tmp_user_id = str(user_hash)
                 if plugin_event_bot_hash in gBotIdDict \
                 and tmp_user_id == gBotIdDict[plugin_event_bot_hash]:
                     target_event.plugin_info['func_type'] = 'group_message_sent'
                     target_event.data = target_event.group_message_sent(
                         str(0),
-                        str(target_event.sdk_event.payload.data['userid']),
+                        str(user_hash),
                         message_obj,
                         'group'
                     )
@@ -114,7 +123,7 @@ def get_Event_from_SDK(target_event):
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
                         str(0),
-                        str(target_event.sdk_event.payload.data['userid']),
+                        str(user_hash),
                         message_obj,
                         'group'
                     )
@@ -123,32 +132,32 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message = message_obj
                 target_event.data.raw_message_sdk = message_obj
                 target_event.data.font = None
-                target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data['userid'])
+                target_event.data.sender['user_id'] = str(user_hash)
                 target_event.data.sender['nickname'] = target_event.sdk_event.payload.data['nick']
-                target_event.data.sender['id'] = str(target_event.sdk_event.payload.data['userid'])
+                target_event.data.sender['id'] = str(user_hash)
                 target_event.data.sender['name'] = target_event.sdk_event.payload.data['nick']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
                 target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
         elif target_event.sdk_event.payload.cmd == 'onlineAdd':
-            if 'userid' in target_event.sdk_event.payload.data:
+            if True:
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_member_increase'
                 target_event.data = target_event.group_member_increase(
                     str(0),
                     str(0),
-                    str(target_event.sdk_event.payload.data['userid']),
+                    str(user_hash),
                     'approve'
                 )
         elif target_event.sdk_event.payload.cmd == 'onlineRemove':
-            if 'userid' in target_event.sdk_event.payload.data:
+            if True:
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_member_decrease'
                 target_event.data = target_event.group_member_decrease(
                     str(0),
                     str(0),
-                    str(target_event.sdk_event.payload.data['userid']),
+                    str(user_hash),
                     'leave'
                 )
 
