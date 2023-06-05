@@ -163,3 +163,10 @@ class free_port_selector:
     def close(self):
         for s in self._socket_list:
             s.close()
+
+def get_free_port():
+    "注意：本函数两次分配的端口有可能相同 (详见issue #83) 。推荐改用上方 free_port_selector 在上下文中分配端口！"
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
