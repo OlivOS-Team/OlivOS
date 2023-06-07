@@ -96,37 +96,38 @@ class Account(object):
 
 def accountFix(basic_conf_models, bot_info_dict, logger_proc):
     res = {}
-    for basic_conf_models_this in basic_conf_models:
-        if basic_conf_models[basic_conf_models_this]['type'] == 'post':
-            if basic_conf_models[basic_conf_models_this]['server']['auto'] == True:
-                basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
-                if isInuse(
-                        '127.0.0.1',
-                        basic_conf_models[basic_conf_models_this]['server']['port']
-                ):
-                    basic_conf_models[basic_conf_models_this]['server']['port'] = get_free_port()
-    for bot_info_dict_this in bot_info_dict:
-        Account_data_this = bot_info_dict[bot_info_dict_this]
-        if platform.system() == 'Windows':
-            if Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList:
-                if Account_data_this.post_info.auto == True:
-                    Account_data_this.post_info.type = 'post'
-                    Account_data_this.post_info.host = 'http://127.0.0.1'
-                    Account_data_this.post_info.port = get_free_port()
-                    Account_data_this.post_info.access_token = bot_info_dict_this
-            if Account_data_this.platform['model'] in OlivOS.libWQEXEModelAPI.gCheckList:
-                if Account_data_this.post_info.auto == True:
-                    Account_data_this.post_info.type = 'websocket'
-                    Account_data_this.post_info.host = 'ws://127.0.0.1'
-                    Account_data_this.post_info.port = get_free_port()
-                    Account_data_this.post_info.access_token = bot_info_dict_this
-            if Account_data_this.platform['model'] in OlivOS.libCWCBEXEModelAPI.gCheckList:
-                if Account_data_this.post_info.auto == True:
-                    Account_data_this.post_info.type = 'websocket'
-                    Account_data_this.post_info.host = 'ws://127.0.0.1'
-                    Account_data_this.post_info.port = get_free_port()
-                    Account_data_this.post_info.access_token = bot_info_dict_this
-        res[bot_info_dict_this] = Account_data_this
+    with free_port_selector() as g:         # 在端口选择过程中使用上下文
+        for basic_conf_models_this in basic_conf_models:
+            if basic_conf_models[basic_conf_models_this]['type'] == 'post':
+                if basic_conf_models[basic_conf_models_this]['server']['auto'] == True:
+                    basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
+                    if isInuse(
+                            '127.0.0.1',
+                            basic_conf_models[basic_conf_models_this]['server']['port']
+                    ):
+                        basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
+        for bot_info_dict_this in bot_info_dict:
+            Account_data_this = bot_info_dict[bot_info_dict_this]
+            if platform.system() == 'Windows':
+                if Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList:
+                    if Account_data_this.post_info.auto == True:
+                        Account_data_this.post_info.type = 'post'
+                        Account_data_this.post_info.host = 'http://127.0.0.1'
+                        Account_data_this.post_info.port = g.get_free_port()
+                        Account_data_this.post_info.access_token = bot_info_dict_this
+                if Account_data_this.platform['model'] in OlivOS.libWQEXEModelAPI.gCheckList:
+                    if Account_data_this.post_info.auto == True:
+                        Account_data_this.post_info.type = 'websocket'
+                        Account_data_this.post_info.host = 'ws://127.0.0.1'
+                        Account_data_this.post_info.port = g.get_free_port()
+                        Account_data_this.post_info.access_token = bot_info_dict_this
+                if Account_data_this.platform['model'] in OlivOS.libCWCBEXEModelAPI.gCheckList:
+                    if Account_data_this.post_info.auto == True:
+                        Account_data_this.post_info.type = 'websocket'
+                        Account_data_this.post_info.host = 'ws://127.0.0.1'
+                        Account_data_this.post_info.port = g.get_free_port()
+                        Account_data_this.post_info.access_token = bot_info_dict_this
+            res[bot_info_dict_this] = Account_data_this
     return res
 
 
@@ -141,8 +142,30 @@ def isInuse(ip, port):
         flag = False
     return flag
 
+class free_port_selector:
+    "对先前的端口获取函数进行二次包装，使得在上下文范围内不会重复生成套接字"
+    def __init__(self) -> None:
+        self._socket_list = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def get_free_port(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._socket_list.append(s)     # 通过在分配端口阶段维持所有套接字，理论上可以杜绝 Issue #83
+        return s.getsockname()[1]
+
+    def close(self):
+        for s in self._socket_list:
+            s.close()
 
 def get_free_port():
+    "注意：本函数两次分配的端口有可能相同 (详见issue #83) 。推荐改用上方 free_port_selector 在上下文中分配端口！"
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind(('', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
