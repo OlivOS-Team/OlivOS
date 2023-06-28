@@ -321,11 +321,9 @@ class TreeEditUI(object):
         self.UIObject = {}
         self.UIConfig = {}
         self.UIConfig.update(dictColorContext)
-        self.UIData = {'Account_data': Account_data, 'Edit_res': [
-            'none',
-            'OLDHASH',
-            None
-        ],
+        self.UIData = {
+            'Account_data': Account_data,
+            'Edit_res': ['none', 'OLDHASH', None],
             'edit_root_Combobox_platform_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_sdk_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_model_StringVar': tkinter.StringVar(),
@@ -337,28 +335,29 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_port_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Server_access_token_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
+            'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_dict': {
                 'type_list': [
-                    'QQ - GoCq - 默认',
-                    'QQ - GoCq - 安卓手机',
-                    'QQ - GoCq - 安卓平板',
-                    'QQ - GoCq - 安卓手表',
-                    'QQ - GoCq - iPad',
-                    'QQ - GoCq - iMac',
-                    'QQ - Wq - 安卓手表',
-                    'QQ - Wq - 安卓手机',
-                    'QQ - Wq - 安卓平板',
-                    '微信 - ComWeChat',
-                    'QQ - GoCq - 旧',
-                    'QQ - Wq - 旧',
+                    'QQ/GoCq/默认',
+                    'QQ/GoCq/安卓手机',
+                    'QQ/GoCq/安卓平板',
+                    'QQ/GoCq/安卓手表',
+                    'QQ/GoCq/iPad',
+                    'QQ/GoCq/iMac',
+                    'QQ/Wq/安卓手表',
+                    'QQ/Wq/安卓手机',
+                    'QQ/Wq/安卓平板',
+                    '微信/ComWeChat',
+                    'QQ/GoCq/旧',
+                    'QQ/Wq/旧',
                     'Discord',
                     'Telegram',
-                    '开黑啦 - KOOK',
-                    'B站直播间 - 游客',
-                    'B站直播间 - 登录',
-                    'QQ频道 - 公域',
-                    'QQ频道 - 私域',
-                    '渡渡语音 - Dodo',
+                    '开黑啦/KOOK',
+                    'B站直播间/游客',
+                    'B站直播间/登录',
+                    'QQ频道/公域',
+                    'QQ频道/私域',
+                    '渡渡语音/Dodo',
                     'Fanbook',
                     'Hack.Chat',
                     '虚拟终端',
@@ -369,133 +368,142 @@ class TreeEditUI(object):
                 # 各类账号组合的匹配与注册表
                 # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
                 'type_note_list': {
-                    'QQ - GoCq - 安卓手表': '密码留空即尝试使用扫码登录',
-                    'QQ - GoCq - 旧': '密码留空即尝试使用扫码登录',
-                    'QQ - Wq - 安卓手表': '密码留空即尝试使用扫码登录',
-                    'QQ - Wq - 旧': '密码留空即尝试使用扫码登录',
-                    '微信 - ComWeChat': '启动后需要再运行特定版本微信',
+                    'QQ/GoCq/安卓手表': '密码留空即尝试使用扫码登录',
+                    'QQ/GoCq/旧': '密码留空即尝试使用扫码登录',
+                    'QQ/Wq/安卓手表': '密码留空即尝试使用扫码登录',
+                    'QQ/Wq/旧': '密码留空即尝试使用扫码登录',
+                    '微信/ComWeChat': '启动后需要再运行特定版本微信',
                     'Hack.Chat': '密码可以留空'
                 },
                 'type_clear_note_list': {
-                    'QQ - GoCq - 默认': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - 安卓手机': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - 安卓平板': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - 安卓手表': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - iPad': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - iMac': './conf/gocqhttp/{bothash}',
-                    'QQ - GoCq - 旧': './conf/gocqhttp/{bothash}',
-                    'QQ - Wq - 安卓手表': './conf/walleq/{bothash}',
-                    'QQ - Wq - 安卓手机': './conf/walleq/{bothash}',
-                    'QQ - Wq - 安卓平板': './conf/walleq/{bothash}',
-                    'QQ - Wq - 旧': './conf/walleq/{bothash}'
+                    'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/安卓手机': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/安卓平板': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/安卓手表': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/iPad': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/iMac': './conf/gocqhttp/{bothash}',
+                    'QQ/GoCq/旧': './conf/gocqhttp/{bothash}',
+                    'QQ/Wq/安卓手表': './conf/walleq/{bothash}',
+                    'QQ/Wq/安卓手机': './conf/walleq/{bothash}',
+                    'QQ/Wq/安卓平板': './conf/walleq/{bothash}',
+                    'QQ/Wq/旧': './conf/walleq/{bothash}'
+                },
+                'type_extend_note_list': {
+                    'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/安卓手表': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/iPad': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/iMac': ['签名服务器', 'sign-server'],
+                    'QQ/GoCq/旧': ['签名服务器', 'sign-server']
                 },
                 'type_mapping_list': {
-                    'QQ - GoCq - 默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
+                    'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - 安卓手机': ['qq', 'onebot', 'gocqhttp_show_Android_Phone', 'True', 'post', {
+                    'QQ/GoCq/安卓手机': ['qq', 'onebot', 'gocqhttp_show_Android_Phone', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - 安卓平板': ['qq', 'onebot', 'gocqhttp_show_Android_Pad', 'True', 'post', {
+                    'QQ/GoCq/安卓平板': ['qq', 'onebot', 'gocqhttp_show_Android_Pad', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - 安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
+                    'QQ/GoCq/安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
+                    'QQ/GoCq/iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - iMac': ['qq', 'onebot', 'gocqhttp_show_iMac', 'True', 'post', {
+                    'QQ/GoCq/iMac': ['qq', 'onebot', 'gocqhttp_show_iMac', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - GoCq - 旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
+                    'QQ/GoCq/旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - 默认': ['qq', 'onebot', 'walleq_show', 'True', 'websocket', {
+                    'QQ/Wq/默认': ['qq', 'onebot', 'walleq_show', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - 安卓手机': ['qq', 'onebot', 'walleq_show_Android_Phone', 'True', 'websocket', {
+                    'QQ/Wq/安卓手机': ['qq', 'onebot', 'walleq_show_Android_Phone', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - 安卓平板': ['qq', 'onebot', 'walleq_show_Android_Pad', 'True', 'websocket', {
+                    'QQ/Wq/安卓平板': ['qq', 'onebot', 'walleq_show_Android_Pad', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - 安卓手表': ['qq', 'onebot', 'walleq_show_Android_Watch', 'True', 'websocket', {
+                    'QQ/Wq/安卓手表': ['qq', 'onebot', 'walleq_show_Android_Watch', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - iPad': ['qq', 'onebot', 'walleq_show_iPad', 'True', 'websocket', {
+                    'QQ/Wq/iPad': ['qq', 'onebot', 'walleq_show_iPad', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - iMac': ['qq', 'onebot', 'walleq_show_iMac', 'True', 'websocket', {
+                    'QQ/Wq/iMac': ['qq', 'onebot', 'walleq_show_iMac', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    'QQ - Wq - 旧': ['qq', 'onebot', 'walleq_show_old', 'True', 'websocket', {
+                    'QQ/Wq/旧': ['qq', 'onebot', 'walleq_show_old', 'True', 'websocket', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
                             # 推荐使用扫码登录时，可以隐藏密码栏
                         }
                     ],
-                    '微信 - ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
+                    '微信/ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
                             '微信号': 'edit_root_Entry_ID'
                         }
                     ],
-                    '开黑啦 - KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
+                    '开黑啦/KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
                             'Token': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'B站直播间 - 游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
+                    'B站直播间/游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
                             '直播间ID': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'B站直播间 - 登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
+                    'B站直播间/登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
                             '直播间ID': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'QQ频道 - 公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
+                    'QQ频道/公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
                             'BotAppID': 'edit_root_Entry_ID',
                             '机器人令牌': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'QQ频道 - 私域': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
+                    'QQ频道/私域': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
                             'BotAppID': 'edit_root_Entry_ID',
                             '机器人令牌': 'edit_root_Entry_Server_access_token'
                         }
@@ -508,7 +516,7 @@ class TreeEditUI(object):
                             'TOKEN': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    '渡渡语音 - Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
+                    '渡渡语音/Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
                             'BotID': 'edit_root_Entry_ID',
                             'Bot私钥': 'edit_root_Entry_Server_access_token'
                         }
@@ -711,6 +719,7 @@ class TreeEditUI(object):
             tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
             tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
             tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
+            tmp_extend = self.UIData['edit_root_Entry_Extend_StringVar'].get()
             if tmp_platform_platform == 'qq' \
             and tmp_platform_sdk == 'onebot' \
             and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList \
@@ -858,21 +867,34 @@ class TreeEditUI(object):
                     tmp_id_last = int(tmp_id)
                 except:
                     pass
+                tmp_res_bot_info = OlivOS.API.bot_info_T(
+                    id=tmp_id_last,
+                    password=tmp_password,
+                    server_auto=str2bool(tmp_server_auto),
+                    server_type=tmp_server_type,
+                    host=tmp_host,
+                    port=int(tmp_port),
+                    access_token=tmp_access_token,
+                    platform_sdk=tmp_platform_sdk,
+                    platform_platform=tmp_platform_platform,
+                    platform_model=tmp_platform_model
+                )
+                type_this = self.get_type_name(
+                    tmp_platform_platform,
+                    tmp_platform_sdk,
+                    tmp_platform_model,
+                    tmp_server_auto,
+                    tmp_server_type
+                )
+                if type_this is not None \
+                and type_this in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
+                and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
+                and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]):
+                    tmp_res_bot_info.extends[self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1]] = tmp_extend
                 self.UIData['Edit_res'] = [
                     tmp_action,
                     self.hash_key,
-                    OlivOS.API.bot_info_T(
-                        id=tmp_id_last,
-                        password=tmp_password,
-                        server_auto=str2bool(tmp_server_auto),
-                        server_type=tmp_server_type,
-                        host=tmp_host,
-                        port=int(tmp_port),
-                        access_token=tmp_access_token,
-                        platform_sdk=tmp_platform_sdk,
-                        platform_platform=tmp_platform_platform,
-                        platform_model=tmp_platform_model
-                    )
+                    tmp_res_bot_info
                 ]
             else:
                 miss_key_list = []
@@ -1092,7 +1114,8 @@ class TreeEditUI(object):
             'edit_root_Combobox_Server_auto',
             'edit_root_Combobox_Server_type',
             'edit_root_Label_type_note',
-            'edit_root_Button_type_clear_note'
+            'edit_root_Button_type_clear_note',
+            'edit_root_Entry_Extend'
         ]:
             try:
                 self.UIObject[item_this].place_forget()
@@ -1188,6 +1211,23 @@ class TreeEditUI(object):
                         action=self.action,
                         title=entry_this,
                         mode=tmp_mode
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
+                and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type]) \
+                and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type]):
+                    self.tree_edit_UI_Entry_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Entry_Extend',
+                        str_name='edit_root_Entry_Extend_StringVar',
+                        x=100,
+                        y=40 + count * (24 + 6),
+                        width=200,
+                        height=24,
+                        action=self.action,
+                        title=self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type][0],
+                        mode='NONE'
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
@@ -1287,560 +1327,53 @@ class TreeEditUI(object):
                         str(self.UIData['Account_data'][self.hash_key].post_info.port))
                     self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(
                         self.UIData['Account_data'][self.hash_key].post_info.access_token)
-
-
-class TreeEditUI_old(object):
-    def __init__(self, action, Account_data, hash_key=None, edit_commit_callback=None):
-        self.hash_key = hash_key
-        self.action = action
-        self.edit_commit_callback = edit_commit_callback
-        self.UIObject = {}
-        self.UIConfig = {'color_001': '#00A0EA', 'color_002': '#BBE9FF', 'color_003': '#40C3FF', 'color_004': '#FFFFFF',
-                         'color_005': '#000000', 'color_006': '#80D7FF'}
-        self.UIData = {'Account_data': Account_data, 'Edit_res': [
-            'none',
-            'OLDHASH',
-            None
-        ],
-            'edit_root_Combobox_platform_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_sdk_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_model_StringVar': tkinter.StringVar(),
-            'edit_root_Entry_ID_StringVar': tkinter.StringVar(),
-            'edit_root_Entry_Password_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_Server_auto_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_Server_type_StringVar': tkinter.StringVar(),
-            'edit_root_Entry_Server_host_StringVar': tkinter.StringVar(),
-            'edit_root_Entry_Server_port_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_Server_access_token_StringVar': tkinter.StringVar(),
-            'edit_root_Combobox_dict': {
-                'platform_list': [
-                    'qq',
-                    'qqGuild',
-                    'kaiheila',
-                    'telegram',
-                    'dodo',
-                    'fanbook'
-                ],
-                'platform_sdk_list': {
-                    'qq': [
-                        'onebot'
-                    ],
-                    'qqGuild': [
-                        'qqGuild_link'
-                    ],
-                    'kaiheila': [
-                        'kaiheila_link'
-                    ],
-                    'telegram': [
-                        'telegram_poll'
-                    ],
-                    'dodo': [
-                        'dodo_link'
-                        # 'dodo_poll',
-                        # 'dodobot_ea'
-                    ],
-                    'fanbook': [
-                        'fanbook_poll'
-                    ]
-                },
-                'platform_sdk_model_list': {
-                    'qq': {
-                        'onebot': [
-                            # 'gocqhttp',
-                            # 'gocqhttp_hide',
-                            'gocqhttp_show',
-                            'default'
-                        ]
-                    },
-                    'qqGuild': {
-                        'qqGuild_link': [
-                            'private',
-                            'public',
-                            'default'
-                        ]
-                    },
-                    'kaiheila': {
-                        'kaiheila_link': [
-                            'default'
-                        ]
-                    },
-                    'telegram': {
-                        'telegram_poll': [
-                            'default'
-                        ]
-                    },
-                    'dodo': {
-                        'dodo_link': [
-                            'default'
-                        ],
-                        'dodo_poll': [
-                            'default'
-                        ],
-                        'dodobot_ea': [
-                            'default'
-                        ]
-                    },
-                    'fanbook': {
-                        'fanbook_poll': [
-                            'default',
-                            'private'
-                        ]
-                    }
-                }
-            }, 'edit_root_Combobox_Server_auto_list': [
-                'True',
-                'False'
-            ], 'edit_root_Combobox_Server_type_list': [
-                'post',
-                'websocket'
-            ]}
-
-    def start(self):
-        if self.action == 'create' or self.action == 'update':
-            self.tree_edit_UI()
-        elif self.action == 'delete':
-            self.tree_edit_commit()
-
-    def tree_edit_UI(self):
-        self.UIObject['edit_root'] = tkinter.Toplevel()
-        self.UIObject['edit_root'].title('OlivOS Edit Account')
-        self.UIObject['edit_root'].geometry('400x370')
-        self.UIObject['edit_root'].resizable(
-            width=False,
-            height=False
-        )
-        self.UIObject['edit_root'].configure(bg=self.UIConfig['color_001'])
-
-        self.tree_UI_Button_init(
-            name='edit_root_Button_commit',
-            text='SAVE',
-            command=self.tree_edit_commit,
-            x=310,
-            y=40,
-            width=70,
-            height=54
-        )
-
-        self.tree_edit_UI_Entry_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Entry_ID',
-            str_name='edit_root_Entry_ID_StringVar',
-            x=100,
-            y=40,
-            width=200,
-            height=24,
-            action=self.action,
-            title='ID'
-        )
-
-        self.tree_edit_UI_Entry_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Entry_Password',
-            str_name='edit_root_Entry_Password_StringVar',
-            x=100,
-            y=70,
-            width=200,
-            height=24,
-            action=self.action,
-            title='PASSWORD',
-            mode='SAFE'
-        )
-
-        self.tree_edit_UI_Combobox_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Combobox_platform',
-            str_name='edit_root_Combobox_platform_StringVar',
-            x=100,
-            y=100,
-            width=280,
-            height=24,
-            action=self.action,
-            title='PLATFORM'
-        )
-
-        self.tree_edit_UI_Combobox_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Combobox_sdk',
-            str_name='edit_root_Combobox_sdk_StringVar',
-            x=100,
-            y=130,
-            width=280,
-            height=24,
-            action=self.action,
-            title='SDK'
-        )
-
-        self.tree_edit_UI_Combobox_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Combobox_model',
-            str_name='edit_root_Combobox_model_StringVar',
-            x=100,
-            y=160,
-            width=280,
-            height=24,
-            action=self.action,
-            title='MODEL'
-        )
-
-        self.tree_edit_UI_Combobox_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Combobox_Server_auto',
-            str_name='edit_root_Combobox_Server_auto_StringVar',
-            x=100,
-            y=190,
-            width=280,
-            height=24,
-            action=self.action,
-            title='AUTO'
-        )
-
-        self.tree_edit_UI_Combobox_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Combobox_Server_type',
-            str_name='edit_root_Combobox_Server_type_StringVar',
-            x=100,
-            y=220,
-            width=280,
-            height=24,
-            action=self.action,
-            title='TYPE'
-        )
-
-        self.tree_edit_UI_Entry_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Entry_Server_host',
-            str_name='edit_root_Entry_Server_host_StringVar',
-            x=100,
-            y=250,
-            width=280,
-            height=24,
-            action=self.action,
-            title='HOST'
-        )
-
-        self.tree_edit_UI_Entry_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Entry_Server_port',
-            str_name='edit_root_Entry_Server_port_StringVar',
-            x=100,
-            y=280,
-            width=280,
-            height=24,
-            action=self.action,
-            title='PORT'
-        )
-
-        self.tree_edit_UI_Entry_init(
-            obj_root='edit_root',
-            obj_name='edit_root_Entry_Server_access_token',
-            str_name='edit_root_Entry_Server_access_token_StringVar',
-            x=100,
-            y=310,
-            width=280,
-            height=24,
-            action=self.action,
-            title='TOKEN'
-        )
-
-        self.tree_edit_UI_Entry_update(self.action, 'init')
-        self.tree_edit_UI_Combobox_update(self.action, 'init')
-
-        self.UIObject['edit_root'].iconbitmap('./resource/tmp_favoricon.ico')
-
-        self.UIObject['edit_root'].mainloop()
-
-    def buttom_action(self, name, action):
-        if name in self.UIObject:
-            if action == '<Enter>':
-                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
-            if action == '<Leave>':
-                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
-
-    def tree_UI_Button_init(self, name, text, command, x, y, width, height):
-        self.UIObject[name] = tkinter.Button(
-            self.UIObject['edit_root'],
-            text=text,
-            command=command,
-            bd=0,
-            activebackground=self.UIConfig['color_002'],
-            activeforeground=self.UIConfig['color_001'],
-            bg=self.UIConfig['color_003'],
-            fg=self.UIConfig['color_004'],
-            relief='groove'
-        )
-        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
-        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
-        self.UIObject[name].place(
-            x=x,
-            y=y,
-            width=width,
-            height=height
-        )
-
-    def tree_edit_UI_Entry_init(self, obj_root, obj_name, str_name, x, y, width, height, action, title='', mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
-        self.UIObject[obj_name + '=Label'].place(
-            x=x - 100,
-            y=y,
-            width=100,
-            height=height
-        )
-        self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
-        )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
-        if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].place(
-            x=x,
-            y=y,
-            width=width,
-            height=height
-        )
-
-    def tree_edit_UI_Combobox_init(self, obj_root, obj_name, str_name, x, y, width, height, action, title=''):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
-        self.UIObject[obj_name + '=Label'].place(
-            x=x - 100,
-            y=y,
-            width=100,
-            height=height
-        )
-        self.UIObject[obj_name] = ttk.Combobox(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
-        )
-        self.UIObject[obj_name].place(
-            x=x,
-            y=y,
-            width=width,
-            height=height
-        )
-        self.UIObject[obj_name].configure(state='readonly')
-        self.UIObject[obj_name].bind('<<ComboboxSelected>>',
-                                     lambda x: self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name))
-
-    def tree_edit_UI_Combobox_ComboboxSelected(self, action, event, target):
-        if target == 'edit_root_Combobox_platform':
-            self.tree_edit_UI_Combobox_update(action, 'platform')
-        elif target == 'edit_root_Combobox_sdk':
-            self.tree_edit_UI_Combobox_update(action, 'sdk')
-        elif target == 'edit_root_Combobox_model':
-            self.tree_edit_UI_Combobox_update(action, 'model')
-
-    def tree_edit_UI_Combobox_update(self, action, con_action):
-        if action == 'update':
-            if self.hash_key in self.UIData['Account_data']:
-                Account_data_this = self.UIData['Account_data'][self.hash_key]
-        tmp_list_platform = self.UIData['edit_root_Combobox_dict']['platform_list']
-        self.UIObject['edit_root_Combobox_platform']['value'] = tuple(tmp_list_platform)
-        if con_action == 'init':
-            self.UIObject['edit_root_Combobox_platform'].current(0)
-            if action == 'update':
-                account_this_platform = Account_data_this.platform['platform']
-                if account_this_platform in tmp_list_platform:
-                    self.UIData['edit_root_Combobox_platform_StringVar'].set(account_this_platform)
-
-        tmp_list_sdk = self.UIData['edit_root_Combobox_dict']['platform_sdk_list'][
-            self.UIData['edit_root_Combobox_platform_StringVar'].get()
-        ]
-        self.UIObject['edit_root_Combobox_sdk']['value'] = tuple(tmp_list_sdk)
-        if con_action == 'init':
-            self.UIObject['edit_root_Combobox_sdk'].current(0)
-            if action == 'update':
-                account_this_sdk = Account_data_this.platform['sdk']
-                if account_this_sdk in tmp_list_sdk:
-                    self.UIData['edit_root_Combobox_sdk_StringVar'].set(account_this_sdk)
-        elif con_action == 'platform':
-            self.UIObject['edit_root_Combobox_sdk'].current(0)
-
-        tmp_list_model = self.UIData['edit_root_Combobox_dict']['platform_sdk_model_list'][
-            self.UIData['edit_root_Combobox_platform_StringVar'].get()
-        ][
-            self.UIData['edit_root_Combobox_sdk_StringVar'].get()
-        ]
-        self.UIObject['edit_root_Combobox_model']['value'] = tuple(tmp_list_model)
-        if con_action == 'init':
-            self.UIObject['edit_root_Combobox_model'].current(0)
-            if action == 'update':
-                account_this_model = Account_data_this.platform['model']
-                if account_this_model in tmp_list_model:
-                    self.UIData['edit_root_Combobox_model_StringVar'].set(account_this_model)
-        elif con_action == 'platform':
-            self.UIObject['edit_root_Combobox_model'].current(0)
-        elif con_action == 'sdk':
-            self.UIObject['edit_root_Combobox_model'].current(0)
-        tmp_list_server_auto = self.UIData['edit_root_Combobox_Server_auto_list']
-        self.UIObject['edit_root_Combobox_Server_auto']['value'] = tuple(tmp_list_server_auto)
-        tmp_list_server_type = self.UIData['edit_root_Combobox_Server_type_list']
-        self.UIObject['edit_root_Combobox_Server_type']['value'] = tuple(tmp_list_server_type)
-        if con_action == 'init':
-            self.UIObject['edit_root_Combobox_Server_auto'].current(0)
-            self.UIObject['edit_root_Combobox_Server_type'].current(0)
-            if action == 'update':
-                account_this_server_auto = str(Account_data_this.post_info.auto)
-                account_this_server_type = Account_data_this.post_info.type
-                if account_this_server_auto in tmp_list_server_auto:
-                    self.UIData['edit_root_Combobox_Server_auto_StringVar'].set(account_this_server_auto)
-                if account_this_server_type in tmp_list_server_type:
-                    self.UIData['edit_root_Combobox_Server_type_StringVar'].set(account_this_server_type)
-
-    def tree_edit_UI_Entry_update(self, action, con_action):
-        if con_action == 'init':
-            if action == 'update':
-                if self.hash_key in self.UIData['Account_data']:
-                    self.UIData['edit_root_Entry_ID_StringVar'].set(str(self.UIData['Account_data'][self.hash_key].id))
-                    self.UIData['edit_root_Entry_Password_StringVar'].set(
-                        self.UIData['Account_data'][self.hash_key].password)
-                    self.UIData['edit_root_Entry_Server_host_StringVar'].set(
-                        self.UIData['Account_data'][self.hash_key].post_info.host)
-                    self.UIData['edit_root_Entry_Server_port_StringVar'].set(
-                        str(self.UIData['Account_data'][self.hash_key].post_info.port))
-                    self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(
-                        self.UIData['Account_data'][self.hash_key].post_info.access_token)
-
-    def tree_edit_commit(self):
-        miss_key_list = None
-        if self.action == 'create' or self.action == 'update':
-            if self.action == 'create':
-                tmp_action = 'create'
-            elif self.action == 'update':
-                tmp_action = 'update'
-            tmp_id = self.UIData['edit_root_Entry_ID_StringVar'].get()
-            tmp_password = self.UIData['edit_root_Entry_Password_StringVar'].get()
-            tmp_server_auto = self.UIData['edit_root_Combobox_Server_auto_StringVar'].get()
-            tmp_server_type = self.UIData['edit_root_Combobox_Server_type_StringVar'].get()
-            tmp_host = self.UIData['edit_root_Entry_Server_host_StringVar'].get()
-            tmp_port = self.UIData['edit_root_Entry_Server_port_StringVar'].get()
-            tmp_access_token = self.UIData['edit_root_Entry_Server_access_token_StringVar'].get()
-            tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
-            tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
-            tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
-            if tmp_platform_platform == 'qq' and tmp_platform_sdk == 'onebot' and tmp_server_auto == 'True':
-                if tmp_host == '':
-                    tmp_host = 'http://127.0.0.1'
-                if tmp_port == '':
-                    tmp_port = '58000'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'qqGuild' and tmp_platform_sdk == 'qqGuild_link':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'kaiheila' and tmp_platform_sdk == 'kaiheila_link':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'fanbook' and tmp_platform_sdk == 'fanbook_poll':
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_poll':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if tmp_platform_platform == 'dodo' and tmp_platform_sdk == 'dodo_link':
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if not checkByListEmptyOr([
-                tmp_id,
-                tmp_server_auto,
-                tmp_server_type,
-                tmp_host,
-                tmp_port,
-                tmp_access_token,
-                tmp_platform_sdk,
-                tmp_platform_platform,
-                tmp_platform_model
-            ]):
-                self.UIData['Edit_res'] = [
-                    tmp_action,
-                    self.hash_key,
-                    OlivOS.API.bot_info_T(
-                        id=int(tmp_id),
-                        password=tmp_password,
-                        server_auto=str2bool(tmp_server_auto),
-                        server_type=tmp_server_type,
-                        host=tmp_host,
-                        port=int(tmp_port),
-                        access_token=tmp_access_token,
-                        platform_sdk=tmp_platform_sdk,
-                        platform_platform=tmp_platform_platform,
-                        platform_model=tmp_platform_model
+                    type_this = self.get_type_name(
+                        str(self.UIData['Account_data'][self.hash_key].platform['platform']),
+                        str(self.UIData['Account_data'][self.hash_key].platform['sdk']),
+                        str(self.UIData['Account_data'][self.hash_key].platform['model']),
+                        str(self.UIData['Account_data'][self.hash_key].post_info.auto),
+                        str(self.UIData['Account_data'][self.hash_key].post_info.type)
                     )
-                ]
-            else:
-                miss_key_list = []
-                tmp_check_list = [
-                    ['ID', tmp_id],
-                    ['SDK', tmp_platform_sdk],
-                    ['PLATFORM', tmp_platform_platform],
-                    ['MODEL', tmp_platform_model],
-                    ['AUTO', tmp_server_auto],
-                    ['TYPE', tmp_server_type],
-                    ['HOST', tmp_host],
-                    ['PORT', tmp_port],
-                    ['TOKEN', tmp_access_token]
-                ]
-                for tmp_check_list_this in tmp_check_list:
-                    if tmp_check_list_this[1] == '':
-                        miss_key_list.append(tmp_check_list_this[0])
-        elif self.action == 'delete':
-            self.UIData['Edit_res'] = [
-                'delete',
-                self.hash_key,
-                None
-            ]
-        self.edit_commit_callback(self.UIData['Edit_res'])
-        if self.action == 'create' or self.action == 'update':
-            if miss_key_list != None:
-                if type(miss_key_list) == list:
-                    tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(
-                        miss_key_list)
-                    messagebox.showwarning('Warning', tmp_messagebox_str)
-            else:
-                self.UIObject['edit_root'].destroy()
+                    if type_this is not None \
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
+                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
+                    and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
+                    and self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1] \
+                    in self.UIData['Account_data'][self.hash_key].extends:
+                        self.UIData['edit_root_Entry_Extend_StringVar'].set(
+                            self.UIData['Account_data'][self.hash_key].extends[
+                                self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1]
+                            ]
+                        )
+
+    def get_type_name(
+        self,
+        platform_platform,
+        platform_sdk,
+        platform_model,
+        server_auto,
+        server_type
+    ):
+        res = None
+        list_data_check = [
+            platform_platform,
+            platform_sdk,
+            platform_model,
+            server_auto,
+            server_type
+        ]
+        for type_this in self.UIData['edit_root_Combobox_dict']['type_list']:
+            flag_hit = True
+            for list_data_check_i in range(len(list_data_check)):
+                if list_data_check[list_data_check_i] \
+                != self.UIData['edit_root_Combobox_dict']['type_mapping_list'][type_this][list_data_check_i]:
+                    flag_hit = False
+                    break
+            if flag_hit:
+                break
+        if flag_hit:
+            res = type_this
+        return res
 
 
 def get_tree_force(tree_obj):

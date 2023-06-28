@@ -356,60 +356,61 @@ class goTypeConfig(object):
         self.config_file_format = {}
 
     def setConfig(self):
-        self.config_file_str = (
-            "account:\n"
-            "  uin: {uin}\n"
-            "  password: '{password}'\n"
-            "  encrypt: false\n"
-            "  status: 0\n"
-            "  relogin:\n"
-            "    disabled: false\n"
-            "    delay: 3\n"
-            "    interval: 0\n"
-            "    max-times: 0\n"
-            "  use-sso-address: true\n"
-            "\n"
-            "heartbeat:\n"
-            "  disabled: false\n"
-            "  interval: 5\n"
-            "\n"
-            "message:\n"
-            "  post-format: string\n"
-            "  ignore-invalid-cqcode: false\n"
-            "  force-fragment: false\n"
-            "  fix-url: false\n"
-            "  proxy-rewrite: ''\n"
-            "  report-self-message: true\n"
-            "  remove-reply-at: false\n"
-            "  extra-reply-data: false\n"
-            "\n"
-            "output:\n"
-            "  log-level: info\n"
-            "  debug: false\n"
-            "\n"
-            "default-middlewares: &default\n"
-            "  access-token: '{access-token}'\n"
-            "  filter: '../filter.json'\n"
-            "  rate-limit:\n"
-            "    enabled: false\n"
-            "    frequency: 1\n"
-            "    bucket: 1\n"
-            "\n"
-            "servers:\n"
-            "  - http:\n"
-            "      disabled: false\n"
-            "      host: {servers-host}\n"
-            "      port: {servers-port}\n"
-            "      timeout: 60\n"
-            "      middlewares:\n"
-            "        <<: *default\n"
-            "      post:\n"
-            "       - url: '{servers-post-url}'\n"
-            "\n"
-            "database:\n"
-            "  leveldb:\n"
-            "    enable: true\n"
-        )
+        self.config_file_str = '''
+account:
+  uin: {uin}
+  password: '{password}'
+  encrypt: false
+  status: 0
+  relogin:
+    disabled: false
+    delay: 3
+    interval: 0
+    max-times: 0
+  use-sso-address: true
+  sign-server: '{sign-server}'
+
+heartbeat:
+  disabled: false
+  interval: 5
+
+message:
+  post-format: string
+  ignore-invalid-cqcode: false
+  force-fragment: false
+  fix-url: false
+  proxy-rewrite: ''
+  report-self-message: true
+  remove-reply-at: false
+  extra-reply-data: false
+
+output:
+  log-level: info
+  debug: false
+
+default-middlewares: &default
+  access-token: '{access-token}'
+  filter: '../filter.json'
+  rate-limit:
+    enabled: false
+    frequency: 1
+    bucket: 1
+
+servers:
+  - http:
+      disabled: false
+      host: {servers-host}
+      port: {servers-port}
+      timeout: 60
+      middlewares:
+        <<: *default
+      post:
+       - url: '{servers-post-url}'
+
+database:
+  leveldb:
+    enable: true
+'''
 
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['password'] = self.bot_info_dict.password
@@ -429,6 +430,10 @@ class goTypeConfig(object):
         self.config_file_format['servers-port'] = str(self.bot_info_dict.post_info.port)
         self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(
             self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
+        self.config_file_format['sign-server'] = '-'
+        if 'sign-server' in self.bot_info_dict.extends \
+        and '' != self.bot_info_dict.extends['sign-server']:
+            self.config_file_format['sign-server'] = str(self.bot_info_dict.extends['sign-server'])
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 

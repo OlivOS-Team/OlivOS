@@ -59,6 +59,7 @@ class bot_info_T(object):
             port=port,
             access_token=access_token
         )
+        self.extends = {}
         self.debug_mode = False
         self.getHash()
 

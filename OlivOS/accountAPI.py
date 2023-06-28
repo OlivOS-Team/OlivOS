@@ -61,6 +61,9 @@ class Account(object):
                 platform_platform=account_conf_account_this['platform_type'],
                 platform_model=account_conf_account_this['model_type']
             )
+            if 'extends' in account_conf_account_this \
+            and dict is type(account_conf_account_this['extends']):
+                bot_info_tmp.extends = account_conf_account_this['extends']
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
             logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
@@ -75,7 +78,7 @@ class Account(object):
         tmp_total_account_data = {}
         tmp_total_account_data['account'] = []
         for Account_data_this_key in Account_data:
-            Account_data_this = Account_data[Account_data_this_key]
+            Account_data_this:OlivOS.API.bot_info_T = Account_data[Account_data_this_key]
             tmp_this_account_data = {}
             tmp_this_account_data['id'] = Account_data_this.id
             tmp_this_account_data['password'] = Account_data_this.password
@@ -88,6 +91,7 @@ class Account(object):
             tmp_this_account_data['server']['host'] = Account_data_this.post_info.host
             tmp_this_account_data['server']['port'] = Account_data_this.post_info.port
             tmp_this_account_data['server']['access_token'] = Account_data_this.post_info.access_token
+            tmp_this_account_data['extends'] = Account_data_this.extends
             tmp_this_account_data['debug'] = Account_data_this.debug_mode
             tmp_total_account_data['account'].append(tmp_this_account_data)
         with open(path, 'w', encoding='utf-8') as account_conf_f:
