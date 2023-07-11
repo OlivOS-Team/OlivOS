@@ -281,9 +281,9 @@ class API(object):
             def __init__(self):
                 self.file = None
 
-        def do_api(self, req_type='POST'):
+        def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
             try:
-                tmp_payload_dict = {'file': (str(uuid.uuid4()) + '.png', self.data.file, 'image/png')}
+                tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
                 payload = MultipartEncoder(
                     fields=tmp_payload_dict
                 )
@@ -341,6 +341,24 @@ def get_message_obj(target_event):
                 'olivos_para',
                 [
                     OlivOS.messageAPI.PARA.image(file=target_event.sdk_event.payload.data.d['content'])
+                ]
+            )
+        elif 3 == target_event.sdk_event.payload.data.d['type'] \
+        and 'content' in target_event.sdk_event.payload.data.d:
+            flag_hit = True
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [
+                    OlivOS.messageAPI.PARA.video(file=target_event.sdk_event.payload.data.d['content'])
+                ]
+            )
+        elif 8 == target_event.sdk_event.payload.data.d['type'] \
+        and 'content' in target_event.sdk_event.payload.data.d:
+            flag_hit = True
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [
+                    OlivOS.messageAPI.PARA.record(file=target_event.sdk_event.payload.data.d['content'])
                 ]
             )
     if not flag_hit:
@@ -484,8 +502,18 @@ class event_action(object):
         if this_msg is None:
             return
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
-                image_path = event_action.setImageUploadFast(target_event, message_this.data['file'])
+            if type(message_this) == OlivOS.messageAPI.PARA.text:
+                res_data['modules'].append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "plain-text",
+                            "content": message_this.data['text']
+                        }
+                    }
+                )
+            elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
                 res_data['modules'].append(
                     {
                         "type": "image-group",
@@ -497,14 +525,22 @@ class event_action(object):
                         ]
                     }
                 )
-            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+            elif type(message_this) == OlivOS.messageAPI.PARA.video:
+                video_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'videos')
                 res_data['modules'].append(
                     {
-                        "type": "section",
-                        "text": {
-                            "type": "plain-text",
-                            "content": message_this.data['text']
-                        }
+                        "type": "video",
+                        "title": "video.mp4",
+                        "src": video_path
+                    }
+                )
+            elif type(message_this) == OlivOS.messageAPI.PARA.record:
+                audio_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'audios')
+                res_data['modules'].append(
+                    {
+                        "type": "audio",
+                        "title": "audio.mp4",
+                        "src": audio_path
                     }
                 )
         if len(res_data['modules']) > 0:
@@ -577,8 +613,14 @@ class event_action(object):
         return res_data
 
     # 现场上传的就地实现
-    def setImageUploadFast(target_event, url: str):
+    def setResourceUploadFast(target_event, url: str, type_path: str = 'images'):
         res = None
+        check_list = {
+            'images': ['.png', 'image/png'],
+            'videos': ['.mp4', 'video/mp4'],
+            'audios': ['.mp3', 'audio/mp3']
+        }
+        check_list.setdefault(type_path, ['', 'file/*'])
         try:
             pic_file = None
             if url.startswith("base64://"):
@@ -596,13 +638,13 @@ class event_action(object):
                     pic_file = msg_res.content
                 else:
                     file_path = url_parsed.path
-                    file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+                    file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
                     with open(file_path, "rb") as f:
                         pic_file = f.read()
 
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
             msg_upload_api.data.file = pic_file
-            msg_upload_api.do_api()
+            msg_upload_api.do_api('POST', check_list[type_path])
             if msg_upload_api.res is not None:
                 msg_upload_api_obj = json.loads(msg_upload_api.res)
                 if 'code' in msg_upload_api_obj \

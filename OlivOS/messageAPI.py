@@ -776,7 +776,7 @@ class PARA(object):
 
     class video(PARA_templet):
         def __init__(self, file, url=None, cache=None, proxy=None, timeout=None):
-            PARA_templet.__init__(self, 'record', self.data_T(file, url, cache, proxy, timeout))
+            PARA_templet.__init__(self, 'video', self.data_T(file, url, cache, proxy, timeout))
 
         class data_T(dict):
             def __init__(self, file, url, cache, proxy, timeout):
