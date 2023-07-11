@@ -338,10 +338,10 @@ class TreeEditUI(object):
             'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_dict': {
                 'type_list': [
-                    'QQ/GoCq/默认',
+                    'QQ/GoCq/安卓手表',
                     'QQ/GoCq/安卓手机',
                     'QQ/GoCq/安卓平板',
-                    'QQ/GoCq/安卓手表',
+                    'QQ/GoCq/默认',
                     'QQ/GoCq/iPad',
                     'QQ/GoCq/iMac',
                     'QQ/Wq/安卓手表',
@@ -360,6 +360,8 @@ class TreeEditUI(object):
                     '渡渡语音/Dodo',
                     'Fanbook',
                     'Hack.Chat',
+                    'onebotV11/Http',
+                    'onebotV12/正向WS',
                     '虚拟终端',
                     '接口终端',
                     'FF14终端',
@@ -398,6 +400,20 @@ class TreeEditUI(object):
                     'QQ/GoCq/旧': ['签名服务器', 'sign-server']
                 },
                 'type_mapping_list': {
+                    'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '地址': 'edit_root_Entry_Server_host',
+                            '端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            '地址': 'edit_root_Entry_Server_host',
+                            '端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
                     'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '密码': 'edit_root_Entry_Password',
@@ -1132,19 +1148,21 @@ class TreeEditUI(object):
                 self.UIObject['edit_root_Combobox_Account_type'].current(0)
             if action == 'update':
                 if self.hash_key in self.UIData['Account_data']:
-                    Account_data_this = self.UIData['Account_data'][self.hash_key]
+                    Account_data_this:OlivOS.API.bot_info_T = self.UIData['Account_data'][self.hash_key]
                 tmp_list_match_old = self.UIData['edit_root_Combobox_dict']['type_mapping_list']
                 tmp_list_match = {}
                 tmp_list_data = [
                     Account_data_this.platform['platform'],
                     Account_data_this.platform['sdk'],
-                    Account_data_this.platform['model']
+                    Account_data_this.platform['model'],
+                    Account_data_this.post_info.auto,
+                    Account_data_this.post_info.type
                 ]
-                for index in [0, 1, 2]:
+                for index in [0, 1, 2, 3, 4]:
                     tmp_list_match = {}
                     for tmp_list_match_old_this in tmp_list_match_old:
-                        if tmp_list_match_old_this != '自定义' and tmp_list_data[index] == \
-                                tmp_list_match_old[tmp_list_match_old_this][index]:
+                        if tmp_list_match_old_this != '自定义' \
+                        and str(tmp_list_data[index]) == str(tmp_list_match_old[tmp_list_match_old_this][index]):
                             tmp_list_match[tmp_list_match_old_this] = tmp_list_match_old[tmp_list_match_old_this]
                     tmp_list_match_old = tmp_list_match
                 if len(tmp_list_match) > 0:
