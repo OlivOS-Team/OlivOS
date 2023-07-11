@@ -18,7 +18,11 @@ import sys
 import json
 import requests as req
 import time
+from requests_toolbelt import MultipartEncoder
+import uuid
 import traceback
+import base64
+from urllib import parse
 
 import OlivOS
 
@@ -34,7 +38,8 @@ sdkAPIRoute = {
     'user-chat': '/user-chat',
     'direct-message': '/direct-message',
     'user': '/user',
-    'gateway': '/gateway'
+    'gateway': '/gateway',
+    'asset': '/asset'
 }
 
 sdkAPIRouteTemp = {}
@@ -263,6 +268,46 @@ class API(object):
                 self.user_id = '-1'
                 self.guild_id = None
 
+    class setResourcePictureUpload(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['asset'] + '/create'
+
+        class data_T(object):
+            def __init__(self):
+                self.file = None
+
+        def do_api(self, req_type='POST'):
+            try:
+                tmp_payload_dict = {'file': (str(uuid.uuid4()) + '.png', self.data.file, 'image/png')}
+                payload = MultipartEncoder(
+                    fields=tmp_payload_dict
+                )
+
+                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+                send_url_temp = self.host + self.route
+                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+                headers = {
+                    'Content-Type': payload.content_type,
+                    'Content-Length': str(len(self.data.file)),
+                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                    'Authorization': 'Bot %s' % self.bot_info.access_token
+                }
+
+                msg_res = None
+                if req_type == 'POST':
+                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+
+                self.res = msg_res.text
+                return msg_res.text
+            except Exception as e:
+                traceback.print_exc()
+                return None
+
 
 def get_kmarkdown_message_raw(data: dict):
     res = data['raw_content']
@@ -378,7 +423,8 @@ def get_Event_from_SDK(target_event):
                             target_event.active = False
                     else:
                         target_event.active = False
-                except:
+                except Exception as e:
+                    traceback.print_exc()
                     target_event.active = False
         elif target_event.sdk_event.payload.data.d['channel_type'] == 'PERSON':
             message_obj = get_message_obj(target_event)
@@ -439,13 +485,14 @@ class event_action(object):
             return
         for message_this in message.data:
             if type(message_this) == OlivOS.messageAPI.PARA.image:
+                image_path = event_action.setImageUploadFast(target_event, message_this.data['file'])
                 res_data['modules'].append(
                     {
                         "type": "image-group",
                         "elements": [
                             {
                                 "type": "image",
-                                "src": message_this.data['file']
+                                "src": image_path
                             }
                         ]
                     }
@@ -528,6 +575,45 @@ class event_action(object):
         except:
             res_data['active'] = False
         return res_data
+
+    # 现场上传的就地实现
+    def setImageUploadFast(target_event, url: str):
+        res = None
+        try:
+            pic_file = None
+            if url.startswith("base64://"):
+                data = url[9:]
+                pic_file = base64.decodebytes(data.encode("utf-8"))
+            else:
+                url_parsed = parse.urlparse(url)
+                if url_parsed.scheme in ["http", "https"]:
+                    send_url = url
+                    headers = {
+                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
+                    }
+                    msg_res = None
+                    msg_res = req.request("GET", send_url, headers=headers)
+                    pic_file = msg_res.content
+                else:
+                    file_path = url_parsed.path
+                    file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+                    with open(file_path, "rb") as f:
+                        pic_file = f.read()
+
+            msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
+            msg_upload_api.data.file = pic_file
+            msg_upload_api.do_api()
+            if msg_upload_api.res is not None:
+                msg_upload_api_obj = json.loads(msg_upload_api.res)
+                if 'code' in msg_upload_api_obj \
+                and 0 == msg_upload_api_obj['code'] \
+                and 'data' in msg_upload_api_obj \
+                and 'url' in msg_upload_api_obj['data']:
+                    res = msg_upload_api_obj['data']['url']
+        except Exception as e:
+            traceback.print_exc()
+            res = None
+        return res
 
 
 def init_api_json(raw_str):
