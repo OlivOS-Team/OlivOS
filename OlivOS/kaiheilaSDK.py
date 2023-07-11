@@ -18,6 +18,7 @@ import sys
 import json
 import requests as req
 import time
+import traceback
 
 import OlivOS
 
@@ -267,6 +268,49 @@ def get_kmarkdown_message_raw(data: dict):
     res = data['raw_content']
     return res
 
+def get_message_obj(target_event):
+    flag_hit = False
+    if 'type' in target_event.sdk_event.payload.data.d:
+        if 1 == target_event.sdk_event.payload.data.d['type'] \
+        and 'content' in target_event.sdk_event.payload.data.d:
+            flag_hit = True
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'kaiheila_string',
+                target_event.sdk_event.payload.data.d['content']
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+        elif 9 == target_event.sdk_event.payload.data.d['type'] \
+        and 'content' in target_event.sdk_event.payload.data.d:
+            flag_hit = True
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'kaiheila_string',
+                target_event.sdk_event.payload.data.d['content']
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+        elif 2 == target_event.sdk_event.payload.data.d['type'] \
+        and 'content' in target_event.sdk_event.payload.data.d:
+            flag_hit = True
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [
+                    OlivOS.messageAPI.PARA.image(file=target_event.sdk_event.payload.data.d['content'])
+                ]
+            )
+    if not flag_hit:
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_para',
+            []
+        )
+        message_obj.active = False
+    else:
+        try:
+            message_obj.init_data()
+        except:
+            message_obj.active = False
+            message_obj.data = []
+    return message_obj
 
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
@@ -297,60 +341,11 @@ def get_Event_from_SDK(target_event):
             pass
     if 'channel_type' in target_event.sdk_event.payload.data.d:
         if target_event.sdk_event.payload.data.d['channel_type'] == 'GROUP':
-            message_obj = None
-            flag_have_image = False
-            if 'extra' in target_event.sdk_event.payload.data.d:
-                if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
-                    if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
-                        attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
-                        if 'type' in attachments_this:
-                            if attachments_this['type'].startswith('image'):
-                                flag_have_image = True
-                                message_obj = OlivOS.messageAPI.Message_templet(
-                                    'olivos_para',
-                                    []
-                                )
-                                message_obj.data_raw.append(
-                                    OlivOS.messageAPI.PARA.image(
-                                        '%s' % attachments_this['url']
-                                    )
-                                )
-                elif 'kmarkdown' in target_event.sdk_event.payload.data.d['extra']:
-                    if type(target_event.sdk_event.payload.data.d['extra']['kmarkdown']) == dict:
-                        attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
-                        if attachments_this['raw_content'] != '':
-                            message_obj = OlivOS.messageAPI.Message_templet(
-                                'olivos_string',
-                                get_kmarkdown_message_raw(attachments_this)
-                            )
-                            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                            message_obj.data_raw = message_obj.data.copy()
-                        else:
-                            message_obj = OlivOS.messageAPI.Message_templet(
-                                'olivos_para',
-                                []
-                            )
-            if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
-                if target_event.sdk_event.payload.data.d['content'] != '':
-                    message_obj = OlivOS.messageAPI.Message_templet(
-                        'kaiheila_string',
-                        target_event.sdk_event.payload.data.d['content']
-                    )
-                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                    message_obj.data_raw = message_obj.data.copy()
-                else:
-                    message_obj = OlivOS.messageAPI.Message_templet(
-                        'olivos_para',
-                        []
-                    )
-            try:
-                message_obj.init_data()
-            except:
-                message_obj.active = False
-                message_obj.data = []
+            message_obj = get_message_obj(target_event)
             if message_obj.active:
                 try:
-                    if target_event.sdk_event.payload.data.d['extra']['type'] in [1, 9]:
+                    if 'extra' in target_event.sdk_event.payload.data.d \
+                    and 'type' in target_event.sdk_event.payload.data.d:
                         target_event.active = True
                         target_event.plugin_info['func_type'] = 'group_message'
                         target_event.data = target_event.group_message(
@@ -386,60 +381,11 @@ def get_Event_from_SDK(target_event):
                 except:
                     target_event.active = False
         elif target_event.sdk_event.payload.data.d['channel_type'] == 'PERSON':
-            message_obj = None
-            flag_have_image = False
-            if 'extra' in target_event.sdk_event.payload.data.d:
-                if 'attachments' in target_event.sdk_event.payload.data.d['extra']:
-                    if type(target_event.sdk_event.payload.data.d['extra']['attachments']) == dict:
-                        attachments_this = target_event.sdk_event.payload.data.d['extra']['attachments']
-                        if 'type' in attachments_this:
-                            if attachments_this['type'].startswith('image'):
-                                flag_have_image = True
-                                message_obj = OlivOS.messageAPI.Message_templet(
-                                    'olivos_para',
-                                    []
-                                )
-                                message_obj.data_raw.append(
-                                    OlivOS.messageAPI.PARA.image(
-                                        '%s' % attachments_this['url']
-                                    )
-                                )
-                elif 'kmarkdown' in target_event.sdk_event.payload.data.d['extra']:
-                    if type(target_event.sdk_event.payload.data.d['extra']['kmarkdown']) == dict:
-                        attachments_this = target_event.sdk_event.payload.data.d['extra']['kmarkdown']
-                        if attachments_this['raw_content'] != '':
-                            message_obj = OlivOS.messageAPI.Message_templet(
-                                'olivos_string',
-                                get_kmarkdown_message_raw(attachments_this)
-                            )
-                            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                            message_obj.data_raw = message_obj.data.copy()
-                        else:
-                            message_obj = OlivOS.messageAPI.Message_templet(
-                                'olivos_para',
-                                []
-                            )
-            if not flag_have_image and 'content' in target_event.sdk_event.payload.data.d:
-                if target_event.sdk_event.payload.data.d['content'] != '':
-                    message_obj = OlivOS.messageAPI.Message_templet(
-                        'kaiheila_string',
-                        target_event.sdk_event.payload.data.d['content']
-                    )
-                    message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                    message_obj.data_raw = message_obj.data.copy()
-                else:
-                    message_obj = OlivOS.messageAPI.Message_templet(
-                        'olivos_para',
-                        []
-                    )
-            try:
-                message_obj.init_data()
-            except:
-                message_obj.active = False
-                message_obj.data = []
+            message_obj = get_message_obj(target_event)
             if message_obj.active:
                 try:
-                    if target_event.sdk_event.payload.data.d['extra']['type'] in [1, 9]:
+                    if 'extra' in target_event.sdk_event.payload.data.d \
+                    and 'type' in target_event.sdk_event.payload.data.d:
                         target_event.active = True
                         target_event.plugin_info['func_type'] = 'private_message'
                         target_event.data = target_event.private_message(
@@ -469,7 +415,8 @@ def get_Event_from_SDK(target_event):
                             target_event.active = False
                     else:
                         target_event.active = False
-                except:
+                except Exception as e:
+                    traceback.print_exc()
                     target_event.active = False
 
 
