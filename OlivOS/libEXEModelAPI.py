@@ -369,6 +369,8 @@ account:
     max-times: 0
   use-sso-address: true
   sign-server: '{sign-server}'
+  is-below-110: {is-below-110}
+  key: '{key}'
 
 heartbeat:
   disabled: false
@@ -434,6 +436,12 @@ database:
         if 'sign-server' in self.bot_info_dict.extends \
         and '' != self.bot_info_dict.extends['sign-server']:
             self.config_file_format['sign-server'] = str(self.bot_info_dict.extends['sign-server'])
+        self.config_file_format['is-below-110'] = 'true'
+        self.config_file_format['key'] = ''
+        if 'key' in self.bot_info_dict.extends \
+        and '' != self.bot_info_dict.extends['key']:
+            self.config_file_format['is-below-110'] = 'false'
+            self.config_file_format['key'] = str(self.bot_info_dict.extends['key'])
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 

@@ -336,6 +336,11 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_access_token_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
+            'edit_root_Entry_Extend2_StringVar': tkinter.StringVar(),
+            'edit_root_Entry_Extend_list': [
+                'edit_root_Entry_Extend',
+                'edit_root_Entry_Extend2'
+            ],
             'edit_root_Combobox_dict': {
                 'type_list': [
                     'QQ/GoCq/安卓手表',
@@ -398,6 +403,24 @@ class TreeEditUI(object):
                     'QQ/GoCq/iPad': ['签名服务器', 'sign-server'],
                     'QQ/GoCq/iMac': ['签名服务器', 'sign-server'],
                     'QQ/GoCq/旧': ['签名服务器', 'sign-server']
+                },
+                'type_extends_name_note_list': {
+                    'QQ/GoCq/默认': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/安卓手表': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/iPad': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/iMac': ['签名服务器', 'KEY'],
+                    'QQ/GoCq/旧': ['签名服务器', 'KEY']
+                },
+                'type_extends_note_list': {
+                    'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/安卓手表': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/iPad': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/iMac': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'}
                 },
                 'type_mapping_list': {
                     'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post', {
@@ -736,6 +759,7 @@ class TreeEditUI(object):
             tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
             tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
             tmp_extend = self.UIData['edit_root_Entry_Extend_StringVar'].get()
+            tmp_extends = [self.UIData[edit_root_Entry_Extend_this + '_StringVar'].get() for edit_root_Entry_Extend_this in self.UIData['edit_root_Entry_Extend_list']]
             if tmp_platform_platform == 'qq' \
             and tmp_platform_sdk == 'onebot' \
             and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList \
@@ -903,10 +927,16 @@ class TreeEditUI(object):
                     tmp_server_type
                 )
                 if type_this is not None \
-                and type_this in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
-                and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
-                and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]):
-                    tmp_res_bot_info.extends[self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1]] = tmp_extend
+                and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
+                and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
+                and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this]) \
+                and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]):
+                    tmp_offset = 0
+                    for tmp_Entry_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]:
+                        if tmp_offset >= len(tmp_extends):
+                            break
+                        tmp_res_bot_info.extends[self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]] = tmp_extends[tmp_offset]
+                        tmp_offset += 1
                 self.UIData['Edit_res'] = [
                     tmp_action,
                     self.hash_key,
@@ -1131,7 +1161,8 @@ class TreeEditUI(object):
             'edit_root_Combobox_Server_type',
             'edit_root_Label_type_note',
             'edit_root_Button_type_clear_note',
-            'edit_root_Entry_Extend'
+            'edit_root_Entry_Extend',
+            'edit_root_Entry_Extend2'
         ]:
             try:
                 self.UIObject[item_this].place_forget()
@@ -1232,23 +1263,31 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
-                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
-                and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type]) \
-                and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type]):
-                    self.tree_edit_UI_Entry_init(
-                        obj_root='edit_root',
-                        obj_name='edit_root_Entry_Extend',
-                        str_name='edit_root_Entry_Extend_StringVar',
-                        x=100,
-                        y=40 + count * (24 + 6),
-                        width=200,
-                        height=24,
-                        action=self.action,
-                        title=self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][tmp_type][0],
-                        mode='NONE'
-                    )
-                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
-                    count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
+                and tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
+                and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type])\
+                and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type]):
+                    tmp_offset = 0
+                    self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type]
+                    for Entry_Extend_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type]:
+                        if Entry_Extend_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type]:
+                            if tmp_offset >= len(self.UIData['edit_root_Entry_Extend_list']):
+                                break
+                            self.tree_edit_UI_Entry_init(
+                                obj_root='edit_root',
+                                obj_name=self.UIData['edit_root_Entry_Extend_list'][tmp_offset],
+                                str_name=self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar',
+                                x=100,
+                                y=40 + count * (24 + 6),
+                                width=200,
+                                height=24,
+                                action=self.action,
+                                title=Entry_Extend_this,
+                                mode='NONE'
+                            )
+                            self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                            count += 1
+                            tmp_offset += 1
                 if tmp_type in self.UIData['edit_root_Combobox_dict']['type_note_list']:
                     self.tree_edit_UI_Label_init(
                         obj_root='edit_root',
@@ -1353,16 +1392,21 @@ class TreeEditUI(object):
                         str(self.UIData['Account_data'][self.hash_key].post_info.type)
                     )
                     if type_this is not None \
-                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extend_note_list'] \
-                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
-                    and 2 == len(self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this]) \
-                    and self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1] \
-                    in self.UIData['Account_data'][self.hash_key].extends:
-                        self.UIData['edit_root_Entry_Extend_StringVar'].set(
-                            self.UIData['Account_data'][self.hash_key].extends[
-                                self.UIData['edit_root_Combobox_dict']['type_extend_note_list'][type_this][1]
-                            ]
-                        )
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
+                    and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this]) \
+                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]):
+                        tmp_offset = 0
+                        for tmp_Entry_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]:
+                            if tmp_offset >= len(self.UIData['edit_root_Entry_Extend_list']):
+                                break
+                            self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set(
+                                self.UIData['Account_data'][self.hash_key].extends[
+                                    self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]
+                                ]
+                            )
+                            tmp_offset += 1
+
 
     def get_type_name(
         self,
