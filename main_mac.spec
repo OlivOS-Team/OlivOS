@@ -33,5 +33,5 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           upx_exclude=[],
-          runtime_tmpdir=None,
+          runtime_tmpdir='./runtime/',
           console=True , icon='resource/favoricon.ico')
