@@ -6,7 +6,7 @@ requests
 pybase64
 websockets
 websocket-client
-pillow
+pillow==9.3.0
 lxml
 rsa
 requests_toolbelt
