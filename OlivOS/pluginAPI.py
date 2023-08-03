@@ -91,6 +91,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
+        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(logger_proc, max_thread=None, timeout=dead_interval)
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -652,11 +653,12 @@ class shallow(OlivOS.API.Proc_templet):
                                     )
                                     removeDir(plugin_path_tmp + plugin_dir_this)
                                     plugin_dir_this = plugin_namespace
+                            # 完成插件数据库中对应命名空间的表格页初始化
+                            self.database._init_namespace( plugin_models_dict_this['namespace'])
                             plugin_models_dict[plugin_dir_this] = {
                                 'isOPK': flag_is_opk,
                                 'data': plugin_models_dict_this
                             }
-
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
