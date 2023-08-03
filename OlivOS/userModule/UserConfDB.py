@@ -39,18 +39,18 @@ DATABASE_SQL = {
 # CREATE
     # 每个插件预先在总表中
     "create.table.master": """\
-CREATE TABLE IF NOT EXISTS table_master{
-    'hash_namespace'        TEXT        PRIMARY KEY,
-    'str_namespace'         TEXT        UNIQUE,
-    'time_last_update'      DATETIME    DEFAULT CURRENT_TIMESTAMP
-};""",
+CREATE TABLE IF NOT EXISTS table_master(
+    hash_namespace        TEXT        PRIMARY KEY,
+    str_namespace         TEXT        UNIQUE,
+    time_last_update      DATETIME    DEFAULT CURRENT_TIMESTAMP
+);""",
     "create.table.namespace": """\
-CREATE TABLE IF NOT EXISTS table_namespace_{namespace_hash}{
-    'hash_key_basic'            TEXT,
-    'str_key_conf_name'         TEXT,
-    'raw_value'                 BLOB,
-    (str_key_basic_hash, str_key_conf_name)     PRIMARY KEY
-};""",
+CREATE TABLE IF NOT EXISTS table_namespace_{namespace_hash}(
+    hash_key_basic            TEXT,
+    str_key_conf_name         TEXT,
+    raw_value                 BLOB,
+    PRIMARY KEY (hash_key_basic, str_key_conf_name)
+);""",
     # 创建一个触发器，当某个插件对应的命名空间有更新的时候，更新主表中对应插件的那一行
     "create.trigger.namespace": """\
 CREATE TRIGGER IF NOT EXISTS trigger_namespace_{namespace_hash}
@@ -59,7 +59,7 @@ FOR EACH ROW
 BEGIN
     UPDATE OR IGNORE table_master
     SET time_last_update = CURRENT_TIMESTAMP
-    WHERE hash_namespace = {namespace_hash}
+    WHERE hash_namespace = {namespace_hash};
 END;
 """,
 
@@ -132,22 +132,27 @@ class DataBaseAPI:
         self.cache = {}
         self.namespace_list = []
         self._thread_pool = PoolExecutor(max_thread, initializer=self.__init_thread)
-        self._conn_all = []
-        self._init_database
+        self._conn_all = {}
+        self._init_database()
+        # atexit.register(self.stop)
 
 
     def __init_thread(self):
         "线程池中每个线程的初始化过程，进行数据库连接"
-        data = threading.local()
-        data.conn = sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout)
-        self._conn_all.append(data.conn)
+        name = threading.current_thread().name
+        conn= sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout, check_same_thread=False)
+        self._conn_all[name] = conn
+        # print(self._conn_all)
+        self.proc_log(0, f"thread init <{name}>")
 
     def __run_sql_thread(self, script_list):
         "具体的运行函数，传入的是形如 `[(sql, param), (sql, param), (sql, param)]` 的操作指令队列"
-        data = threading.local()
-        with self._sqlconn(data.conn) as cur:
+        name = threading.current_thread().name
+        conn = self._conn_all[name]
+        with self._sqlconn(conn) as cur:
             res = {}
             for data in script_list:
+                self.proc_log(0, str(data))
                 if isinstance(data, str):
                     sql = data
                     cur.execute(sql)
@@ -156,8 +161,14 @@ class DataBaseAPI:
                     sql = data[0]
                     param = data[1]
                     cur.execute(sql, param)
-                    res[(sql, param)] = cur.fetchall()
+                    res[str((sql, param))] = cur.fetchall()
             return res
+
+    def __stop_sql_thread(self, *arg):
+        name = threading.current_thread().name
+        conn = self._conn_all[name]
+        conn.close()
+        self.proc_log(0, f"thread stop <{name}>")
 
     def _init_database(self):
         "对数据库进行总体初始化"
@@ -168,10 +179,10 @@ class DataBaseAPI:
         ]
         res = self._execmany(sql_list)
         namespace_sql = res[DATABASE_SQL["select.master.namespace"]]
-        svn = res[DATABASE_SQL["pragma.get.version"]]
+        svn = res[DATABASE_SQL["pragma.get.version"]][0][0]
         if svn != DATABASE_SVN:
             if svn == 0:
-                self._exec(DATABASE_SQL["pragma.set.version"], DATABASE_SVN)
+                self._exec(DATABASE_SQL["pragma.set.version"].format(ver=DATABASE_SVN))
             else:
                 self.proc_log(3, "用户自定义数据库版本不符合，数据库版本为{0}，OlivOS中所需版本为{1}".format(svn, DATABASE_SVN))
         for i in namespace_sql:
@@ -204,17 +215,20 @@ class DataBaseAPI:
         r = self._thread_pool.submit(self.__run_sql_thread, sql_list)
         return r.result(self.timeout)
 
-    def _exec(self, sql, param=None, *, blocking=True):
+    def _exec(self, sql, param=None):
         """
         低层次接口函数，直接运行对应的 sql 指令，完成数据库操作
         
         如果 `blocking=False` 则直接返回 concurrent.futures.Future 对象
         """
-        r = self._thread_pool.submit(self.__run_sql_thread, [(sql, param)])
-        if blocking:
-            return r.result(self.timeout)[(sql, param)]
+        if param is None:
+            r = self._thread_pool.submit(self.__run_sql_thread, [sql,])
+            return r.result(self.timeout)[sql]
         else:
-            return r
+            r = self._thread_pool.submit(self.__run_sql_thread, [str((sql, param))])
+            return r.result(self.timeout)[str((sql, param))]
+        # else:
+        #     return r
 
     def clean_cache(self):
         "清空 cache 中的内容，同时运行垃圾回收（由于是直接赋值然后去垃圾回收，属于原子操作，不用管多线程）"
@@ -223,7 +237,7 @@ class DataBaseAPI:
 
     def stop(self):
         self._thread_pool.shutdown()
-        for conn in self._conn_all:
+        for conn in self._conn_all.values():
             conn.close()
     
     def get_config(self, key: str, basic_hashed=None, namespace=None, *, default_value=None):
@@ -259,8 +273,8 @@ class DataBaseAPI:
         if len(res) == 0:
             return default_value
         else:
-            self.cache[cache_key] = res[0][0]
-            return res[0][0]
+            self.cache[cache_key] = res[str((sql_this, param))][0][0]
+            return res[str((sql_this, param))][0][0]
 
     def set_config(self, key: str, value, basic_hashed=None, namespace=None):
         """

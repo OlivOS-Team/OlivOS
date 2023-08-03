@@ -91,7 +91,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
-        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(logger_proc, max_thread=None, timeout=dead_interval)
+        self.database = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -130,6 +130,7 @@ class shallow(OlivOS.API.Proc_templet):
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
+        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(self.log, max_thread=None, timeout=self.Proc_info.dead_interval)
         self.load_plugin_list()
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
