@@ -1,10 +1,35 @@
+# -*- encoding: utf-8 -*-
+r"""
+ ________  ________  ___  ________       ___    ___ ________  ___  ___  ________  ___  ___     
+|\   __  \|\   __  \|\  \|\   ___  \    |\  \  /  /|\_____  \|\  \|\  \|\   __  \|\  \|\  \    
+\ \  \|\  \ \  \|\  \ \  \ \  \\ \  \   \ \  \/  / /\|___/  /\ \  \\\  \ \  \|\  \ \  \\\  \   
+ \ \   _  _\ \   __  \ \  \ \  \\ \  \   \ \    / /     /  / /\ \   __  \ \  \\\  \ \  \\\  \  
+  \ \  \\  \\ \  \ \  \ \  \ \  \\ \  \   \/  /  /     /  /_/__\ \  \ \  \ \  \\\  \ \  \\\  \ 
+   \ \__\\ _\\ \__\ \__\ \__\ \__\\ \__\__/  / /      |\________\ \__\ \__\ \_______\ \_______\
+    \|__|\|__|\|__|\|__|\|__|\|__| \|__|\___/ /        \|_______|\|__|\|__|\|_______|\|_______|
+                                       \|___|/                                                 
+
+    Copyright 2023 RainyZhou
+    @Contact: thunderain_zhou@163.com
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+"""
 
 import sqlite3
 import threading
 import os
 import hashlib
 import traceback
-# import atexit
 import gc
 from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 
@@ -136,7 +161,6 @@ class DataBaseAPI:
 
     def _init_database(self):
         "对数据库进行总体初始化"
-        # TODO
         sql_list = [
             DATABASE_SQL["create.table.master"],
             DATABASE_SQL["select.master.namespace"],

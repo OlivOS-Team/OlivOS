@@ -148,6 +148,7 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
+                        self.database.stop()
                         self.Proc_info.control_queue.put(
                             OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.log(2, OlivOS.L10NAPI.getTrans(
