@@ -1400,11 +1400,15 @@ class TreeEditUI(object):
                         for tmp_Entry_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]:
                             if tmp_offset >= len(self.UIData['edit_root_Entry_Extend_list']):
                                 break
-                            self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set(
-                                self.UIData['Account_data'][self.hash_key].extends[
-                                    self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]
-                                ]
-                            )
+                            if self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this] \
+                            in self.UIData['Account_data'][self.hash_key].extends:
+                                self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set(
+                                    self.UIData['Account_data'][self.hash_key].extends[
+                                        self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]
+                                    ]
+                                )
+                            else:
+                                self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set('')
                             tmp_offset += 1
 
 
