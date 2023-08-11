@@ -109,7 +109,7 @@ def get_hash(*data):
 
 class DataBaseAPI:
     class _sqlconn:
-        # sql上下文管理实现
+        "sqlite 上下文管理实现"
         def __init__(self, conn: sqlite3.Connection):
             # print('start')
             self.conn = conn
@@ -132,7 +132,7 @@ class DataBaseAPI:
         self.cache = {}
         self.namespace_list = []
         self._thread_pool = PoolExecutor(max_thread, initializer=self.__init_thread)
-        self._conn_all = {}
+        self.__conn_all = {}
         self._init_database()
         # atexit.register(self.stop)
 
@@ -140,15 +140,16 @@ class DataBaseAPI:
     def __init_thread(self):
         "线程池中每个线程的初始化过程，进行数据库连接"
         name = threading.current_thread().name
+        # 为方便在主线程一并关闭所有连接 check_same_thread 设为 False
         conn= sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout, check_same_thread=False)
-        self._conn_all[name] = conn
+        self.__conn_all[name] = conn
         # print(self._conn_all)
         self.proc_log(0, f"thread init <{name}>")
 
     def __run_sql_thread(self, script_list):
         "具体的运行函数，传入的是形如 `[(sql, param), (sql, param), (sql, param)]` 的操作指令队列"
         name = threading.current_thread().name
-        conn = self._conn_all[name]
+        conn = self.__conn_all[name]
         with self._sqlconn(conn) as cur:
             res = {}
             for data in script_list:
@@ -163,12 +164,6 @@ class DataBaseAPI:
                     cur.execute(sql, param)
                     res[str((sql, param))] = cur.fetchall()
             return res
-
-    def __stop_sql_thread(self, *arg):
-        name = threading.current_thread().name
-        conn = self._conn_all[name]
-        conn.close()
-        self.proc_log(0, f"thread stop <{name}>")
 
     def _init_database(self):
         "对数据库进行总体初始化"
@@ -237,7 +232,7 @@ class DataBaseAPI:
 
     def stop(self):
         self._thread_pool.shutdown()
-        for conn in self._conn_all.values():
+        for conn in self.__conn_all.values():
             conn.close()
     
     def get_config(self, key: str, basic_hashed=None, namespace=None, *, default_value=None):
