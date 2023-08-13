@@ -149,14 +149,17 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
-                        self.database.stop()
                         self.Proc_info.control_queue.put(
                             OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'),
                                                          block=False)
                     elif rx_packet_data.action == 'send':
@@ -655,8 +658,10 @@ class shallow(OlivOS.API.Proc_templet):
                                     )
                                     removeDir(plugin_path_tmp + plugin_dir_this)
                                     plugin_dir_this = plugin_namespace
-                            # 完成插件数据库中对应命名空间的表格页初始化
-                            self.database._init_namespace( plugin_models_dict_this['namespace'])
+
+                            # 完成配置数据库中对应插件命名空间的表格页初始化
+                            self.database._init_namespace(plugin_models_dict_this['namespace'])
+
                             plugin_models_dict[plugin_dir_this] = {
                                 'isOPK': flag_is_opk,
                                 'data': plugin_models_dict_this

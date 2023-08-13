@@ -1,13 +1,13 @@
 # -*- encoding: utf-8 -*-
 r"""
- ________  ________  ___  ________       ___    ___ ________  ___  ___  ________  ___  ___     
-|\   __  \|\   __  \|\  \|\   ___  \    |\  \  /  /|\_____  \|\  \|\  \|\   __  \|\  \|\  \    
-\ \  \|\  \ \  \|\  \ \  \ \  \\ \  \   \ \  \/  / /\|___/  /\ \  \\\  \ \  \|\  \ \  \\\  \   
- \ \   _  _\ \   __  \ \  \ \  \\ \  \   \ \    / /     /  / /\ \   __  \ \  \\\  \ \  \\\  \  
-  \ \  \\  \\ \  \ \  \ \  \ \  \\ \  \   \/  /  /     /  /_/__\ \  \ \  \ \  \\\  \ \  \\\  \ 
+ ________  ________  ___  ________       ___    ___ ________  ___  ___  ________  ___  ___
+|\   __  \|\   __  \|\  \|\   ___  \    |\  \  /  /|\_____  \|\  \|\  \|\   __  \|\  \|\  \
+\ \  \|\  \ \  \|\  \ \  \ \  \\ \  \   \ \  \/  / /\|___/  /\ \  \\\  \ \  \|\  \ \  \\\  \
+ \ \   _  _\ \   __  \ \  \ \  \\ \  \   \ \    / /     /  / /\ \   __  \ \  \\\  \ \  \\\  \
+  \ \  \\  \\ \  \ \  \ \  \ \  \\ \  \   \/  /  /     /  /_/__\ \  \ \  \ \  \\\  \ \  \\\  \
    \ \__\\ _\\ \__\ \__\ \__\ \__\\ \__\__/  / /      |\________\ \__\ \__\ \_______\ \_______\
     \|__|\|__|\|__|\|__|\|__|\|__| \|__|\___/ /        \|_______|\|__|\|__|\|_______|\|_______|
-                                       \|___|/                                                 
+                                       \|___|/
 
     Copyright 2023 RainyZhou
     @Contact: thunderain_zhou@163.com
@@ -97,8 +97,8 @@ def get_nammespace_hash(namespace:str):
         return "unity"
     return get_hash(namespace)
 
-def get_conf_basic(config_type, platform, config_id, *args):
-    return get_hash(config_type, platform, config_id, *args)
+def get_conf_basic(config_type, platform, target_id, host_id=None, *args):
+    return get_hash(config_type, platform, target_id, host_id, *args)
 
 def get_hash(*data):
     if len(data) == 0:
@@ -143,8 +143,7 @@ class DataBaseAPI:
         # 为方便在主线程一并关闭所有连接 check_same_thread 设为 False
         conn= sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout, check_same_thread=False)
         self.__conn_all[name] = conn
-        # print(self._conn_all)
-        self.proc_log(0, f"thread init <{name}>")
+        # self.proc_log(0, f"thread init <{name}>")
 
     def __run_sql_thread(self, script_list):
         "具体的运行函数，传入的是形如 `[(sql, param), (sql, param), (sql, param)]` 的操作指令队列"
@@ -153,7 +152,7 @@ class DataBaseAPI:
         with self._sqlconn(conn) as cur:
             res = {}
             for data in script_list:
-                self.proc_log(0, str(data))
+                # self.proc_log(0, str(data))
                 if isinstance(data, str):
                     sql = data
                     cur.execute(sql)
@@ -213,7 +212,7 @@ class DataBaseAPI:
     def _exec(self, sql, param=None):
         """
         低层次接口函数，直接运行对应的 sql 指令，完成数据库操作
-        
+
         如果 `blocking=False` 则直接返回 concurrent.futures.Future 对象
         """
         if param is None:
@@ -234,36 +233,45 @@ class DataBaseAPI:
         self._thread_pool.shutdown()
         for conn in self.__conn_all.values():
             conn.close()
-    
-    def get_config(self, key: str, basic_hashed=None, namespace=None, *, default_value=None):
+
+    def get_config(self, namespace: "str | None", key: "str", basic_hashed: "str | None" =None, *, default_value=None):
         """
         最基本的配置项读取操作，返回对应的键值
-        
-        `key`: 具体存储的配置项名称 (应为字符串)
-        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
-                        默认为 --NONEED--
-        `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则应为 "unity"
+
+        `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则填写 None
                      否则此处应当填写当前插件 app.json 中的命名空间
-                     默认为 unity
+        `key`: 具体存储的配置项名称 (应为字符串)
+
+        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
+            具体的计算函数应当使用 OlivOs.userModule.UserConfDB.get_conf_basic(config_type, platform, config_id, *args):
         `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值（注意：必须写成 default_value=xxx 的形式）
+
+        计算用户信息的对应哈希值:
+        >>> hashed_conf = OlivOs.userModule.UserConfDB.get_conf_basic("group", "qq", 12345678)
+        >>> Proc.database.get_config(None, "enable_log", hashed_conf, default_value=False)
+        True
+        如果平台具有
+        >>> hashed_conf = OlivOs.userModule.UserConfDB.get_conf_basic("group", "qq", 12345678)
+
+
         """
         if basic_hashed is None:
             basic_hashed = "--NONEED--"
         if namespace is None:
             namespace = "unity"
-        
+
         namespace_hashed = get_nammespace_hash(namespace)
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
         # 缓存的键通过 命名空间+basichash+键名计算得出，如果存在则直接返回
         if cache_key in self.cache:
             return self.cache[cache_key]
-        
+
         sql_this = DATABASE_SQL["select.namespace.conf"].format(namespace_hash=namespace_hashed)
         param = {
             "hash_key_basic": basic_hashed,
             "str_key_conf_name": key,
         }
-        
+
         res = self._exec(sql_this, param)
         if len(res) == 0:
             return default_value
@@ -271,23 +279,24 @@ class DataBaseAPI:
             self.cache[cache_key] = res[str((sql_this, param))][0][0]
             return res[str((sql_this, param))][0][0]
 
-    def set_config(self, key: str, value, basic_hashed=None, namespace=None):
+    def set_config(self, namespace: "str | None", key: "str", value, basic_hashed: "str | None"=None):
         """
         最基本的配置项写入操作，返回对应的键值
-        
+
+        `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则配置为 None
+                    否则此处应当填写当前插件 app.json 中的命名空间
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值
+
         `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
                         默认为 --NONEED--
-        `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
-                     否则此处应当填写当前插件 app.json 中的命名空间
-                     默认为 None
+
         """
         if basic_hashed is None:
             basic_hashed = "--NONEED--"
         if namespace is None:
             namespace = "unity"
-        
+
         namespace_hashed = get_nammespace_hash(namespace)
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
 
@@ -302,10 +311,10 @@ class DataBaseAPI:
         self._exec(sql_this, param)
         return True
 
-    def get_user_config(self, platform, user_id, key, namespace=None, *other_arg, default_value=None):
+    def get_user_config(self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int", *other_arg, default_value=None):
         """
         读取对应用户配置项
-        
+
         `platform`: 用户所在平台
         `user_id`: 用户id
         `key`: 具体存储的配置项名称 (应为字符串)
@@ -315,13 +324,13 @@ class DataBaseAPI:
         `*other_arg`: 如果有其他需要被记录的键名，一并写在这里，会计算入哈希值中
         `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值（注意：必须写成 default_value=xxx 的形式）
         """
-        basic_hash = get_conf_basic("user", platform, user_id, *other_arg)
+        basic_hash = get_conf_basic("user", platform, str(user_id), *other_arg)
         return self.get_config(key, basic_hash, namespace, default_value=default_value)
 
-    def get_group_config(self, platform, group_id, key, namespace=None, *other_arg, default_value=None):
+    def get_group_config(self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int", host_id: "None|str|int"=None, *other_arg, default_value=None):
         """
         读取对应群组配置项
-        
+
         `platform`: 群组所在平台
         `group_id`: 群组id
         `key`: 具体存储的配置项名称 (应为字符串)
@@ -331,10 +340,10 @@ class DataBaseAPI:
         `*other_arg`: 如果有其他需要被记录的键名，一并写在这里，会计算入哈希值中
         `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值（注意：必须写成 default_value=xxx 的形式）
         """
-        basic_hash = get_conf_basic("group", platform, group_id, *other_arg)
+        basic_hash = get_conf_basic("group", platform, str(group_id), str(host_id), *other_arg)
         return self.get_config(key, basic_hash, namespace, default_value=default_value)
 
-    def get_basic_config(self, key, namespace=None, *, default_value=None):
+    def get_basic_config(self, namespace: "str|None", key: "str", *, default_value=None):
         """
         读取插件自身配置项（与平台和用户群组无关的配置）
 
@@ -347,40 +356,39 @@ class DataBaseAPI:
         basic_hash = "--NONEED--"
         return self.get_config(key, basic_hash, namespace, default_value=default_value)
 
-    def set_user_config(self, platform, user_id, key, value, namespace=None, *other_arg):
+    def set_user_config(self, namespace: "str|None", key: "str", value, platform: "str", user_id: "str|int", *other_arg):
         """
         设置对应用户配置项
-        
+
+        `key`: 具体存储的配置项名称 (应为字符串)
+        `value`: 具体存储的配置项值
         `platform`: 用户所在平台
         `user_id`: 用户id
-        `key`: 具体存储的配置项名称 (应为字符串)
-        `value`: 具体存储的配置项值
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
                      默认为 None
         `*other_arg`: 如果有其他需要被记录的键名，一并写在这里，会计算入哈希值中
         """
-        basic_hash = get_conf_basic("user", platform, user_id, *other_arg)
+        basic_hash = get_conf_basic("user", platform, str(user_id), *other_arg)
         return self.set_config(key, value, basic_hash, namespace)
 
-    def set_group_config(self, platform, group_id, key, value, namespace=None, *other_arg):
+    def set_group_config(self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int", host_id: "str|int|None"=None,*other_arg):
         """
         设置对应群组配置项
-        
-        `platform`: 群组所在平台
-        `group_id`: 群组id
+
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值
+        `platform`: 群组所在平台
+        `group_id`: 群组id
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
                      默认为 None
         `*other_arg`: 如果有其他需要被记录的键名，一并写在这里，会计算入哈希值中
         """
-        basic_hash = get_conf_basic("group", platform, group_id, *other_arg)
+        basic_hash = get_conf_basic("group", platform, str(group_id), str(host_id), *other_arg)
         return self.set_config(key, value, basic_hash, namespace)
 
-
-    def set_basic_config(self, key, value, namespace=None):
+    def set_basic_config(self, namespace: "str|None", key: "str", value):
         """
         设置插件自身配置项（与平台和用户群组无关的配置）
 
@@ -388,7 +396,6 @@ class DataBaseAPI:
         `value`: 具体存储的配置项值
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
-                     默认为 None
         """
         basic_hash = "--NONEED--"
         return self.set_config(key, value, basic_hash, namespace)
