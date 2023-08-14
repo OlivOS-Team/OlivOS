@@ -31,9 +31,9 @@ import os
 import hashlib
 import traceback
 import gc
+import pickle
 from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 
-modelName = "UserConfDB"
 
 DATABASE_SVN = 1
 DATABASE_PATH = os.path.join(".","plugin","conf","UserConfAll.db")
@@ -132,7 +132,7 @@ class DataBaseAPI:
                 err_str = traceback.format_exc()
                 self.cur.close()
                 self.conn.rollback()
-                self.log(4, f"配置数据库发生错误： {err_str}", modelName)
+                self.log(4, f"配置数据库发生错误： {err_str}")
                 return False
             self.cur.close()
             self.conn.commit()
@@ -245,7 +245,7 @@ class DataBaseAPI:
         for conn in self.__conn_all.values():
             conn.close()
 
-    def get_config(self, namespace: "str | None", key: "str", basic_hashed: "str | None" =None,  default_value=None):
+    def get_config(self, namespace: "str | None", key: "str", basic_hashed: "str | None" =None,  default_value=None, pkl=False):
         """
         最基本的配置项读取操作，返回对应的键值
 
@@ -259,8 +259,8 @@ class DataBaseAPI:
             - 用户哈希： OlivOS.userModule.UserConfDB.get_user_hash(platform, user_id)
             - 群组哈希： OlivOS.userModule.UserConfDB.get_group_hash(platform, group_id, host_id=None)
         
-        `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值
-
+        `default_value`: 如果存在，则当该配置项不存在时，返回这个值 默认为 `None`
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         if basic_hashed is None:
             basic_hashed = "--NONEED--"
@@ -272,7 +272,10 @@ class DataBaseAPI:
         # 缓存的键通过 命名空间+basichash+键名计算得出，如果存在则直接返回
         res = self.cache.get(cache_key, None)
         if res is not None:
-            return res
+            if pkl:
+                return pickle.loads(res)
+            else:
+                return res
 
         sql_this = DATABASE_SQL["select.namespace.conf"].format(namespace_hash=namespace_hashed)
         param = {
@@ -284,10 +287,14 @@ class DataBaseAPI:
         if len(res) == 0:
             return default_value
         else:
-            self.cache[cache_key] = res[0][0]
-            return res[0][0]
+            val_raw = res[0][0]
+            self.cache[cache_key] = val_raw
+            if pkl:
+                return pickle.loads(val_raw)
+            else:
+                return val_raw
 
-    def set_config(self, namespace: "str | None", key: "str", value, basic_hashed: "str | None"=None):
+    def set_config(self, namespace: "str | None", key: "str", value, basic_hashed: "str | None"=None, pkl=False):
         """
         最基本的配置项写入操作，返回对应的键值
 
@@ -298,7 +305,7 @@ class DataBaseAPI:
 
         `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
                         默认为 --NONEED--
-
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         if basic_hashed is None:
             basic_hashed = "--NONEED--"
@@ -309,18 +316,23 @@ class DataBaseAPI:
 
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
 
-        self.cache[cache_key] = value
+        if pkl:
+            val_raw = pickle.dumps(value)
+        else:
+            val_raw = value
+
+        self.cache[cache_key] = val_raw
 
         sql_this = DATABASE_SQL["insert.namespace"].format(namespace_hash=namespace_hashed)
         param = {
             "hash_key_basic": basic_hashed,
             "str_key_conf_name": key,
-            "raw_value": value,
+            "raw_value": val_raw,
         }
         self._exec(sql_this, param)
         return True
 
-    def get_user_config(self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int", default_value=None):
+    def get_user_config(self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int", default_value=None, pkl=False):
         """
         读取对应用户配置项
 
@@ -329,7 +341,8 @@ class DataBaseAPI:
         `platform`: 用户所在平台
         `user_id`: 用户id
         `key`: 具体存储的配置项名称 (应为字符串)
-        `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值
+        `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_user_hash(
             platform=platform, 
@@ -339,10 +352,11 @@ class DataBaseAPI:
             namespace=namespace,
             key=key,
             basic_hashed=basic_hash,
-            default_value=default_value
+            default_value=default_value,
+            pkl=pkl
         )
 
-    def get_group_config(self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int", host_id: "None|str|int"=None, default_value=None):
+    def get_group_config(self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int", host_id: "None|str|int"=None, default_value=None, pkl=False):
         """
         读取对应群组配置项
 
@@ -352,7 +366,8 @@ class DataBaseAPI:
         `group_id`: 群组id
         `key`: 具体存储的配置项名称 (应为字符串)
         `host_id`: 如果如果该平台的群组有多个层级，则在这里设置，默认为 None
-        `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
+        `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_group_hash(
             platform=platform, 
@@ -363,27 +378,30 @@ class DataBaseAPI:
             namespace=namespace,
             key=key,
             basic_hashed=basic_hash,
-            default_value=default_value
+            default_value=default_value,
+            pkl=pkl
         )
 
-    def get_basic_config(self, namespace: "str|None", key: "str", default_value=None):
+    def get_basic_config(self, namespace: "str|None", key: "str", default_value=None, pkl=False):
         """
         读取插件自身配置项（与平台和用户群组无关的配置）
 
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
         `key`: 具体存储的配置项名称 (应为字符串)
-        `dafault_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
+        `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = "--NONEED--"
         return self.get_config(
             namespace=namespace,
             key=key,
             basic_hashed=basic_hash,
-            default_value=default_value
+            default_value=default_value,
+            pkl=pkl
         )
 
-    def set_user_config(self, namespace: "str|None", key: "str", value, platform: "str", user_id: "str|int",):
+    def set_user_config(self, namespace: "str|None", key: "str", value, platform: "str", user_id: "str|int", pkl=False):
         """
         设置对应用户配置项
 
@@ -393,6 +411,7 @@ class DataBaseAPI:
         `value`: 具体存储的配置项值 (所有sqlite支持的数据类型)
         `platform`: 用户所在平台
         `user_id`: 用户id
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_user_hash(
             platform=platform, 
@@ -402,10 +421,11 @@ class DataBaseAPI:
             namespace=namespace,
             key=key,
             value=value,
-            basic_hashed=basic_hash
+            basic_hashed=basic_hash,
+            pkl=pkl
         )
 
-    def set_group_config(self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int", host_id: "str|int|None"=None):
+    def set_group_config(self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int", host_id: "str|int|None"=None, pkl=False):
         """
         设置对应群组配置项
 
@@ -416,6 +436,7 @@ class DataBaseAPI:
         `platform`: 群组所在平台
         `group_id`: 群组id
         `host_id`: 如果如果该平台的群组有多个层级，则在这里设置，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_group_hash(
             platform=platform, 
@@ -427,10 +448,11 @@ class DataBaseAPI:
             namespace=namespace,
             key=key,
             value=value,
-            basic_hashed=basic_hash
+            basic_hashed=basic_hash,
+            pkl=pkl
         )
 
-    def set_basic_config(self, namespace: "str|None", key: "str", value):
+    def set_basic_config(self, namespace: "str|None", key: "str", value, pkl=False):
         """
         设置插件自身配置项（与平台和用户群组无关的配置）
 
@@ -438,16 +460,18 @@ class DataBaseAPI:
                      否则此处应当填写当前插件 app.json 中的命名空间
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值 (所有sqlite支持的数据类型)
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = "--NONEED--"
         return self.set_config(
             namespace=namespace,
             key=key,
             value=value,
-            basic_hashed=basic_hash
+            basic_hashed=basic_hash,
+            pkl=pkl
         )
 
-    def get_group_config_from_event(self, namespace: "str|None", key: "str", plugin_event, defalult_value=None):
+    def get_group_config_from_event(self, namespace: "str|None", key: "str", plugin_event, default_value=None, pkl=False):
         """
         读取消息事件对应群组的配置项
 
@@ -455,7 +479,8 @@ class DataBaseAPI:
                      否则此处应当填写当前插件 app.json 中的命名空间
         `key`: 具体存储的配置项名称 (应为字符串)
         `plugin_event`: OlivOS 框架的事件对象
-        `dafault_value`: 当该配置项不存在时，返回这个值
+        `default_value`: 当该配置项不存在时，返回这个值，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         platfrom = plugin_event.platform["platform"]
         group_id = plugin_event.data.group_id
@@ -466,10 +491,11 @@ class DataBaseAPI:
             platform=platfrom,
             group_id=group_id,
             host_id=host_id,
-            default_value=defalult_value
+            default_value=default_value,
+            pkl=pkl
         )
 
-    def set_group_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event):
+    def set_group_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event, pkl=False):
         """
         设置消息事件对应群组的配置项
 
@@ -478,6 +504,7 @@ class DataBaseAPI:
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值 (所有sqlite支持的数据类型)
         `plugin_event`: OlivOS 框架的事件对象
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         platfrom = plugin_event.platform["platform"]
         group_id = plugin_event.data.group_id
@@ -489,9 +516,10 @@ class DataBaseAPI:
             platform=platfrom,
             group_id=group_id,
             host_id=host_id,
+            pkl=pkl
         )
 
-    def get_user_config_from_event(self, namespace: "str|None", key: "str", plugin_event, defalult_value=None):
+    def get_user_config_from_event(self, namespace: "str|None", key: "str", plugin_event, default_value=None, pkl=False):
         """
         读取消息事件对应用户的配置项
 
@@ -499,7 +527,8 @@ class DataBaseAPI:
                      否则此处应当填写当前插件 app.json 中的命名空间
         `key`: 具体存储的配置项名称 (应为字符串)
         `plugin_event`: OlivOS 框架的事件对象
-        `dafault_value`: 当该配置项不存在时，返回这个值
+        `default_value`: 当该配置项不存在时，返回这个值，默认为 None
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         platfrom = plugin_event.platform["platform"]
         user_id = plugin_event.data.user_id
@@ -508,9 +537,10 @@ class DataBaseAPI:
             key=key,
             platform=platfrom,
             user_id=user_id,
-            default_value=defalult_value
+            default_value=default_value,
+            pkl=pkl
         )
-    def set_user_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event):
+    def set_user_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event, pkl=False):
         """
         设置消息事件对应用户的配置项
 
@@ -519,6 +549,7 @@ class DataBaseAPI:
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值 (所有sqlite支持的数据类型)
         `plugin_event`: OlivOS 框架的事件对象
+        `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         platfrom = plugin_event.platform["platform"]
         user_id = plugin_event.data.user_id
@@ -527,6 +558,7 @@ class DataBaseAPI:
             key=key,
             value=value,
             platform=platfrom,
-            user_id=user_id
+            user_id=user_id,
+            pkl=pkl
         )
 

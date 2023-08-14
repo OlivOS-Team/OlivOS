@@ -151,17 +151,17 @@ class shallow(OlivOS.API.Proc_templet):
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(
                             OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
-                        # 在运行过 save 指令后，将配置数据库关闭
-                        self.database.stop()
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
-                        # 在运行过 save 指令后，将配置数据库关闭
-                        self.database.stop()
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'),
                                                          block=False)
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'send':
                         self.menu_queue.append(rx_packet_data)
                 else:
