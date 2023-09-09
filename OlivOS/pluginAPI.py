@@ -91,6 +91,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
+        self.database = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -129,6 +130,7 @@ class shallow(OlivOS.API.Proc_templet):
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
+        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(self.log, max_thread=None, timeout=self.Proc_info.dead_interval)
         self.load_plugin_list()
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
@@ -151,11 +153,15 @@ class shallow(OlivOS.API.Proc_templet):
                             OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'),
                                                          block=False)
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'send':
                         self.menu_queue.append(rx_packet_data)
                 else:
@@ -652,11 +658,14 @@ class shallow(OlivOS.API.Proc_templet):
                                     )
                                     removeDir(plugin_path_tmp + plugin_dir_this)
                                     plugin_dir_this = plugin_namespace
+
+                            # 完成配置数据库中对应插件命名空间的表格页初始化
+                            self.database._init_namespace(plugin_models_dict_this['namespace'])
+
                             plugin_models_dict[plugin_dir_this] = {
                                 'isOPK': flag_is_opk,
                                 'data': plugin_models_dict_this
                             }
-
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
