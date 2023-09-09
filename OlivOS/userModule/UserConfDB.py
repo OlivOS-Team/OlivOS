@@ -94,7 +94,7 @@ WHERE hash_key_basic = :hash_key_basic AND str_key_conf_name = :str_key_conf_nam
 
 }
 
-def get_nammespace_hash(namespace:"str|None"):
+def get_namespace_hash(namespace:"str|None"):
     if namespace == "unity" or namespace is None:
         return "unity"
     return get_hash(namespace)
@@ -106,7 +106,7 @@ def get_group_hash(platform: "str", group_id: "str|int", host_id: "str|int|None"
     return get_hash("group", platform, str(group_id), str(host_id), *args)
 
 def get_hash(*data):
-    if len(data) == 0:
+    if len(data) == 0 or data[0] == "--NONEED--":
         return "--NONEED--"
     sha1 = hashlib.sha1()
     sha1.update("-".join(map(str, data)).encode("utf-8"))
@@ -201,7 +201,7 @@ class DataBaseAPI:
             namespace = "unity"
             namespace_hash = "unity"
         else:
-            namespace_hash = get_nammespace_hash(namespace)
+            namespace_hash = get_namespace_hash(namespace)
         if namespace in self.namespace_list:
             return True
 
@@ -254,7 +254,7 @@ class DataBaseAPI:
         
         `key`: 具体存储的配置项名称 (应为字符串)
 
-        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
+        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则填写 None
             具体的计算函数应当使用当前模块给定函数：
             - 用户哈希： OlivOS.userModule.UserConfDB.get_user_hash(platform, user_id)
             - 群组哈希： OlivOS.userModule.UserConfDB.get_group_hash(platform, group_id, host_id=None)
@@ -267,7 +267,7 @@ class DataBaseAPI:
         if namespace is None:
             namespace = "unity"
 
-        namespace_hashed = get_nammespace_hash(namespace)
+        namespace_hashed = get_namespace_hash(namespace)
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
         # 缓存的键通过 命名空间+basichash+键名计算得出，如果存在则直接返回
         res = self.cache.get(cache_key, None)
@@ -303,14 +303,14 @@ class DataBaseAPI:
         `key`: 具体存储的配置项名称 (应为字符串)
         `value`: 具体存储的配置项值
 
-        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则为常量 "--NONEED--"
-                        默认为 --NONEED--
+        `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则填写 None
+                        默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         if basic_hashed is None:
             basic_hashed = "--NONEED--"
 
-        namespace_hashed = get_nammespace_hash(namespace)
+        namespace_hashed = get_namespace_hash(namespace)
         if namespace is None:
             namespace = "unity"
 
@@ -338,9 +338,9 @@ class DataBaseAPI:
 
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
+        `key`: 具体存储的配置项名称 (应为字符串)
         `platform`: 用户所在平台
         `user_id`: 用户id
-        `key`: 具体存储的配置项名称 (应为字符串)
         `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
@@ -362,9 +362,9 @@ class DataBaseAPI:
 
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则留空为 None
                      否则此处应当填写当前插件 app.json 中的命名空间
+        `key`: 具体存储的配置项名称 (应为字符串)
         `platform`: 群组所在平台
         `group_id`: 群组id
-        `key`: 具体存储的配置项名称 (应为字符串)
         `host_id`: 如果如果该平台的群组有多个层级，则在这里设置，默认为 None
         `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
