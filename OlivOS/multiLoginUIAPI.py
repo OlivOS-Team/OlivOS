@@ -341,6 +341,8 @@ class TreeEditUI(object):
                 'edit_root_Entry_Extend',
                 'edit_root_Entry_Extend2'
             ],
+            'edit_root_Entry_qsign_list': [],
+            'edit_root_Entry_qsign_num': 1,
             'edit_root_Combobox_dict': {
                 'type_list': [
                     'QQ/GoCq/安卓手表',
@@ -396,31 +398,28 @@ class TreeEditUI(object):
                     'QQ/Wq/旧': './conf/walleq/{bothash}'
                 },
                 'type_extend_note_list': {
-                    'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/安卓手表': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/iPad': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/iMac': ['签名服务器', 'sign-server'],
-                    'QQ/GoCq/旧': ['签名服务器', 'sign-server']
+                    #'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
+                    #'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
+                    #'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
+                    #'QQ/GoCq/旧': ['签名服务器', 'sign-server']
                 },
                 'type_extends_name_note_list': {
-                    'QQ/GoCq/默认': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/安卓手表': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/iPad': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/iMac': ['签名服务器', 'KEY'],
-                    'QQ/GoCq/旧': ['签名服务器', 'KEY']
+                    #'QQ/GoCq/默认': ['签名服务器', 'KEY'],
+                    #'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
+                    #'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
+                    #'QQ/GoCq/旧': ['签名服务器', 'KEY']
                 },
                 'type_extends_note_list': {
-                    'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/安卓手表': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/iPad': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/iMac': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'}
+                    #'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    #'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    #'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'}
+                },
+                'type_qsign_array_note_list': {
+                    'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/安卓手机': {'地址': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/安卓平板': {'地址': 'sign-server', 'KEY': 'key'},
+                    'QQ/GoCq/旧': {'地址': 'sign-server', 'KEY': 'key'}
                 },
                 'type_mapping_list': {
                     'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post', {
@@ -937,6 +936,22 @@ class TreeEditUI(object):
                             break
                         tmp_res_bot_info.extends[self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]] = tmp_extends[tmp_offset]
                         tmp_offset += 1
+                if type_this is not None \
+                and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
+                    tmp_res_bot_info.extends['qsign-server'] = []
+                    for tmp_i in range(self.UIData['edit_root_Entry_qsign_num']):
+                        key_pare = [
+                            'edit_root_Entry_qsign_addr_%d' % tmp_i,
+                            'edit_root_Entry_qsign_key_%d' % tmp_i
+                        ]
+                        tmp_data = {}
+                        if key_pare[0] + '_StringVar' in self.UIData:
+                            tmp_data['addr'] = self.UIData[key_pare[0] + '_StringVar'].get()
+                        if key_pare[1] + '_StringVar' in self.UIData:
+                            tmp_data['key'] = self.UIData[key_pare[1] + '_StringVar'].get()
+                        if len(tmp_data['addr']) > 0 \
+                        or len(tmp_data['key']) > 0:
+                            tmp_res_bot_info.extends['qsign-server'].append(tmp_data)
                 self.UIData['Edit_res'] = [
                     tmp_action,
                     self.hash_key,
@@ -1147,6 +1162,19 @@ class TreeEditUI(object):
                 removeDir(dirPath)
         return tree_edit_UI_type_clear_note
 
+    def tree_edit_UI_qsign_list_set_GEN(self, tmp_type:str):
+        def tree_edit_UI_qsign_list_set():
+            if '+' == tmp_type:
+                self.UIData['edit_root_Entry_qsign_num'] += 1
+            elif '-' == tmp_type:
+                self.UIData['edit_root_Entry_qsign_num'] -= 1
+            if self.UIData['edit_root_Entry_qsign_num'] <= 0:
+                self.UIData['edit_root_Entry_qsign_num'] = 1
+            if self.UIData['edit_root_Entry_qsign_num'] > 10:
+                self.UIData['edit_root_Entry_qsign_num'] = 10
+            self.tree_edit_UI_Combobox_update(self.action, 'type')
+        return tree_edit_UI_qsign_list_set
+
     def tree_edit_UI_Combobox_update(self, action, con_action):
         for item_this in [
             'edit_root_Entry_ID',
@@ -1162,8 +1190,11 @@ class TreeEditUI(object):
             'edit_root_Label_type_note',
             'edit_root_Button_type_clear_note',
             'edit_root_Entry_Extend',
-            'edit_root_Entry_Extend2'
-        ]:
+            'edit_root_Entry_Extend2',
+            'edit_root_Label_qsign_note',
+            'edit_root_Button_qsign_list_set_+',
+            'edit_root_Button_qsign_list_set_-'
+        ] + self.UIData['edit_root_Entry_qsign_list']:
             try:
                 self.UIObject[item_this].place_forget()
             except:
@@ -1314,6 +1345,76 @@ class TreeEditUI(object):
                         count = 1
                         self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                         count += 1
+                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_qsign_note',
+                        x=100,
+                        y=40 + count * (24 + 6),
+                        width=200,
+                        height=24,
+                        title='QSign服务器列表'
+                    )
+                    count += 1
+                    self.tree_UI_Button_init(
+                        name='edit_root_Button_qsign_list_set_+',
+                        text='增加一行',
+                        command=self.tree_edit_UI_qsign_list_set_GEN('+'),
+                        x=310,
+                        y=40 + 4 * (24 + 6),
+                        width=70,
+                        height=24
+                    )
+                    self.tree_UI_Button_init(
+                        name='edit_root_Button_qsign_list_set_-',
+                        text='减少一行',
+                        command=self.tree_edit_UI_qsign_list_set_GEN('-'),
+                        x=310,
+                        y=40 + 5 * (24 + 6),
+                        width=70,
+                        height=24
+                    )
+                    array_num = self.UIData['edit_root_Entry_qsign_num']
+                    for tmp_i in range(array_num):
+                        key_pare = [
+                            'edit_root_Entry_qsign_addr_%d' % tmp_i,
+                            'edit_root_Entry_qsign_key_%d' % tmp_i
+                        ]
+                        self.UIData['edit_root_Entry_qsign_list'].append(key_pare[0])
+                        self.UIData['edit_root_Entry_qsign_list'].append(key_pare[1])
+                        if key_pare[0] + '_StringVar' not in self.UIData:
+                            self.UIData[key_pare[0] + '_StringVar'] = tkinter.StringVar()
+                        self.tree_edit_UI_Entry_init(
+                            obj_root='edit_root',
+                            obj_name=key_pare[0],
+                            str_name=key_pare[0] + '_StringVar',
+                            x=100,
+                            y=40 + count * (24 + 6),
+                            width=200,
+                            height=24,
+                            action=self.action,
+                            title='地址',
+                            mode='NONE'
+                        )
+                        count += 1
+                        if key_pare[1] + '_StringVar' not in self.UIData:
+                            self.UIData[key_pare[1] + '_StringVar'] = tkinter.StringVar()
+                        self.tree_edit_UI_Entry_init(
+                            obj_root='edit_root',
+                            obj_name=key_pare[1],
+                            str_name=key_pare[1] + '_StringVar',
+                            x=100,
+                            y=40 + count * (24 + 6),
+                            width=200,
+                            height=24,
+                            action=self.action,
+                            title='KEY',
+                            mode='NONE'
+                        )
+                        count += 1
+                    count -= 1
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
         if tmp_type == '自定义':
             if action == 'update':
                 if self.hash_key in self.UIData['Account_data']:
@@ -1410,6 +1511,34 @@ class TreeEditUI(object):
                             else:
                                 self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set('')
                             tmp_offset += 1
+                    if type_this is not None \
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
+                        if 'qsign-server' in self.UIData['Account_data'][self.hash_key].extends \
+                        and type(self.UIData['Account_data'][self.hash_key].extends['qsign-server']) is list:
+                            tmp_i = 0
+                            for tmp_data_this in self.UIData['Account_data'][self.hash_key].extends['qsign-server']:
+                                key_pare = [
+                                    'edit_root_Entry_qsign_addr_%d' % tmp_i,
+                                    'edit_root_Entry_qsign_key_%d' % tmp_i
+                                ]
+                                if type(tmp_data_this) is dict \
+                                and 'addr' in tmp_data_this \
+                                and type(tmp_data_this['addr']) is str \
+                                and 'key' in tmp_data_this \
+                                and type(tmp_data_this['key']) is str:
+                                    self.UIData[key_pare[0] + '_StringVar'] = tkinter.StringVar()
+                                    self.UIData[key_pare[0] + '_StringVar'].set(tmp_data_this['addr'])
+                                    self.UIData[key_pare[1] + '_StringVar'] = tkinter.StringVar()
+                                    self.UIData[key_pare[1] + '_StringVar'].set(tmp_data_this['key'])
+                                    tmp_i += 1
+                                else:
+                                    break
+                            if tmp_i <= 0:
+                                tmp_i = 1
+                            if tmp_i > 10:
+                                tmp_i = 10
+                            self.UIData['edit_root_Entry_qsign_num'] = tmp_i
+
 
 
     def get_type_name(
