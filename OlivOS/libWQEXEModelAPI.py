@@ -62,7 +62,7 @@ def startWalleQLibExeModel(
             releaseDir('./lib')
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource/',
+                resouce_api='https://api.oliva.icu/olivosver/resource_0_11_15/',
                 resouce_name='walle-q',
                 filePath='./lib/walle-q.exe',
                 filePathUpdate='./lib/walle-q.exe.tmp',
