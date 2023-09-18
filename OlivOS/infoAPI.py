@@ -36,3 +36,5 @@ OlivOS_message_mode_tx_default = 'old_string'
 OlivOS_message_mode_tx_unity = 'olivos_string'
 
 OlivOS_plugin_data_path = './plugin/data'
+
+resourceUrlPath = 'https://api.oliva.icu/olivosver/resource_0_11_15/'

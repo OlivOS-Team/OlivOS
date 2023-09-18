@@ -32,6 +32,8 @@ import OlivOS
 
 modelName = 'libEXEModelAPI'
 
+resourceUrlPath = OlivOS.infoAPI.resourceUrlPath
+
 gCheckList = [
     'gocqhttp',
     'gocqhttp_hide',
@@ -62,7 +64,7 @@ def startGoCqhttpLibExeModel(
             releaseDir('./lib')
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource_0_11_15/',
+                resouce_api=resourceUrlPath,
                 resouce_name='go-cqhttp',
                 filePath='./lib/go-cqhttp.exe',
                 filePathUpdate='./lib/go-cqhttp.exe.tmp',
