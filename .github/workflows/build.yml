@@ -32,10 +32,12 @@ jobs:
         name: OlivOS-Win-old-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
@@ -71,10 +73,12 @@ jobs:
         name: OlivOS-Win-64-old-debug-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
@@ -110,10 +114,12 @@ jobs:
         name: OlivOS-Win-32-old-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
@@ -149,10 +155,12 @@ jobs:
         name: OlivOS-Win-32-old-debug-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
@@ -217,10 +225,12 @@ jobs:
         name: OlivOS-Win-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
@@ -256,10 +266,12 @@ jobs:
         name: OlivOS-Win-64-debug-origin
         path: ./OlivOS-Win
     - name: Ready for Packing
+      #run: |
+      #  mkdir ./OlivOS-Win/lib
+      #  curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
+      #  curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
       run: |
         mkdir ./OlivOS-Win/lib
-        curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_amd64.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
-        curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
     - name: Packing OlivOS-Win-with-lib
       uses: actions/upload-artifact@v3
       with:
