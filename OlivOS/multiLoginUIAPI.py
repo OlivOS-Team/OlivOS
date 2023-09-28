@@ -337,6 +337,14 @@ class TreeEditUI(object):
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend2_StringVar': tkinter.StringVar(),
+            'edit_root_Combobox_qsign_protocal_StringVar': tkinter.StringVar(),
+            'edit_root_Combobox_qsign_protocal_list': [
+                '手动',
+                '8.9.63',
+                '8.9.68',
+                '8.9.70',
+                '8.9.73'
+            ],
             'edit_root_Entry_Extend_list': [
                 'edit_root_Entry_Extend',
                 'edit_root_Entry_Extend2'
@@ -938,6 +946,8 @@ class TreeEditUI(object):
                         tmp_offset += 1
                 if type_this is not None \
                 and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
+                    tmp_res_bot_info.extends['qsign-server-protocal'] = self.UIData[
+                        'edit_root_Combobox_qsign_protocal_StringVar'].get()
                     tmp_res_bot_info.extends['qsign-server'] = []
                     for tmp_i in range(self.UIData['edit_root_Entry_qsign_num']):
                         key_pare = [
@@ -1191,6 +1201,7 @@ class TreeEditUI(object):
             'edit_root_Button_type_clear_note',
             'edit_root_Entry_Extend',
             'edit_root_Entry_Extend2',
+            'edit_root_Combobox_qsign_protocal',
             'edit_root_Label_qsign_note',
             'edit_root_Button_qsign_list_set_+',
             'edit_root_Button_qsign_list_set_-'
@@ -1356,12 +1367,40 @@ class TreeEditUI(object):
                         title='QSign服务器列表'
                     )
                     count += 1
+                    self.tree_edit_UI_Combobox_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Combobox_qsign_protocal',
+                        str_name='edit_root_Combobox_qsign_protocal_StringVar',
+                        x=100,
+                        y=40 + count * (24 + 6),
+                        width=200,
+                        height=24,
+                        action=self.action,
+                        title='协议版本'
+                    )
+                    self.UIObject['edit_root_Combobox_qsign_protocal']['value'] = tuple(
+                        self.UIData['edit_root_Combobox_qsign_protocal_list']
+                    )
+                    self.UIObject['edit_root_Combobox_qsign_protocal'].current(0)
+                    if con_action == 'init':
+                        if action == 'update':
+                            if self.hash_key in self.UIData['Account_data']:
+                                Account_data_this = self.UIData['Account_data'][self.hash_key]
+                                if 'qsign-server-protocal' in Account_data_this.extends \
+                                and type(Account_data_this.extends['qsign-server-protocal']) is str \
+                                and Account_data_this.extends['qsign-server-protocal'] in self.UIData['edit_root_Combobox_qsign_protocal_list']:
+                                    self.UIObject['edit_root_Combobox_qsign_protocal'].current(
+                                        self.UIData['edit_root_Combobox_qsign_protocal_list'].index(
+                                            Account_data_this.extends['qsign-server-protocal']
+                                        )
+                                    )
+                    count += 1
                     self.tree_UI_Button_init(
                         name='edit_root_Button_qsign_list_set_+',
                         text='增加一行',
                         command=self.tree_edit_UI_qsign_list_set_GEN('+'),
                         x=310,
-                        y=40 + 4 * (24 + 6),
+                        y=40 + 5 * (24 + 6),
                         width=70,
                         height=24
                     )
@@ -1370,7 +1409,7 @@ class TreeEditUI(object):
                         text='减少一行',
                         command=self.tree_edit_UI_qsign_list_set_GEN('-'),
                         x=310,
-                        y=40 + 5 * (24 + 6),
+                        y=40 + 6 * (24 + 6),
                         width=70,
                         height=24
                     )
