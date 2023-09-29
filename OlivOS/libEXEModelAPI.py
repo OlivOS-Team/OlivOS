@@ -46,6 +46,149 @@ gCheckList = [
     'gocqhttp_show_old'
 ]
 
+gProtocalInfo = {
+    'android_pad': {
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164888,
+    "sub_app_id": 537164888,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168361,
+    "sub_app_id": 537168361,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.70': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537169976,
+    "sub_app_id": 537169976,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.73': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537171018,
+    "sub_app_id": 537171018,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 6
+}'''
+    },
+    'android_phone': {
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164840,
+    "sub_app_id": 537164840,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168313,
+    "sub_app_id": 537168313,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.70': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537169928,
+    "sub_app_id": 537169928,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.73': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537171007,
+    "sub_app_id": 537171007,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 1
+}'''
+    }
+}
+
 def startGoCqhttpLibExeModel(
     plugin_bot_info_dict,
     basic_conf_models_this,
@@ -610,6 +753,33 @@ def accountFix(bot_info_dict, logger_proc):
                     f.write(json.dumps(device_info, ensure_ascii = False))
             except:
                 pass
+
+            protocal_info = None
+            protocal_num = 6
+            releaseDir('./conf/gocqhttp/' + bot_hash)
+            releaseDir('./conf/gocqhttp/' + bot_hash + '/data')
+            releaseDir('./conf/gocqhttp/' + bot_hash + '/data/versions')
+            if 'qsign-server-protocal' in bot_info_dict[bot_hash].extends \
+            and type(bot_info_dict[bot_hash].extends['qsign-server-protocal']) is str:
+                if bot_info_dict[bot_hash].platform['model'] in [
+                    'gocqhttp_show_Android_Pad'
+                ]:
+                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_pad']:
+                        protocal_info = gProtocalInfo['android_pad'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                    protocal_num = 6
+                if bot_info_dict[bot_hash].platform['model'] in [
+                    'gocqhttp_show_Android_Phone'
+                ]:
+                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
+                        protocal_info = gProtocalInfo['android_phone'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                    protocal_num = 1
+            if protocal_info is not None:
+                file_path = './conf/gocqhttp/' + bot_hash + '/data/versions/%d.json' % protocal_num
+                try:
+                    with open(file_path, 'w', encoding = 'utf-8') as f:
+                        f.write(protocal_info)
+                except:
+                    pass
 
 def deviceInfoFix(deviceInfo:dict):
     deviceRes = copy.deepcopy(deviceInfo)
