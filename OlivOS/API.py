@@ -755,7 +755,13 @@ class Event(object):
         if tmp_message is None:
             return
         if self.platform['sdk'] == 'terminal_link':
-            OlivOS.virtualTerminalSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
+            OlivOS.virtualTerminalSDK.event_action.send_msg(
+                self,
+                tmp_message,
+                self.plugin_info['control_queue'],
+                flag_type=flag_type,
+                target_id=target_id
+            )
         elif self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 if flag_type == 'private':
