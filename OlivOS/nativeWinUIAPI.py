@@ -374,7 +374,7 @@ class dock(OlivOS.API.Proc_templet):
                                                             "user_name": "未知",
                                                             "user_id": "-1",
                                                             "flag_group": True,
-                                                            "group_id": "-1",
+                                                            "target_id": "-1",
                                                             "group_role": "member",
                                                         }
                                                         if "user_conf" in rx_packet_data.key['data'] and rx_packet_data.key['data']["user_conf"] is not None:
@@ -2165,6 +2165,11 @@ class VirtualTerminalUI(object):
             tmp_data['flag_group'] = self.UIData['BoolVar_flag_group'].get()
             tmp_data['group_id'] = self.UIData['StringVar_group_id'].get()
             tmp_data['group_role'] = self.UIData['StringVar_group_role'].get()
+            if tmp_data['flag_group']:
+                tmp_data['target_id'] = self.UIData['StringVar_group_id'].get()
+
+            else:
+                tmp_data['target_id'] = self.root.bot.id        # 当为私聊消息时，target_id 为 bot 的 id
             self.root.user_conf_data = tmp_data
 
 
@@ -2415,6 +2420,7 @@ class VirtualTerminalUI(object):
             "group_id": "88888888",
             "group_role": "owner",
         }
+        self.user_conf_data["target_id"] = self.user_conf_data["group_id"]
 
     def start(self):
         self.UIObject['root'] = tkinter.Toplevel()
@@ -2599,12 +2605,12 @@ class VirtualTerminalUI(object):
             user_conf = data["user_conf"]
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
-        res_data = res_data.replace(' ', '\ ')
+        res_data = res_data.replace(' ', r'\ ')
         res_data = res_data.replace('\r\n', '\n')
         if not user_conf['flag_group']:
-            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']})"
+            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (用户: {user_conf['target_id']})"
         else:
-            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) - (群: {user_conf['group_id']})"
+            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (群: {user_conf['target_id']})"
         data_header = data_header.replace(' ', r'\ ')
         data_header = data_header.replace('\r\n', '\n')
         res_data = '%s\n%s\n%s' % (data_header, res_data, '-' * 25)

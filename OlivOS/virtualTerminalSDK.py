@@ -94,7 +94,7 @@ def get_Event_from_SDK(target_event):
                 "user_name": "未知",
                 "user_id": "-1",
                 "flag_group": True,
-                "group_id": "-1",
+                "target_id": "-1",
                 "group_role": "member",
             }
             if user_conf is not None:
@@ -102,7 +102,7 @@ def get_Event_from_SDK(target_event):
             if tmp_user_conf["flag_group"] == True:
                 target_event.plugin_info['func_type'] = 'group_message'
                 target_event.data = target_event.group_message(
-                    tmp_user_conf["group_id"],
+                    tmp_user_conf["target_id"],             # 此时的 target_id 为群号
                     tmp_user_conf["user_id"],
                     message_obj,
                     'group'
@@ -110,7 +110,7 @@ def get_Event_from_SDK(target_event):
             else:
                 target_event.plugin_info['func_type'] = 'private_message'
                 target_event.data = target_event.private_message(
-                    tmp_user_conf["user_id"],
+                    tmp_user_conf["user_id"],               # 此时的 user_id 为发送者的 user_id，接收者固定为机器人
                     message_obj,
                     'private'
                 )
@@ -129,6 +129,7 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['role'] = tmp_user_conf["group_role"]
             target_event.data.host_id = None
     elif target_event.platform['model'] in ['postapi', 'ff14']:
+        # 此段内容不修改
         if 'type' in target_event.sdk_event.payload and target_event.sdk_event.payload['type'] == 'message':
             if 'message_type' in target_event.sdk_event.payload and target_event.sdk_event.payload['message_type'] == 'group_message':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -185,9 +186,9 @@ class event_action:
                 user_conf = {}
                 user_conf['user_name'] = "BOT"
                 user_conf['user_id'] = target_event.base_info['self_id']
+                user_conf['target_id'] = target_id
                 if flag_type == 'group':
                     user_conf['flag_group'] = True
-                    user_conf['group_id'] = target_id
                     user_conf['group_role'] = "member"
                 else:
                     user_conf['flag_group'] = False
