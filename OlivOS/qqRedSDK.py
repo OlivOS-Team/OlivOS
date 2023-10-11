@@ -69,9 +69,9 @@ def get_message_obj(elements:list):
     for element_this in elements:
         if 'textElement' in element_this and type(element_this['textElement']) is dict \
         and 'atType' in element_this['textElement'] and type(element_this['textElement']['atType']) is int \
-        and 'atUid' in element_this['textElement'] and type(element_this['textElement']['atUid']) is str \
+        and 'atNtUin' in element_this['textElement'] and type(element_this['textElement']['atNtUin']) is str \
         and 2 == element_this['textElement']['atType']:
-            message_list.append(OlivOS.messageAPI.PARA.at(id=element_this['textElement']['atUid']))
+            message_list.append(OlivOS.messageAPI.PARA.at(id=element_this['textElement']['atNtUin']))
             flag_hit = True
         elif 'textElement' in element_this and type(element_this['textElement']) is dict \
         and 'content' in element_this['textElement'] and type(element_this['textElement']['content']) is str:
@@ -149,8 +149,6 @@ def get_Event_from_SDK(target_event):
                     target_event.data.host_id = None
             elif 'chatType' in payload_data and payload_data['chatType'] == 1 \
             and 'peerUin' in payload_data and type(payload_data['peerUin']) is str \
-            and (('sendNickName' in payload_data and type(payload_data['sendNickName']) is str) \
-            or ('sendMemberName' in payload_data and type(payload_data['sendMemberName']) is str)) \
             and 'elements' in payload_data and type(payload_data['elements']) is list \
             and len(payload_data['elements']) > 0:
                 message_obj = get_message_obj(payload_data['elements'])
