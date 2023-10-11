@@ -176,6 +176,8 @@ class Event(object):
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
         elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.qqRedSDK.event:
+            OlivOS.qqRedSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
@@ -783,6 +785,11 @@ class Event(object):
                         OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
                     else:
                         OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+            elif self.platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.qqRedSDK.event_action.send_msg(self, 1, target_id, tmp_message, self.plugin_info['control_queue'])
+                elif flag_type == 'group':
+                    OlivOS.qqRedSDK.event_action.send_msg(self, 2, target_id, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
                 if 'reply_msg_id' in self.data.extend:

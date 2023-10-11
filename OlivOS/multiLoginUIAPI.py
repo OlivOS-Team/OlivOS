@@ -377,6 +377,7 @@ class TreeEditUI(object):
                     'Hack.Chat',
                     'onebotV11/Http',
                     'onebotV12/正向WS',
+                    'RED协议',
                     '虚拟终端',
                     '接口终端',
                     'FF14终端',
@@ -390,7 +391,8 @@ class TreeEditUI(object):
                     'QQ/Wq/安卓手表': '密码留空即尝试使用扫码登录',
                     'QQ/Wq/旧': '密码留空即尝试使用扫码登录',
                     '微信/ComWeChat': '启动后需要再运行特定版本微信',
-                    'Hack.Chat': '密码可以留空'
+                    'Hack.Chat': '密码可以留空',
+                    'RED协议': 'HTTP可以不填，反正也没实现'
                 },
                 'type_clear_note_list': {
                     'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
@@ -410,18 +412,21 @@ class TreeEditUI(object):
                     #'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
                     #'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
                     #'QQ/GoCq/旧': ['签名服务器', 'sign-server']
+                    'RED协议': ['HTTP地址']
                 },
                 'type_extends_name_note_list': {
                     #'QQ/GoCq/默认': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/旧': ['签名服务器', 'KEY']
+                    'RED协议': ['HTTP地址']
                 },
                 'type_extends_note_list': {
                     #'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     #'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     #'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'}
+                    #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    'RED协议': {'HTTP地址': 'http-path'}
                 },
                 'type_qsign_array_note_list': {
                     'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
@@ -441,6 +446,13 @@ class TreeEditUI(object):
                             '账号': 'edit_root_Entry_ID',
                             '地址': 'edit_root_Entry_Server_host',
                             '端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket', {
+                            '账号': 'edit_root_Entry_ID',
+                            'WS地址': 'edit_root_Entry_Server_host',
+                            'WS端口': 'edit_root_Entry_Server_port',
                             'TOKEN': 'edit_root_Entry_Server_access_token',
                         }
                     ],
@@ -664,6 +676,7 @@ class TreeEditUI(object):
                             # 'gocqhttp_hide',
                             'default',
                             'onebotV12',
+                            'red',
                             'gocqhttp_show',
                             'gocqhttp_show_Android_Phone',
                             'gocqhttp_show_Android_Pad',

@@ -33,6 +33,7 @@ default_Conf = {
             "OlivOS_walleq_lib_exe_model",
             "OlivOS_cwcb_lib_exe_model",
             "OlivOS_hackChat_link",
+            "OlivOS_qqRed_link",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
@@ -72,6 +73,7 @@ default_Conf = {
                 "OlivOS_walleq_lib_exe_model",
                 "OlivOS_cwcb_lib_exe_model",
                 "OlivOS_hackChat_link",
+                "OlivOS_qqRed_link",
                 "OlivOS_virtual_terminal_link",
                 "OlivOS_flask_post_rx",
                 "OlivOS_onebotV12_link",
@@ -90,6 +92,7 @@ default_Conf = {
                 "walleq_lib_exe_model",
                 "cwcb_lib_exe_model",
                 "hackChat_link",
+                "qqRed_link",
                 "terminal_link",
                 "flask_post_rx",
                 "onebotV12_link",
@@ -118,7 +121,8 @@ default_Conf = {
         "OlivOS_virtual_terminal_queue",
         "OlivOS_hackChat_queue",
         "OlivOS_biliLive_queue",
-        "OlivOS_onebotv12_queue"
+        "OlivOS_onebotv12_queue",
+        "OlivOS_qqRed_queue"
     ],
     "models": {
         "OlivOS_sleep": {
@@ -300,6 +304,17 @@ default_Conf = {
             "interval": 0.2,
             "dead_interval": 1,
             "rx_queue": "OlivOS_hackChat_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_qqRed_link": {
+            "enable": True,
+            "name": "OlivOS_qqRed_link",
+            "type": "qqRed_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_qqRed_queue",
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False
