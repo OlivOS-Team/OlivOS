@@ -63,7 +63,7 @@ class send_onebot_post_json_T(object):
 
             headers = {
                 'Content-Type': 'application/json',
-                'access_token': self.bot_info.access_token
+                'Authorization': 'Bearer ' + self.bot_info.access_token
             }
             msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
 
