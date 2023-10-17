@@ -145,7 +145,6 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender['name'] = target_event.data.sender['nickname']
                     target_event.data.sender['sex'] = 'unknown'
                     target_event.data.sender['age'] = 0
-                    target_event.data.sender['role'] = 'member'
                     target_event.data.host_id = None
             elif 'chatType' in payload_data and payload_data['chatType'] == 1 \
             and 'peerUin' in payload_data and type(payload_data['peerUin']) is str \

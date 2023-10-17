@@ -111,6 +111,18 @@ def getMenuEvent(target_event):
     pass
 
 
+class inde_interface_T(object):
+    def __init__(self, event, platform:str):
+        self.platform = platform
+        self.event = event
+
+    def hasAPI(self, api_name):
+        res = False
+        if hasattr(self, api_name):
+            res = True
+        return res
+
+
 class Event(object):
     def __init__(self, sdk_event=None, log_func=None, Proc=None):
         self.bot_info = None
@@ -147,9 +159,15 @@ class Event(object):
             self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
         if type(self.log_func) is None:
             self.log_func = Proc.log
+        self.indeAPI = None
         self.get_Event_from_SDK()
         self.get_Event_on_Plugin()
+        self.__init_inde_interface()
         self.do_init_log()
+
+    def __init_inde_interface(self):
+        if self.platform['sdk'] == 'kaiheila_link':
+            self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
 
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.virtualTerminalSDK.event:
