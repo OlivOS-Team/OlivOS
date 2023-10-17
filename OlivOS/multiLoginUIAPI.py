@@ -378,6 +378,7 @@ class TreeEditUI(object):
                     'onebotV11/Http',
                     'onebotV12/正向WS',
                     'RED协议',
+                    '钉钉',
                     '虚拟终端',
                     '接口终端',
                     'FF14终端',
@@ -412,21 +413,24 @@ class TreeEditUI(object):
                     #'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
                     #'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
                     #'QQ/GoCq/旧': ['签名服务器', 'sign-server']
-                    'RED协议': ['HTTP地址']
+                    'RED协议': ['HTTP地址'],
+                    '钉钉': ["AppKey", "AppSecret"],
                 },
                 'type_extends_name_note_list': {
                     #'QQ/GoCq/默认': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
                     #'QQ/GoCq/旧': ['签名服务器', 'KEY']
-                    'RED协议': ['HTTP地址']
+                    'RED协议': ['HTTP地址'],
+                    '钉钉': ["AppKey", "AppSecret"],
                 },
                 'type_extends_note_list': {
                     #'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     #'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     #'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'RED协议': {'HTTP地址': 'http-path'}
+                    'RED协议': {'HTTP地址': 'http-path'},
+                    '钉钉': {"AppKey": 'app_key', "AppSecret": "app_secret"},
                 },
                 'type_qsign_array_note_list': {
                     'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
@@ -604,6 +608,11 @@ class TreeEditUI(object):
                             '回调端口': 'edit_root_Entry_Server_access_token'
                         }
                     ],
+                    "钉钉": ["dingtalk", "dingtalk_link", "default",  "True", "websocket", {
+                            "Robot Code": 'edit_root_Entry_ID',
+                            # ""
+                        }
+                    ],
                     '自定义': ['qq', 'default', 'default', 'True', 'post', {
                             'ID': 'edit_root_Entry_ID',
                             'PASSWORD': 'edit_root_Entry_Password',
@@ -624,7 +633,8 @@ class TreeEditUI(object):
                     'discord',
                     'terminal',
                     'hackChat',
-                    'biliLive'
+                    'biliLive',
+                    "dingtalk"
                 ],
                 'platform_sdk_list': {
                     'wechat': [
@@ -661,6 +671,9 @@ class TreeEditUI(object):
                     ],
                     'biliLive': [
                         'biliLive_link'
+                    ],
+                    "dingtalk": [
+                        "dingtalk_link"
                     ]
                 },
                 'platform_sdk_model_list': {
@@ -750,6 +763,11 @@ class TreeEditUI(object):
                         'biliLive_link': [
                             'default',
                             'login'
+                        ]
+                    },
+                    "dingtalk": {
+                        "dingtalk_link": [
+                            "default"
                         ]
                     }
                 }
@@ -911,6 +929,17 @@ class TreeEditUI(object):
                     tmp_id = random.randint(1000000000, 9999999999)
                 if tmp_port == '':
                     tmp_port = '0'
+            if tmp_platform_platform == 'dingtalk' \
+            and tmp_platform_sdk == 'dingtalk_link' \
+            and tmp_platform_model == 'default':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
             if not checkByListEmptyOr([
                 tmp_id,
                 tmp_server_auto,

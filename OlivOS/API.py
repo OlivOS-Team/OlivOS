@@ -180,6 +180,8 @@ class Event(object):
             OlivOS.qqRedSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.dingtalkSDK.event:
+            OlivOS.dingtalkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
             OlivOS.biliLiveSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
@@ -851,6 +853,8 @@ class Event(object):
                 tx_packet_data = OlivOS.dodobotEATXAPI.server.rx_packet('send', tmp_send_msg)
                 for tx_queue_this in self.plugin_info['tx_queue']:
                     tx_queue_this.put(tx_packet_data, block=False)
+        elif self.platform['sdk'] == 'dingtalk_link':
+            OlivOS.dingtalkSDK.event_action.send_msg(self, flag_type, target_id, tmp_message)
 
         if flag_log and self.log_func is not None:
             if tmp_message_obj.active:
