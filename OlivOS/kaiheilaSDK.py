@@ -39,7 +39,8 @@ sdkAPIRoute = {
     'direct-message': '/direct-message',
     'user': '/user',
     'gateway': '/gateway',
-    'asset': '/asset'
+    'asset': '/asset',
+    'game': '/game'
 }
 
 sdkAPIRouteTemp = {}
@@ -307,6 +308,88 @@ class API(object):
             except Exception as e:
                 traceback.print_exc()
                 return None
+
+    #在玩游戏相关接口
+    class getPlayGameList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game']
+
+    class setPlayGameCreate(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game'] + '/create'
+
+        class data_T(object):
+            def __init__(self):
+                self.name = "N/A"
+                self.icon = None
+
+    class setPlayGameUpdate(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game'] + '/update'
+
+        class data_T(object):
+            def __init__(self):
+                self.id = -1
+                self.name = None
+                self.icon = None
+
+    class setPlayGameDelete(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game'] + '/delete'
+
+        class data_T(object):
+            def __init__(self):
+                self.id = -1
+
+    class setPlayGameActivity(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game'] + '/activity'
+
+        class data_T(object):
+            def __init__(self):
+                self.id = -1
+                self.data_type = 1
+                self.software = None
+                self.singer = None
+                self.music_name = None
+
+    class setPlayGameDeleteActivity(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['game'] + '/delete-activity'
+
+        class data_T(object):
+            def __init__(self):
+                self.data_type = 1
 
 
 def get_kmarkdown_message_raw(data: dict):
@@ -657,6 +740,115 @@ class event_action(object):
             res = None
         return res
 
+    def set_playgame_delete_activity(target_event, data_type:int):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setPlayGameDeleteActivity(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.data_type = data_type
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+            return res_data
+        return res_data
+
+    def set_playgame_delete_activity_all(target_event):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = False
+        for i in [1, 2]:
+            res_data = event_action.set_playgame_delete_activity(target_event, i)
+            if not res_data['active']:
+                return res_data
+        return res_data
+
+    def set_playgame_activity_game(target_event, game_id):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = False
+        res_data = event_action.set_playgame_delete_activity_all(target_event)
+        if not res_data['active']:
+            return res_data
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setPlayGameActivity(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.data_type = 1
+        this_msg.data.id = game_id
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+            return res_data
+        return res_data
+
+    def set_playgame_activity_music(target_event, music_name, singer, software):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = False
+        res_data = event_action.set_playgame_delete_activity_all(target_event)
+        if not res_data['active']:
+            return res_data
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setPlayGameActivity(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.data_type = 2
+        this_msg.data.id = None
+        this_msg.data.software = software
+        this_msg.data.music_name = music_name
+        this_msg.data.singer = singer
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+class inde_interface(OlivOS.API.inde_interface_T):
+    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_game')
+    def __set_playgame_activity_game(target_event, game_id, flag_log=True):
+        res_data = None
+        res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_game(target_event, game_id)
+        return res_data
+
+    def set_playgame_activity_game(self, game_id:int, flag_log: bool = True, remote: bool = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__set_playgame_activity_game(self.event, game_id, flag_log=True)
+        return res_data
+    
+    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_music')
+    def __set_playgame_activity_music(target_event, music_name, singer, software, flag_log=True):
+        res_data = None
+        res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_music(target_event, music_name, singer, software)
+        return res_data
+
+    def set_playgame_activity_music(
+        self,
+        music_name:str,
+        singer:str,
+        software:str = 'cloudmusic',
+        flag_log: bool = True,
+        remote: bool = False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__set_playgame_activity_music(self.event, music_name, singer, software, flag_log=True)
+        return res_data
 
 def init_api_json(raw_str):
     res_data = None
@@ -671,8 +863,6 @@ def init_api_json(raw_str):
             flag_is_active = True
     if flag_is_active:
         if type(tmp_obj) == dict:
-            res_data = tmp_obj.copy()
-        elif type(tmp_obj) == list:
             res_data = tmp_obj.copy()
     return res_data
 

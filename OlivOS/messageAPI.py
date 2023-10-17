@@ -32,7 +32,7 @@ dictMessageType = {
         'onebot': {
             'default': 'old_string',
             'onebotV12': 'obv12_para',
-            'red': 'obv12_para',
+            'red': 'olivos_para',
             'gocqhttp': 'old_string',
             'gocqhttp_hide': 'old_string',
             'gocqhttp_show': 'old_string',
