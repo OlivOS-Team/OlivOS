@@ -784,6 +784,8 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
+                    res_data['data'] = {}
+                    res_data['data']['id'] = game_id
         except:
             res_data['active'] = False
             return res_data
@@ -810,12 +812,30 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
+                    res_data['data'] = {}
+                    res_data['data']['music_name'] = music_name
+                    res_data['data']['singer'] = singer
+                    res_data['data']['software'] = software
         except:
             res_data['active'] = False
         return res_data
 
 class inde_interface(OlivOS.API.inde_interface_T):
-    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_game')
+    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_delete_activity_all')
+    def __set_playgame_delete_activity_all(target_event, flag_log=True):
+        res_data = None
+        res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_delete_activity_all(target_event)
+        return res_data
+
+    def set_playgame_delete_activity_all(self, flag_log: bool = True, remote: bool = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__set_playgame_delete_activity_all(self.event, flag_log=True)
+        return res_data
+
+    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_game', ['id'])
     def __set_playgame_activity_game(target_event, game_id, flag_log=True):
         res_data = None
         res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_game(target_event, game_id)
@@ -828,8 +848,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
         else:
             res_data = inde_interface.__set_playgame_activity_game(self.event, game_id, flag_log=True)
         return res_data
-    
-    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_music')
+
+    @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_music', ['music_name', 'singer', 'software'])
     def __set_playgame_activity_music(target_event, music_name, singer, software, flag_log=True):
         res_data = None
         res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_music(target_event, music_name, singer, software)

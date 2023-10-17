@@ -166,6 +166,7 @@ class Event(object):
         self.do_init_log()
 
     def __init_inde_interface(self):
+        self.indeAPI = inde_interface_T(self, self.platform['platform'])
         if self.platform['sdk'] == 'kaiheila_link':
             self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
 
