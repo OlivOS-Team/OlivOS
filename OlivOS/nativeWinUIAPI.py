@@ -1953,9 +1953,9 @@ class VirtualTerminalUI(object):
                 master=self.root.UIObject['root'],
                 bg=self.UIConfig['color_001']
             )
-            self.UIObject['root'].title('Virtual Terminal 终端 - %s - 账号编辑' % str(self.bot.id))
-            self.UIObject['root'].geometry('400x300')
-            self.UIObject['root'].minsize(400, 300)
+            self.UIObject['root'].title('账号编辑 - %s' % str(self.bot.id))
+            self.UIObject['root'].geometry('300x210')
+            self.UIObject['root'].minsize(300, 210)
             self.UIObject['root'].resizable(
                 width=False,
                 height=False
@@ -1969,48 +1969,26 @@ class VirtualTerminalUI(object):
                 obj_root='root',
                 obj_name='root_entry_user_name',
                 str_name='StringVar_user_name',
-                x=15,
-                y=15,
+                x=15 + 80,
+                y=15 + 30 * 0,
                 width_t=80,
-                width=400 - 15 * 2 - 80,
+                width=300 - 15 * 2 - 80,
                 height=24,
                 action=None,
                 title='账号名称:\t',
-            )
-            self.UIObject['root_entry_user_name'].grid(
-                row=0,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(15, 15),
-                pady=(15, 0),
-                ipadx=0,
-                ipady=0
             )
 
             self.root_Entry_init(
                 obj_root='root',
                 obj_name='root_entry_user_id',
                 str_name='StringVar_user_id',
-                x=15,
-                y=15,
+                x=15 + 80,
+                y=15 + 30 * 1,
                 width_t=80,
-                width=400 - 15 * 2 - 80,
+                width=300 - 15 * 2 - 80,
                 height=24,
                 action=None,
-                title='账号 ID:\t',
-            )
-            self.UIObject['root_entry_user_id'].grid(
-                row=1,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(15, 15),
-                pady=(15, 0),
-                ipadx=0,
-                ipady=0
+                title='账号ID:\t',
             )
 
             def root_checkbutton_flag_action_Func(str_name):
@@ -2024,93 +2002,49 @@ class VirtualTerminalUI(object):
                 obj_root='root',
                 obj_name='root_checkbutton_flag_group',
                 str_name='BoolVar_flag_group',
-                x=15,
-                y=15,
+                x=15 + 80,
+                y=15 + 30 * 2,
                 width_t=80,
-                width=400 - 15 * 2 - 80,
+                width=300 - 15 * 2 - 80,
                 height=24,
                 action=root_checkbutton_flag_action_Func('BoolVar_flag_group'),
-                title='是否为群组发言:\t',
+                title='是否为群:\t',
             )
-            self.UIObject["root_checkbutton_flag_group"].grid(
-                row=2,
-                column=0,
-                sticky="nsw",
-                rowspan=1,
-                columnspan=1,
-                padx=(15, 15),
-                pady=(15, 0),
-                ipadx=0,
-                ipady=0
-            )
-            
 
             self.root_Entry_init(
                 obj_root='root',
                 obj_name='root_entry_group_id',
                 str_name='StringVar_group_id',
-                x=15,
-                y=15,
+                x=15 + 80,
+                y=15 + 30 * 3,
                 width_t=80,
-                width=400 - 15 * 2 - 80,
+                width=300 - 15 * 2 - 80,
                 height=24,
                 action=None,
-                title='群组 ID:\t',
-            )
-            self.UIObject['root_entry_group_id'].grid(
-                row=3,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(15, 15),
-                pady=(15, 0),
-                ipadx=0,
-                ipady=0
+                title='群组ID:\t',
             )
 
             self.root_ComboBox_init(
                 obj_root='root',
                 obj_name='root_combobox_group_role',
                 str_name='StringVar_group_role',
-                x=15,
-                y=15,
+                x=15 + 80,
+                y=15 + 30 * 4,
                 width_t=80,
-                width=400 - 15 * 2 - 80,
+                width=300 - 15 * 2 - 80,
                 height=24,
                 action=["owner", "admin", "member", "unknown"],
                 title='群组角色:\t',
             )
-            self.UIObject["root_combobox_group_role"].grid(
-                row=5,
-                column=0,
-                sticky="nsw",
-                rowspan=1,
-                columnspan=1,
-                padx=(15, 15),
-                pady=(15, 0),
-                ipadx=0,
-                ipady=0
-            )
 
-            self.UIObject["root_button_save"] = tkinter.Button(
-                self.UIObject['root'],
-                text="保存并返回",
+            self.root_Button_init(
+                name='root_button_save',
+                text='保存并返回',
                 command=self.root_button_save_Func(),
-                bg=self.UIConfig['color_004'],
-                fg=self.UIConfig['color_005'],
-                bd=0
-            )
-            self.UIObject["root_button_save"].grid(
-                row=6,
-                column=0,
-                sticky="nsw",
-                rowspan=1,
-                columnspan=2,
-                padx=(75, 15),
-                pady=(15, 15),
-                ipadx=75,
-                ipady=0
+                x=15 + 80,
+                y=15 + 30 * 5,
+                width=300 - 15 * 2 - 80,
+                height=24
             )
 
             self.UIObject['root'].mainloop()
@@ -2173,110 +2107,69 @@ class VirtualTerminalUI(object):
             self.root.user_conf_data = tmp_data
 
 
-        def tree_edit_UI_Combobox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
-            self.UIObject[obj_name] = tkinter.Frame(
-                self.UIObject[obj_root],
-                bg=self.UIConfig['color_001']
-            )
+        def buttom_action(self, name, action):
+            if name in self.UIObject:
+                if action == '<Enter>':
+                    self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+                if action == '<Leave>':
+                    self.UIObject[name].configure(bg=self.UIConfig['color_003'])
 
-            
-            self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_name],
-                text=title
+        def root_Button_init(self, name, text, command, x, y, width, height):
+            self.UIObject[name] = tkinter.Button(
+                self.UIObject['root'],
+                text=text,
+                command=command,
+                bd=0,
+                activebackground=self.UIConfig['color_002'],
+                activeforeground=self.UIConfig['color_001'],
+                bg=self.UIConfig['color_003'],
+                fg=self.UIConfig['color_004'],
+                relief='groove'
             )
-            self.UIObject[obj_name + '=Label'].configure(
-                bg=self.UIConfig['color_001'],
-                fg=self.UIConfig['color_004']
-            )
-            self.UIObject[obj_name + '=Label'].grid(
-                row=0,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 10),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
-            )
-            # self.UIObject[obj_name + '=Label'].place(
-            #    x = x - width_t,
-            #    y = y,
-            #    width = width_t,
-            #    height = height
-            # )
-            # self.UIData[str_name] = tkinter.StringVar()
-            self.UIObject[obj_name + '=combobox'] = ttk.Combobox(
-                self.UIObject[obj_name],
-                textvariable=self.UIData[str_name],
-                values=action,
-                state='readonly',
-            )
-            self.UIObject[obj_name + '=combobox'].configure(
-                bg=self.UIConfig['color_004'],
-                fg=self.UIConfig['color_005'],
-                bd=0
-            )
-            self.UIObject[obj_name + '=combobox'].grid(
-                row=0,
-                column=1,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 0),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
-            )                
-        
-
-        def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
-            self.UIObject[obj_name] = tkinter.Label(
-                self.UIObject[obj_root],
-                bg=self.UIConfig['color_001'],
+            self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+            self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+            self.UIObject[name].place(
+                x=x,
+                y=y,
                 width=width,
                 height=height
             )
+
+        def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_name],
+                self.UIObject[obj_root],
                 text=title
             )
             self.UIObject[obj_name + '=Label'].configure(
                 bg=self.UIConfig['color_001'],
                 fg=self.UIConfig['color_004']
             )
-            self.UIObject[obj_name + '=Label'].grid(
-                row=0,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 10),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
             )
             # self.UIData[str_name] = tkinter.BooleanVar(
             #     master=self.UIObject[obj_name],
             #     name=str_name,
             # )
-            self.UIObject[obj_name + "=checkbutton"] = ttk.Checkbutton(
-                self.UIObject[obj_name],
+            self.UIObject[obj_name] = ttk.Checkbutton(
+                self.UIObject[obj_root],
                 variable=self.UIData[str_name],
                 onvalue=True,
                 offvalue=False,
 
                 # command=action
             )
-            # self.UIObject[obj_name + "=checkbutton"].configure(
+            # self.UIObject[obj_name].configure(
             #     bg=self.UIConfig['color_001'],
             #     fg=self.UIConfig['color_004'],
             #     bd=0
             # )
-            self.UIObject[obj_name + "=checkbutton"].grid(
-                row=0,
-                column=1,
-                sticky="ns",
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y
             )
 
         def root_ComboBox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
@@ -2287,113 +2180,75 @@ class VirtualTerminalUI(object):
                 height=height
             )
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_name],
+                self.UIObject[obj_root],
                 text=title
             )
             self.UIObject[obj_name + '=Label'].configure(
                 bg=self.UIConfig['color_001'],
                 fg=self.UIConfig['color_004']
             )
-            self.UIObject[obj_name + '=Label'].grid(
-                row=0,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 10),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
             )
             # self.UIData[str_name] = tkinter.StringVar(
             #     master=self.UIObject[obj_name],
             #     name=str_name,
             # )
-            self.UIObject[obj_name + "=combobox"] = ttk.Combobox(
-                self.UIObject[obj_name],
+            self.UIObject[obj_name] = ttk.Combobox(
+                self.UIObject[obj_root],
                 textvariable=self.UIData[str_name],
                 values=action,
                 state='readonly',
             )
-            # self.UIObject[obj_name + "=combobox"].configure(
+            # self.UIObject[obj_name].configure(
             #     bg=self.UIConfig['color_004'],
             #     fg=self.UIConfig['color_005'],
             #     bd=0
             # )
-            self.UIObject[obj_name + "=combobox"].grid(
-                row=0,
-                column=1,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 0),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y,
+               width = width,
+               height = height
             )
 
-        def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                            mode='NONE'):
-            # CHANGE: 创建一个 Frame 作为容器
-            # NOTE: 此处的初始化函数经过修改，tkinter 的变量在外部进行初始化定义，这里只是进行赋值
-
-            self.UIObject[obj_name] = tkinter.Label(
-                self.UIObject[obj_root],
-                bg=self.UIConfig['color_001'],
-                width=width,
-                height=height
-            )
-
+        def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_name],
+                self.UIObject[obj_root],
                 text=title
             )
             self.UIObject[obj_name + '=Label'].configure(
                 bg=self.UIConfig['color_001'],
                 fg=self.UIConfig['color_004']
             )
-            self.UIObject[obj_name + '=Label'].grid(
-                row=0,
-                column=0,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 10),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
             )
-            # self.UIData[str_name] = tkinter.StringVar(
-            #     master=self.UIObject[obj_name],
-            #     name=str_name,
-            # )
-            self.UIObject[obj_name + "=entry"] = tkinter.Entry(
-                self.UIObject[obj_name],
+            self.UIObject[obj_name] = tkinter.Entry(
+                self.UIObject[obj_root],
                 textvariable=self.UIData[str_name]
             )
-            self.UIObject[obj_name + "=entry"].configure(
+            self.UIObject[obj_name].configure(
                 bg=self.UIConfig['color_004'],
                 fg=self.UIConfig['color_005'],
                 bd=0
             )
-            self.UIObject[obj_name + "=entry"].grid(
-                row=0,
-                column=1,
-                sticky="ns",
-                rowspan=1,
-                columnspan=1,
-                padx=(0, 0),
-                pady=(0, 0),
-                ipadx=0,
-                ipady=0
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y,
+               width = width,
+               height = height
             )
             if mode == 'SAFE':
-                self.UIObject[obj_name + "=entry"].configure(
+                self.UIObject[obj_name].configure(
                     show='●'
                 )
-            self.UIObject[obj_name + "=entry"].configure(
-                width=width
-            )
 
 
         def stop(self):
