@@ -840,6 +840,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     try:
                         if tmp_Proc_name in Proc_dict \
                         and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type:
+                            Proc_dict[tmp_Proc_name].set_stop_flag()
                             Proc_Proc_dict[tmp_Proc_name].terminate()
                             Proc_Proc_dict[tmp_Proc_name].join()
                             list_stop.append(tmp_Proc_name)

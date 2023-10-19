@@ -1463,15 +1463,17 @@ class StoppableThread(threading.Thread):
         super(StoppableThread, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
         self.root = None
+        self.flag_stop = False
 
     def terminate(self):
+        self._stop_event.set()
         if self.root is not None:
             try:
                 self.root.on_terminate()
             except Exception as e:
                 traceback.print_exc()
-        self._stop_event.set()
         self.stop_thread()
+        self.flag_stop = True
 
     def stop(self):
         self.terminate()
@@ -1481,7 +1483,31 @@ class StoppableThread(threading.Thread):
 
     def stopped(self):
         return self._stop_event.is_set()
- 
+
+    def _get_my_tid(self):
+        """determines this (self's) thread id
+
+        CAREFUL: this function is executed in the context of the caller
+        thread, to get the identity of the thread represented by this
+        instance.
+        """
+        #if not self.isAlive():
+        #    raise threading.ThreadError("the thread is not active")
+
+        # do we have it cached?
+        if hasattr(self, "_thread_id"):
+            return self._thread_id
+
+        # no, look for it in the _active dict
+        for tid, tobj in threading._active.items():
+            if tobj is self:
+                self._thread_id = tid
+                return tid
+
+        # TODO: in python 2.6, there's a simpler way to do: self.ident
+
+        raise AssertionError("could not determine the thread's id")
+
     def _async_raise(self, tid, exctype):
         """raises the exception, performs cleanup if needed"""
         tid = ctypes.c_long(tid)
@@ -1497,7 +1523,7 @@ class StoppableThread(threading.Thread):
             raise SystemError("PyThreadState_SetAsyncExc failed")
 
     def stop_thread(self):
-        self._async_raise(self.ident, SystemExit)
+        self._async_raise(self._get_my_tid(), SystemExit)
 
 
 class Proc_templet(object):
@@ -1517,6 +1543,9 @@ class Proc_templet(object):
         )
         self.Proc_config = {}
         self.Proc_data = {}
+        self.Proc_theard = {}
+        self.flag_stop = False
+        self.run_mode = 'threading'
 
     class Proc_info_T(object):
         def __init__(self, rx_queue, tx_queue, control_queue, logger_proc, scan_interval=0.001, dead_interval=1):
@@ -1542,7 +1571,7 @@ class Proc_templet(object):
         self.run()
 
     def on_control_rx_init(self):
-        while True:
+        while self.flag_stop is False:
             if self.Proc_info.control_rx_queue.empty():
                 time.sleep(0.02)
             else:
@@ -1559,7 +1588,11 @@ class Proc_templet(object):
     def on_terminate(self):
         pass
 
+    def set_stop_flag(self):
+        self.flag_stop = True
+
     def start(self):
+        self.run_mode = 'processing'
         proc_this = multiprocessing.Process(name=self.Proc_name, target=self.run_total, args=())
         proc_this.daemon = self.deamon
         proc_this.start()
@@ -1567,9 +1600,11 @@ class Proc_templet(object):
         return proc_this
 
     def start_lite(self):
+        self.run_mode = 'threading'
         proc_this = StoppableThread(name=self.Proc_name, target=self.run_total, args=())
         proc_this.root = self
         proc_this.daemon = self.deamon
+        proc_this.flag_stop = False
         proc_this.start()
         # self.Proc = proc_this
         return proc_this
