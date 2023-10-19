@@ -56,6 +56,8 @@ from . import dodoSDK
 from . import dodoPollServerAPI
 from . import dodoLinkSDK
 from . import dodoLinkServerAPI
+from . import dingtalkSDK
+from . import dingtalkLinkServerAPI
 from . import fanbookSDK
 from . import fanbookPollServerAPI
 from . import kaiheilaSDK

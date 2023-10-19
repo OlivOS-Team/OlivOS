@@ -15,3 +15,4 @@ qrcode
 brotli
 pyjson5
 pywebview
+filetype

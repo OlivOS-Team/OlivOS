@@ -24,3 +24,4 @@ httpx
 prompt_toolkit
 regex
 rich
+filetype

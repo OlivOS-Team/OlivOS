@@ -92,6 +92,11 @@ dictMessageType = {
             'default': 'olivos_para'
         }
     },
+    'dingtalk': {
+        'dingtalk_link': {
+            'default': 'olivos_para'
+        }
+    },
     'fake': {
         'fake': {
             'default': 'olivos_para'
