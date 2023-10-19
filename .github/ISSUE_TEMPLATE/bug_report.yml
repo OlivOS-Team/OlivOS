@@ -1,7 +1,7 @@
 name: Bug report
 description: Create a report to help us improve
-title: "我发现了一个潜在的漏洞并希望官方能够修复它"
-labels: [bug]
+title: "bug?: "
+labels: ["bug?"]
 body:
   - type: input
     id: describe
@@ -58,7 +58,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: expected_behavior
+    id: additional
     attributes:
       label: Additional context
       description: Add any other context about the problem here.
@@ -67,4 +67,4 @@ body:
   - type: markdown
     attributes:
       value: |
-        你也可以加入[用户2群【OlivOS青果铺｜用户交流】](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Xb0LXu7ZCSopSOxwM0CSQCLhlS_TF21H&authKey=gN5E07ZNJ3MjST1AuyTxZLqdMoH3rwNWASRMUQJ%2BcMBG9vMWRElJxM3RspQjZeYp&noverify=0&group_code=635811009)或者[论坛](forum.olivos.run)获取更多信息。
+        [Forum](https://forum.olivos.run)
