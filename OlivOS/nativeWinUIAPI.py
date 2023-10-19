@@ -33,6 +33,7 @@ from PIL import ImageTk
 
 from tkinter import ttk
 from tkinter import messagebox
+from tkinter import filedialog
 
 dictColorContext = {
     'color_001': '#00A0EA',
@@ -369,6 +370,15 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data'] and 'data' in \
                                                             rx_packet_data.key['data'] and 'name' in rx_packet_data.key[
                                                         'data']:
+                                                        user_conf = {
+                                                            "user_name": "未知",
+                                                            "user_id": "-1",
+                                                            "flag_group": True,
+                                                            "target_id": "-1",
+                                                            "group_role": "member",
+                                                        }
+                                                        if "user_conf" in rx_packet_data.key['data'] and rx_packet_data.key['data']["user_conf"] is not None:
+                                                            user_conf.update(rx_packet_data.key['data']["user_conf"])
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject[
                                                             'root_virtual_terminal_terminal_data']:
@@ -383,7 +393,7 @@ class dock(OlivOS.API.Proc_templet):
                                                                 hash].pop(0)
                                                         if hash in self.UIObject['root_virtual_terminal_terminal']:
                                                             self.UIObject['root_virtual_terminal_terminal'][
-                                                                hash].tree_add_line(rx_packet_data.key['data'])
+                                                                hash].tree_add_line(rx_packet_data.key['data'], user_conf)
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
 
@@ -634,7 +644,7 @@ class dock(OlivOS.API.Proc_templet):
         }
                                   )
 
-    def setVirtualModelSend(self, hash, data):
+    def setVirtualModelSend(self, hash, data, user_conf=None):
         self.sendControlEventSend('send', {
             'target': {
                 'type': 'terminal_link',
@@ -642,7 +652,8 @@ class dock(OlivOS.API.Proc_templet):
             },
             'data': {
                 'action': 'input',
-                'data': data
+                'data': data,
+                'user_conf': user_conf
             }
         }
                                   )
@@ -1924,7 +1935,341 @@ class OlivOSTerminalUI(object):
 
 
 class VirtualTerminalUI(object):
-    def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
+    class VirtualTerminalUI_AccountEdit(object):
+        def __init__(self, Model_name, root: "VirtualTerminalUI", root_tk=None, bot=None):
+            self.Model_name = Model_name
+            self.root = root
+            self.root_tk = root_tk
+            self.bot = bot
+            self.UIObject = {}
+            self.UIData = {}
+            # 由于 root 在 start 后才会初始化，故在之后调用
+            # self.userConfDataInit(self.root.user_conf_data)
+            self.UIConfig = {}
+            self.UIConfig.update(dictColorContext)
+        
+        def start(self):
+            self.UIObject['root'] = tkinter.Toplevel(
+                master=self.root.UIObject['root'],
+                bg=self.UIConfig['color_001']
+            )
+            self.UIObject['root'].title('账号编辑 - %s' % str(self.bot.id))
+            self.UIObject['root'].geometry('300x210')
+            self.UIObject['root'].minsize(300, 210)
+            self.UIObject['root'].resizable(
+                width=False,
+                height=False
+            )
+            self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
+            self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+
+            self.userConfDataInit(self.root.user_conf_data)
+
+            self.root_Entry_init(
+                obj_root='root',
+                obj_name='root_entry_user_name',
+                str_name='StringVar_user_name',
+                x=15 + 80,
+                y=15 + 30 * 0,
+                width_t=80,
+                width=300 - 15 * 2 - 80,
+                height=24,
+                action=None,
+                title='账号名称:\t',
+            )
+
+            self.root_Entry_init(
+                obj_root='root',
+                obj_name='root_entry_user_id',
+                str_name='StringVar_user_id',
+                x=15 + 80,
+                y=15 + 30 * 1,
+                width_t=80,
+                width=300 - 15 * 2 - 80,
+                height=24,
+                action=None,
+                title='账号ID:\t',
+            )
+
+            def root_checkbutton_flag_action_Func(str_name):
+                def resFunc():
+                    self.UIData[str_name].set(
+                        not self.UIData[str_name].get()
+                    )
+                return resFunc
+
+            self.init_style()
+            self.root_Checkbutton_init(
+                obj_root='root',
+                obj_name='root_checkbutton_flag_group',
+                str_name='BoolVar_flag_group',
+                x=15 + 80,
+                y=15 + 30 * 2,
+                width_t=80,
+                width=300 - 15 * 2 - 80,
+                height=24,
+                action=root_checkbutton_flag_action_Func('BoolVar_flag_group'),
+                title='是否为群:\t',
+            )
+
+            self.root_Entry_init(
+                obj_root='root',
+                obj_name='root_entry_group_id',
+                str_name='StringVar_group_id',
+                x=15 + 80,
+                y=15 + 30 * 3,
+                width_t=80,
+                width=300 - 15 * 2 - 80,
+                height=24,
+                action=None,
+                title='群组ID:\t',
+            )
+
+            self.root_ComboBox_init(
+                obj_root='root',
+                obj_name='root_combobox_group_role',
+                str_name='StringVar_group_role',
+                x=15 + 80,
+                y=15 + 30 * 4,
+                width_t=80,
+                width=300 - 15 * 2 - 80,
+                height=24,
+                action=["owner", "admin", "member", "unknown"],
+                title='群组角色:\t',
+            )
+
+            self.root_Button_init(
+                name='root_button_save',
+                text='保存并返回',
+                command=self.root_button_save_Func(),
+                x=15 + 80,
+                y=15 + 30 * 5,
+                width=300 - 15 * 2 - 80,
+                height=24
+            )
+
+            self.UIObject['root'].mainloop()
+
+            self.stop()
+
+        def root_button_save_Func(self):
+            def resFunc():
+                self.setUserConfDataFunc()
+                # print(self.root.user_conf_data)
+                self.stop()
+            return resFunc
+
+        def userConfDataInit(self, datadict):
+            """
+                根据 VirtualTerminalUI 的用户信息，初始化编辑界面中的用户信息数据
+            """
+            self.UIData['StringVar_user_name'] = tkinter.StringVar(
+                master=self.UIObject['root'],
+                name='StringVar_user_name',
+                value=datadict['user_name']
+            )
+            self.UIData['StringVar_user_id'] = tkinter.StringVar(
+                master=self.UIObject['root'],
+                name='StringVar_user_id',
+                value=datadict['user_id']
+            )
+            self.UIData['BoolVar_flag_group'] = tkinter.BooleanVar(
+                master=self.UIObject['root'],
+                name='BoolVar_flag_group',
+                value=datadict['flag_group']
+            )
+            self.UIData['StringVar_group_id'] = tkinter.StringVar(
+                master=self.UIObject['root'],
+                name='StringVar_group_id',
+                value=datadict['group_id']
+            )
+            self.UIData['StringVar_group_role'] = tkinter.StringVar(
+                master=self.UIObject['root'],
+                name='StringVar_group_role',
+                value=datadict['group_role']
+            )
+
+
+        def setUserConfDataFunc(self):
+            """
+                根据编辑界面中的用户信息数据，更新 VirtualTerminalUI 的用户信息
+            """
+            tmp_data = {}
+            tmp_data['user_name'] = self.UIData['StringVar_user_name'].get()
+            tmp_data['user_id'] = self.UIData['StringVar_user_id'].get()
+            tmp_data['flag_group'] = self.UIData['BoolVar_flag_group'].get()
+            tmp_data['group_id'] = self.UIData['StringVar_group_id'].get()
+            tmp_data['group_role'] = self.UIData['StringVar_group_role'].get()
+            if tmp_data['flag_group']:
+                tmp_data['target_id'] = self.UIData['StringVar_group_id'].get()
+
+            else:
+                tmp_data['target_id'] = self.root.bot.id        # 当为私聊消息时，target_id 为 bot 的 id
+            self.root.user_conf_data = tmp_data
+
+
+        def buttom_action(self, name, action):
+            if name in self.UIObject:
+                if action == '<Enter>':
+                    self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+                if action == '<Leave>':
+                    self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+        def root_Button_init(self, name, text, command, x, y, width, height):
+            self.UIObject[name] = tkinter.Button(
+                self.UIObject['root'],
+                text=text,
+                command=command,
+                bd=0,
+                activebackground=self.UIConfig['color_002'],
+                activeforeground=self.UIConfig['color_001'],
+                bg=self.UIConfig['color_003'],
+                fg=self.UIConfig['color_004'],
+                relief='groove'
+            )
+            self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+            self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+            self.UIObject[name].place(
+                x=x,
+                y=y,
+                width=width,
+                height=height
+            )
+
+        def init_style(self):
+            self.UIData['style'] = ttk.Style(self.UIObject['root'])
+            self.UIData['style'].configure(
+                "TCheckbutton",
+                indicatorbackground=self.UIConfig['color_001'],
+                indicatorforeground=self.UIConfig['color_004'],
+                background=self.UIConfig['color_001'],
+                foreground=self.UIConfig['color_004']
+            )
+            #self.UIData['style'].map("TCheckbutton", background=[("active", "darkgrey")])
+
+        def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(
+                self.UIObject[obj_root],
+                text=title
+            )
+            self.UIObject[obj_name + '=Label'].configure(
+                bg=self.UIConfig['color_001'],
+                fg=self.UIConfig['color_004']
+            )
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
+            )
+            # self.UIData[str_name] = tkinter.BooleanVar(
+            #     master=self.UIObject[obj_name],
+            #     name=str_name,
+            # )
+            self.UIObject[obj_name] = ttk.Checkbutton(
+                self.UIObject[obj_root],
+                variable=self.UIData[str_name],
+                onvalue=True,
+                offvalue=False,
+                style='TCheckbutton'
+            )
+            # self.UIObject[obj_name].configure(
+            #     bg=self.UIConfig['color_001'],
+            #     fg=self.UIConfig['color_004'],
+            #     bd=0
+            # )
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y
+            )
+
+        def root_ComboBox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
+            self.UIObject[obj_name] = tkinter.Label(
+                self.UIObject[obj_root],
+                bg=self.UIConfig['color_001'],
+                width=width,
+                height=height
+            )
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(
+                self.UIObject[obj_root],
+                text=title
+            )
+            self.UIObject[obj_name + '=Label'].configure(
+                bg=self.UIConfig['color_001'],
+                fg=self.UIConfig['color_004']
+            )
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
+            )
+            # self.UIData[str_name] = tkinter.StringVar(
+            #     master=self.UIObject[obj_name],
+            #     name=str_name,
+            # )
+            self.UIObject[obj_name] = ttk.Combobox(
+                self.UIObject[obj_root],
+                textvariable=self.UIData[str_name],
+                values=action,
+                state='readonly',
+            )
+            # self.UIObject[obj_name].configure(
+            #     bg=self.UIConfig['color_004'],
+            #     fg=self.UIConfig['color_005'],
+            #     bd=0
+            # )
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y,
+               width = width,
+               height = height
+            )
+
+        def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'):
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(
+                self.UIObject[obj_root],
+                text=title
+            )
+            self.UIObject[obj_name + '=Label'].configure(
+                bg=self.UIConfig['color_001'],
+                fg=self.UIConfig['color_004']
+            )
+            self.UIObject[obj_name + '=Label'].place(
+               x = x - width_t,
+               y = y,
+               width = width_t,
+               height = height
+            )
+            self.UIObject[obj_name] = tkinter.Entry(
+                self.UIObject[obj_root],
+                textvariable=self.UIData[str_name]
+            )
+            self.UIObject[obj_name].configure(
+                bg=self.UIConfig['color_004'],
+                fg=self.UIConfig['color_005'],
+                bd=0
+            )
+            self.UIObject[obj_name].place(
+               x = x,
+               y = y,
+               width = width,
+               height = height
+            )
+            if mode == 'SAFE':
+                self.UIObject[obj_name].configure(
+                    show='●'
+                )
+
+
+        def stop(self):
+            self.exit()
+            self.UIObject['root'].destroy()
+
+        def exit(self):
+            self.root.UIObject["root_terminal_account_edit"] = None
+
+    def __init__(self, Model_name, logger_proc, root: dock, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
         self.root_tk = root_tk
@@ -1934,6 +2279,14 @@ class VirtualTerminalUI(object):
         self.UIConfig = {}
         self.logger_proc = logger_proc
         self.UIConfig.update(dictColorContext)
+        self.user_conf_data = {
+            "user_name": "仑质",
+            "user_id": "88888888",
+            "flag_group": True,
+            "group_id": "88888888",
+            "group_role": "owner",
+        }
+        self.user_conf_data["target_id"] = self.user_conf_data["group_id"]
 
     def start(self):
         self.UIObject['root'] = tkinter.Toplevel()
@@ -2006,6 +2359,7 @@ class VirtualTerminalUI(object):
             title='输入'
         )
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+
         self.UIObject['root_input'].grid(
             row=1,
             column=1,
@@ -2030,19 +2384,39 @@ class VirtualTerminalUI(object):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
         self.UIObject['tree_rightkey_menu'].add_command(label='查看', command=lambda: self.rightKey_action('show'))
         self.UIObject['tree_rightkey_menu'].add_command(label='复制', command=lambda: self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].add_command(label='编辑账号', command=lambda: self.rightKey_action('account'))
         self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
 
     def rightKey_action(self, action: str):
         if action == 'show':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
-                tkinter.messagebox.showinfo('日志内容', msg)
+                messagebox.showinfo('日志内容', msg)
         elif action == 'copy':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
                 self.UIObject['root'].clipboard_clear()
                 self.UIObject['root'].clipboard_append(msg)
                 self.UIObject['root'].update()
+        elif action == 'account':
+            self.root_AccountEdit_init()
+
+    def root_AccountEdit_init(self):
+        """
+            用于初始化账号编辑界面(如果存在则关闭后重新打开)
+        """
+        if "root_terminal_account_edit" not in self.UIObject:
+            self.UIObject["root_terminal_account_edit"] = None
+        elif self.UIObject['root_terminal_account_edit'] is not None:
+            self.UIObject['root_terminal_account_edit'].stop()
+        
+        self.UIObject['root_terminal_account_edit'] = self.VirtualTerminalUI_AccountEdit(
+            Model_name=self.Model_name,
+            root=self,
+            root_tk=self.root_tk,
+            bot=self.bot
+        )
+        self.UIObject['root_terminal_account_edit'].start()
 
     def root_Entry_enter_Func(self, name):
         def resFunc(event):
@@ -2054,7 +2428,7 @@ class VirtualTerminalUI(object):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
             if len(input) >= 0 and len(input) < 1000:
-                self.root.setVirtualModelSend(self.bot.hash, input)
+                self.root.setVirtualModelSend(self.bot.hash, input, self.user_conf_data)
                 pass
             self.UIData['root_input_StringVar'].set('')
 
@@ -2091,13 +2465,21 @@ class VirtualTerminalUI(object):
             for line in self.root.UIObject['root_virtual_terminal_terminal_data'][self.bot.hash]:
                 self.tree_add_line(line)
 
-    def tree_add_line(self, data):
+    def tree_add_line(self, data, user_conf=None):
         res_data = data['data']
+        if user_conf is None:
+            user_conf = data["user_conf"]
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
-        res_data = res_data.replace(' ', '\ ')
+        res_data = res_data.replace(' ', r'\ ')
         res_data = res_data.replace('\r\n', '\n')
-        res_data = '<%s>\n%s\n%s' % (data['name'], res_data, '-' * 25)
+        if not user_conf['flag_group']:
+            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (用户: {user_conf['target_id']})"
+        else:
+            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (群: {user_conf['target_id']})"
+        data_header = data_header.replace(' ', r'\ ')
+        data_header = data_header.replace('\r\n', '\n')
+        res_data = '%s\n%s\n%s' % (data_header, res_data, '-' * 25)
         res_data_list = res_data.split('\n')
         for res_data_list_this in res_data_list:
             try:

@@ -86,11 +86,22 @@ class server(OlivOS.API.Proc_templet):
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'input' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data']:
+                                # 增加 user_conf 配置字段
+                                user_conf = None
+                                user_name = "仑质"
+                                if "user_conf" in rx_packet_data.key['data']:
+                                    user_conf = rx_packet_data.key['data']['user_conf']
+                                    if "user_name" in user_conf:
+                                        user_name = user_conf['user_name']
                                 sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data,
                                                                             self.Proc_data['bot_info_dict'])
                                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-                                self.send_log_event(rx_packet_data.key['data']['data'], '仑质')
+                                self.send_log_event(
+                                    rx_packet_data.key['data']['data'],
+                                    name=user_name, 
+                                    user_conf=user_conf
+                                )
 
     def set_flask(self):
         self.Proc_config['Flask_app'] = Flask('__main__')
@@ -157,7 +168,7 @@ class server(OlivOS.API.Proc_templet):
                 block=False
             )
 
-    def send_log_event(self, data, name):
+    def send_log_event(self, data, name, user_conf=None):
         self.sendControlEventSend('send', {
             'target': {
                 'type': 'nativeWinUI'
@@ -167,7 +178,8 @@ class server(OlivOS.API.Proc_templet):
                 'event': 'log',
                 'hash': self.Proc_data['bot_info_dict'].hash,
                 'data': data,
-                'name': name
+                'name': name,
+                'user_conf': user_conf
             }
         }
                                   )
