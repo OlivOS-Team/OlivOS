@@ -125,7 +125,8 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['name'] = tmp_user_conf["user_name"]
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
-            if tmp_user_conf["flag_group"]:
+            if tmp_user_conf["flag_group"] \
+            and 'unknown' != tmp_user_conf["group_role"]:
                 target_event.data.sender['role'] = tmp_user_conf["group_role"]
             target_event.data.host_id = None
     elif target_event.platform['model'] in ['postapi', 'ff14']:

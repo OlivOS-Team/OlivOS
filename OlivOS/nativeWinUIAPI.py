@@ -1998,6 +1998,7 @@ class VirtualTerminalUI(object):
                     )
                 return resFunc
 
+            self.init_style()
             self.root_Checkbutton_init(
                 obj_root='root',
                 obj_name='root_checkbutton_flag_group',
@@ -2135,6 +2136,17 @@ class VirtualTerminalUI(object):
                 height=height
             )
 
+        def init_style(self):
+            self.UIData['style'] = ttk.Style(self.UIObject['root'])
+            self.UIData['style'].configure(
+                "TCheckbutton",
+                indicatorbackground=self.UIConfig['color_001'],
+                indicatorforeground=self.UIConfig['color_004'],
+                background=self.UIConfig['color_001'],
+                foreground=self.UIConfig['color_004']
+            )
+            #self.UIData['style'].map("TCheckbutton", background=[("active", "darkgrey")])
+
         def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
                 self.UIObject[obj_root],
@@ -2159,8 +2171,7 @@ class VirtualTerminalUI(object):
                 variable=self.UIData[str_name],
                 onvalue=True,
                 offvalue=False,
-
-                # command=action
+                style='TCheckbutton'
             )
             # self.UIObject[obj_name].configure(
             #     bg=self.UIConfig['color_001'],
