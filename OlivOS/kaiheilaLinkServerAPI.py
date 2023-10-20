@@ -52,11 +52,7 @@ class server(OlivOS.API.Proc_templet):
 
     def run(self):
         self.log(2, 'OlivOS kaiheila link server [' + self.Proc_name + '] is running')
-        threading.Thread(
-            target=self.check_killer,
-            args=()
-        ).start()
-        while self.flag_stop is False:
+        while True:
             api_obj = OlivOS.kaiheilaSDK.API.getGateway(
                 OlivOS.kaiheilaSDK.get_SDK_bot_info_from_Plugin_bot_info(
                     self.Proc_data['bot_info_dict']
@@ -73,8 +69,7 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
-            if self.flag_stop is False:
-                time.sleep(10)
+            time.sleep(10)
 
     def on_message(self, ws, message):
         try:
@@ -95,13 +90,6 @@ class server(OlivOS.API.Proc_templet):
         except:
             pass
 
-    def check_killer(self):
-        while self.flag_stop is False:
-            time.sleep(0.02)
-        if self.Proc_data['extend_data']['ws_obj'] is not None:
-            self.Proc_data['extend_data']['ws_obj'].close()
-
-
     def on_error(self, ws, error):
         self.log(0, 'OlivOS kaiheila link server [' + self.Proc_name + '] websocket link error')
 
@@ -114,8 +102,6 @@ class server(OlivOS.API.Proc_templet):
     def run_pulse(self):
         tmp_ws_item = self.Proc_data['extend_data']['ws_item']
         while self.Proc_data['extend_data']['pulse_interval'] is not None:
-            if self.flag_stop:
-                break
             tmp_pulse_interval = self.Proc_data['extend_data']['pulse_interval']
             if tmp_pulse_interval > 1:
                 tmp_pulse_interval -= 1
