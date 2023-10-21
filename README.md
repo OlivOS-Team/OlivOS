@@ -40,7 +40,7 @@
 [![OnebotV12](https://img.shields.io/badge/-OnebotV12-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![RED](https://img.shields.io/badge/-RED-111111?style=flat-square&logoColor=white)](https://chrononeko.github.io/QQNTRedProtocol/)
 [![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
-[![DingTalk](https://img.shields.io/badge/-%E9%92%89%E9%92%89-007FFF?style=flat-square&logo=alibabadotcom&logoColor=white)](https://discord.com/)
+[![DingTalk](https://img.shields.io/badge/-%E9%92%89%E9%92%89-007FFF?style=flat-square&logo=alibabadotcom&logoColor=white)](https://open.dingtalk.com/)
 [![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://discord.com/)
 [![Bilibili](https://img.shields.io/badge/-Bilibili-FB7299?style=flat-square&logo=Bilibili&logoColor=white)](http://www.bilibili.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
