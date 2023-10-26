@@ -569,14 +569,19 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, flag_direct=False):
+    def send_msg(target_event, chat_id, message, flag_direct=False, message_type='text'):
+        if message_type not in ['text', 'card']:
+            message_type = 'card'
         this_msg = None
-        res_data = {
-            "type": "card",
-            "theme": "secondary",
-            "size": "lg",
-            "modules": []
-        }
+        if message_type == 'text':
+            res_data = ''
+        elif message_type == 'card':
+            res_data = {
+                "type": "card",
+                "theme": "secondary",
+                "size": "lg",
+                "modules": []
+            }
         if flag_direct:
             this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
         else:
@@ -584,52 +589,77 @@ class event_action(object):
         this_msg.data.target_id = str(chat_id)
         if this_msg is None:
             return
+        msg_type_last = 'text'
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.text:
-                res_data['modules'].append(
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "plain-text",
-                            "content": message_this.data['text']
-                        }
-                    }
-                )
-            elif type(message_this) == OlivOS.messageAPI.PARA.image:
-                image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
-                res_data['modules'].append(
-                    {
-                        "type": "image-group",
-                        "elements": [
-                            {
-                                "type": "image",
-                                "src": image_path
+            if message_type == 'text':
+                if type(message_this) == OlivOS.messageAPI.PARA.text:
+                    if msg_type_last != 'text':
+                        res_data = ''
+                    res_data += message_this.data['text']
+                    msg_type_last = 'text'
+                elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                    if msg_type_last == 'text':
+                        if len(res_data) > 0:
+                            this_msg.data.type = 9
+                            this_msg.data.content = res_data
+                            this_msg.do_api()
+                        image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
+                        this_msg.data.type = 2
+                        this_msg.data.content = image_path
+                        this_msg.do_api()
+                    msg_type_last = 'media'
+            elif message_type == 'card':
+                if type(message_this) == OlivOS.messageAPI.PARA.text:
+                    res_data['modules'].append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "plain-text",
+                                "content": message_this.data['text']
                             }
-                        ]
-                    }
-                )
-            elif type(message_this) == OlivOS.messageAPI.PARA.video:
-                video_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'videos')
-                res_data['modules'].append(
-                    {
-                        "type": "video",
-                        "title": "video.mp4",
-                        "src": video_path
-                    }
-                )
-            elif type(message_this) == OlivOS.messageAPI.PARA.record:
-                audio_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'audios')
-                res_data['modules'].append(
-                    {
-                        "type": "audio",
-                        "title": "audio.mp4",
-                        "src": audio_path
-                    }
-                )
-        if len(res_data['modules']) > 0:
-            this_msg.data.type = 10
-            this_msg.data.content = json.dumps([res_data], ensure_ascii=False)
-            this_msg.do_api()
+                        }
+                    )
+                elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                    image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
+                    res_data['modules'].append(
+                        {
+                            "type": "image-group",
+                            "elements": [
+                                {
+                                    "type": "image",
+                                    "src": image_path
+                                }
+                            ]
+                        }
+                    )
+                elif type(message_this) == OlivOS.messageAPI.PARA.video:
+                    video_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'videos')
+                    res_data['modules'].append(
+                        {
+                            "type": "video",
+                            "title": "video.mp4",
+                            "src": video_path
+                        }
+                    )
+                elif type(message_this) == OlivOS.messageAPI.PARA.record:
+                    audio_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'audios')
+                    res_data['modules'].append(
+                        {
+                            "type": "audio",
+                            "title": "audio.mp4",
+                            "src": audio_path
+                        }
+                    )
+        if message_type == 'text':
+            if len(res_data) > 0:
+                this_msg.data.type = 9
+                this_msg.data.content = res_data
+                this_msg.do_api()
+        elif message_type == 'card':
+            if len(res_data['modules']) > 0:
+                this_msg.data.type = 10
+                this_msg.data.content = json.dumps([res_data], ensure_ascii=False)
+                this_msg.do_api()
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
