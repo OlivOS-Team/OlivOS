@@ -569,7 +569,7 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, flag_direct=False, message_type='text'):
+    def send_msg(target_event, chat_id, message, flag_direct=False, message_type='card'):
         if message_type not in ['text', 'card']:
             message_type = 'card'
         this_msg = None
