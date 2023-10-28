@@ -340,10 +340,15 @@ class TreeEditUI(object):
             'edit_root_Combobox_qsign_protocal_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_qsign_protocal_list': [
                 '手动',
+                '8.9.58',
                 '8.9.63',
                 '8.9.68',
                 '8.9.70',
-                '8.9.73'
+                '8.9.71',
+                '8.9.73',
+                '8.9.80',
+                '8.9.83',
+                '8.9.85'
             ],
             'edit_root_Entry_Extend_list': [
                 'edit_root_Entry_Extend',
