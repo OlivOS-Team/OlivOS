@@ -28,7 +28,8 @@ from urllib import parse
 import OlivOS
 
 sdkAPIHost = {
-    'default': 'https://botopen.imdodo.com/api/v1',
+    'default': 'https://botopen.imdodo.com/api/v2',
+    'v2': 'https://botopen.imdodo.com/api/v2',
     'v1': 'https://botopen.imdodo.com/api/v1',
     'native': 'https://botopen.imdodo.com/api'
 }
@@ -83,7 +84,7 @@ def get_SDK_bot_info_from_Event(target_event):
 class event(object):
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
-        self.platform = {'sdk': 'dodo_link', 'platform': 'dodo', 'model': 'default'}
+        self.platform = bot_info.platform
         self.active = False
         if self.payload is not None:
             self.active = True
@@ -175,7 +176,8 @@ class api_templet(object):
                 tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
             if self.data is not None:
                 for data_this in self.data.__dict__:
-                    tmp_payload_dict[data_this] = self.data.__dict__[data_this]
+                    if self.data.__dict__[data_this] is not None:
+                        tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + self.route
@@ -251,7 +253,10 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.dodoId = '-1'
+                self.dodoSourceId = '-1'
+                self.dodoId = None
+                self.islandSourceId = '-1'
+                self.islandId = None
                 self.messageType = 1
                 self.messageBody = {}
 
@@ -266,8 +271,10 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.islandId = '-1'
-                self.dodoId = '-1'
+                self.islandSourceId = '-1'
+                self.islandId = None
+                self.dodoSourceId = '-1'
+                self.dodoId = None
 
     class setResourcePictureUpload(api_templet):
         def __init__(self, bot_info=None):
@@ -340,7 +347,7 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('POST')
             api_res_json = json.loads(api_msg_obj.res)
             if api_res_json['status'] == 0:
-                sdkSubSelfInfo[plugin_event_bot_hash] = int(api_res_json['data']['dodoId'])
+                sdkSubSelfInfo[plugin_event_bot_hash] = int(api_res_json['data']['dodoSourceId'])
         except:
             pass
     try:
@@ -374,14 +381,14 @@ def get_Event_from_SDK(target_event):
                     )
                 if message_obj is not None:
                     target_event.active = True
-                    tmp_host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
-                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    tmp_host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandSourceId'])
+                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     if tmp_host_id not in sdkUserInfo:
                         sdkUserInfo[tmp_host_id] = {}
                     if tmp_user_id not in sdkUserInfo[tmp_host_id]:
                         api_msg_obj = API.getMemberInfo(tmp_bot_info)
-                        api_msg_obj.data.islandId = tmp_host_id
-                        api_msg_obj.data.dodoId = tmp_user_id
+                        api_msg_obj.data.islandSourceId = tmp_host_id
+                        api_msg_obj.data.dodoSourceId = tmp_user_id
                         api_msg_obj.do_api('POST')
                         api_res_json = json.loads(api_msg_obj.res)
                         if api_res_json['status'] == 0:
@@ -390,11 +397,11 @@ def get_Event_from_SDK(target_event):
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
                         str(target_event.sdk_event.payload.data.data['eventBody']['channelId']),
-                        str(target_event.sdk_event.payload.data.data['eventBody']['dodoId']),
+                        str(target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId']),
                         message_obj,
                         'group'
                     )
-                    target_event.data.host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
+                    target_event.data.host_id = str(target_event.sdk_event.payload.data.data['eventBody']['islandSourceId'])
                     target_event.data.message_sdk = message_obj
                     target_event.data.message_id = str(
                         target_event.sdk_event.payload.data.data['eventBody']['messageId'])
@@ -402,9 +409,9 @@ def get_Event_from_SDK(target_event):
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
                     target_event.data.sender['user_id'] = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     target_event.data.sender['id'] = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     target_event.data.sender['nickname'] = 'User'
                     target_event.data.sender['name'] = 'User'
                     target_event.data.sender['sex'] = 'unknown'
@@ -419,7 +426,7 @@ def get_Event_from_SDK(target_event):
                             elif sdkUserInfo[tmp_host_id][tmp_user_id]['sex'] == 1:
                                 target_event.data.sender['sex'] = 'male'
                     target_event.data.extend['host_group_id'] = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['islandId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['islandSourceId'])
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
             elif target_event.sdk_event.payload.data.data['eventType'] == str(1001):
@@ -453,10 +460,10 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     tmp_user_info = target_event.sdk_event.payload.data.data['eventBody'][
                         'personal']  # use personal info from remote instead of local
-                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                    tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     target_event.plugin_info['func_type'] = 'private_message'
                     target_event.data = target_event.private_message(
-                        str(target_event.sdk_event.payload.data.data['eventBody']['dodoId']),
+                        str(target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId']),
                         message_obj,
                         'private'
                     )
@@ -467,9 +474,9 @@ def get_Event_from_SDK(target_event):
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
                     target_event.data.sender['user_id'] = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     target_event.data.sender['id'] = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['dodoId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     target_event.data.sender['nickname'] = 'User'
                     target_event.data.sender['name'] = 'User'
                     target_event.data.sender['sex'] = 'unknown'
@@ -483,7 +490,7 @@ def get_Event_from_SDK(target_event):
                                 target_event.data.sender['sex'] = 'female'
                             elif tmp_user_info['sex'] == 1:
                                 target_event.data.sender['sex'] = 'male'
-                    # target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['islandId'])
+                    # target_event.data.extend['host_group_id'] = str(target_event.sdk_event.payload.data.data['eventBody']['islandSourceId'])
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     except:
@@ -492,10 +499,13 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message):
+    def send_msg(target_event:OlivOS.API.Event, chat_id, message):
         this_msg = None
         this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = str(chat_id)
+        if target_event is not None \
+        and target_event.bot_info.platform['model'] == 'v1':
+            this_msg.host = sdkAPIHost['v1']
         for message_this in message.data:
             if type(message_this) is OlivOS.messageAPI.PARA.text:
                 this_msg.data.messageType = 1
@@ -503,24 +513,27 @@ class event_action(object):
                 this_msg.do_api('POST')
             elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 this_msg.data.messageType = 2
-                this_msg.data.messageBody = None
                 this_msg.data.messageBody = event_action.setImageUploadFast(target_event, message_this.data['file'])
                 if this_msg.data.messageBody is not None:
                     this_msg.do_api('POST')
 
-    def send_personal_msg(target_event, chat_id, message):
+    def send_personal_msg(target_event:OlivOS.API.Event, chat_id, message):
         this_msg = None
         this_msg = API.sendPersonalMessage(get_SDK_bot_info_from_Event(target_event))
-        this_msg.data.dodoId = str(chat_id)
+        this_msg.data.dodoSourceId = str(chat_id)
+        if type(target_event.data) is OlivOS.API.Event.group_message:
+            this_msg.data.islandSourceId = str(target_event.data.host_id)
+        if target_event is not None \
+        and target_event.bot_info.platform['model'] == 'v1':
+            this_msg.host = sdkAPIHost['v1']
+            this_msg.data.islandSourceId = None
         for message_this in message.data:
             if type(message_this) is OlivOS.messageAPI.PARA.text:
                 this_msg.data.messageType = 1
                 this_msg.data.messageBody = {'content': message_this.data['text']}
                 this_msg.do_api('POST')
             elif type(message_this) is OlivOS.messageAPI.PARA.image:
-                tmp_image_url = message_this.data['url']
                 this_msg.data.messageType = 2
-                this_msg.data.messageBody = None
                 this_msg.data.messageBody = event_action.setImageUploadFast(target_event, message_this.data['file'])
                 if this_msg.data.messageBody is not None:
                     this_msg.do_api('POST')
@@ -529,6 +542,9 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+        if target_event is not None \
+        and target_event.bot_info.platform['model'] == 'v1':
+            this_msg.host = sdkAPIHost['v1']
         try:
             this_msg.do_api('POST')
             if this_msg.res is not None:
@@ -537,7 +553,7 @@ class event_action(object):
                 if type(raw_obj) == dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickName'], str)
-                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'dodoId'], str)
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'dodoSourceId'], str)
         except:
             res_data['active'] = False
         return res_data
@@ -568,6 +584,9 @@ class event_action(object):
                         pic_file = f.read()
 
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
+            if target_event is not None \
+            and target_event.bot_info.platform['model'] == 'v1':
+                msg_upload_api.host = sdkAPIHost['v1']
             msg_upload_api.data.file = pic_file
             msg_upload_api.do_api()
             if msg_upload_api.res is not None:

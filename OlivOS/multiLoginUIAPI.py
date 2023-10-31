@@ -361,6 +361,7 @@ class TreeEditUI(object):
                     '开黑啦/KOOK',
                     '钉钉',
                     '渡渡语音/Dodo',
+                    '渡渡语音/Dodo/V1',
                     'QQ频道/公域',
                     'QQ频道/私域',
                     'Discord',
@@ -588,6 +589,11 @@ class TreeEditUI(object):
                             'Bot私钥': 'edit_root_Entry_Server_access_token'
                         }
                     ],
+                    '渡渡语音/Dodo/V1': ['dodo', 'dodo_link', 'v1', 'True', 'websocket', {
+                            'BotID': 'edit_root_Entry_ID',
+                            'Bot私钥': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'Fanbook': ['fanbook', 'fanbook_poll', 'default', 'True', 'post', {
                             'Token': 'edit_root_Entry_Server_access_token'
                         }
@@ -737,7 +743,9 @@ class TreeEditUI(object):
                     },
                     'dodo': {
                         'dodo_link': [
-                            'default'
+                            'default',
+                            'v1',
+                            'v2'
                         ],
                         'dodo_poll': [
                             'default'

@@ -83,7 +83,9 @@ dictMessageType = {
     },
     'dodo': {
         'dodo_link': {
-            'default': 'olivos_para'
+            'default': 'olivos_para',
+            'v1': 'olivos_para',
+            'v2': 'olivos_para'
         },
         'dodo_poll': {
             'default': 'olivos_para'
