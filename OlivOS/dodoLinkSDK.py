@@ -347,9 +347,9 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('POST')
             api_res_json = json.loads(api_msg_obj.res)
             if api_res_json['status'] == 0:
-                sdkSubSelfInfo[plugin_event_bot_hash] = int(api_res_json['data'].get('dodoSourceId', None))
+                sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoSourceId', None))
                 if target_event.platform['model'] == 'v1':
-                    sdkSubSelfInfo[plugin_event_bot_hash] = int(api_res_json['data'].get('dodoId', None))
+                    sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoId', None))
         except:
             pass
     try:
