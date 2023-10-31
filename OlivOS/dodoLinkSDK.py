@@ -344,12 +344,17 @@ def get_Event_from_SDK(target_event):
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         api_msg_obj = API.getMe(tmp_bot_info)
         try:
-            api_msg_obj.do_api('POST')
-            api_res_json = json.loads(api_msg_obj.res)
-            if api_res_json['status'] == 0:
-                sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoSourceId', None))
-                if target_event.platform['model'] == 'v1':
+            if target_event.platform['model'] == 'v1':
+                api_msg_obj.host = sdkAPIHost['v1']
+                api_msg_obj.do_api('POST')
+                api_res_json = json.loads(api_msg_obj.res)
+                if api_res_json['status'] == 0:
                     sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoId', None))
+            else:
+                api_msg_obj.do_api('POST')
+                api_res_json = json.loads(api_msg_obj.res)
+                if api_res_json['status'] == 0:
+                    sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoSourceId', None))
         except:
             pass
     try:
