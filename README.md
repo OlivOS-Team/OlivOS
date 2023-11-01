@@ -30,7 +30,11 @@
   <p align="center">
     <a href="https://doc.olivos.wiki/">文档</a>
     ·
+    <a href="https://forum.olivos.run/">论坛</a>
+    ·
     <a href="https://github.com/OlivOS-Team/OlivOS/releases">下载</a>
+    ·
+    <a href="https://afdian.net/a/OlivOS">赞助</a>
   </p>
 
 </div>

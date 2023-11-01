@@ -358,9 +358,10 @@ class TreeEditUI(object):
             'edit_root_Entry_qsign_num': 1,
             'edit_root_Combobox_dict': {
                 'type_list': [
-                    '开黑啦/KOOK',
+                    'KOOK',
+                    'KOOK/消息兼容',
                     '钉钉',
-                    '渡渡语音/Dodo',
+                    '渡渡语音/Dodo/V2',
                     '渡渡语音/Dodo/V1',
                     'QQ频道/公域',
                     'QQ频道/私域',
@@ -554,7 +555,11 @@ class TreeEditUI(object):
                             '微信号': 'edit_root_Entry_ID'
                         }
                     ],
-                    '开黑啦/KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
+                    'KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
+                            'Token': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'KOOK/消息兼容': ['kaiheila', 'kaiheila_link', 'text', 'True', 'websocket', {
                             'Token': 'edit_root_Entry_Server_access_token'
                         }
                     ],
@@ -584,7 +589,7 @@ class TreeEditUI(object):
                             'TOKEN': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    '渡渡语音/Dodo': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
+                    '渡渡语音/Dodo/V2': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
                             'BotID': 'edit_root_Entry_ID',
                             'Bot私钥': 'edit_root_Entry_Server_access_token'
                         }
@@ -728,7 +733,9 @@ class TreeEditUI(object):
                     },
                     'kaiheila': {
                         'kaiheila_link': [
-                            'default'
+                            'default',
+                            'card',
+                            'text'
                         ]
                     },
                     'telegram': {

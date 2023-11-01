@@ -73,7 +73,9 @@ dictMessageType = {
     },
     'kaiheila': {
         'kaiheila_link': {
-            'default': 'olivos_para'
+            'default': 'olivos_para',
+            'card': 'olivos_para',
+            'text': 'olivos_para'
         }
     },
     'discord': {

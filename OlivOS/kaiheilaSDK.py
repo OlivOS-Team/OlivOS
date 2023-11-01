@@ -78,6 +78,8 @@ class event(object):
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'kaiheila_link', 'platform': 'kaiheila', 'model': 'default'}
+        if type(bot_info.platform) is dict:
+            self.platform.update(bot_info.platform)
         self.active = False
         if self.payload is not None:
             self.active = True
@@ -569,7 +571,14 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event, chat_id, message, flag_direct=False, message_type='card'):
+    def send_msg(target_event, chat_id, message, flag_direct=False, message_type_in='card'):
+        message_type = message_type_in
+        if target_event is not None:
+            if target_event.bot_info.platform['model'] != 'default':
+                if target_event.bot_info.platform['model'] == 'text':
+                    message_type = 'text'
+                elif target_event.bot_info.platform['model'] == 'card':
+                    message_type = 'card'
         if message_type not in ['text', 'card']:
             message_type = 'card'
         this_msg = None
