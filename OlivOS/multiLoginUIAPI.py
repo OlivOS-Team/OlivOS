@@ -369,6 +369,7 @@ class TreeEditUI(object):
                     'Telegram',
                     'Fanbook',
                     'Hack.Chat',
+                    'Hack.Chat/私有',
                     'onebotV12/正向WS',
                     'onebotV11/Http',
                     'RED协议',
@@ -422,6 +423,7 @@ class TreeEditUI(object):
                     #'QQ/GoCq/旧': ['签名服务器', 'sign-server']
                     'RED协议': ['HTTP地址'],
                     '钉钉': ["AppKey", "AppSecret"],
+                    'Hack.Chat/私有': ["WS地址"]
                 },
                 'type_extends_name_note_list': {
                     #'QQ/GoCq/默认': ['签名服务器', 'KEY'],
@@ -430,6 +432,7 @@ class TreeEditUI(object):
                     #'QQ/GoCq/旧': ['签名服务器', 'KEY']
                     'RED协议': ['HTTP地址'],
                     '钉钉': ["AppKey", "AppSecret"],
+                    'Hack.Chat/私有': ["WS地址"]
                 },
                 'type_extends_note_list': {
                     #'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
@@ -438,6 +441,7 @@ class TreeEditUI(object):
                     #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     'RED协议': {'HTTP地址': 'http-path'},
                     '钉钉': {"AppKey": 'app_key', "AppSecret": "app_secret"},
+                    'Hack.Chat/私有': {"WS地址": 'ws_path'}
                 },
                 'type_qsign_array_note_list': {
                     'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
@@ -604,6 +608,12 @@ class TreeEditUI(object):
                         }
                     ],
                     'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
+                            '房间名称': 'edit_root_Entry_Server_host',
+                            'Bot名称': 'edit_root_Entry_Server_access_token',
+                            '密码': 'edit_root_Entry_Password'
+                        }
+                    ],
+                    'Hack.Chat/私有': ['hackChat', 'hackChat_link', 'private', 'True', 'websocket', {
                             '房间名称': 'edit_root_Entry_Server_host',
                             'Bot名称': 'edit_root_Entry_Server_access_token',
                             '密码': 'edit_root_Entry_Password'
@@ -776,7 +786,8 @@ class TreeEditUI(object):
                     },
                     'hackChat': {
                         'hackChat_link': [
-                            'default'
+                            'default',
+                            'private'
                         ]
                     },
                     'biliLive': {
@@ -944,7 +955,7 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
             if tmp_platform_platform == 'hackChat' \
             and tmp_platform_sdk == 'hackChat_link' \
-            and tmp_platform_model == 'default':
+            and tmp_platform_model in ['default', 'private']:
                 if tmp_id == '':
                     tmp_id = random.randint(1000000000, 9999999999)
                 if tmp_port == '':

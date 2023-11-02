@@ -26,6 +26,8 @@ from OlivOS.qqGuildSDK import PAYLOAD
 
 modelName = 'hackChatLinkServerAPI'
 
+gDefaultWsPath = 'wss://hack.chat/chat-ws'
+
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
                  debug_mode=False, bot_info_dict=None):
@@ -49,14 +51,18 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS hackChat link server [{0}] is running', [self.Proc_name], modelName))
+        global gDefaultWsPath
+        wsPath = gDefaultWsPath
+        if 'ws_path' in self.Proc_data['bot_info_dict'].extends:
+            wsPath = self.Proc_data['bot_info_dict'].extends['ws_path']
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS hackChat link server [{0}] is running on [{1}]', [self.Proc_name, wsPath], modelName))
         threading.Thread(
             target=self.message_router,
             args=()
         ).start()
         while True:
             try:
-                self.Proc_data['extend_data']['websocket_url'] = 'wss://hack.chat/chat-ws'
+                self.Proc_data['extend_data']['websocket_url'] = wsPath
             except:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:

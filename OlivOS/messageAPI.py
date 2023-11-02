@@ -115,7 +115,8 @@ dictMessageType = {
     },
     'hackChat': {
         'hackChat_link': {
-            'default': 'olivos_string'
+            'default': 'olivos_string',
+            'private': 'olivos_string'
         }
     },
     'biliLive': {

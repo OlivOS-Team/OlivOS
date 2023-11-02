@@ -53,6 +53,8 @@ class event(object):
     def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
         self.platform = {'sdk': 'hackChat_link', 'platform': 'hackChat', 'model': 'default'}
+        if type(bot_info.platform) is dict:
+            self.platform.update(bot_info.platform)
         self.active = False
         if self.payload is not None:
             self.active = True
