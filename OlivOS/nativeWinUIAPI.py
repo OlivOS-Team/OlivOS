@@ -401,7 +401,8 @@ class dock(OlivOS.API.Proc_templet):
         tmp_new = []
         self.UIData['shallow_menu_list'] = [
             ['打开终端', self.startOlivOSTerminalUISend],
-            ['账号管理', self.startAccountEditSendFunc()],
+            #['账号管理', self.startAccountEditSendFunc()],
+            ['账号管理', None],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
             ['walleq管理', self.UIData['shallow_walleq_menu_list']],
             ['ComWeChat管理', self.UIData['shallow_cwcb_menu_list']],
