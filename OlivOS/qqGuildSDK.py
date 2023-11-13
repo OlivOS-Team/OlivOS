@@ -306,6 +306,48 @@ class API(object):
                 self.image = None  # str
                 self.msg_id = None  # str
 
+    class sendQQMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{group_openid}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None  # str
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
+
+    class sendQQDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['dms'] + '/{openid}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None  # str
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
+
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
     if var_path is None:
@@ -374,6 +416,145 @@ def get_Event_from_SDK(target_event):
         except:
             pass
     if target_event.sdk_event.payload.data.t in [
+        'GROUP_AT_MESSAGE_CREATE',
+        'GROUP_MESSAGE_CREATE'
+    ]:
+        message_obj = None
+        message_para_list = []
+        if 'content' in target_event.sdk_event.payload.data.d:
+            if target_event.sdk_event.payload.data.d['content'] != '':
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'qqGuild_string',
+                    target_event.sdk_event.payload.data.d['content']
+                )
+                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                message_obj.data_raw = message_obj.data.copy()
+            else:
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'olivos_para',
+                    []
+                )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
+        if 'attachments' in target_event.sdk_event.payload.data.d:
+            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
+                    if 'content_type' in attachments_this:
+                        if attachments_this['content_type'].startswith('image'):
+                            message_obj.data_raw.append(
+                                OlivOS.messageAPI.PARA.image(
+                                    'https://%s' % attachments_this['url']
+                                )
+                            )
+        try:
+            message_obj.init_data()
+        except:
+            message_obj.active = False
+            message_obj.data = []
+        if message_obj.active:
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_message'
+            target_event.data = target_event.group_message(
+                str(target_event.sdk_event.payload.data.d['group_id']),
+                str(target_event.sdk_event.payload.data.d['author']['id']),
+                message_obj,
+                'group'
+            )
+            target_event.data.message_sdk = message_obj
+            target_event.data.message_id = target_event.sdk_event.payload.data.d['id']
+            target_event.data.raw_message = message_obj
+            target_event.data.raw_message_sdk = message_obj
+            target_event.data.font = None
+            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['sex'] = 'unknown'
+            target_event.data.sender['age'] = 0
+            target_event.data.sender['role'] = 'member'
+            target_event.data.host_id = None
+            target_event.data.extend['group_id'] = str(target_event.sdk_event.payload.data.d['group_id'])
+            target_event.data.extend['host_group_id'] = None
+            target_event.data.extend['flag_from_direct'] = False
+            target_event.data.extend['flag_from_qq'] = True
+            target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
+            if 'member' in target_event.sdk_event.payload.data.d:
+                if 'roles' in target_event.sdk_event.payload.data.d['member']:
+                    tmp_role_now = target_event.sdk_event.payload.data.d['member']['roles']
+                    if '4' in tmp_role_now:
+                        target_event.data.sender['role'] = 'owner'
+                    elif '5' in tmp_role_now:
+                        target_event.data.sender['role'] = 'sub_admin'
+                    elif '2' in tmp_role_now:
+                        target_event.data.sender['role'] = 'admin'
+                    elif '1' in tmp_role_now:
+                        target_event.data.sender['role'] = 'member'
+            if plugin_event_bot_hash in sdkSubSelfInfo:
+                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+    elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
+        message_obj = None
+        message_para_list = []
+        if 'content' in target_event.sdk_event.payload.data.d:
+            if target_event.sdk_event.payload.data.d['content'] != '':
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'qqGuild_string',
+                    target_event.sdk_event.payload.data.d['content']
+                )
+                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+                message_obj.data_raw = message_obj.data.copy()
+            else:
+                message_obj = OlivOS.messageAPI.Message_templet(
+                    'olivos_para',
+                    []
+                )
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                []
+            )
+        if 'attachments' in target_event.sdk_event.payload.data.d:
+            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
+                    if 'content_type' in attachments_this:
+                        if attachments_this['content_type'].startswith('image'):
+                            message_obj.data_raw.append(
+                                OlivOS.messageAPI.PARA.image(
+                                    'https://%s' % attachments_this['url']
+                                )
+                            )
+        try:
+            message_obj.init_data()
+        except:
+            message_obj.active = False
+            message_obj.data = []
+        if message_obj.active:
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'private_message'
+            target_event.data = target_event.private_message(
+                str(target_event.sdk_event.payload.data.d['author']['id']),
+                message_obj,
+                'friend'
+            )
+            target_event.data.message_sdk = message_obj
+            target_event.data.message_id = str(target_event.sdk_event.payload.data.d['id'])
+            target_event.data.raw_message = message_obj
+            target_event.data.raw_message_sdk = message_obj
+            target_event.data.font = None
+            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['sex'] = 'unknown'
+            target_event.data.sender['age'] = 0
+            target_event.data.extend['flag_from_direct'] = True
+            target_event.data.extend['flag_from_qq'] = True
+            target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
+            if plugin_event_bot_hash in sdkSubSelfInfo:
+                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+    elif target_event.sdk_event.payload.data.t in [
         'MESSAGE_CREATE',
         'AT_MESSAGE_CREATE'
     ]:
@@ -516,6 +697,38 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
+    def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
+        this_msg = None
+        if flag_direct:
+            this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.openid = int(chat_id)
+        else:
+            this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.group_openid = int(chat_id)
+        if this_msg is None:
+            return
+        this_msg.data.msg_id = reply_msg_id
+        flag_now_type = 'string'
+        res = ''
+        for message_this in message.data:
+            if type(message_this) == OlivOS.messageAPI.PARA.image:
+                pass
+            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+                res += message_this.OP()
+                flag_now_type = 'string'
+        if res != '':
+            res_list = []
+            for res_this in res.split('\n'):
+                if res_this != '':
+                    res_list.append({
+                        'name': res_this,
+                    })
+            this_msg.data.embed = {
+                'prompt': res,
+                'fields': res_list
+            }
+            this_msg.do_api()
+
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
         if flag_direct:
