@@ -34,6 +34,8 @@ class intents_T(IntEnum):
     FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
     AUDIO_ACTION = (1 << 29)  # 语音消息
     PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
+    QQ_MESSAGES = (1 << 25)  # 消息事件，此为私域的普通QQ消息事件
+    PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
 
 
 sdkAPIHost = {
@@ -46,7 +48,9 @@ sdkAPIRoute = {
     'channels': '/channels',
     'dms': '/dms',
     'users': '/users',
-    'gateway': '/gateway'
+    'gateway': '/gateway',
+    'qq_users': '/v2/users',
+    'qq_groups': '/v2/groups'
 }
 
 sdkAPIRouteTemp = {
@@ -163,8 +167,10 @@ class PAYLOAD(object):
             tmp_intents = intents
             if bot_info.model == 'private':
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
+                #tmp_intents |= int(intents_T.QQ_MESSAGES)
             elif bot_info.model == 'public':
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
+                tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
             payload_template.__init__(self)
             self.data.op = 2
             try:
@@ -240,6 +246,7 @@ class api_templet(object):
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
             self.res = msg_res.text
+            #print(self.res)
             return msg_res.text
         except:
             return None
@@ -313,7 +320,7 @@ class API(object):
             self.data = self.data_T()
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{group_openid}/messages'
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages'
 
         class metadata_T(object):
             def __init__(self):
@@ -322,10 +329,12 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None  # str
+                self.msg_type = 0
                 self.embed = None  # str
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
+                self.timestamp = int(time.time())
 
     class sendQQDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -334,7 +343,7 @@ class API(object):
             self.data = self.data_T()
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['dms'] + '/{openid}/messages'
+            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages'
 
         class metadata_T(object):
             def __init__(self):
@@ -343,10 +352,12 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None  # str
+                self.msg_type = 0
                 self.embed = None  # str
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
+                self.timestamp = int(time.time())
 
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
@@ -469,9 +480,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
             target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
-            target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
-            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
-            target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['nickname'] = '用户'
+            target_event.data.sender['id'] = target_event.data.sender['user_id']
+            target_event.data.sender['name'] = target_event.data.sender['nickname']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             target_event.data.sender['role'] = 'member'
@@ -544,9 +555,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
             target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
-            target_event.data.sender['nickname'] = target_event.sdk_event.payload.data.d['author']['username']
-            target_event.data.sender['id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
-            target_event.data.sender['name'] = target_event.sdk_event.payload.data.d['author']['username']
+            target_event.data.sender['nickname'] = '用户'
+            target_event.data.sender['id'] = target_event.data.sender['user_id']
+            target_event.data.sender['name'] = target_event.data.sender['nickname']
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
             target_event.data.extend['flag_from_direct'] = True
@@ -699,15 +710,21 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
+        msg_id = None
         if flag_direct:
             this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.openid = int(chat_id)
+            this_msg.metadata.openid = str(chat_id)
+            if(type(target_event.sdk_event) is event):
+                msg_id = target_event.sdk_event.payload.data.d.get('id', None)
         else:
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.group_openid = int(chat_id)
+            this_msg.metadata.group_openid = str(chat_id)
+            if(type(target_event.sdk_event) is event):
+                msg_id = target_event.sdk_event.payload.data.d.get('id', None)
         if this_msg is None:
             return
-        this_msg.data.msg_id = reply_msg_id
+        this_msg.data.msg_id = msg_id
+        #this_msg.data.msg_id = reply_msg_id
         flag_now_type = 'string'
         res = ''
         for message_this in message.data:
@@ -727,6 +744,9 @@ class event_action(object):
                 'prompt': res,
                 'fields': res_list
             }
+            this_msg.data.content = res
+            this_msg.data.msg_type = 0
+            
             this_msg.do_api()
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):

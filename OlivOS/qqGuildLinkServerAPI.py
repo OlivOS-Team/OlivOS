@@ -71,6 +71,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_message(self, ws, message):
         try:
+            #print(message)
             tmp_data_rx_obj = OlivOS.qqGuildSDK.PAYLOAD.rxPacket(
                 data=json.loads(message)
             )
@@ -79,7 +80,10 @@ class server(OlivOS.API.Proc_templet):
                 if tmp_data_rx_obj.data.t in [
                     'MESSAGE_CREATE',
                     'DIRECT_MESSAGE_CREATE',
-                    'AT_MESSAGE_CREATE'
+                    'AT_MESSAGE_CREATE',
+                    'GROUP_AT_MESSAGE_CREATE',
+                    'GROUP_MESSAGE_CREATE',
+                    'C2C_MESSAGE_CREATE'
                 ]:
                     sdk_event = OlivOS.qqGuildSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
