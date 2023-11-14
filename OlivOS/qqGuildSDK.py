@@ -19,6 +19,7 @@ import sys
 import json
 import requests as req
 import time
+from datetime import datetime, timezone, timedelta
 
 import OlivOS
 
@@ -227,6 +228,7 @@ class api_templet(object):
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj=tmp_payload_dict)
+            #print(payload)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
@@ -334,7 +336,7 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
-                self.timestamp = int(time.time())
+                self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     class sendQQDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -357,7 +359,7 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
-                self.timestamp = int(time.time())
+                self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
@@ -734,19 +736,8 @@ class event_action(object):
                 res += message_this.OP()
                 flag_now_type = 'string'
         if res != '':
-            res_list = []
-            for res_this in res.split('\n'):
-                if res_this != '':
-                    res_list.append({
-                        'name': res_this,
-                    })
-            this_msg.data.embed = {
-                'prompt': res,
-                'fields': res_list
-            }
             this_msg.data.content = res
             this_msg.data.msg_type = 0
-            
             this_msg.do_api()
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
