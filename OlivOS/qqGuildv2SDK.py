@@ -21,6 +21,7 @@ import requests as req
 import time
 from datetime import datetime, timezone, timedelta
 import traceback
+import re
 
 import OlivOS
 
@@ -509,8 +510,8 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('GET')
             api_res_json = json.loads(api_msg_obj.res)
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
-        except:
-            pass
+        except Exception as e:
+            traceback.print_exc()
     if target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
@@ -657,6 +658,12 @@ def get_Event_from_SDK(target_event):
         message_obj = None
         message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
+            if(target_event.sdk_event.payload.data.t == 'AT_MESSAGE_CREATE'):
+                # 针对某些无法调用 /users/@me 接口的机器人的临时解决方案
+                target_event.sdk_event.payload.data.d['content'] = re.sub(
+                    r'^<@!\d+>', r'',
+                    target_event.sdk_event.payload.data.d['content']
+                )
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
