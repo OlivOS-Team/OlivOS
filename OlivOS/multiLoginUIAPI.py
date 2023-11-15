@@ -752,9 +752,7 @@ class TreeEditUI(object):
                             'private',
                             'public',
                             'default'
-                        ]
-                    },
-                    'qqGuild': {
+                        ],
                         'qqGuildv2_link': [
                             'private',
                             'public',
@@ -871,6 +869,14 @@ class TreeEditUI(object):
                     tmp_access_token = 'NONEED'
             if tmp_platform_platform == 'qqGuild' \
             and tmp_platform_sdk == 'qqGuild_link':
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'qqGuild' \
+            and tmp_platform_sdk == 'qqGuildv2_link':
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
