@@ -363,8 +363,10 @@ class TreeEditUI(object):
                     '钉钉',
                     '渡渡语音/Dodo/V2',
                     '渡渡语音/Dodo/V1',
-                    'QQ官方/公域',
-                    'QQ官方/私域',
+                    'QQ官方/公域/V2',
+                    'QQ官方/私域/V2',
+                    'QQ官方/公域/V1',
+                    'QQ官方/私域/V1',
                     'Discord',
                     'Telegram',
                     'Fanbook',
@@ -575,14 +577,24 @@ class TreeEditUI(object):
                             '直播间ID': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'QQ官方/公域': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
-                            'BotAppID': 'edit_root_Entry_ID',
+                    'QQ官方/公域/V1': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
                             '机器人令牌': 'edit_root_Entry_Server_access_token'
                         }
                     ],
-                    'QQ官方/私域': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
-                            'BotAppID': 'edit_root_Entry_ID',
+                    'QQ官方/私域/V1': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
                             '机器人令牌': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'QQ官方/公域/V2': ['qqGuild', 'qqGuildv2_link', 'public', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'QQ官方/私域/V2': ['qqGuild', 'qqGuildv2_link', 'private', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token'
                         }
                     ],
                     'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
@@ -670,7 +682,8 @@ class TreeEditUI(object):
                         'onebot'
                     ],
                     'qqGuild': [
-                        'qqGuild_link'
+                        'qqGuild_link',
+                        'qqGuildv2_link'
                     ],
                     'kaiheila': [
                         'kaiheila_link'
@@ -736,6 +749,13 @@ class TreeEditUI(object):
                     },
                     'qqGuild': {
                         'qqGuild_link': [
+                            'private',
+                            'public',
+                            'default'
+                        ]
+                    },
+                    'qqGuild': {
+                        'qqGuildv2_link': [
                             'private',
                             'public',
                             'default'

@@ -99,6 +99,7 @@ dictL10NSTR = {
         'bootAPI_0004': 'OlivOS model [{0}] type init',
         'bootAPI_0005': 'OlivOS model [{0}] stopped',
         'bootAPI_0006': 'OlivOS model [{0}] will stop',
+        'qqGuildv2SDK_0001': 'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -178,5 +179,6 @@ dictL10NSTR = {
         'bootAPI_0004': 'OlivOS 组件 [{0}] 类型 即将初始化',
         'bootAPI_0005': 'OlivOS 组件 [{0}] 已被停止',
         'bootAPI_0006': 'OlivOS 组件 [{0}] 即将停止',
+        'qqGuildv2SDK_0001': 'OlivOS QQ官方开放平台 [{0}] 刷新 TOKEN [{1}]',
     }
 }

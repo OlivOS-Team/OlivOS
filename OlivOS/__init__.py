@@ -41,6 +41,8 @@ from . import virtualTerminalSDK
 from . import virtualTerminalLinkServerAPI
 from . import qqGuildSDK
 from . import qqGuildLinkServerAPI
+from . import qqGuildv2SDK
+from . import qqGuildv2LinkServerAPI
 from . import qqRedSDK
 from . import qqRedLinkServerAPI
 from . import telegramSDK

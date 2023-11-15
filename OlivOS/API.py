@@ -179,6 +179,8 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
             OlivOS.qqGuildSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.qqGuildv2SDK.event:
+            OlivOS.qqGuildv2SDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.discordSDK.event:
             OlivOS.discordSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
@@ -818,16 +820,34 @@ class Event(object):
                 elif flag_type == 'group':
                     OlivOS.qqRedSDK.event_action.send_msg(self, 2, target_id, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'qqGuild_link':
+            if flag_type == 'group':
+                if 'reply_msg_id' in self.data.extend:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                else:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
+            elif flag_type == 'private':
+                if host_id is not None and not flag_log:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                elif 'flag_from_direct' in self.data.extend:
+                    if self.data.extend['flag_from_direct']:
+                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                    else:
+                        # 主动私聊待实现
+                        pass
+                else:
+                    # 主动私聊待实现
+                    pass
+        elif self.platform['sdk'] == 'qqGuildv2_link':
             if self.data.extend.get('flag_from_qq', False):
                 if flag_type == 'group':
                     if 'reply_msg_id' in self.data.extend:
-                        OlivOS.qqGuildSDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
                     else:
-                        OlivOS.qqGuildSDK.event_action.send_qq_msg(self, target_id, tmp_message)
+                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
                     if 'flag_from_direct' in self.data.extend:
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildSDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
                         else:
                             # 主动私聊待实现
                             pass
@@ -837,15 +857,15 @@ class Event(object):
             else:
                 if flag_type == 'group':
                     if 'reply_msg_id' in self.data.extend:
-                        OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
                     else:
-                        OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
                     if host_id is not None and not flag_log:
-                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
                     elif 'flag_from_direct' in self.data.extend:
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                            OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
                         else:
                             # 主动私聊待实现
                             pass

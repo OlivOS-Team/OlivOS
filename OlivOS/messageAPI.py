@@ -58,6 +58,11 @@ dictMessageType = {
             'default': 'olivos_para',
             'private': 'olivos_para',
             'public': 'olivos_para'
+        },
+        'qqGuildv2_link': {
+            'default': 'olivos_para',
+            'private': 'olivos_para',
+            'public': 'olivos_para'
         }
     },
     'telegram': {
