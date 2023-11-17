@@ -82,12 +82,13 @@ class server(OlivOS.API.Proc_templet):
                     'AT_MESSAGE_CREATE',
                     'GROUP_AT_MESSAGE_CREATE',
                     'GROUP_MESSAGE_CREATE',
-                    'C2C_MESSAGE_CREATE'
+                    'C2C_MESSAGE_CREATE',
+                    'READY'
                 ]:
                     sdk_event = OlivOS.qqGuildv2SDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-                elif tmp_data_rx_obj.data.t == 'READY':
+                if tmp_data_rx_obj.data.t == 'READY':
                     self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify ACK')
             elif tmp_data_rx_obj.data.op == 10:
                 self.Proc_data['extend_data']['pulse_interval'] = tmp_data_rx_obj.data.d['heartbeat_interval'] / 1000

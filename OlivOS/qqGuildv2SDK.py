@@ -66,6 +66,8 @@ sdkAPIRouteTemp = {
 
 sdkSubSelfInfo = {}
 sdkTokenInfo = {}
+sdkMsgidinfo = {}
+sdkSelfInfo = {}
 
 
 class bot_info_T(object):
@@ -421,6 +423,7 @@ class API(object):
                 self.image = None  # str
                 self.msg_id = None  # str
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.msg_seq = None
 
     class sendQQDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -444,6 +447,7 @@ class API(object):
                 self.image = None  # str
                 self.msg_id = None  # str
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.msg_seq = None
 
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
@@ -486,7 +490,7 @@ def checkByListAnd(check_list):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
+    global sdkSubSelfInfo, sdkSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -512,7 +516,18 @@ def get_Event_from_SDK(target_event):
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
         except Exception as e:
             traceback.print_exc()
-    if target_event.sdk_event.payload.data.t in [
+        if plugin_event_bot_hash in sdkSelfInfo \
+        and type(sdkSelfInfo[plugin_event_bot_hash]) is dict \
+        and 'id' in sdkSelfInfo[plugin_event_bot_hash] \
+        and 'username' in sdkSelfInfo[plugin_event_bot_hash]:
+            sdkSubSelfInfo[plugin_event_bot_hash] = str(sdkSelfInfo[plugin_event_bot_hash]['id'])
+    if target_event.sdk_event.payload.data.t == 'READY':
+        target_event.active = False
+        if type(target_event.sdk_event.payload.data.d) is dict \
+        and 'user' in target_event.sdk_event.payload.data.d \
+        and type(target_event.sdk_event.payload.data.d['user']) is dict:
+            sdkSelfInfo[plugin_event_bot_hash] = target_event.sdk_event.payload.data.d['user']
+    elif target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
     ]:
@@ -828,6 +843,7 @@ class event_action(object):
         if res != '':
             this_msg.data.content = res
             this_msg.data.msg_type = 0
+            this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
             this_msg.do_api()
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
@@ -863,22 +879,41 @@ class event_action(object):
             this_msg.do_api()
 
     def get_login_info(target_event):
+        global sdkSelfInfo
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
-        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
-        try:
-            this_msg.do_api('GET')
-            if this_msg.res is not None:
-                raw_obj = init_api_json(this_msg.res)
-            if raw_obj is not None:
-                if type(raw_obj) == dict:
-                    res_data['active'] = True
-                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
-                    res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
-        except:
-            res_data['active'] = False
+        if target_event.bot_info.hash in sdkSelfInfo \
+        and type(sdkSelfInfo[target_event.bot_info.hash]) is dict \
+        and 'id' in sdkSelfInfo[target_event.bot_info.hash] \
+        and 'username' in sdkSelfInfo[target_event.bot_info.hash]:
+            res_data['active'] = True
+            res_data['data']['name'] = str(sdkSelfInfo[target_event.bot_info.hash]['username'])
+            res_data['data']['id'] = str(sdkSelfInfo[target_event.bot_info.hash]['id'])
+        else:
+            this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
+            try:
+                this_msg.do_api('GET')
+                if this_msg.res is not None:
+                    raw_obj = init_api_json(this_msg.res)
+                if raw_obj is not None:
+                    if type(raw_obj) is dict \
+                    and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int):
+                        res_data['active'] = True
+                        res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
+                        res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
+            except:
+                res_data['active'] = False
         return res_data
 
+def get_msgid(key:str):
+    global sdkMsgidinfo
+    res = sdkMsgidinfo.get(key, 0)
+    if type(res) is int:
+        res += 1
+        sdkMsgidinfo[key] = res
+    else:
+        res = None
+    return res
 
 def init_api_json(raw_str):
     res_data = None
@@ -899,7 +934,7 @@ def init_api_json(raw_str):
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 

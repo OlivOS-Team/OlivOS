@@ -1235,6 +1235,8 @@ class Event(object):
             res_data = OlivOS.fanbookSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'qqGuild_link':
             res_data = OlivOS.qqGuildSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'dodo_link':
