@@ -313,9 +313,14 @@ def getTokenNow(bot_info:bot_info_T):
             ]
             access_token = sdkTokenInfo[plugin_event_bot_hash][0]
             try:
+                tmp_Proc = None
                 if OlivOS.bootAPI.gLoggerProc is not None:
-                    OlivOS.bootAPI.gLoggerProc.log(
-                        0,
+                    tmp_Proc = OlivOS.bootAPI.gLoggerProc
+                if OlivOS.pluginAPI.gProc is not None:
+                    tmp_Proc = OlivOS.pluginAPI.gProc
+                if tmp_Proc is not None:
+                    tmp_Proc.log(
+                        2,
                         OlivOS.L10NAPI.getTrans(
                             'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
                             [plugin_event_bot_hash, access_token],
