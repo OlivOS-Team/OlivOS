@@ -71,6 +71,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_message(self, ws, message):
         try:
+            #print(message)
             tmp_data_rx_obj = OlivOS.qqGuildv2SDK.PAYLOAD.rxPacket(
                 data=json.loads(message)
             )

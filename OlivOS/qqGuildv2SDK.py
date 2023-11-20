@@ -265,6 +265,7 @@ class api_templet(object):
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj=tmp_payload_dict)
+            #print(payload)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
@@ -281,6 +282,7 @@ class api_templet(object):
                 msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
+            #print(self.res)
             return msg_res.text
         except Exception as e:
             traceback.print_exc()
@@ -384,6 +386,8 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
+                #self.msg_type = 0
+                #self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -405,6 +409,8 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
+                #self.msg_type = 0
+                #self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     class sendQQMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -871,16 +877,8 @@ class event_action(object):
                 res += message_this.OP()
                 flag_now_type = 'string'
         if res != '':
-            res_list = []
-            for res_this in res.split('\n'):
-                if res_this != '':
-                    res_list.append({
-                        'name': res_this,
-                    })
-            this_msg.data.embed = {
-                'prompt': res,
-                'fields': res_list
-            }
+            this_msg.data.content = res
+            #this_msg.data.msg_type = 0
             this_msg.do_api()
 
     def get_login_info(target_event):
