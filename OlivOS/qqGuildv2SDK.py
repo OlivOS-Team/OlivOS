@@ -22,6 +22,10 @@ import time
 from datetime import datetime, timezone, timedelta
 import traceback
 import re
+from requests_toolbelt import MultipartEncoder
+import uuid
+import base64
+from urllib import parse
 
 import OlivOS
 
@@ -428,6 +432,7 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None  # str
+                self.media = None  # str
                 self.msg_type = 0
                 self.embed = None  # str
                 self.ark = None  # str
@@ -459,6 +464,56 @@ class API(object):
                 self.msg_id = None  # str
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
                 self.msg_seq = None
+
+    #资源文件上传
+    class setResourcePictureUpload(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/files'
+
+        class data_T(object):
+            def __init__(self):
+                self.file = None
+                self.type = 'qq_groups'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
+            try:
+                tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
+                payload = MultipartEncoder(
+                    fields=tmp_payload_dict
+                )
+
+                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+                if self.metadata is not None:
+                    tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
+                self.route = sdkAPIRoute[self.data.type] + '/{openid}/files'
+                send_url_temp = self.host + ':' + str(self.port) + self.route
+                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+                headers = {
+                    'Content-Type': payload.content_type,
+                    'Content-Length': str(len(self.data.file)),
+                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                    'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
+                    'X-Union-Appid': str(self.bot_info.id)
+                }
+
+                msg_res = None
+                if req_type == 'POST':
+                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+
+                self.res = msg_res.text
+                return msg_res.text
+            except Exception as e:
+                traceback.print_exc()
+                return None
 
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
@@ -844,18 +899,32 @@ class event_action(object):
         this_msg.data.msg_id = msg_id
         #this_msg.data.msg_id = reply_msg_id
         flag_now_type = 'string'
+        flag_now_type_last = flag_now_type
         res = ''
+        count_data = 0
+        size_data = len(message.data)
         for message_this in message.data:
+            count_data += 1
+            flag_now_type_last = flag_now_type
             if type(message_this) == OlivOS.messageAPI.PARA.image:
+                #this_msg.data.media = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
+                #this_msg.data.msg_type = 7
+                #this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
+                #this_msg.do_api()
+                #flag_now_type = 'image'
                 pass
             elif type(message_this) == OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
                 flag_now_type = 'string'
-        if res != '':
-            this_msg.data.content = res
-            this_msg.data.msg_type = 0
-            this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
-            this_msg.do_api()
+            if size_data == count_data\
+            or (flag_now_type_last != flag_now_type \
+            and flag_now_type_last == 'string' \
+            and len(res) > 0):
+                this_msg.data.content = res
+                this_msg.data.msg_type = 0
+                this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
+                this_msg.do_api()
+                res = ''
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
@@ -907,6 +976,54 @@ class event_action(object):
             except:
                 res_data['active'] = False
         return res_data
+
+    # 现场上传的就地实现
+    def setResourceUploadFast(target_event, url: str, type_path: str = 'images', type_chat: str = 'qq_groups'):
+        res = None
+        check_list = {
+            'images': ['.png', 'image/png'],
+            'videos': ['.mp4', 'video/mp4'],
+            'audios': ['.mp3', 'audio/mp3']
+        }
+        check_list.setdefault(type_path, ['', 'file/*'])
+        try:
+            pic_file = None
+            if url.startswith("base64://"):
+                data = url[9:]
+                pic_file = base64.decodebytes(data.encode("utf-8"))
+            else:
+                url_parsed = parse.urlparse(url)
+                if url_parsed.scheme in ["http", "https"]:
+                    send_url = url
+                    headers = {
+                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
+                    }
+                    msg_res = None
+                    msg_res = req.request("GET", send_url, headers=headers)
+                    pic_file = msg_res.content
+                else:
+                    file_path = url_parsed.path
+                    file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
+                    with open(file_path, "rb") as f:
+                        pic_file = f.read()
+
+            msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
+            msg_upload_api.data.file = pic_file
+            msg_upload_api.data.type = type_chat
+            msg_upload_api.do_api('POST', check_list[type_path])
+            #print(msg_upload_api.res)
+            if msg_upload_api.res is not None:
+                msg_upload_api_obj = json.loads(msg_upload_api.res)
+                if 'code' in msg_upload_api_obj \
+                and 0 == msg_upload_api_obj['code'] \
+                and 'data' in msg_upload_api_obj \
+                and 'url' in msg_upload_api_obj['data']:
+                    res = msg_upload_api_obj['data']['url']
+        except Exception as e:
+            traceback.print_exc()
+            res = None
+        return res
+
 
 def get_msgid(key:str):
     global sdkMsgidinfo
