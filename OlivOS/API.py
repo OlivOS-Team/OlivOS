@@ -59,6 +59,7 @@ class bot_info_T(object):
             port=port,
             access_token=access_token
         )
+        self.extends = {}
         self.debug_mode = False
         self.getHash()
 
@@ -110,6 +111,18 @@ def getMenuEvent(target_event):
     pass
 
 
+class inde_interface_T(object):
+    def __init__(self, event, platform:str):
+        self.platform = platform
+        self.event = event
+
+    def hasAPI(self, api_name):
+        res = False
+        if hasattr(self, api_name):
+            res = True
+        return res
+
+
 class Event(object):
     def __init__(self, sdk_event=None, log_func=None, Proc=None):
         self.bot_info = None
@@ -146,9 +159,16 @@ class Event(object):
             self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
         if type(self.log_func) is None:
             self.log_func = Proc.log
+        self.indeAPI = None
         self.get_Event_from_SDK()
         self.get_Event_on_Plugin()
+        self.__init_inde_interface()
         self.do_init_log()
+
+    def __init_inde_interface(self):
+        self.indeAPI = inde_interface_T(self, self.platform['platform'])
+        if self.platform['sdk'] == 'kaiheila_link':
+            self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
 
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.virtualTerminalSDK.event:
@@ -159,6 +179,8 @@ class Event(object):
             OlivOS.onebotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqGuildSDK.event:
             OlivOS.qqGuildSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.qqGuildv2SDK.event:
+            OlivOS.qqGuildv2SDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.discordSDK.event:
             OlivOS.discordSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.telegramSDK.event:
@@ -175,8 +197,12 @@ class Event(object):
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
         elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.qqRedSDK.event:
+            OlivOS.qqRedSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.dingtalkSDK.event:
+            OlivOS.dingtalkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
             OlivOS.biliLiveSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
@@ -654,7 +680,8 @@ class Event(object):
                     'friend_add_request'
                 ]
         ):
-            if 'host_group_id' in self.data.extend:
+            if hasattr(self.data, 'extend') \
+            and 'host_group_id' in self.data.extend:
                 self.__send('private', self.data.user_id, tmp_message, host_id=self.data.extend['host_group_id'],
                             flag_log=False)
             else:
@@ -754,7 +781,13 @@ class Event(object):
         if tmp_message is None:
             return
         if self.platform['sdk'] == 'terminal_link':
-            OlivOS.virtualTerminalSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
+            OlivOS.virtualTerminalSDK.event_action.send_msg(
+                self,
+                tmp_message,
+                self.plugin_info['control_queue'],
+                flag_type=flag_type,
+                target_id=target_id
+            )
         elif self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 if flag_type == 'private':
@@ -782,27 +815,75 @@ class Event(object):
                         OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
                     else:
                         OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+            elif self.platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.qqRedSDK.event_action.send_msg(self, 1, target_id, tmp_message, self.plugin_info['control_queue'])
+                elif flag_type == 'group':
+                    OlivOS.qqRedSDK.event_action.send_msg(self, 2, target_id, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
-                if 'reply_msg_id' in self.data.extend:
-                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message,
-                                                            self.data.extend['reply_msg_id'])
+                if hasattr(self.data, 'extend') \
+                and 'reply_msg_id' in self.data.extend:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
                 else:
                     OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
             elif flag_type == 'private':
-                if host_id is not None and not flag_log:
-                    OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message,
-                                                            self.data.extend['reply_msg_id'], flag_direct=True)
-                elif 'flag_from_direct' in self.data.extend:
-                    if self.data.extend['flag_from_direct']:
-                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message,
-                                                                self.data.extend['reply_msg_id'], flag_direct=True)
+                if hasattr(self.data, 'extend') \
+                and host_id is not None and not flag_log:
+                    OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                elif hasattr(self.data, 'extend') \
+                and 'flag_from_direct' in self.data.extend:
+                    if hasattr(self.data, 'extend') \
+                    and self.data.extend['flag_from_direct']:
+                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
                     else:
                         # 主动私聊待实现
                         pass
                 else:
                     # 主动私聊待实现
                     pass
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            if hasattr(self.data, 'extend') \
+            and self.data.extend.get('flag_from_qq', False):
+                if flag_type == 'group':
+                    if hasattr(self.data, 'extend') \
+                    and 'reply_msg_id' in self.data.extend:
+                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                    else:
+                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
+                elif flag_type == 'private':
+                    if hasattr(self.data, 'extend') \
+                    and 'flag_from_direct' in self.data.extend:
+                        if self.data.extend['flag_from_direct']:
+                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                        else:
+                            # 主动私聊待实现
+                            pass
+                    else:
+                        # 主动私聊待实现
+                        pass
+            else:
+                if flag_type == 'group':
+                    if hasattr(self.data, 'extend') \
+                    and 'reply_msg_id' in self.data.extend:
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                    else:
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
+                elif flag_type == 'private':
+                    if hasattr(self.data, 'extend') \
+                    and host_id is not None:
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                    elif  hasattr(self.data, 'extend') \
+                    and 'flag_from_direct' in self.data.extend \
+                    and 'reply_msg_id' in self.data.extend:
+                        if self.data.extend['flag_from_direct']:
+                            OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                        else:
+                            # 主动私聊待实现
+                            pass
+                    else:
+                        # 主动私聊待实现
+                        pass
         elif self.platform['sdk'] == 'discord_link':
             if flag_type == 'group':
                 OlivOS.discordSDK.event_action.send_msg(self, target_id, tmp_message)
@@ -843,6 +924,8 @@ class Event(object):
                 tx_packet_data = OlivOS.dodobotEATXAPI.server.rx_packet('send', tmp_send_msg)
                 for tx_queue_this in self.plugin_info['tx_queue']:
                     tx_queue_this.put(tx_packet_data, block=False)
+        elif self.platform['sdk'] == 'dingtalk_link':
+            OlivOS.dingtalkSDK.event_action.send_msg(self, flag_type, target_id, tmp_message)
 
         if flag_log and self.log_func is not None:
             if tmp_message_obj.active:
@@ -1164,6 +1247,8 @@ class Event(object):
             res_data = OlivOS.fanbookSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'qqGuild_link':
             res_data = OlivOS.qqGuildSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'dodo_link':

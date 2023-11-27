@@ -32,6 +32,8 @@ import OlivOS
 
 modelName = 'libEXEModelAPI'
 
+resourceUrlPath = OlivOS.infoAPI.resourceUrlPath
+
 gCheckList = [
     'gocqhttp',
     'gocqhttp_hide',
@@ -43,6 +45,319 @@ gCheckList = [
     'gocqhttp_show_Android_Pad',
     'gocqhttp_show_old'
 ]
+
+gProtocalInfo = {
+    'android_pad': {
+        '8.9.58': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537161402,
+    "sub_app_id": 537161402,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.58.11170",
+    "build_time": 1684467300,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2545",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1686334718,
+    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164888,
+    "sub_app_id": 537164888,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168361,
+    "sub_app_id": 537168361,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.70': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537169976,
+    "sub_app_id": 537169976,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.71': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537170072,
+    "sub_app_id": 537170072,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.71.11735",
+    "build_time": 1688560152,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1688560152,
+    "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.73': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537171018,
+    "sub_app_id": 537171018,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 6
+}''',
+        '8.9.80': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537176902,
+    "sub_app_id": 537176902,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.80.12440",
+    "build_time": 1691565978,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2554",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.83': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537178685,
+    "sub_app_id": 537178685,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.83.12605",
+    "build_time": 1691565978,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2554",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.85': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537180607,
+    "sub_app_id": 537180607,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.85.12820",
+    "build_time": 1697015435,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2556",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
+    "protocol_type": 6
+}'''
+    },
+    'android_phone': {
+        '8.9.58': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537163098,
+    "sub_app_id": 537163098,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.58.11170",
+    "build_time": 1684467300,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2545",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1686334718,
+    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164840,
+    "sub_app_id": 537164840,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168313,
+    "sub_app_id": 537168313,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.70': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537169928,
+    "sub_app_id": 537169928,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.71': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537170024,
+    "sub_app_id": 537170024,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.71.11735",
+    "build_time": 1688560152,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1688560152,
+    "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.73': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537171007,
+    "sub_app_id": 537171007,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 1
+}''',
+        '8.9.80': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537176863,
+    "sub_app_id": 537176863,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.80.12440",
+    "build_time": 1691565978,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2554",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.83': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537178646,
+    "sub_app_id": 537178646,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.83.12605",
+    "build_time": 1691565978,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2554",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.85': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537180568,
+    "sub_app_id": 537180568,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.85.12820",
+    "build_time": 1697015435,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2556",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1692110632,
+    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
+    "protocol_type": 1
+}'''
+    }
+}
 
 def startGoCqhttpLibExeModel(
     plugin_bot_info_dict,
@@ -62,7 +377,7 @@ def startGoCqhttpLibExeModel(
             releaseDir('./lib')
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource/',
+                resouce_api=resourceUrlPath,
                 resouce_name='go-cqhttp',
                 filePath='./lib/go-cqhttp.exe',
                 filePathUpdate='./lib/go-cqhttp.exe.tmp',
@@ -356,60 +671,168 @@ class goTypeConfig(object):
         self.config_file_format = {}
 
     def setConfig(self):
-        self.config_file_str = (
-            "account:\n"
-            "  uin: {uin}\n"
-            "  password: '{password}'\n"
-            "  encrypt: false\n"
-            "  status: 0\n"
-            "  relogin:\n"
-            "    disabled: false\n"
-            "    delay: 3\n"
-            "    interval: 0\n"
-            "    max-times: 0\n"
-            "  use-sso-address: true\n"
-            "\n"
-            "heartbeat:\n"
-            "  disabled: false\n"
-            "  interval: 5\n"
-            "\n"
-            "message:\n"
-            "  post-format: string\n"
-            "  ignore-invalid-cqcode: false\n"
-            "  force-fragment: false\n"
-            "  fix-url: false\n"
-            "  proxy-rewrite: ''\n"
-            "  report-self-message: true\n"
-            "  remove-reply-at: false\n"
-            "  extra-reply-data: false\n"
-            "\n"
-            "output:\n"
-            "  log-level: info\n"
-            "  debug: false\n"
-            "\n"
-            "default-middlewares: &default\n"
-            "  access-token: '{access-token}'\n"
-            "  filter: '../filter.json'\n"
-            "  rate-limit:\n"
-            "    enabled: false\n"
-            "    frequency: 1\n"
-            "    bucket: 1\n"
-            "\n"
-            "servers:\n"
-            "  - http:\n"
-            "      disabled: false\n"
-            "      host: {servers-host}\n"
-            "      port: {servers-port}\n"
-            "      timeout: 60\n"
-            "      middlewares:\n"
-            "        <<: *default\n"
-            "      post:\n"
-            "       - url: '{servers-post-url}'\n"
-            "\n"
-            "database:\n"
-            "  leveldb:\n"
-            "    enable: true\n"
-        )
+        self.config_file_str = '''
+account: # 账号相关
+  uin: {uin} # QQ账号
+  password: '{password}' # 密码为空时使用扫码登录
+  encrypt: false  # 是否开启密码加密
+  status: 0      # 在线状态 请参考 https://docs.go-cqhttp.org/guide/config.html#在线状态
+  relogin: # 重连设置
+    delay: 3   # 首次重连延迟, 单位秒
+    interval: 3   # 重连间隔
+    max-times: 0  # 最大重连次数, 0为无限制
+
+  # 是否使用服务器下发的新地址进行重连
+  # 注意, 此设置可能导致在海外服务器上连接情况更差
+  use-sso-address: true
+  # 是否允许发送临时会话消息
+  allow-temp-session: false
+
+  # 数据包的签名服务器列表，第一个作为主签名服务器，后续作为备用
+  # 兼容 https://github.com/fuqiuluo/unidbg-fetch-qsign
+  # 如果遇到 登录 45 错误, 或者发送信息风控的话需要填入一个或多个服务器
+  # 不建议设置过多，设置主备各一个即可，超过 5 个只会取前五个
+  # 示例:
+  # sign-servers: 
+  #   - url: 'http://127.0.0.1:8080' # 本地签名服务器
+  #     key: "114514"  # 相应 key
+  #     authorization: "-"   # authorization 内容, 依服务端设置
+  #   - url: 'https://signserver.example.com' # 线上签名服务器
+  #     key: "114514"  
+  #     authorization: "-"   
+  #   ...
+  # 
+  # 服务器可使用docker在本地搭建或者使用他人开放的服务
+  sign-servers: 
+{sign-servers-data}
+
+  # 判断签名服务不可用（需要切换）的额外规则
+  # 0: 不设置 （此时仅在请求无法返回结果时判定为不可用）
+  # 1: 在获取到的 sign 为空 （若选此建议关闭 auto-register，一般为实例未注册但是请求签名的情况）
+  # 2: 在获取到的 sign 或 token 为空（若选此建议关闭 auto-refresh-token ）
+  rule-change-sign-server: 1
+
+  # 连续寻找可用签名服务器最大尝试次数
+  # 为 0 时会在连续 3 次没有找到可用签名服务器后保持使用主签名服务器，不再尝试进行切换备用
+  # 否则会在达到指定次数后 **退出** 主程序
+  max-check-count: 0
+  # 签名服务请求超时时间(s)
+  sign-server-timeout: 60
+  # 如果签名服务器的版本在1.1.0及以下, 请将下面的参数改成true
+  # 建议使用 1.1.6 以上版本，低版本普遍半个月冻结一次
+  is-below-110: false
+  # 在实例可能丢失（获取到的签名为空）时是否尝试重新注册
+  # 为 true 时，在签名服务不可用时可能每次发消息都会尝试重新注册并签名。
+  # 为 false 时，将不会自动注册实例，在签名服务器重启或实例被销毁后需要重启 go-cqhttp 以获取实例
+  # 否则后续消息将不会正常签名。关闭此项后可以考虑开启签名服务器端 auto_register 避免需要重启
+  # 由于实现问题，当前建议关闭此项，推荐开启签名服务器的自动注册实例
+  auto-register: false
+  # 是否在 token 过期后立即自动刷新签名 token（在需要签名时才会检测到，主要防止 token 意外丢失）
+  # 独立于定时刷新
+  auto-refresh-token: false
+  # 定时刷新 token 间隔时间，单位为分钟, 建议 30~40 分钟, 不可超过 60 分钟
+  # 目前丢失token也不会有太大影响，可设置为 0 以关闭，推荐开启
+  refresh-interval: 40
+
+heartbeat:
+  # 心跳频率, 单位秒
+  # -1 为关闭心跳
+  interval: 5
+
+message:
+  # 上报数据类型
+  # 可选: string,array
+  post-format: string
+  # 是否忽略无效的CQ码, 如果为假将原样发送
+  ignore-invalid-cqcode: false
+  # 是否强制分片发送消息
+  # 分片发送将会带来更快的速度
+  # 但是兼容性会有些问题
+  force-fragment: false
+  # 是否将url分片发送
+  fix-url: false
+  # 下载图片等请求网络代理
+  proxy-rewrite: ''
+  # 是否上报自身消息
+  report-self-message: true
+  # 移除服务端的Reply附带的At
+  remove-reply-at: false
+  # 为Reply附加更多信息
+  extra-reply-data: false
+  # 跳过 Mime 扫描, 忽略错误数据
+  skip-mime-scan: false
+  # 是否自动转换 WebP 图片
+  convert-webp-image: false
+  # download 超时时间(s)
+  http-timeout: 15
+
+output:
+  # 日志等级 trace,debug,info,warn,error
+  log-level: info
+  # 日志时效 单位天. 超过这个时间之前的日志将会被自动删除. 设置为 0 表示永久保留.
+  log-aging: 15
+  # 是否在每次启动时强制创建全新的文件储存日志. 为 false 的情况下将会在上次启动时创建的日志文件续写
+  log-force-new: true
+  # 是否启用日志颜色
+  log-colorful: false
+  # 是否启用 DEBUG
+  debug: false # 开启调试模式
+
+# 默认中间件锚点
+default-middlewares: &default
+  # 访问密钥, 强烈推荐在公网的服务器设置
+  access-token: '{access-token}'
+  # 事件过滤器文件目录
+  # API限速设置
+  # 该设置为全局生效
+  # 原 cqhttp 虽然启用了 rate_limit 后缀, 但是基本没插件适配
+  # 目前该限速设置为令牌桶算法, 请参考:
+  # https://baike.baidu.com/item/%E4%BB%A4%E7%89%8C%E6%A1%B6%E7%AE%97%E6%B3%95/6597000?fr=aladdin
+  filter: '../filter.json'
+  rate-limit:
+    enabled: false # 是否启用限速
+    frequency: 1  # 令牌回复频率, 单位秒
+    bucket: 1     # 令牌桶大小
+
+servers:
+  # 添加方式，同一连接方式可添加多个，具体配置说明请查看文档
+  #- http: # http 通信
+  #- ws:   # 正向 Websocket
+  #- ws-reverse: # 反向 Websocket
+  #- pprof: #性能分析服务器
+  - http:
+      address: {servers-host}:{servers-port} # HTTP监听地址
+      version: 11      # OneBot协议版本, 支持 11/12
+      timeout: 60      # 反向 HTTP 超时时间, 单位秒，<5 时将被忽略
+      long-polling:   # 长轮询拓展
+        enabled: false       # 是否开启
+        max-queue-size: 2000 # 消息队列大小，0 表示不限制队列大小，谨慎使用
+      middlewares:
+        <<: *default # 引用默认中间件
+      post:           # 反向HTTP POST地址列表
+       - url: '{servers-post-url}'
+      #- url: ''                # 地址
+      #  secret: ''             # 密钥
+      #  max-retries: 3         # 最大重试，0 时禁用
+      #  retries-interval: 1500 # 重试时间，单位毫秒，0 时立即
+      #- url: http://127.0.0.1:5701/ # 地址
+      #  secret: ''                  # 密钥
+      #  max-retries: 10             # 最大重试，0 时禁用
+      #  retries-interval: 1000      # 重试时间，单位毫秒，0 时立即
+
+database: # 数据库相关设置
+  leveldb:
+    # 是否启用内置leveldb数据库
+    # 启用将会增加10-20MB的内存占用和一定的磁盘空间
+    # 关闭将无法使用 撤回 回复 get_msg 等上下文相关功能
+    enable: true
+  sqlite3:
+    # 是否启用内置sqlite3数据库
+    # 启用将会增加一定的内存占用和一定的磁盘空间
+    # 关闭将无法使用 撤回 回复 get_msg 等上下文相关功能
+    enable: false
+    cachettl: 3600000000000 # 1h
+'''
 
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['password'] = self.bot_info_dict.password
@@ -429,6 +852,23 @@ class goTypeConfig(object):
         self.config_file_format['servers-port'] = str(self.bot_info_dict.post_info.port)
         self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(
             self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
+        self.config_file_format['sign-servers-data'] = '''
+    - url: '-'
+      key: '-'
+      authorization: '-'
+'''
+        if 'qsign-server' in self.bot_info_dict.extends \
+        and type(self.bot_info_dict.extends['qsign-server']) is list \
+        and len(self.bot_info_dict.extends['qsign-server']) > 0:
+            self.config_file_format['sign-servers-data'] = ''
+            for tmp_data_this in self.bot_info_dict.extends['qsign-server']:
+                if type(tmp_data_this) is dict \
+                and 'addr' in tmp_data_this \
+                and 'key' in tmp_data_this:
+                    self.config_file_format['sign-servers-data'] += '''
+    - url: '%s'
+      key: '%s'
+      authorization: '-' ''' % (tmp_data_this['addr'], tmp_data_this['key'])
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 
@@ -483,6 +923,33 @@ def accountFix(bot_info_dict, logger_proc):
                     f.write(json.dumps(device_info, ensure_ascii = False))
             except:
                 pass
+
+            protocal_info = None
+            protocal_num = 6
+            releaseDir('./conf/gocqhttp/' + bot_hash)
+            releaseDir('./conf/gocqhttp/' + bot_hash + '/data')
+            releaseDir('./conf/gocqhttp/' + bot_hash + '/data/versions')
+            if 'qsign-server-protocal' in bot_info_dict[bot_hash].extends \
+            and type(bot_info_dict[bot_hash].extends['qsign-server-protocal']) is str:
+                if bot_info_dict[bot_hash].platform['model'] in [
+                    'gocqhttp_show_Android_Pad'
+                ]:
+                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_pad']:
+                        protocal_info = gProtocalInfo['android_pad'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                    protocal_num = 6
+                if bot_info_dict[bot_hash].platform['model'] in [
+                    'gocqhttp_show_Android_Phone'
+                ]:
+                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
+                        protocal_info = gProtocalInfo['android_phone'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                    protocal_num = 1
+            if protocal_info is not None:
+                file_path = './conf/gocqhttp/' + bot_hash + '/data/versions/%d.json' % protocal_num
+                try:
+                    with open(file_path, 'w', encoding = 'utf-8') as f:
+                        f.write(protocal_info)
+                except:
+                    pass
 
 def deviceInfoFix(deviceInfo:dict):
     deviceRes = copy.deepcopy(deviceInfo)

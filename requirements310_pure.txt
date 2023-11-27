@@ -6,7 +6,7 @@ requests
 pybase64
 websockets
 websocket-client
-pillow
+pillow==9.3.0
 rsa
 requests_toolbelt
 pystray
@@ -15,3 +15,4 @@ qrcode
 brotli
 pyjson5
 pywebview
+filetype

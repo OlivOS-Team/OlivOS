@@ -50,7 +50,7 @@ dictL10NSTR = {
         'onebotV12LinkServerAPI_0004': 'OlivOS onebotV12 link server [{0}] websocket link close',
         'onebotV12LinkServerAPI_0005': 'OlivOS onebotV12 link server [{0}] websocket link start',
         'onebotV12LinkServerAPI_0006': 'OlivOS onebotV12 link server [{0}] websocket link lost',
-        'hackChatLinkServerAPI_0001': 'OlivOS hackChat link server [{0}] is running',
+        'hackChatLinkServerAPI_0001': 'OlivOS hackChat link server [{0}] is running on [{1}]',
         'hackChatLinkServerAPI_0002': 'OlivOS hackChat link server [{0}] websocket link will retry in {1}s',
         'hackChatLinkServerAPI_0003': 'OlivOS hackChat link server [{0}] websocket link error',
         'hackChatLinkServerAPI_0004': 'OlivOS hackChat link server [{0}] websocket link close',
@@ -99,6 +99,7 @@ dictL10NSTR = {
         'bootAPI_0004': 'OlivOS model [{0}] type init',
         'bootAPI_0005': 'OlivOS model [{0}] stopped',
         'bootAPI_0006': 'OlivOS model [{0}] will stop',
+        'qqGuildv2SDK_0001': 'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -129,7 +130,7 @@ dictL10NSTR = {
         'onebotV12LinkServerAPI_0004': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经关闭',
         'onebotV12LinkServerAPI_0005': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经启动',
         'onebotV12LinkServerAPI_0006': 'OlivOS onebotV12 连接服务组件 [{0}] WebSocket 连接 已经丢失',
-        'hackChatLinkServerAPI_0001': 'OlivOS hackChat 连接服务组件 [{0}] 正在运作',
+        'hackChatLinkServerAPI_0001': 'OlivOS hackChat 连接服务组件 [{0}] 正在运作, 采用WS服务器 [{1}]',
         'hackChatLinkServerAPI_0002': 'OlivOS hackChat 连接服务组件 [{0}] WebSocket 连接 将在{1}秒内重试',
         'hackChatLinkServerAPI_0003': 'OlivOS hackChat 连接服务组件 [{0}] WebSocket 连接 发生错误',
         'hackChatLinkServerAPI_0004': 'OlivOS hackChat 连接服务组件 [{0}] WebSocket 连接 已经关闭',
@@ -178,5 +179,6 @@ dictL10NSTR = {
         'bootAPI_0004': 'OlivOS 组件 [{0}] 类型 即将初始化',
         'bootAPI_0005': 'OlivOS 组件 [{0}] 已被停止',
         'bootAPI_0006': 'OlivOS 组件 [{0}] 即将停止',
+        'qqGuildv2SDK_0001': 'OlivOS QQ官方开放平台 [{0}] 刷新 TOKEN [{1}]',
     }
 }

@@ -80,35 +80,57 @@ def get_Event_from_SDK(target_event):
         platform_model=target_event.platform['model']
     )
     message_obj = None
+    user_conf = None
     if target_event.platform['model'] in ['default']:
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_string',
             target_event.sdk_event.payload.key['data']['data']
         )
+        user_conf = target_event.sdk_event.payload.key['data']['user_conf']
     if message_obj is not None and target_event.platform['model'] in ['default']:
         if message_obj.active:
             target_event.active = True
-            target_event.plugin_info['func_type'] = 'group_message'
-            target_event.data = target_event.group_message(
-                str(88888888),
-                str(88888888),
-                message_obj,
-                'group'
-            )
+            tmp_user_conf = {
+                "user_name": "未知",
+                "user_id": "-1",
+                "flag_group": True,
+                "target_id": "-1",
+                "group_role": "member",
+            }
+            if user_conf is not None:
+                tmp_user_conf.update(user_conf)
+            if tmp_user_conf["flag_group"] == True:
+                target_event.plugin_info['func_type'] = 'group_message'
+                target_event.data = target_event.group_message(
+                    tmp_user_conf["target_id"],             # 此时的 target_id 为群号
+                    tmp_user_conf["user_id"],
+                    message_obj,
+                    'group'
+                )
+            else:
+                target_event.plugin_info['func_type'] = 'private_message'
+                target_event.data = target_event.private_message(
+                    tmp_user_conf["user_id"],               # 此时的 user_id 为发送者的 user_id，接收者固定为机器人
+                    message_obj,
+                    'private'
+                )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = str(88888888)
             target_event.data.raw_message = message_obj
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
-            target_event.data.sender['user_id'] = str(88888888)
-            target_event.data.sender['nickname'] = '仑质'
-            target_event.data.sender['id'] = str(88888888)
-            target_event.data.sender['name'] = '仑质'
+            target_event.data.sender['user_id'] = tmp_user_conf["user_id"]
+            target_event.data.sender['nickname'] = tmp_user_conf["user_name"]
+            target_event.data.sender['id'] = tmp_user_conf["user_id"]
+            target_event.data.sender['name'] = tmp_user_conf["user_name"]
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
-            target_event.data.sender['role'] = 'owner'
+            if tmp_user_conf["flag_group"] \
+            and 'unknown' != tmp_user_conf["group_role"]:
+                target_event.data.sender['role'] = tmp_user_conf["group_role"]
             target_event.data.host_id = None
     elif target_event.platform['model'] in ['postapi', 'ff14']:
+        # 此段内容不修改
         if 'type' in target_event.sdk_event.payload and target_event.sdk_event.payload['type'] == 'message':
             if 'message_type' in target_event.sdk_event.payload and target_event.sdk_event.payload['message_type'] == 'group_message':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -151,8 +173,9 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
-    def send_msg(target_event, message, control_queue):
+class event_action:
+    @staticmethod
+    def send_msg(target_event, message,  control_queue, flag_type="group", target_id=None):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
@@ -160,7 +183,17 @@ class event_action(object):
             platform_model=target_event.platform['model']
         )
         if target_event.platform['model'] in ['default']:
-            send_log_event(plugin_event_bot_hash, message, 'BOT', control_queue)
+            if target_event.active:
+                user_conf = {}
+                user_conf['user_name'] = "BOT"
+                user_conf['user_id'] = target_event.base_info['self_id']
+                user_conf['target_id'] = target_id
+                if flag_type == 'group':
+                    user_conf['flag_group'] = True
+                    user_conf['group_role'] = "member"
+                else:
+                    user_conf['flag_group'] = False
+                send_log_event(plugin_event_bot_hash, message, 'BOT', control_queue, user_conf)
         elif target_event.platform['model'] in ['postapi']:
             if target_event.sdk_event.event_id is not None:
                 evnet_id = target_event.sdk_event.event_id
@@ -184,7 +217,7 @@ def sendControlEventSend(action, data, control_queue):
         )
 
 
-def send_log_event(hash, data, name, control_queue):
+def send_log_event(hash, data, name, control_queue, user_conf=None):
     sendControlEventSend('send', {
         'target': {
             'type': 'nativeWinUI'
@@ -194,7 +227,8 @@ def send_log_event(hash, data, name, control_queue):
             'event': 'log',
             'hash': hash,
             'data': data,
-            'name': name
+            'name': name,
+            'user_conf': user_conf
         }
     },
                          control_queue

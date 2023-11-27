@@ -1,0 +1,70 @@
+name: "错误报告"
+description: "创建报告以帮助我们改进"
+title: "bug: "
+labels: ["bug?"]
+body:
+  - type: input
+    id: describe
+    attributes:
+      label: "描述错误"
+      placeholder: "清晰简洁地描述错误是什么。"
+    validations:
+      required: true
+  - type: textarea
+    id: deproduce
+    attributes:
+      label: "重现行为"
+      placeholder: |
+        步骤：
+        1. 去 “...”
+        2. 点击 “....”
+        3. 向下滚动到“....”
+        4. 查看错误
+    validations:
+      required: false
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: "预期行为"
+      description: "对您预期会发生的事情的清晰简明描述。"
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "屏幕截图"
+      description: "如果适用，请添加屏幕截图以帮助解释您的问题。"
+    validations:
+      required: false
+  - type: textarea
+    id: desktop
+    attributes:
+      label: "桌面（请填写以下信息）"
+      description: |
+         - 操作系统：[例如 IOS]
+         - 浏览器 [例如 chrome, safari]
+         - 版本 [例如 22]
+    validations:
+      required: true
+  - type: textarea
+    id: smartphone
+    attributes:
+      label: "智能手机（请填写以下信息）"
+      description: |
+         - 设备：[例如iPhone6]
+         - 操作系统：[例如iOS8.1]
+         - 浏览器 [例如股票浏览器，野生动物园]
+         - 版本 [例如 22]
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: "附加上下文"
+      description: "在此处添加有关该问题的任何其他上下文。"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        [论坛](https://forum.olivos.run)

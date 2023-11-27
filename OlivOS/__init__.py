@@ -41,6 +41,10 @@ from . import virtualTerminalSDK
 from . import virtualTerminalLinkServerAPI
 from . import qqGuildSDK
 from . import qqGuildLinkServerAPI
+from . import qqGuildv2SDK
+from . import qqGuildv2LinkServerAPI
+from . import qqRedSDK
+from . import qqRedLinkServerAPI
 from . import telegramSDK
 from . import telegramPollServerAPI
 from . import discordSDK
@@ -54,6 +58,8 @@ from . import dodoSDK
 from . import dodoPollServerAPI
 from . import dodoLinkSDK
 from . import dodoLinkServerAPI
+from . import dingtalkSDK
+from . import dingtalkLinkServerAPI
 from . import fanbookSDK
 from . import fanbookPollServerAPI
 from . import kaiheilaSDK

@@ -29,6 +29,11 @@ class api_result_error_template(object):
 
 
 class api_result_data_template(object):
+    class universal_result(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+
     class get_msg(dict):
         def __init__(self):
             self['active'] = False

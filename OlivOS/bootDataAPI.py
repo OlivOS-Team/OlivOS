@@ -33,11 +33,14 @@ default_Conf = {
             "OlivOS_walleq_lib_exe_model",
             "OlivOS_cwcb_lib_exe_model",
             "OlivOS_hackChat_link",
+            "OlivOS_qqRed_link",
+            "OlivOS_dingtalk_link",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
             "OlivOS_onebotV12_link",
             "OlivOS_qqGuild_link",
+            "OlivOS_qqGuildv2_link",
             "OlivOS_discord_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
@@ -72,10 +75,13 @@ default_Conf = {
                 "OlivOS_walleq_lib_exe_model",
                 "OlivOS_cwcb_lib_exe_model",
                 "OlivOS_hackChat_link",
+                "OlivOS_qqRed_link",
+                "OlivOS_dingtalk_link",
                 "OlivOS_virtual_terminal_link",
                 "OlivOS_flask_post_rx",
                 "OlivOS_onebotV12_link",
                 "OlivOS_qqGuild_link",
+                "OlivOS_qqGuildv2_link",
                 "OlivOS_discord_link",
                 "OlivOS_telegram_poll",
                 "OlivOS_fanbook_poll",
@@ -90,10 +96,13 @@ default_Conf = {
                 "walleq_lib_exe_model",
                 "cwcb_lib_exe_model",
                 "hackChat_link",
+                "qqRed_link",
+                "dingtalk_link",
                 "terminal_link",
                 "flask_post_rx",
                 "onebotV12_link",
                 "qqGuild_link",
+                "qqGuildv2_link",
                 "discord_link",
                 "telegram_poll",
                 "fanbook_poll",
@@ -118,7 +127,9 @@ default_Conf = {
         "OlivOS_virtual_terminal_queue",
         "OlivOS_hackChat_queue",
         "OlivOS_biliLive_queue",
-        "OlivOS_onebotv12_queue"
+        "OlivOS_onebotv12_queue",
+        "OlivOS_qqRed_queue",
+        "OlivOS_dingtalk_queue"
     ],
     "models": {
         "OlivOS_sleep": {
@@ -282,6 +293,17 @@ default_Conf = {
             "logger_proc": "OlivOS_logger",
             "debug": False
         },
+        "OlivOS_qqGuildv2_link": {
+            "enable": True,
+            "name": "OlivOS_qqGuildv2_link",
+            "type": "qqGuildv2_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": None,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
         "OlivOS_discord_link": {
             "enable": True,
             "name": "OlivOS_discord_link",
@@ -300,6 +322,17 @@ default_Conf = {
             "interval": 0.2,
             "dead_interval": 1,
             "rx_queue": "OlivOS_hackChat_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_qqRed_link": {
+            "enable": True,
+            "name": "OlivOS_qqRed_link",
+            "type": "qqRed_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_qqRed_queue",
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False
@@ -384,6 +417,17 @@ default_Conf = {
             "interval": 0.2,
             "dead_interval": 1,
             "rx_queue": "OlivOS_dodobot_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_dingtalk_link": {
+            "enable": True,
+            "name": "OlivOS_dingtalk_link",
+            "type": "dingtalk_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_dingtalk_queue",
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False

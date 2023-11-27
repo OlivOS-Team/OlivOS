@@ -32,6 +32,7 @@ dictMessageType = {
         'onebot': {
             'default': 'old_string',
             'onebotV12': 'obv12_para',
+            'red': 'olivos_para',
             'gocqhttp': 'old_string',
             'gocqhttp_hide': 'old_string',
             'gocqhttp_show': 'old_string',
@@ -57,6 +58,11 @@ dictMessageType = {
             'default': 'olivos_para',
             'private': 'olivos_para',
             'public': 'olivos_para'
+        },
+        'qqGuildv2_link': {
+            'default': 'olivos_para',
+            'private': 'olivos_para',
+            'public': 'olivos_para'
         }
     },
     'telegram': {
@@ -72,7 +78,9 @@ dictMessageType = {
     },
     'kaiheila': {
         'kaiheila_link': {
-            'default': 'olivos_para'
+            'default': 'olivos_para',
+            'card': 'olivos_para',
+            'text': 'olivos_para'
         }
     },
     'discord': {
@@ -82,12 +90,19 @@ dictMessageType = {
     },
     'dodo': {
         'dodo_link': {
-            'default': 'olivos_para'
+            'default': 'olivos_para',
+            'v1': 'olivos_para',
+            'v2': 'olivos_para'
         },
         'dodo_poll': {
             'default': 'olivos_para'
         },
         'dodobot_ea': {
+            'default': 'olivos_para'
+        }
+    },
+    'dingtalk': {
+        'dingtalk_link': {
             'default': 'olivos_para'
         }
     },
@@ -105,7 +120,8 @@ dictMessageType = {
     },
     'hackChat': {
         'hackChat_link': {
-            'default': 'olivos_string'
+            'default': 'olivos_string',
+            'private': 'olivos_string'
         }
     },
     'biliLive': {
@@ -776,7 +792,7 @@ class PARA(object):
 
     class video(PARA_templet):
         def __init__(self, file, url=None, cache=None, proxy=None, timeout=None):
-            PARA_templet.__init__(self, 'record', self.data_T(file, url, cache, proxy, timeout))
+            PARA_templet.__init__(self, 'video', self.data_T(file, url, cache, proxy, timeout))
 
         class data_T(dict):
             def __init__(self, file, url, cache, proxy, timeout):

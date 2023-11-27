@@ -18,3 +18,4 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 from . import JyunkoUserConf
 from . import IOStream
+from . import UserConfDB

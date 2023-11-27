@@ -58,6 +58,8 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['bot_info_dict']
                 )
             )
+            if self.Proc_data['bot_info_dict'].platform['model'] == 'v1':
+                api_obj.host = OlivOS.dodoLinkSDK.sdkAPIHost['v1']
             try:
                 api_obj.do_api('POST')
                 api_obj_json = json.loads(api_obj.res)

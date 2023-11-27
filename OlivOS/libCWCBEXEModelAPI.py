@@ -32,6 +32,8 @@ import OlivOS
 
 modelName = 'libCWCBEXEModelAPI'
 
+resourceUrlPath = OlivOS.infoAPI.resourceUrlPath
+
 gCheckList = [
     'ComWeChatBotClient'
 ]
@@ -55,7 +57,7 @@ def startCWCBQLibExeModel(
             releaseDir('./lib')
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource/',
+                resouce_api=resourceUrlPath,
                 resouce_name='ComWeChat-Client',
                 filePath='./lib/ComWeChat-Client.exe',
                 filePathUpdate='./lib/ComWeChat-Client.exe.tmp',
@@ -63,7 +65,7 @@ def startCWCBQLibExeModel(
             )
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource/',
+                resouce_api=resourceUrlPath,
                 resouce_name='CWeChatRobot-exe',
                 filePath='./lib/CWeChatRobot.exe',
                 filePathUpdate='./lib/CWeChatRobot.exe.tmp',
@@ -71,7 +73,7 @@ def startCWCBQLibExeModel(
             )
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api='https://api.oliva.icu/olivosver/resource/',
+                resouce_api=resourceUrlPath,
                 resouce_name='DWeChatRobot-dll',
                 filePath='./lib/DWeChatRobot.dll',
                 filePathUpdate='./lib/DWeChatRobot.dll.tmp',

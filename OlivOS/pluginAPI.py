@@ -71,7 +71,7 @@ class shallow(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
                  treading_mode='full', restart_gate=10000, enable_auto_restart=False):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='shallow', scan_interval=scan_interval,
+        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='plugin', scan_interval=scan_interval,
                                          dead_interval=dead_interval, rx_queue=rx_queue, tx_queue=tx_queue,
                                          control_queue=control_queue, logger_proc=logger_proc)
         if bot_info_dict is None:
@@ -91,6 +91,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
+        self.database = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -124,9 +125,12 @@ class shallow(OlivOS.API.Proc_templet):
         releaseDir('./lib/DLLs')
         releaseDir('./data')
         releaseDir('./data/images')
+        releaseDir('./data/videos')
+        releaseDir('./data/audios')
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
+        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(self.log, max_thread=None, timeout=self.Proc_info.dead_interval)
         self.load_plugin_list()
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
@@ -145,16 +149,19 @@ class shallow(OlivOS.API.Proc_templet):
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
-                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name),
-                                                         block=False)
-                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init', self.Proc_name), block=False)
+                        self.Proc_info.control_queue.put(
+                            OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'),
                                                          block=False)
+                        # 在运行过 save 指令后，将配置数据库关闭
+                        self.database.stop()
                     elif rx_packet_data.action == 'send':
                         self.menu_queue.append(rx_packet_data)
                 else:
@@ -651,11 +658,14 @@ class shallow(OlivOS.API.Proc_templet):
                                     )
                                     removeDir(plugin_path_tmp + plugin_dir_this)
                                     plugin_dir_this = plugin_namespace
+
+                            # 完成配置数据库中对应插件命名空间的表格页初始化
+                            self.database._init_namespace(plugin_models_dict_this['namespace'])
+
                             plugin_models_dict[plugin_dir_this] = {
                                 'isOPK': flag_is_opk,
                                 'data': plugin_models_dict_this
                             }
-
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)

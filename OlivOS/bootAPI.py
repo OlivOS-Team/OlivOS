@@ -278,6 +278,56 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     )
                                     Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                         tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'qqRed_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                                    flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                                    tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                    tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                                    multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                                    Proc_dict[tmp_Proc_name] = OlivOS.qqRedLinkServerAPI.server(
+                                        Proc_name=tmp_Proc_name,
+                                        scan_interval=basic_conf_models_this['interval'],
+                                        dead_interval=basic_conf_models_this['dead_interval'],
+                                        rx_queue=multiprocessing_dict[tmp_queue_name],
+                                        tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                        logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                        bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                                        debug_mode=False
+                                    )
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'dingtalk_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'dingtalk_link':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
+                                    flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'dingtalk_link':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
+                                    tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                    tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                                    multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                                    Proc_dict[tmp_Proc_name] = OlivOS.dingtalkLinkServerAPI.server(
+                                        Proc_name=tmp_Proc_name,
+                                        scan_interval=basic_conf_models_this['interval'],
+                                        dead_interval=basic_conf_models_this['dead_interval'],
+                                        rx_queue=multiprocessing_dict[tmp_queue_name],
+                                        tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                        logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                        bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                                        debug_mode=False
+                                    )
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config':
                         plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
                             path=basic_conf_models_this['data']['path'],
@@ -323,6 +373,28 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuild_link':
                                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                 Proc_dict[tmp_Proc_name] = OlivOS.qqGuildLinkServerAPI.server(
+                                    Proc_name=tmp_Proc_name,
+                                    scan_interval=basic_conf_models_this['interval'],
+                                    dead_interval=basic_conf_models_this['dead_interval'],
+                                    rx_queue=None,
+                                    tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                    bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                                    debug_mode=False
+                                )
+                                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
+                                    tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'qqGuildv2_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link':
+                                flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link':
+                                tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                Proc_dict[tmp_Proc_name] = OlivOS.qqGuildv2LinkServerAPI.server(
                                     Proc_name=tmp_Proc_name,
                                     scan_interval=basic_conf_models_this['interval'],
                                     dead_interval=basic_conf_models_this['dead_interval'],
@@ -638,11 +710,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
             elif rx_packet_data.action == 'restart_do':
+                Proc_type_this = Proc_dict[rx_packet_data.key].Proc_type
                 time.sleep(Proc_dict[rx_packet_data.key].Proc_info.dead_interval)
                 Proc_Proc_dict[rx_packet_data.key].terminate()
                 Proc_Proc_dict[rx_packet_data.key].join()
                 Proc_dict.pop(rx_packet_data.key)
                 Proc_Proc_dict.pop(rx_packet_data.key)
+                main_control.control_queue.put(
+                    OlivOS.API.Control.packet('init_type', Proc_type_this),
+                    block=False
+                )
             elif rx_packet_data.action == 'restart_send':
                 for tmp_Proc_name in basic_conf_models:
                     basic_conf_models_this = basic_conf_models[tmp_Proc_name]

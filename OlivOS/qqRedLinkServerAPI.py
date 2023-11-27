@@ -6,7 +6,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   OlivOS/hackChatLinkServerAPI.py
+@File      :   OlivOS/qqRedLinkServerAPI.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
@@ -19,22 +19,32 @@ import json
 import websocket
 import uuid
 import threading
+import traceback
 
 import OlivOS
-from OlivOS import hackChatSDK
-from OlivOS.qqGuildSDK import PAYLOAD
 
-modelName = 'hackChatLinkServerAPI'
+modelName = 'qqRedLinkServerAPI'
 
-gDefaultWsPath = 'wss://hack.chat/chat-ws'
+gCheckList = [
+    'red',
+]
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
-            Proc_type='hackChat_link',
+            Proc_type='qqRed_link',
             scan_interval=scan_interval,
             dead_interval=dead_interval,
             rx_queue=rx_queue,
@@ -51,18 +61,14 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        global gDefaultWsPath
-        wsPath = gDefaultWsPath
-        if 'ws_path' in self.Proc_data['bot_info_dict'].extends:
-            wsPath = self.Proc_data['bot_info_dict'].extends['ws_path']
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS hackChat link server [{0}] is running on [{1}]', [self.Proc_name, wsPath], modelName))
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] is running', [self.Proc_name], modelName))
         threading.Thread(
             target=self.message_router,
             args=()
         ).start()
         while True:
             try:
-                self.Proc_data['extend_data']['websocket_url'] = wsPath
+                self.Proc_data['extend_data']['websocket_url'] = self.Proc_data['bot_info_dict'].post_info.host + ':' + str(self.Proc_data['bot_info_dict'].post_info.port)
             except:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
@@ -72,38 +78,36 @@ class server(OlivOS.API.Proc_templet):
     def on_message(self, ws, message):
         try:
             rx_data = json.loads(message)
-            rx_obj = OlivOS.hackChatSDK.PAYLOAD.rxPacket(data=rx_data)
+            rx_obj = OlivOS.qqRedSDK.PAYLOAD.rxPacket(data=rx_data)
             if rx_obj.active:
-                sdk_event = OlivOS.hackChatSDK.event(rx_obj, self.Proc_data['bot_info_dict'])
+                sdk_event = OlivOS.qqRedSDK.event(rx_obj, self.Proc_data['bot_info_dict'])
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     def on_error(self, ws, error):
         self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS hackChat link server [{0}] websocket link error',
+            'OlivOS qqRed link server [{0}] websocket link error',
             [self.Proc_name],
             modelName
         ))
 
     def on_close(self, ws, close_status_code, close_msg):
         self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS hackChat link server [{0}] websocket link close',
+            'OlivOS qqRed link server [{0}] websocket link close',
             [self.Proc_name],
             modelName
         ))
 
     def on_open(self, ws: websocket.WebSocketApp):
         ws.send(
-            OlivOS.hackChatSDK.PAYLOAD.join(
-                nickname=self.Proc_data['bot_info_dict'].post_info.access_token,
-                chatroom=self.Proc_data['bot_info_dict'].post_info.host,
-                password=self.Proc_data['bot_info_dict'].password
+            OlivOS.qqRedSDK.PAYLOAD.metaConnect(
+                token=self.Proc_data['bot_info_dict'].post_info.access_token
             ).dump()
         )
         self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS hackChat link server [{0}] websocket link start',
+            'OlivOS qqRed link server [{0}] websocket link start',
             [self.Proc_name],
             modelName
         ))
@@ -124,7 +128,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None
         self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS hackChat link server [{0}] websocket link lost',
+            'OlivOS qqRed link server [{0}] websocket link lost',
             [self.Proc_name],
             modelName
         ))

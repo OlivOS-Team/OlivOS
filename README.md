@@ -18,7 +18,7 @@
     <img src="https://img.shields.io/badge/OneBot-v12-black?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAABwCAMAAADxPgR5AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAxQTFRF////29vbr6+vAAAAk1hCcwAAAAR0Uk5T////AEAqqfQAAAKcSURBVHja7NrbctswDATQXfD//zlpO7FlmwAWIOnOtNaTM5JwDMa8E+PNFz7g3waJ24fviyDPgfhz8fHP39cBcBL9KoJbQUxjA2iYqHL3FAnvzhL4GtVNUcoSZe6eSHizBcK5LL7dBr2AUZlev1ARRHCljzRALIEog6H3U6bCIyqIZdAT0eBuJYaGiJaHSjmkYIZd+qSGWAQnIaz2OArVnX6vrItQvbhZJtVGB5qX9wKqCMkb9W7aexfCO/rwQRBzsDIsYx4AOz0nhAtWu7bqkEQBO0Pr+Ftjt5fFCUEbm0Sbgdu8WSgJ5NgH2iu46R/o1UcBXJsFusWF/QUaz3RwJMEgngfaGGdSxJkE/Yg4lOBryBiMwvAhZrVMUUvwqU7F05b5WLaUIN4M4hRocQQRnEedgsn7TZB3UCpRrIJwQfqvGwsg18EnI2uSVNC8t+0QmMXogvbPg/xk+Mnw/6kW/rraUlvqgmFreAA09xW5t0AFlHrQZ3CsgvZm0FbHNKyBmheBKIF2cCA8A600aHPmFtRB1XvMsJAiza7LpPog0UJwccKdzw8rdf8MyN2ePYF896LC5hTzdZqxb6VNXInaupARLDNBWgI8spq4T0Qb5H4vWfPmHo8OyB1ito+AysNNz0oglj1U955sjUN9d41LnrX2D/u7eRwxyOaOpfyevCWbTgDEoilsOnu7zsKhjRCsnD/QzhdkYLBLXjiK4f3UWmcx2M7PO21CKVTH84638NTplt6JIQH0ZwCNuiWAfvuLhdrcOYPVO9eW3A67l7hZtgaY9GZo9AFc6cryjoeFBIWeU+npnk/nLE0OxCHL1eQsc1IciehjpJv5mqCsjeopaH6r15/MrxNnVhu7tmcslay2gO2Z1QfcfX0JMACG41/u0RrI9QAAAABJRU5ErkJggg==" alt="action">
   </a>
   <a href="https://github.com/OlivOS-Team/OlivOS/actions">
-    <img src="https://github.com/OlivOS-Team/OlivOS/workflows/CI-Packing/badge.svg" alt="action">
+    <img src="https://github.com/OlivOS-Team/OlivOS/actions/workflows/build.yml/badge.svg" alt="action">
   </a>
   <a href="https://pypi.python.org/pypi/olivos">
     <img src="https://img.shields.io/pypi/v/olivos" alt="PyPI">
@@ -30,7 +30,11 @@
   <p align="center">
     <a href="https://doc.olivos.wiki/">文档</a>
     ·
+    <a href="https://forum.olivos.run/">论坛</a>
+    ·
     <a href="https://github.com/OlivOS-Team/OlivOS/releases">下载</a>
+    ·
+    <a href="https://afdian.net/a/OlivOS">赞助</a>
   </p>
 
 </div>
@@ -38,16 +42,14 @@
 ## 兼容
 [![OnebotV11](https://img.shields.io/badge/-OnebotV11-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![OnebotV12](https://img.shields.io/badge/-OnebotV12-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
-[![QQ](https://img.shields.io/badge/-QQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://im.qq.com/index/)
-[![QQGuild](https://img.shields.io/badge/-QQGuild-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
-[![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
-[![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
-[![WeChat](https://img.shields.io/badge/-WeChat-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
-[![ComWeChatBotClient](https://img.shields.io/badge/-ComWeChatBotClient-07C160?style=flat-square&logo=wechat&logoColor=white)](https://github.com/JustUndertaker/ComWeChatBotClient)
+[![RED](https://img.shields.io/badge/-RED-111111?style=flat-square&logoColor=white)](https://chrononeko.github.io/QQNTRedProtocol/)
+[![QQ全域](https://img.shields.io/badge/-QQ%E5%85%A8%E5%9F%9F-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
+[![QQ频道](https://img.shields.io/badge/-QQ%E9%A2%91%E9%81%93-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
+[![DingTalk](https://img.shields.io/badge/-%E9%92%89%E9%92%89-007FFF?style=flat-square&logo=alibabadotcom&logoColor=white)](https://open.dingtalk.com/)
 [![Discord](https://img.shields.io/badge/-Discord-6666CC?style=flat-square&logo=Discord&logoColor=white)](https://discord.com/)
 [![Bilibili](https://img.shields.io/badge/-Bilibili-FB7299?style=flat-square&logo=Bilibili&logoColor=white)](http://www.bilibili.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
-[![开黑啦](https://img.shields.io/badge/-%E5%BC%80%E9%BB%91%E5%95%A6KOOK-83E700?style=flat-square&logo=Discord&logoColor=white)](https://www.kaiheila.cn/)
+[![开黑啦](https://img.shields.io/badge/-%E5%BC%80%E9%BB%91%E5%95%A6KOOK-83E700?style=flat-square&logo=Discord&logoColor=white)](https://www.kookapp.cn/)
 [![Dodo](https://img.shields.io/badge/-Dodo-00B8AA?style=flat-square&logo=%2Fe%2F&logoColor=white)](https://dodo.link/)
 [![Fanbook](https://img.shields.io/badge/-Fanbook-1A52F3?style=flat-square&logo=sharp&logoColor=white)](https://fanbook.mobi/)
 [![Hack.Chat](https://img.shields.io/badge/-Hack.Chat-20201D?style=flat-square&logo=Hetzner&logoColor=white)](https://hack.chat/)
