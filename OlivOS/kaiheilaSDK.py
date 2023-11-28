@@ -587,7 +587,8 @@ class event_action(object):
         elif message_type == 'card':
             res_data = {
                 "type": "card",
-                "theme": "secondary",
+                "theme": "primary",
+                "color": "#009FE9",
                 "size": "lg",
                 "modules": []
             }
