@@ -22,6 +22,7 @@ import random
 import shutil
 import platform
 import traceback
+import json
 
 from tkinter import ttk
 from tkinter import messagebox
@@ -367,6 +368,8 @@ class TreeEditUI(object):
                     'QQ官方/私域/V2',
                     'QQ官方/公域/V1',
                     'QQ官方/私域/V1',
+                    '米游社/大别野/公域',
+                    '米游社/大别野/私域',
                     'Discord',
                     'Telegram',
                     'Fanbook',
@@ -569,6 +572,18 @@ class TreeEditUI(object):
                             'Token': 'edit_root_Entry_Server_access_token'
                         }
                     ],
+                    '米游社/大别野/公域': ['vila', 'vila_link', 'public', 'True', 'websocket', {
+                            'Bot_Id': 'edit_root_Entry_ID',
+                            'Secret': 'edit_root_Entry_Password',
+                            'Pub_Key': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    '米游社/大别野/私域': ['vila', 'vila_link', 'private', 'True', 'websocket', {
+                            'Bot_Id': 'edit_root_Entry_ID',
+                            'Secret': 'edit_root_Entry_Password',
+                            'Pub_Key': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
                     'B站直播间/游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
                             '直播间ID': 'edit_root_Entry_Server_access_token'
                         }
@@ -665,6 +680,7 @@ class TreeEditUI(object):
                     'qq',
                     'qqGuild',
                     'kaiheila',
+                    'vila',
                     'telegram',
                     'dodo',
                     'fanbook',
@@ -695,6 +711,9 @@ class TreeEditUI(object):
                         'dodo_link'
                         # 'dodo_poll',
                         # 'dodobot_ea'
+                    ],
+                    'vila': [
+                        'vila_link'
                     ],
                     'fanbook': [
                         'fanbook_poll'
@@ -764,6 +783,13 @@ class TreeEditUI(object):
                             'default',
                             'card',
                             'text'
+                        ]
+                    },
+                    'vila': {
+                        'vila_link': [
+                            'private',
+                            'public',
+                            'default'
                         ]
                     },
                     'telegram': {
@@ -883,6 +909,20 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
+            if tmp_platform_platform == 'vila' \
+            and tmp_platform_sdk == 'vila_link':
+                tmp_id = tmp_id.strip('\n')
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+                try:
+                    tmp_access_token_new = json.loads(tmp_access_token)
+                    if type(tmp_access_token_new) is str:
+                        tmp_access_token = tmp_access_token_new
+                except Exception as e:
+                    pass
+                    #traceback.print_exc()
             if tmp_platform_platform == 'telegram' \
             and tmp_platform_sdk == 'telegram_poll':
                 if tmp_id == '':
