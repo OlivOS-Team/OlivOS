@@ -147,7 +147,7 @@ class payload_template(object):
 class PAYLOAD(object):
     class rxPacket(payload_template):
         def __init__(self, raw):
-            payload_template.__init__(self, data, True)
+            payload_template.__init__(self, raw, True)
 
     # 登录命令
     class PLogin(payload_template):
