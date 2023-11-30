@@ -64,6 +64,8 @@ from . import fanbookSDK
 from . import fanbookPollServerAPI
 from . import kaiheilaSDK
 from . import kaiheilaLinkServerAPI
+from . import mhyVilaSDK
+from . import mhyVilaLinkServerAPI
 from . import biliLiveSDK
 from . import biliLiveLinkServerAPI
 from . import updateAPI
