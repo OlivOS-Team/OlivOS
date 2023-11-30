@@ -25,3 +25,6 @@ prompt_toolkit
 regex
 rich
 filetype
+grpcio
+grpcio-tools
+protobuf

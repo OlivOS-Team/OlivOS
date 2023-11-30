@@ -16,3 +16,6 @@ brotli
 pyjson5
 pywebview
 filetype
+grpcio
+grpcio-tools
+protobuf

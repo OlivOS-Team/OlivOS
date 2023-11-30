@@ -27,3 +27,6 @@ regex
 rich
 pywebview
 filetype
+grpcio
+grpcio-tools
+protobuf
