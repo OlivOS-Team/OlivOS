@@ -158,12 +158,12 @@ class PAYLOAD(object):
 
         class data_T(object):
             def __init__(self):
-                self.uid:int = 1
-                self.token:str = '2'
-                self.platform:int = 3
-                self.app_id:int = 4
-                self.device_id:str = '5'
-                self.region:str = '6'
+                self.uid:int = 0
+                self.token:str = ''
+                self.platform:int = 0
+                self.app_id:int = 0
+                self.device_id:str = ''
+                self.region:str = ''
 
 
 '''
@@ -241,6 +241,3 @@ class API(object):
                 self.room_id = -1
                 self.object_name = 'MHY:Text'
                 self.msg_content = ''
-
-# test
-print(PAYLOAD.PLogin().dump())
