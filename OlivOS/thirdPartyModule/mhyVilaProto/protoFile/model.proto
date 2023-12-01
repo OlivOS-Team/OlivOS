@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package vila_bot;
+option go_package="gopkg.mihoyo.com/vila-bot-go/proto/vila_bot;vila_bot";
+
+enum RoomType {
+    RoomTypeInvalid = 0;
+    RoomTypeChatRoom = 1; // 聊天放假
+    RoomTypePostRoom = 2; // 帖子房间
+    RoomTypeSceneRoom = 3; // 场景房间
+}
+
+message RobotTemplate {
+    message Param {
+        string desc = 1; // 参数描述
+    }
+
+    message Command {
+        string name = 1; // 指令名称
+        string desc = 2; // 指令描述
+        repeated Param params = 3; // 指令参数
+    }
+    message CustomSetting {
+        string name = 1; // 自定义设置项名称
+        string url = 2; // 自定义设置项页面
+    }
+
+    string id = 1; // 机器人模板 id
+    string name = 2; // 机器人名称
+    string desc = 3; // 机器人描述
+    string icon = 4; // 机器人 icon
+    repeated Command commands = 5; // 指令列表
+    repeated CustomSetting custom_settings = 6; // 自定义设置项
+    bool is_allowed_add_to_other_villa = 7; // 是否允许添加到其他大别野
+}
+
+enum ObjectName {
+    UnknowObjectName = 0 ;
+    Text = 1; // 文本消息
+    Post = 2; // 帖子消息
+}
+
+
+message Robot {
+    RobotTemplate template = 1; // 所属机器人模板
+    uint64 villa_id = 2; // 大别野 id
+}
+
+message QuoteMessageInfo {
+    string content = 1; // 消息内容
+    string msg_uid = 2; // 消息msg_uid
+    int64 send_at = 3;
+    string msg_type = 4; // 消息类型
+    string bot_msg_id = 5;  // 如果是机器人消息，则该字段不为空字符串
+    uint64 from_user_id = 6;  // 发送者id
+    string from_user_id_str = 7;  // 发送者id（string）
+    string from_user_nickname = 8; // 发送者昵称
+}
+
+message RobotEvent {
+    enum EventType {
+        UnknowRobotEventType = 0;
+        JoinVilla = 1; // 加入大别野
+        SendMessage = 2; // 发送消息
+        CreateRobot = 3; // 大别野添加机器人实例
+        DeleteRobot = 4; // 大别野删除机器人实例
+        AddQuickEmoticon = 5; // 表情表态
+        AuditCallback = 6; // 审核结果回调
+        ClickMsgComponent = 7; // 点击消息组件
+    }
+
+    message ExtendData {
+        message JoinVillaInfo {
+            uint64 join_uid = 1; // 加入用户 uid
+            string join_user_nickname = 2; // 加入用户昵称
+            int64 join_at = 3; // 加入时间 [待废弃, 可以改用 RobotEvent.created_at]
+            uint64 villa_id = 4;    // 大别野 id
+        }
+
+        message SendMessageInfo {
+            string content = 1; // 消息内容
+            uint64 from_user_id = 2; // 发送人 uid
+            int64 send_at = 3; // 发送时间 [待废弃, 可以改用 RobotEvent.created_at]
+            ObjectName object_name = 4; // 消息类型
+            uint64 room_id = 5; // 房间 id
+            string nickname = 6; // 昵称
+            string msg_uid = 7; // 消息 id
+            string bot_msg_id = 8;  // 如果被回复的消息从属于机器人，则该字段不为空字符串
+            uint64 villa_id = 9;    // 大别野 id
+            QuoteMessageInfo quote_msg = 10; // 引用消息的内容
+        }
+
+        message CreateRobotInfo {
+            uint64 villa_id = 1; // 创建机器人实例的大别野 id
+        }
+
+
+        message DeleteRobotInfo {
+            uint64 villa_id = 1;
+        }
+
+        message AddQuickEmoticonInfo {
+            uint64 villa_id = 1;    // 大别野 id
+            uint64 room_id = 2;     // 房间 id
+            uint64 uid = 3;         // 回复用户 id
+            uint32 emoticon_id = 4; // 表情 id
+            string emoticon = 5;    // 表情
+            string msg_uid = 6;     // 消息 id
+            bool is_cancel = 7;     // 是否是取消表情
+            string bot_msg_id = 8;  // 如果被回复的消息从属于机器人，则该字段不为空字符串
+            uint32 emoticon_type = 9; // 表情类型
+        }
+
+        message AuditCallbackInfo {
+            enum AuditResult {
+                None = 0;
+                Pass = 1;
+                Reject = 2;
+            }
+
+            string audit_id = 1;   // 机器人平台审核事件 id
+            string bot_tpl_id = 2; // 机器人 id
+            uint64 villa_id = 3;   // 大别野 id
+            uint64 room_id = 4;    // 房间 id
+            uint64 user_id = 5;    // 用户 id
+            string pass_through = 6; // 透传字段
+            AuditResult audit_result = 7; // 审核结果
+        }
+
+        message ClickMsgComponentInfo {
+            uint64 villa_id = 1;
+            uint64 room_id = 2;
+            string component_id = 3;    // 自定义组件id
+            string msg_uid = 4;
+            uint64 uid = 5;
+            string bot_msg_id = 6;
+            uint64 template_id = 7; // 模板id
+            string extra = 8;  // 机器人自定义透传数据
+        }
+
+        oneof event_data {
+            JoinVillaInfo join_villa = 1; // 加入大别野扩展信息
+            SendMessageInfo send_message = 2; // 发送消息扩展信息
+            CreateRobotInfo create_robot = 3; // 添加机器人扩展信息
+            DeleteRobotInfo delete_robot = 4; // 删除机器人扩展信息
+            AddQuickEmoticonInfo add_quick_emoticon = 5;   // 表情表态扩展信息
+            AuditCallbackInfo audit_callback = 6; // 审核回调信息
+            ClickMsgComponentInfo click_msg_component = 7;  // 点击消息组件回传
+        }
+    }
+
+    Robot robot = 1; // 事件相关机器人
+    EventType type = 2; // 事件类型
+    ExtendData extend_data = 3; // 事件拓展信息
+    int64 created_at = 4; // 事件发生时间
+    string id = 5; // 事件 id
+    int64 send_at = 6; // 事件消息投递时间
+}
