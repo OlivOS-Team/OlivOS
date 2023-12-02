@@ -185,7 +185,7 @@ jobs:
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./main_debug.spec
+        pyinstaller ./main_linux.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-PKG
@@ -374,7 +374,7 @@ jobs:
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./main_debug.spec
+        pyinstaller ./main_linux.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-PKG
