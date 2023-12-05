@@ -1,4 +1,5 @@
 Flask==2.0.2
+Werkzeug==2.2.2
 gevent==21.12.0
 Pillow==9.3.0
 psutil==5.9.0
@@ -16,3 +17,6 @@ brotli
 pyjson5
 pywebview
 filetype
+grpcio==1.51.3
+grpcio-tools==1.51.3
+protobuf==4.24.4

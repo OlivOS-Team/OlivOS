@@ -587,7 +587,8 @@ class event_action(object):
         elif message_type == 'card':
             res_data = {
                 "type": "card",
-                "theme": "secondary",
+                "theme": "primary",
+                "color": "#009FE9",
                 "size": "lg",
                 "modules": []
             }
@@ -669,6 +670,25 @@ class event_action(object):
                 this_msg.data.type = 10
                 this_msg.data.content = json.dumps([res_data], ensure_ascii=False)
                 this_msg.do_api()
+
+    def create_message(target_event, chat_id, content_type:int, content:str, flag_direct=False):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = True
+        this_msg = None
+        if flag_direct:
+            this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
+        else:
+            this_msg = API.creatMessage(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.target_id = str(chat_id)
+        this_msg.data.type = content_type
+        this_msg.data.content = content
+        this_msg.do_api()
+        res_data['data'] = {}
+        res_data['data']['chat_type'] = 'private' if flag_direct else 'group'
+        res_data['data']['chat_id'] = str(chat_id)
+        res_data['data']['content_type'] = str(content_type)
+        res_data['data']['content'] = str(json.dumps(content, ensure_ascii = False))
+        return res_data
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
@@ -886,6 +906,34 @@ class inde_interface(OlivOS.API.inde_interface_T):
             pass
         else:
             res_data = inde_interface.__set_playgame_activity_game(self.event, game_id, flag_log=True)
+        return res_data
+
+    @OlivOS.API.Event.callbackLogger('kaiheila:create_message', ['chat_type', 'chat_id', 'content_type', 'content'])
+    def __create_message(target_event, chat_type:str, chat_id:str, content_type:int, content:str, flag_log:bool=True):
+        res_data = None
+        res_data = OlivOS.kaiheilaSDK.event_action.create_message(
+            target_event,
+            chat_id,
+            content_type,
+            content,
+            flag_direct = (False if chat_type == 'group' else True)
+        )
+        return res_data
+
+    def create_message(
+        self,
+        chat_type:str,
+        chat_id:str,
+        content_type:int,
+        content:str,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__create_message(self.event, chat_type, chat_id, content_type, content, flag_log=True)
         return res_data
 
     @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_music', ['music_name', 'singer', 'software'])

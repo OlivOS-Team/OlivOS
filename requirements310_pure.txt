@@ -1,5 +1,6 @@
 pyinstaller
 flask
+Werkzeug==2.2.2
 gevent
 psutil
 requests
@@ -16,3 +17,6 @@ brotli
 pyjson5
 pywebview
 filetype
+grpcio
+grpcio-tools
+protobuf

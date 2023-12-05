@@ -1,5 +1,6 @@
 pyinstaller
 flask
+Werkzeug==2.2.2
 gevent
 psutil
 requests
@@ -25,3 +26,6 @@ prompt_toolkit
 regex
 rich
 filetype
+grpcio
+grpcio-tools
+protobuf

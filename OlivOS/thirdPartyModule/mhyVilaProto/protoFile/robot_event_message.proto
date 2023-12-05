@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package vila_bot;
+option go_package="gopkg.mihoyo.com/vila-bot-go/proto/vila_bot;vila_bot";
+
+import 'model.proto';
+
+message RobotEventMessage {
+    RobotEvent event = 1;
+}

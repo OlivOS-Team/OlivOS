@@ -197,6 +197,8 @@ class Event(object):
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
         elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.mhyVilaSDK.event:
+            OlivOS.mhyVilaSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqRedSDK.event:
             OlivOS.qqRedSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
@@ -894,6 +896,14 @@ class Event(object):
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct=False)
             elif flag_type == 'private':
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct=True)
+        elif self.platform['sdk'] == 'mhyVila_link':
+            if flag_type == 'group':
+                if host_id is not None:
+                    OlivOS.mhyVilaSDK.event_action.send_group_msg(self, target_id, tmp_message, host_id=host_id)
+                elif 'host_id' in self.data.__dict__:
+                    OlivOS.mhyVilaSDK.event_action.send_group_msg(self, target_id, tmp_message, host_id=self.data.host_id)
+            elif flag_type == 'private':
+                pass
         elif self.platform['sdk'] == 'hackChat_link':
             OlivOS.hackChatSDK.event_action.send_msg(self, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'biliLive_link':

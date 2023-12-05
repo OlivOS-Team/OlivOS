@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package vila_bot;
+
+option go_package = "gopkg.mihoyo.com/vila-bot-go/proto/vila_bot;vila_bot";
+
+enum Command {
+    UNKNOWN = 0;
+
+    EXCHANGE_KEY = 1;
+    HEARTBEAT = 2;
+    LOGIN = 3;
+    LOGOUT = 4;
+
+    P_EXCHANGE_KEY = 5;
+    P_HEARTBEAT = 6;
+    P_LOGIN = 7;
+    P_LOGOUT = 8;
+
+    KICK_OFF = 51;
+    SHUTDOWN = 52;
+    P_KICK_OFF = 53;
+
+    ROOM_ENTER = 60;
+    ROOM_LEAVE = 61;
+    ROOM_CLOSE = 62;
+    ROOM_MSG = 63;
+
+}
+
+// 心跳请求命令字
+message PHeartBeat {
+    // 客户端时间戳，精确到ms
+    string client_timestamp = 1;
+}
+
+// 心跳返回
+message PHeartBeatReply {
+    // 错误码 非0表示失败
+    int32  code = 1;
+    // 服务端时间戳，精确到ms
+    uint64 server_timestamp = 2;
+}
+
+// 登录命令
+message PLogin {
+    // 长连接侧唯一id，uint64格式
+    uint64 uid = 1;
+    // 用于业务后端验证的token
+    string token = 2;
+    // 客户端操作平台枚举
+    int32 platform = 3;
+    // 业务所在客户端应用标识，用于在同一个客户端隔离不同业务的长连接通道。
+    int32 app_id = 4;
+    string device_id = 5;
+    // 区域划分字段，通过uid+app_id+platform+region四个字段唯一确定一条长连接
+    string region = 6;
+    // 长连内部的扩展字段，是个map
+    map<string, string> meta = 7;
+}
+
+
+// 登录命令返回
+message PLoginReply {
+    // 错误码 非0表示失败
+    int32  code = 1;
+    // 错误信息
+    string msg = 2;
+    // 服务端时间戳，精确到ms
+    uint64 server_timestamp = 3;
+    // 唯一连接ID
+    uint64  conn_id = 4;
+}
+
+// 登出命令字
+message PLogout {
+    // 长连接侧唯一id，uint64格式
+    uint64 uid = 1;
+    // 客户端操作平台枚举
+    int32 platform = 2;
+    // 业务所在客户端应用标识，用于在同一个客户端隔离不同业务的长连接通道。
+    int32 app_id = 3;
+    // 客户端设备唯一标识
+    string device_id = 4;
+    // 区域划分字段，通过uid+app_id+platform+region四个字段唯一确定一条长连接
+    string region = 5;
+}
+
+// 登出命令返回
+message PLogoutReply {
+    // 错误码 非0表示失败
+    int32  code = 1;
+    // 错误信息
+    string msg = 2;
+    // 连接id
+    uint64 conn_id = 3;
+}
+
+// 通用返回
+message CommonReply {
+    // 错误码 非0表示失败
+    int32  code = 1;
+    // 错误信息
+    string msg = 2;
+}
+
+// 踢出连接协议
+message PKickOff{
+    // 踢出原因状态码
+    int32 code = 1;
+    // 状态码对应的文案
+    string reason = 2;
+}

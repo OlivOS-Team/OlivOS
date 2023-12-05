@@ -45,6 +45,7 @@ default_Conf = {
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
+            "OlivOS_mhyVila_link",
             "OlivOS_dodo_link",
             "OlivOS_biliLive_link",
             "OlivOS_update_check"
@@ -86,6 +87,7 @@ default_Conf = {
                 "OlivOS_telegram_poll",
                 "OlivOS_fanbook_poll",
                 "OlivOS_kaiheila_link",
+                "OlivOS_mhyVila_link",
                 "OlivOS_dodo_link",
                 "OlivOS_biliLive_link",
             ]
@@ -107,6 +109,7 @@ default_Conf = {
                 "telegram_poll",
                 "fanbook_poll",
                 "kaiheila_link",
+                "mhyVila_link",
                 "dodo_link",
                 "biliLive_link",
             ]
@@ -353,6 +356,16 @@ default_Conf = {
             "enable": True,
             "name": "OlivOS_kaiheila_link",
             "type": "kaiheila_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_mhyVila_link": {
+            "enable": True,
+            "name": "OlivOS_mhyVila_link",
+            "type": "mhyVila_link",
             "interval": 0.2,
             "dead_interval": 1,
             "tx_queue": "OlivOS_rx_queue",

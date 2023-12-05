@@ -83,6 +83,14 @@ dictMessageType = {
             'text': 'olivos_para'
         }
     },
+    'mhyVila': {
+        'mhyVila_link': {
+            'default': 'olivos_string',
+            'public': 'olivos_string',
+            'private': 'olivos_string',
+            'sandbox': 'olivos_string'
+        }
+    },
     'discord': {
         'discord_link': {
             'default': 'olivos_para'
