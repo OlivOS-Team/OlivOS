@@ -21,8 +21,6 @@ import uuid
 import threading
 
 import OlivOS
-from OlivOS import hackChatSDK
-from OlivOS.qqGuildSDK import PAYLOAD
 
 modelName = 'hackChatLinkServerAPI'
 
