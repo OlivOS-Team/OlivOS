@@ -203,6 +203,8 @@ class Event(object):
             OlivOS.qqRedSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.hackChatSDK.event:
             OlivOS.hackChatSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.OPQBotSDK.event:
+            OlivOS.OPQBotSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.dingtalkSDK.event:
             OlivOS.dingtalkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
@@ -822,6 +824,11 @@ class Event(object):
                     OlivOS.qqRedSDK.event_action.send_msg(self, 1, target_id, tmp_message, self.plugin_info['control_queue'])
                 elif flag_type == 'group':
                     OlivOS.qqRedSDK.event_action.send_msg(self, 2, target_id, tmp_message, self.plugin_info['control_queue'])
+            elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.OPQBotSDK.event_action.send_msg(self, 'private', target_id, tmp_message, self.plugin_info['control_queue'])
+                elif flag_type == 'group':
+                    OlivOS.OPQBotSDK.event_action.send_msg(self, 'group', target_id, tmp_message, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
                 if hasattr(self.data, 'extend') \

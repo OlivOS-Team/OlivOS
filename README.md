@@ -43,6 +43,7 @@
 [![OnebotV11](https://img.shields.io/badge/-OnebotV11-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![OnebotV12](https://img.shields.io/badge/-OnebotV12-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![RED](https://img.shields.io/badge/-RED-111111?style=flat-square&logoColor=white)](https://chrononeko.github.io/QQNTRedProtocol/)
+[![OPQBot](https://img.shields.io/badge/-OPQBot-111111?style=flat-square&logoColor=white)](https://opqbot.com/)
 [![QQ全域](https://img.shields.io/badge/-QQ%E5%85%A8%E5%9F%9F-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![QQ频道](https://img.shields.io/badge/-QQ%E9%A2%91%E9%81%93-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![DingTalk](https://img.shields.io/badge/-%E9%92%89%E9%92%89-007FFF?style=flat-square&logo=alibabadotcom&logoColor=white)](https://open.dingtalk.com/)

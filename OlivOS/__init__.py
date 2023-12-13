@@ -45,6 +45,8 @@ from .adapter.qqGuild import qqGuildv2SDK
 from .adapter.qqGuild import qqGuildv2LinkServerAPI
 from .adapter.red import qqRedSDK
 from .adapter.red import qqRedLinkServerAPI
+from .adapter.OPQBot import OPQBotSDK
+from .adapter.OPQBot import OPQBotLinkServerAPI
 from .adapter.telegram import telegramSDK
 from .adapter.telegram import telegramPollServerAPI
 from .adapter.discord import discordSDK

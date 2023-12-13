@@ -379,6 +379,7 @@ class TreeEditUI(object):
                     'onebotV12/正向WS',
                     'onebotV11/Http',
                     'RED协议',
+                    'OPQBot/正向WS',
                     'B站直播间/游客',
                     'B站直播间/登录',
                     'FF14终端',
@@ -475,6 +476,12 @@ class TreeEditUI(object):
                             'WS地址': 'edit_root_Entry_Server_host',
                             'WS端口': 'edit_root_Entry_Server_port',
                             'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket', {
+                            'QQ号': 'edit_root_Entry_ID',
+                            '服务地址': 'edit_root_Entry_Server_host',
+                            '服务端口': 'edit_root_Entry_Server_port',
                         }
                     ],
                     'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
@@ -771,7 +778,8 @@ class TreeEditUI(object):
                             'walleq_show_Android_Watch',
                             'walleq_show_iPad',
                             'walleq_show_iMac',
-                            'walleq_show_old'
+                            'walleq_show_old',
+                            'opqbot_default'
                         ]
                     },
                     'qqGuild': {
@@ -900,6 +908,14 @@ class TreeEditUI(object):
                     tmp_host = 'ws://127.0.0.1'
                 if tmp_port == '':
                     tmp_port = '58001'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'qq' \
+            and tmp_platform_sdk == 'onebot' \
+            and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList \
+            and tmp_server_auto == 'False':
+                if tmp_host == '':
+                    tmp_host = '127.0.0.1'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
             if tmp_platform_platform == 'qqGuild' \

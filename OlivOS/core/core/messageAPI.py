@@ -50,7 +50,8 @@ dictMessageType = {
             'walleq_show_Android_Watch': 'obv12_para',
             'walleq_show_iPad': 'obv12_para',
             'walleq_show_iMac': 'obv12_para',
-            'walleq_show_old': 'obv12_para'
+            'walleq_show_old': 'obv12_para',
+            'opqbot_default': 'olivos_string'
         }
     },
     'qqGuild': {
