@@ -361,6 +361,8 @@ class TreeEditUI(object):
                 'type_list': [
                     'KOOK',
                     'KOOK/消息兼容',
+                    'QQ/OPQ/默认',
+                    'QQ/OPQ/指定端口',
                     '钉钉',
                     '渡渡语音/Dodo/V2',
                     '渡渡语音/Dodo/V1',
@@ -395,6 +397,7 @@ class TreeEditUI(object):
                     'QQ/Wq/安卓手机',
                     'QQ/Wq/安卓平板',
                     '微信/ComWeChat',
+                    'QQ/OPQ/指定端口/旧',
                     'QQ/GoCq/旧',
                     'QQ/Wq/旧',
                     '自定义'
@@ -421,7 +424,10 @@ class TreeEditUI(object):
                     'QQ/Wq/安卓手表': './conf/walleq/{bothash}',
                     'QQ/Wq/安卓手机': './conf/walleq/{bothash}',
                     'QQ/Wq/安卓平板': './conf/walleq/{bothash}',
-                    'QQ/Wq/旧': './conf/walleq/{bothash}'
+                    'QQ/Wq/旧': './conf/walleq/{bothash}',
+                    'QQ/OPQ/默认': './conf/OPQBot/{bothash}',
+                    'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
+                    'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}'
                 },
                 'type_extend_note_list': {
                     #'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
@@ -482,6 +488,23 @@ class TreeEditUI(object):
                             'QQ号': 'edit_root_Entry_ID',
                             '服务地址': 'edit_root_Entry_Server_host',
                             '服务端口': 'edit_root_Entry_Server_port',
+                        }
+                    ],
+                    'QQ/OPQ/默认': ['qq', 'onebot', 'opqbot_auto', 'True', 'websocket', {
+                            'QQ号': 'edit_root_Entry_ID',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'QQ/OPQ/指定端口': ['qq', 'onebot', 'opqbot_port', 'True', 'websocket', {
+                            'QQ号': 'edit_root_Entry_ID',
+                            '服务端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'QQ/OPQ/指定端口/旧': ['qq', 'onebot', 'opqbot_port_old', 'True', 'websocket', {
+                            'QQ号': 'edit_root_Entry_ID',
+                            '服务端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
                         }
                     ],
                     'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
@@ -779,7 +802,10 @@ class TreeEditUI(object):
                             'walleq_show_iPad',
                             'walleq_show_iMac',
                             'walleq_show_old',
-                            'opqbot_default'
+                            'opqbot_default',
+                            'opqbot_auto',
+                            'opqbot_port',
+                            'opqbot_port_old'
                         ]
                     },
                     'qqGuild': {
@@ -918,6 +944,17 @@ class TreeEditUI(object):
                     tmp_host = '127.0.0.1'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
+            if tmp_platform_platform == 'qq' \
+            and tmp_platform_sdk == 'onebot' \
+            and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList \
+            and tmp_server_auto == 'True':
+                if tmp_host == '':
+                    tmp_host = '127.0.0.1'
+                if tmp_platform_model in [
+                    'opqbot_auto'
+                ]:
+                    if tmp_port == '':
+                        tmp_port = '8086'
             if tmp_platform_platform == 'qqGuild' \
             and tmp_platform_sdk == 'qqGuild_link':
                 if tmp_password == '':

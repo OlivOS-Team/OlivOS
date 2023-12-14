@@ -23,7 +23,10 @@ import threading
 import OlivOS
 
 gCheckList = [
-    'opqbot_default'
+    'opqbot_default',
+    'opqbot_auto',
+    'opqbot_port',
+    'opqbot_port_old',
 ]
 
 modelName = 'OPQBotLinkServerAPI'
