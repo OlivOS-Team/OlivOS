@@ -41,6 +41,10 @@ gCheckList = [
     'opqbot_port_old'
 ]
 
+gAutoCheckList = [
+    'opqbot_auto'
+]
+
 
 def startOPQBotLibExeModel(
     plugin_bot_info_dict,
