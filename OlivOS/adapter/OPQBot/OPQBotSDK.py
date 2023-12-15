@@ -18,10 +18,17 @@ import time
 import json
 import uuid
 import hashlib
+import copy
+import base64
+import requests as req
+from urllib import parse
+import traceback
 
 import OlivOS
 
 gBotIdDict = {}
+
+gResReg = {}
 
 class bot_info_T(object):
     def __init__(self, id=-1):
@@ -78,7 +85,16 @@ def get_Event_from_SDK(target_event):
         platform_model=target_event.platform['model']
     )
     if target_event.sdk_event.payload.active:
-        if target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_NEW_MSG':
+        if target_event.sdk_event.payload.EventName == 'CgiBaseResponse':
+            if type(target_event.sdk_event.payload.ReqId) is int \
+            and type(target_event.sdk_event.payload.ResponseData) is dict \
+            and type(target_event.sdk_event.payload.Ret) is int:
+                target_event.active = False
+                waitForResSet(
+                    str(target_event.sdk_event.payload.ReqId),
+                    target_event.sdk_event.payload.data
+                )
+        elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
             and 'MsgHead' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
@@ -186,6 +202,9 @@ class payload_template(object):
         self.CurrentQQ = None
         self.ReqId = int(getHash(str(uuid.uuid4())), 16) % 1000000000000
         self.CgiCmd = None
+        self.ResponseData = None
+        self.CgiBaseResponse = None
+        self.Ret = None
         self.load(data, is_rx)
 
     def dump(self):
@@ -221,6 +240,23 @@ class payload_template(object):
             self.EventName = data['CurrentPacket']['EventName']
             self.EventData = data['CurrentPacket']['EventData']
             self.CurrentQQ = data['CurrentQQ']
+        elif is_rx \
+        and type(data) is dict \
+        and 'CgiBaseResponse' in data \
+        and type(data['CgiBaseResponse']) is dict \
+        and 'Ret' in data['CgiBaseResponse'] \
+        and type(data['CgiBaseResponse']['Ret']) is int \
+        and 'ReqId' in data \
+        and type(data['ReqId']) is int \
+        and 'ResponseData' in data \
+        and type(data['ResponseData']) is dict:
+            self.active = True
+            self.data = data
+            self.ReqId = data['ReqId']
+            self.ResponseData = data['ResponseData']
+            self.CgiBaseResponse = data['CgiBaseResponse']
+            self.Ret = data['CgiBaseResponse']['Ret']
+            self.EventName = 'CgiBaseResponse'
         return self
 
 
@@ -258,9 +294,117 @@ class PAYLOAD(object):
                 }
             }
 
+    class MessageSvc_PbSendMsg_all(payload_template):
+        def __init__(self, ToUin:'int|str', ToType:int, dataPatch:dict, CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "MessageSvc.PbSendMsg"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {
+                    "ToUin": getIdBackport(ToUin),
+                    "ToType": ToType
+                }
+            }
+            self.data['CgiRequest'].update(dataPatch)
+
+    class exitGroup(payload_template):
+        def __init__(self, Uin:'int|str', CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "SsoGroup.Op"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {
+                    "OpCode": 4247,
+                    "Uin": getIdBackport(Uin)
+                }
+            }
+
+    class GetGroupLists(payload_template):
+        def __init__(self, CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "GetGroupLists"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {}
+            }
+
+    class PicUp_DataUp(payload_template):
+        def __init__(
+            self,
+            CommandId:int,
+            CurrentQQ:'int|str',
+            FilePath:'str|None' = None,
+            FileUrl:'str|None' = None,
+            Base64Buf:'str|None' = None,
+        ):
+            payload_template.__init__(self)
+            self.CgiCmd = "PicUp.DataUp"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {}
+            }
+            self.data['CgiRequest']['CommandId'] = CommandId
+            if FilePath is not None:
+                self.data['CgiRequest']['FilePath'] = FilePath
+            if FileUrl is not None:
+                self.data['CgiRequest']['FileUrl'] = FileUrl
+            if Base64Buf is not None:
+                self.data['CgiRequest']['Base64Buf'] = Base64Buf
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
+    def send_solo_msg(target_event, target_type, target_id, message, control_queue):
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
+        )
+        if len(message) > 0:
+            send_ws_event(
+                plugin_event_bot_hash,
+                PAYLOAD.MessageSvc_PbSendMsg(
+                    ToUin = target_id,
+                    ToType = 2 if 'group' == target_type else 1,
+                    Content = message,
+                    CurrentQQ = target_event.base_info['self_id']
+                ).dump(),
+                control_queue
+            )
+
+    def send_solo_all_msg(target_event, target_type, target_id, dataPatch, control_queue):
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
+        )
+        if type(dataPatch) is dict:
+            send_ws_event(
+                plugin_event_bot_hash,
+                PAYLOAD.MessageSvc_PbSendMsg_all(
+                    ToUin = target_id,
+                    ToType = 2 if 'group' == target_type else 1,
+                    dataPatch = dataPatch,
+                    CurrentQQ = target_event.base_info['self_id']
+                ).dump(),
+                control_queue
+            )
+
+
     def send_msg(target_event, target_type, target_id, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],
@@ -273,21 +417,170 @@ class event_action(object):
             'olivos_string',
             message
         )
+        count_data = 0
+        size_data = len(message_obj.data)
+        flag_now_type = 'string'
+        flag_now_type_last = flag_now_type
         if message_obj.active:
             for data_this in message_obj.data:
-                if data_this.type == 'text':
+                res = None
+                count_data += 1
+                flag_now_type_last = flag_now_type
+                if type(data_this) is OlivOS.messageAPI.PARA.text:
                     message_new += data_this.data['text']
-        if len(message_new) > 0:
+                    flag_now_type = 'string'
+                elif type(data_this) is OlivOS.messageAPI.PARA.image:
+                    res = event_action.setResourceUploadFast(
+                        target_event = target_event,
+                        control_queue = control_queue,
+                        url = data_this.data['file'],
+                        type_path = 'images',
+                        type_chat = 2 if 'group' == target_type else 1
+                    )
+                    flag_now_type = 'image'
+                if size_data == count_data\
+                or (flag_now_type_last != flag_now_type \
+                and flag_now_type_last == 'string' \
+                and len(message_new) > 0):
+                    event_action.send_solo_msg(
+                        target_event = target_event,
+                        target_type = target_type,
+                        target_id = target_id,
+                        message = message_new,
+                        control_queue = control_queue
+                    )
+                    message_new = ''
+                    time.sleep(1)
+                    if flag_now_type == 'image':
+                        if res is not None:
+                            event_action.send_solo_all_msg(
+                                target_event = target_event,
+                                target_type = target_type,
+                                target_id = target_id,
+                                dataPatch = {
+                                    'Images': [
+                                        {
+                                            "FileId": res[2],
+                                            "FileMd5": res[0],
+                                            "FileSize": res[1],
+                                            "Height": 1920,
+                                            "Width": 1080
+                                        }
+                                    ]
+                                },
+                                control_queue = control_queue
+                            )
+                            time.sleep(1)
+
+    # 现场上传的就地实现
+    def setResourceUploadFast(target_event, control_queue, url: str, type_path: str = 'images', type_chat: int = 2):
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
+        )
+        res = [None, None, None]
+        data_obj = None
+        try:
+            pic_file = None
+            if url.startswith("base64://"):
+                data_obj = PAYLOAD.PicUp_DataUp(
+                    CommandId = type_chat,
+                    Base64Buf = url,
+                    CurrentQQ = target_event.base_info['self_id']
+                )
+            else:
+                url_parsed = parse.urlparse(url)
+                if url_parsed.scheme in ["http", "https"]:
+                    data_obj = PAYLOAD.PicUp_DataUp(
+                        CommandId = type_chat,
+                        FileUrl = url,
+                        CurrentQQ = target_event.base_info['self_id']
+                    )
+                else:
+                    file_path = url_parsed.path
+                    file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
+                    data_obj = PAYLOAD.PicUp_DataUp(
+                        CommandId = type_chat,
+                        FilePath = file_path,
+                        CurrentQQ = target_event.base_info['self_id']
+                    )
+
+            if data_obj is not None:
+                waitForResReady(str(data_obj.ReqId))
+                send_ws_event(
+                    plugin_event_bot_hash,
+                    data_obj.dump(),
+                    control_queue
+                )
+                res_raw = waitForRes(str(data_obj.ReqId))
+                raw_obj = init_api_json(res_raw)
+                if raw_obj is not None:
+                    if type(raw_obj) is dict \
+                    and 'FileMd5' in raw_obj \
+                    and type(raw_obj['FileMd5']) is str \
+                    and 'FileSize' in raw_obj \
+                    and type(raw_obj['FileSize']) is int \
+                    and 'FileId' in raw_obj \
+                    and type(raw_obj['FileId']) is int:
+                        res = [raw_obj['FileMd5'], raw_obj['FileSize'], raw_obj['FileId']]
+        except Exception as e:
+            traceback.print_exc()
+            res = [None, None, None]
+        return res
+
+    def set_group_leave(target_event, group_id, control_queue):
+        if target_event.bot_info != None:
+            plugin_event_bot_hash = OlivOS.API.getBotHash(
+                bot_id=target_event.base_info['self_id'],
+                platform_sdk=target_event.platform['sdk'],
+                platform_platform=target_event.platform['platform'],
+                platform_model=target_event.platform['model']
+            )
             send_ws_event(
                 plugin_event_bot_hash,
-                PAYLOAD.MessageSvc_PbSendMsg(
-                    ToUin = target_id,
-                    ToType = 2 if 'group' == target_type else 1,
-                    Content = message_new,
+                PAYLOAD.exitGroup(
+                    Uin = group_id,
                     CurrentQQ = target_event.base_info['self_id']
                 ).dump(),
                 control_queue
             )
+
+    def get_group_list(target_event:OlivOS.API.Event, control_queue):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        if target_event.bot_info != None:
+            plugin_event_bot_hash = OlivOS.API.getBotHash(
+                bot_id=target_event.base_info['self_id'],
+                platform_sdk=target_event.platform['sdk'],
+                platform_platform=target_event.platform['platform'],
+                platform_model=target_event.platform['model']
+            )
+            this_msg = PAYLOAD.GetGroupLists(
+                CurrentQQ = target_event.base_info['self_id']
+            )
+            waitForResReady(str(this_msg.ReqId))
+            send_ws_event(
+                plugin_event_bot_hash,
+                this_msg.dump(),
+                control_queue
+            )
+            res_raw = waitForRes(str(this_msg.ReqId))
+            raw_obj = init_api_json(res_raw)
+            if raw_obj is not None:
+                if type(raw_obj) is dict \
+                and 'GroupLists' in raw_obj \
+                and type(raw_obj['GroupLists']) is list:
+                    res_data['active'] = True
+                    for raw_obj_this in raw_obj['GroupLists']:
+                        tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
+                        tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupName'], str)
+                        tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupCode'], int)
+                        tmp_res_data_this['memo'] = ''
+                        tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['MemberCnt'], int)
+                        tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupCnt'], int)
+                        res_data['data'].append(tmp_res_data_this)
+        return res_data
 
 
 def sendControlEventSend(action, data, control_queue):
@@ -314,3 +607,61 @@ def send_ws_event(hash, data, control_queue):
         },
         control_queue
     )
+
+def init_api_json(raw:dict):
+    res_data = None
+    if type(raw) is dict \
+    and 'CgiBaseResponse' in raw \
+    and type(raw['CgiBaseResponse']) is dict \
+    and 'Ret' in raw['CgiBaseResponse'] \
+    and type(raw['CgiBaseResponse']['Ret']) is int \
+    and raw['CgiBaseResponse']['Ret'] == 0 \
+    and 'ReqId' in raw \
+    and type(raw['ReqId']) is int \
+    and 'ResponseData' in raw \
+    and type(raw['ResponseData']) is dict:
+        res_data = copy.deepcopy(raw['ResponseData'])
+    return res_data
+
+def init_api_do_mapping(src_type, src_data):
+    if type(src_data) == src_type:
+        return src_data
+
+def init_api_do_mapping_for_dict(src_data, path_list, src_type):
+    res_data = None
+    flag_active = True
+    tmp_src_data = src_data
+    for path_list_this in path_list:
+        if type(tmp_src_data) == dict:
+            if path_list_this in tmp_src_data:
+                tmp_src_data = tmp_src_data[path_list_this]
+            else:
+                return None
+        else:
+            return None
+    res_data = init_api_do_mapping(src_type, tmp_src_data)
+    return res_data
+
+def waitForResSet(echo:str, data):
+    global gResReg
+    if echo in gResReg:
+        gResReg[echo] = data
+
+def waitForResReady(echo:str):
+    global gResReg
+    gResReg[echo] = None
+
+def waitForRes(echo:str):
+    global gResReg
+    res = None
+    interval = 0.1
+    limit = 30
+    index_limit = int(limit / interval)
+    for i in range(index_limit):
+        time.sleep(interval)
+        if echo in gResReg \
+        and gResReg[echo] is not None:
+            res = gResReg[echo]
+            gResReg.pop(echo)
+            break
+    return res

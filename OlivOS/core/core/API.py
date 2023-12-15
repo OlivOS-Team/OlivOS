@@ -1187,6 +1187,9 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+            elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.OPQBotSDK.event_action.set_group_leave(self, group_id, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
@@ -1378,6 +1381,8 @@ class Event(object):
                 res_data = OlivOS.onebotV12SDK.event_action.get_group_list(self)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
+            elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                res_data = OlivOS.OPQBotSDK.event_action.get_group_list(self, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
