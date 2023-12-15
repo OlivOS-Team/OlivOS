@@ -50,5 +50,7 @@ import httpx
 import prompt_toolkit
 import regex
 import rich
+import smtplib
+import email
 
 import sys
