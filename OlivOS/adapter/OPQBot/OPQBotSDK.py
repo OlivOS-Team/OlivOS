@@ -30,6 +30,8 @@ gBotIdDict = {}
 
 gResReg = {}
 
+gUinfoReg = {}
+
 class bot_info_T(object):
     def __init__(self, id=-1):
         self.id = id
@@ -186,6 +188,54 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['age'] = 0
                 target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
+        elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
+            if type(target_event.sdk_event.payload.EventData) is dict \
+            and 'ReqUid' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['ReqUid']) is str \
+            and 'Status' in target_event.sdk_event.payload.EventData \
+            and target_event.sdk_event.payload.EventData['Status'] == 7 \
+            and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'friend_add_request'
+                uin = str(target_event.sdk_event.payload.EventData['ReqUid'])
+                if OlivOS.pluginAPI.gProc is not None:
+                    uin = event_action.getUinfo(
+                        target_event = target_event,
+                        Uid = target_event.sdk_event.payload.EventData['ReqUid'],
+                        control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                    )
+                target_event.data = target_event.friend_add_request(
+                    str(uin),
+                    target_event.sdk_event.payload.EventData['MsgAdditional']
+                )
+                target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
+        elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_SYSTEM_MSG_NOTIFY':
+            if type(target_event.sdk_event.payload.EventData) is dict \
+            and 'GroupCode' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['GroupCode']) is int \
+            and 'ReqUid' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['ReqUid']) is str \
+            and 'Status' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['Status']) is int \
+            and target_event.sdk_event.payload.EventData['Status'] in [1, 2] \
+            and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'friend_add_request'
+                uin = str(target_event.sdk_event.payload.EventData['ReqUid'])
+                if OlivOS.pluginAPI.gProc is not None:
+                    uin = event_action.getUinfo(
+                        target_event = target_event,
+                        Uid = target_event.sdk_event.payload.EventData['ReqUid'],
+                        control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                    )
+                target_event.data = target_event.group_add_request(
+                    str(target_event.sdk_event.payload.EventData['GroupCode']),
+                    str(uin),
+                    target_event.sdk_event.payload.EventData['MsgAdditional']
+                )
+                target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
 
 
 '''
@@ -363,9 +413,69 @@ class PAYLOAD(object):
             if Base64Buf is not None:
                 self.data['CgiRequest']['Base64Buf'] = Base64Buf
 
+    class QueryUinByUid(payload_template):
+        def __init__(self, UidQuery:'list[str]', CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "QueryUinByUid"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {
+                    'Uids': UidQuery
+                }
+            }
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
+    def getUinfo(target_event, Uid, control_queue):
+        global gUinfoReg
+        res = Uid
+        if Uid in gUinfoReg:
+            res = gUinfoReg[Uid]
+        else:
+            res_list = event_action.getUinfoCache(
+                target_event = target_event,
+                UidQuery = [Uid],
+                control_queue = control_queue
+            )
+            if len(res_list) == 1:
+                res = res_list[0]
+        return res
+
+    def getUinfoCache(target_event, UidQuery, control_queue):
+        global gUinfoReg
+        res_tmp = {}
+        res = []
+        plugin_event_bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.base_info['self_id'],
+            platform_sdk=target_event.platform['sdk'],
+            platform_platform=target_event.platform['platform'],
+            platform_model=target_event.platform['model']
+        )
+        this_msg = PAYLOAD.QueryUinByUid(
+            UidQuery = UidQuery,
+            CurrentQQ = target_event.base_info['self_id']
+        )
+        waitForResReady(str(this_msg.ReqId))
+        send_ws_event(
+            plugin_event_bot_hash,
+            this_msg.dump(),
+            control_queue
+        )
+        res_raw = waitForRes(str(this_msg.ReqId))
+        raw_obj = init_api_json(res_raw)
+        if raw_obj is not None:
+            if type(raw_obj) is list:
+                for raw_obj_this in raw_obj:
+                    res_tmp[str(raw_obj_this['Uid'])] = raw_obj_this['Uin']
+        gUinfoReg.update(res_tmp)
+        for UidQuery_this in UidQuery:
+            res.append(res_tmp.get(UidQuery_this, None))
+        return res
+
     def send_solo_msg(target_event, target_type, target_id, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],
@@ -619,7 +729,7 @@ def init_api_json(raw:dict):
     and 'ReqId' in raw \
     and type(raw['ReqId']) is int \
     and 'ResponseData' in raw \
-    and type(raw['ResponseData']) is dict:
+    and type(raw['ResponseData']) in [dict, list]:
         res_data = copy.deepcopy(raw['ResponseData'])
     return res_data
 

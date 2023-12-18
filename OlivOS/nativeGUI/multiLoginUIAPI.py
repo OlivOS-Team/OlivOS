@@ -361,8 +361,6 @@ class TreeEditUI(object):
                 'type_list': [
                     'KOOK',
                     'KOOK/消息兼容',
-                    'QQ/OPQ/默认',
-                    'QQ/OPQ/指定端口',
                     '钉钉',
                     '渡渡语音/Dodo/V2',
                     '渡渡语音/Dodo/V1',
@@ -387,6 +385,8 @@ class TreeEditUI(object):
                     'FF14终端',
                     '虚拟终端',
                     '接口终端',
+                    'QQ/OPQ/默认',
+                    'QQ/OPQ/指定端口',
                     'QQ/GoCq/安卓手表',
                     'QQ/GoCq/安卓手机',
                     'QQ/GoCq/安卓平板',
@@ -411,7 +411,10 @@ class TreeEditUI(object):
                     'QQ/Wq/旧': '密码留空即尝试使用扫码登录',
                     '微信/ComWeChat': '启动后需要再运行特定版本微信',
                     'Hack.Chat': '密码可以留空',
-                    'RED协议': 'HTTP可以不填，反正也没实现'
+                    'RED协议': 'HTTP可以不填，反正也没实现',
+                    'QQ/OPQ/默认': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
+                    'QQ/OPQ/指定端口': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
+                    'QQ/OPQ/指定端口/旧': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责'
                 },
                 'type_clear_note_list': {
                     'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
@@ -1537,9 +1540,9 @@ class TreeEditUI(object):
                     self.tree_edit_UI_Label_init(
                         obj_root='edit_root',
                         obj_name='edit_root_Label_type_note',
-                        x=100,
+                        x=15,
                         y=40 + count * (24 + 6),
-                        width=200,
+                        width=400 - 15 * 2,
                         height=24,
                         title=self.UIData['edit_root_Combobox_dict']['type_note_list'][tmp_type]
                     )
