@@ -125,14 +125,14 @@ if __name__ == '__main__':
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-`OlivOS` 采用 `AGPLv3` 协议开源。为了整个社区的良性发展，我们**强烈建议**您做到以下几点：
+`OlivOS` 采用 `AGPLv3` 协议开源。为了整个社区的良性发展，我们**强烈建议**您做到以下几点（此声明继承自[Mirai](https://github.com/mamoe/mirai)）：
 
 - **间接接触（包括但不限于使用 `Http API` 或 跨进程技术）到 `OlivOS` 的软件使用 `AGPLv3` 开源**
 
 ### **OlivOS 的形象图及项目图标都拥有著作权保护。**
 **在未经过允许的情况下，任何人都不可以使用形象图和图标，或本文初的有关 OlivOS 名称来历的介绍原文，用于商业用途或是放置在项目首页，或其他未许可的行为。**
 
-### 衍生软件需声明引用（此声明参考[Mirai](https://github.com/mamoe/mirai)）
+### 衍生软件需声明引用
 
 - 若引用 OlivOS 发布的软件包而不修改 OlivOS，则衍生项目需在描述的任意部位提及使用 OlivOS。
 - 若修改 OlivOS 源代码再发布，**或参考 OlivOS 内部实现发布另一个项目**，则衍生项目必须在**文章首部**或 'OlivOS' 相关内容**首次出现**的位置**明确声明**来源于本仓库 (`https://github.com/OlivOS-Team/OlivOS`)。不得扭曲或隐藏免费且开源的事实。
