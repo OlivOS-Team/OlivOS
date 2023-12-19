@@ -19,8 +19,15 @@ import json
 import requests as req
 from urllib import parse
 import os
+import time
+import traceback
+
 import OlivOS
 
+paraMsgMap = [
+    'shamrock_default',
+    'para_default'
+]
 
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
@@ -53,24 +60,31 @@ class send_onebot_post_json_T(object):
         if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
             return None
         else:
-            json_str_tmp = json.dumps(obj=self.obj.__dict__)
-            send_url = self.bot_info.host + ':' + str(
-                self.bot_info.port) + '/' + self.node_ext + '?access_token=' + self.bot_info.access_token
+            try:
+                json_str_tmp = json.dumps(obj=self.obj.__dict__, ensure_ascii=False)
+                tmp_host = self.bot_info.host
+                if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
+                    pass
+                else:
+                    tmp_host = 'http://' + tmp_host
+                send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}?access_token={self.bot_info.access_token}'
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger is not None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
+                if self.bot_info.debug_mode:
+                    if self.bot_info.debug_logger is not None:
+                        self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
 
-            headers = {
-                'Content-Type': 'application/json'
-            }
-            msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
+                headers = {
+                    'Content-Type': 'application/json'
+                }
+                msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'))
 
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger is not None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
+                if self.bot_info.debug_mode:
+                    if self.bot_info.debug_logger is not None:
+                        self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
-            return msg_res
+                return msg_res
+            except:
+                traceback.print_exc()
 
 
 class api_templet(object):
@@ -138,7 +152,7 @@ class event(object):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
-    target_event.base_info['time'] = target_event.sdk_event.base_info['time']
+    target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
@@ -432,7 +446,7 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.json['interval']
             )
 
-def formatMessage(data:str):
+def formatMessage(data:str, msgType:str = 'para'):
     res = data
     data_obj = OlivOS.messageAPI.Message_templet(
         mode_rx = 'old_string',
@@ -452,7 +466,28 @@ def formatMessage(data:str):
                         file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
                         if os.path.exists(file_path):
                             data_obj_this.data['file'] = 'file:///%s' % file_path
-                            res = data_obj.get('old_string')
+    if msgType == 'para':
+        res = paraMapper(paraList = data_obj.data, msgType = 'para')
+    else:
+        res = data_obj.get('old_string')
+    return res
+
+
+def paraMapper(paraList, msgType='para'):
+    res = []
+    if 'para' == msgType:
+        for para in paraList:
+            tmp_para = para.__dict__
+            if para.type == 'at':
+                tmp_para = {}
+                tmp_para['type'] = 'at'
+                tmp_para['data'] = {}
+                tmp_para['data']['qq'] = para.data['id']
+            res.append(tmp_para)
+    elif 'msg' == msgType:
+        res = ''
+        for para in paraList:
+            res += para.CQ()
     return res
 
 # 支持OlivOS API调用的方法实现
@@ -472,17 +507,25 @@ class event_action(object):
         )
 
     def send_private_msg(target_event, user_id, message):
+        global paraMsgMap
+        msgType = 'msg'
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
         this_msg.data.user_id = str(user_id)
-        this_msg.data.message = formatMessage(message)
+        if target_event.bot_info.platform['model'] in paraMsgMap:
+            msgType = 'para'
+        this_msg.data.message = formatMessage(data = message, msgType = msgType)
         this_msg.do_api()
 
     def send_group_msg(target_event, group_id, message):
+        global paraMsgMap
+        msgType = 'msg'
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
         this_msg.data.group_id = str(group_id)
-        this_msg.data.message = formatMessage(message)
+        if target_event.bot_info.platform['model'] in paraMsgMap:
+            msgType = 'para'
+        this_msg.data.message = formatMessage(data = message, msgType = msgType)
         this_msg.do_api()
 
     def delete_msg(target_event, message_id):

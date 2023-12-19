@@ -26,6 +26,8 @@ modelName = 'flaskServerAPI'
 
 gCheckList = [
     'default',
+    'shamrock_default',
+    'para_default',
     'gocqhttp',
     'gocqhttp_hide',
     'gocqhttp_show',

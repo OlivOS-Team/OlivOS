@@ -378,6 +378,7 @@ class TreeEditUI(object):
                     'Hack.Chat/私有',
                     'onebotV12/正向WS',
                     'onebotV11/Http',
+                    'onebotV11/Http/Shamrock',
                     'RED协议',
                     'OPQBot/正向WS',
                     'B站直播间/游客',
@@ -467,6 +468,20 @@ class TreeEditUI(object):
                 },
                 'type_mapping_list': {
                     'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '地址': 'edit_root_Entry_Server_host',
+                            '端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post', {
+                            '账号': 'edit_root_Entry_ID',
+                            '地址': 'edit_root_Entry_Server_host',
+                            '端口': 'edit_root_Entry_Server_port',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'onebotV11/Http/消息段': ['qq', 'onebot', 'array_default', 'False', 'post', {
                             '账号': 'edit_root_Entry_ID',
                             '地址': 'edit_root_Entry_Server_host',
                             '端口': 'edit_root_Entry_Server_port',
@@ -787,6 +802,8 @@ class TreeEditUI(object):
                             # 'gocqhttp',
                             # 'gocqhttp_hide',
                             'default',
+                            'shamrock_default',
+                            'para_default',
                             'onebotV12',
                             'red',
                             'gocqhttp_show',
