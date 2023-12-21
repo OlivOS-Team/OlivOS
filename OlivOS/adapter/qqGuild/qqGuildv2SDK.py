@@ -75,22 +75,23 @@ sdkSelfInfo = {}
 
 
 class bot_info_T(object):
-    def __init__(self, id=-1, access_token=None, model='private'):
+    def __init__(self, id=-1, access_token=None, model='private', intents=0):
         self.id = id
         self.access_token = access_token
         self.model = model
+        self.intents = intents
         self.debug_mode = False
         self.debug_logger = None
 
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
-        plugin_bot_info.id,
-        plugin_bot_info.post_info.access_token
+        id = plugin_bot_info.id,
+        access_token = plugin_bot_info.post_info.access_token,
+        model = plugin_bot_info.platform.get('model', 'private'),
+        intents = plugin_bot_info.post_info.port
     )
     res.debug_mode = plugin_bot_info.debug_mode
-    if plugin_bot_info.platform['model'] == 'public':
-        res.model = 'public'
     return res
 
 
@@ -175,7 +176,7 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
+        def __init__(self, bot_info:bot_info_T, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
             tmp_intents = intents
             if bot_info.model == 'private':
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
@@ -183,6 +184,10 @@ class PAYLOAD(object):
             elif bot_info.model == 'public':
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
+            elif bot_info.model == 'public_guild_only':
+                tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
+            elif bot_info.model in ['private_intents', 'public_intents']:
+                tmp_intents = bot_info.intents
             payload_template.__init__(self)
             self.data.op = 2
             try:

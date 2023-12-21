@@ -365,7 +365,10 @@ class TreeEditUI(object):
                     '渡渡语音/Dodo/V2',
                     '渡渡语音/Dodo/V1',
                     'QQ官方/公域/V2',
+                    'QQ官方/公域/V2/纯频道',
+                    'QQ官方/公域/V2/指定intents',
                     'QQ官方/私域/V2',
+                    'QQ官方/私域/V2/指定intents',
                     'QQ官方/公域/V1',
                     'QQ官方/私域/V1',
                     '米游社/大别野/公域',
@@ -663,9 +666,26 @@ class TreeEditUI(object):
                             'AppSecret': 'edit_root_Entry_Server_access_token'
                         }
                     ],
+                    'QQ官方/公域/V2/纯频道': ['qqGuild', 'qqGuildv2_link', 'public_guild_only', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'QQ官方/公域/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'public_intents', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token',
+                            'intents': 'edit_root_Entry_Server_port'
+                        }
+                    ],
                     'QQ官方/私域/V2': ['qqGuild', 'qqGuildv2_link', 'private', 'True', 'websocket', {
                             'AppID': 'edit_root_Entry_ID',
                             'AppSecret': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'QQ官方/私域/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'private_intents', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token',
+                            'intents': 'edit_root_Entry_Server_port'
                         }
                     ],
                     'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
@@ -835,8 +855,11 @@ class TreeEditUI(object):
                             'default'
                         ],
                         'qqGuildv2_link': [
-                            'private',
                             'public',
+                            'public_guild_only',
+                            'public_intents',
+                            'private',
+                            'private_intents',
                             'default'
                         ]
                     },
@@ -989,8 +1012,12 @@ class TreeEditUI(object):
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
+                if tmp_platform_model not in [
+                    'public_intents',
+                    'private_intents'
+                ]:
+                    if tmp_port == '':
+                        tmp_port = '0'
             if tmp_platform_platform == 'mhyVila' \
             and tmp_platform_sdk == 'mhyVila_link':
                 tmp_id = tmp_id.strip('\n')
