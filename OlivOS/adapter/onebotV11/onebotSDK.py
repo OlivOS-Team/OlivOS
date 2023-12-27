@@ -67,7 +67,12 @@ class send_onebot_post_json_T(object):
                     pass
                 else:
                     tmp_host = 'http://' + tmp_host
-                send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}?access_token={self.bot_info.access_token}'
+                token_str = ''
+                token_dict = {}
+                if len(self.bot_info.access_token) > 0:
+                    token_str = f'?access_token={self.bot_info.access_token}'
+                    token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
+                send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
 
                 if self.bot_info.debug_mode:
                     if self.bot_info.debug_logger is not None:
@@ -76,6 +81,7 @@ class send_onebot_post_json_T(object):
                 headers = {
                     'Content-Type': 'application/json'
                 }
+                headers.update(token_dict)
                 msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'))
 
                 if self.bot_info.debug_mode:
