@@ -35,6 +35,9 @@ from lxml import etree
 # yaml
 import yaml
 
+# pyjson5
+import pyjson5
+
 # openpyxl
 import openpyxl
 
