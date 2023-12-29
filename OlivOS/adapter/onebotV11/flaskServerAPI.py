@@ -83,8 +83,9 @@ class server(OlivOS.API.Proc_templet):
         self.app()
         self.set_config()
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running', [
-                self.Proc_config['Flask_name']
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running on port [{1}]', [
+                self.Proc_config['Flask_name'],
+                str(self.Proc_config['Flask_server_port'])
             ], modelName
         ))
         if self.Proc_config['config'].debug_mode:
