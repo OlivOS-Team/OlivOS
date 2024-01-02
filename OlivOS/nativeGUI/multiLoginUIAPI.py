@@ -375,6 +375,7 @@ class TreeEditUI(object):
                     '米游社/大别野/私域',
                     '米游社/大别野/沙盒',
                     'Discord',
+                    'Discord/指定intents',
                     'Telegram',
                     'Fanbook',
                     'Hack.Chat',
@@ -696,6 +697,11 @@ class TreeEditUI(object):
                             'TOKEN': 'edit_root_Entry_Server_access_token'
                         }
                     ],
+                    'Discord/指定intents': ['discord', 'discord_link', 'intents', 'True', 'websocket', {
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                            'intents': 'edit_root_Entry_Server_port'
+                        }
+                    ],
                     '渡渡语音/Dodo/V2': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
                             'BotID': 'edit_root_Entry_ID',
                             'Bot私钥': 'edit_root_Entry_Server_access_token'
@@ -885,7 +891,8 @@ class TreeEditUI(object):
                     },
                     'discord': {
                         'discord_link': [
-                            'default'
+                            'default',
+                            'intents'
                         ]
                     },
                     'dodo': {
@@ -1055,8 +1062,11 @@ class TreeEditUI(object):
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
+                if tmp_platform_model not in [
+                    'intents'
+                ]:
+                    if tmp_port == '':
+                        tmp_port = '0'
             if tmp_platform_platform == 'kaiheila' \
             and tmp_platform_sdk == 'kaiheila_link':
                 if tmp_id == '':

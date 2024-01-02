@@ -78,8 +78,9 @@ sdkDMInfo = {}
 
 
 class bot_info_T(object):
-    def __init__(self, id=-1, access_token=None, model='private'):
+    def __init__(self, id=-1, port=-1, access_token=None, model='private'):
         self.id = id
+        self.intents = port
         self.access_token = access_token
         self.model = model
         self.debug_mode = False
@@ -89,6 +90,7 @@ class bot_info_T(object):
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
         plugin_bot_info.id,
+        plugin_bot_info.post_info.port,
         plugin_bot_info.post_info.access_token
     )
     res.debug_mode = plugin_bot_info.debug_mode
@@ -178,9 +180,14 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info,
-                     intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE | intents_T.GUILD_MESSAGES))):
+        def __init__(
+            self,
+            bot_info:bot_info_T,
+            intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE | intents_T.GUILD_MESSAGES))
+        ):
             tmp_intents = intents
+            if bot_info.model == 'intents':
+                tmp_intents = bot_info.intents
             payload_template.__init__(self)
             self.data.op = 2
             try:
