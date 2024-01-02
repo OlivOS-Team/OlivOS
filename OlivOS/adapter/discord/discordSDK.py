@@ -253,14 +253,20 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload,
-                                      proxies=OlivOS.webTool.get_system_proxy())
+                msg_res = req.request(
+                    "POST",
+                    send_url,
+                    headers=headers,
+                    data=payload,
+                    proxies=OlivOS.webTool.get_system_proxy()
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
-
-            if self.bot_info.debug_mode:
-                if self.bot_info.debug_logger is not None:
-                    self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
+                msg_res = req.request(
+                    "GET",
+                    send_url,
+                    headers=headers,
+                    proxies=OlivOS.webTool.get_system_proxy()
+                )
 
             self.res = msg_res.text
             return msg_res.text
