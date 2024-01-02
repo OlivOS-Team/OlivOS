@@ -76,6 +76,7 @@ class server(OlivOS.API.Proc_templet):
             tmp_data_rx_obj = OlivOS.kaiheilaSDK.PAYLOAD.rxPacket(
                 data=json.loads(message)
             )
+            # print(json.dumps(json.loads(message), indent=4, ensure_ascii=False))
             if tmp_data_rx_obj.data.s == 0:
                 self.Proc_data['extend_data']['last_s'] = tmp_data_rx_obj.data.sn
                 sdk_event = OlivOS.kaiheilaSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])

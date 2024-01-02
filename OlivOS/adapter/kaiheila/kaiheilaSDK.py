@@ -567,7 +567,106 @@ def get_Event_from_SDK(target_event):
                 except Exception as e:
                     traceback.print_exc()
                     target_event.active = False
-
+            else:
+                if 'type' in target_event.sdk_event.payload.data.d \
+                and target_event.sdk_event.payload.data.d['type'] == 255 \
+                and 'extra' in target_event.sdk_event.payload.data.d \
+                and type(target_event.sdk_event.payload.data.d['extra']) is dict:
+                    if 'body' in target_event.sdk_event.payload.data.d['extra'] \
+                    and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict \
+                    and 'type' in target_event.sdk_event.payload.data.d['extra'] \
+                    and target_event.sdk_event.payload.data.d['extra']['type'] == 'message_btn_click':
+                        if 'channel_type' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'PERSON' \
+                        and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str \
+                        and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str \
+                        and 'value' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str \
+                        and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict \
+                        and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str \
+                        and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']) is str:
+                            target_event.active = True
+                            target_event.plugin_info['func_type'] = 'private_message'
+                            msg = target_event.sdk_event.payload.data.d['extra']['body']['value']
+                            user_id = target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']
+                            user_name = target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']
+                            message_obj = OlivOS.messageAPI.Message_templet(
+                                'olivos_para',
+                                [OlivOS.messageAPI.PARA.text(text=msg)]
+                            )
+                            target_event.data = target_event.private_message(
+                                user_id,
+                                message_obj,
+                                'friend'
+                            )
+                            target_event.data.message_sdk = message_obj
+                            target_event.data.message_id = str(-1)
+                            target_event.data.raw_message = message_obj
+                            target_event.data.raw_message_sdk = message_obj
+                            target_event.data.font = None
+                            target_event.data.sender['user_id'] = user_id
+                            target_event.data.sender['nickname'] = user_name
+                            target_event.data.sender['id'] = user_id
+                            target_event.data.sender['name'] = user_name
+                            target_event.data.sender['sex'] = 'unknown'
+                            target_event.data.sender['age'] = 0
+                            target_event.data.extend['flag_from_direct'] = True
+                            if plugin_event_bot_hash in sdkSubSelfInfo:
+                                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+                        elif 'channel_type' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'GROUP' \
+                        and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str \
+                        and 'guild_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['guild_id']) is str \
+                        and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str \
+                        and 'value' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str \
+                        and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict \
+                        and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str \
+                        and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']) is str:
+                            target_event.active = True
+                            target_event.plugin_info['func_type'] = 'group_message'
+                            msg = target_event.sdk_event.payload.data.d['extra']['body']['value']
+                            host_id = target_event.sdk_event.payload.data.d['extra']['body']['guild_id']
+                            group_id = target_event.sdk_event.payload.data.d['extra']['body']['target_id']
+                            user_id = target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']
+                            user_name = target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']
+                            message_obj = OlivOS.messageAPI.Message_templet(
+                                'olivos_para',
+                                [OlivOS.messageAPI.PARA.text(text=msg)]
+                            )
+                            target_event.data = target_event.group_message(
+                                group_id,
+                                user_id,
+                                message_obj,
+                                'group'
+                            )
+                            target_event.data.message_sdk = message_obj
+                            target_event.data.message_id = str(-1)
+                            target_event.data.raw_message = message_obj
+                            target_event.data.raw_message_sdk = message_obj
+                            target_event.data.font = None
+                            target_event.data.sender['user_id'] = user_id
+                            target_event.data.sender['nickname'] = user_name
+                            target_event.data.sender['id'] = user_id
+                            target_event.data.sender['name'] = user_name
+                            target_event.data.sender['sex'] = 'unknown'
+                            target_event.data.sender['age'] = 0
+                            target_event.data.sender['role'] = 'member'
+                            target_event.data.host_id = host_id
+                            target_event.data.extend['flag_from_direct'] = False
+                            if plugin_event_bot_hash in sdkSubSelfInfo:
+                                target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
