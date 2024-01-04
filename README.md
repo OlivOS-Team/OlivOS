@@ -64,6 +64,10 @@
 ## 方针
 技术路线上，基于Python、采用模块化框架、进程分离、消息队列通信、前后端分离、响应式布局、渐进式渲染的基本思路，实现一个高并发性、高可靠性、高适应性的整体方案。
 
+## 欢迎点击Star，这对我们将带来很大的支持！
+[![Star History Chart](https://api.star-history.com/svg?repos=OlivOS-Team/OlivOS&type=Date)](https://star-history.com/#OlivOS-Team/OlivOS&Date)
+
+
 ## 开始使用
 ### 发布版本
 #### Windows
