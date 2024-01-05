@@ -169,6 +169,8 @@ class Event(object):
         self.indeAPI = inde_interface_T(self, self.platform['platform'])
         if self.platform['sdk'] == 'kaiheila_link':
             self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
+        if self.platform['sdk'] == 'mhyVila_link':
+            self.indeAPI = OlivOS.mhyVilaSDK.inde_interface(self, self.platform['platform'])
 
     def get_Event_from_SDK(self):
         if self.sdk_event_type is OlivOS.virtualTerminalSDK.event:
@@ -600,7 +602,7 @@ class Event(object):
                                             callback_msg_list.append(
                                                 '%s(%s)' % (
                                                     val_list_this,
-                                                    warppedRes['data'][val_list_this]
+                                                    str(warppedRes['data'][val_list_this])
                                                 )
                                             )
                                     callback_msg = ' '.join(callback_msg_list)

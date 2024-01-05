@@ -497,3 +497,66 @@ class event_action(object):
         api_obj.data.object_name = 'MHY:Text'
         api_obj.do_api('POST')
         return None
+
+    def create_panel_message(target_event, chat_id, object_name, content:dict, host_id = None):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = True
+        if host_id is None:
+            try:
+                host_id = target_event.data.host_id
+            except:
+                pass
+        sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
+        api_obj = API.sendMessage(sdk_bot_info)
+        api_obj.headdata.vila_id = host_id
+        api_obj.data.room_id = chat_id
+        api_obj.data.msg_content = json.dumps(content)
+        api_obj.data.object_name = object_name
+        api_obj.do_api('POST')
+        res_data['data'] = {}
+        res_data['data']['chat_type'] = 'private' if False else 'group'
+        res_data['data']['chat_id'] = str(chat_id)
+        res_data['data']['object_name'] = str(object_name)
+        res_data['data']['content'] = str(json.dumps(content, ensure_ascii = False))
+        return res_data
+
+
+class inde_interface(OlivOS.API.inde_interface_T):
+    @OlivOS.API.Event.callbackLogger('mhyVila:create_message', ['chat_type', 'chat_id', 'object_name', 'content'])
+    def __create_message(target_event, chat_type:str, chat_id:str, object_name:str, content:dict, host_id=None, flag_log:bool=True):
+        res_data = None
+        if chat_type == 'group':
+            res_data = OlivOS.mhyVilaSDK.event_action.create_panel_message(
+                target_event = target_event,
+                chat_id = chat_id,
+                object_name = object_name,
+                content = content,
+                host_id = host_id
+            )
+        return res_data
+
+    def create_message(
+        self,
+        chat_type:str,
+        chat_id:str,
+        object_name:str,
+        content:dict,
+        host_id:'str|None' = None,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__create_message(
+                self.event,
+                chat_type = chat_type,
+                chat_id = chat_id,
+                object_name = object_name,
+                content = content,
+                host_id = host_id,
+                flag_log = True
+            )
+        return res_data
+
