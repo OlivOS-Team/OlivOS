@@ -147,7 +147,8 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
-                target_event.data.sender['role'] = 'member'
+                if 'role' in target_event.data.sender:
+                    target_event.data.sender.pop('role')
                 target_event.data.host_id = None
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
@@ -186,7 +187,6 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
-                target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
         elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
