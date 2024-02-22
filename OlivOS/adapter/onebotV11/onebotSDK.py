@@ -156,10 +156,33 @@ class event(object):
         return res
 
 
+def format_cq_code_msg(msg):
+    res = msg
+    if type(msg) is str:
+        res = msg
+    elif type(msg) is list:
+        res = ''
+        for msg_this in msg:
+            if type(msg_this) is dict \
+            and 'type' in msg_this \
+            and 'data' in msg_this \
+            and type(msg_this['data']) is dict:
+                if msg_this['type'] == 'text':
+                    if 'text' in msg_this['data']:
+                        res += msg_this['data']['text']
+                elif msg_this['type'] == 'at':
+                    if 'qq' in msg_this['data']:
+                        res += f"[CQ:at,qq={msg_this['data']['qq']}]"
+                else:
+                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]) + ']'
+    return res
+
+
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
+    print(target_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
@@ -172,18 +195,16 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_sent'
+            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
             target_event.data = target_event.private_message_sent(
                 str(target_event.sdk_event.json['user_id']),
-                target_event.sdk_event.json['message'],
+                new_msg,
                 target_event.sdk_event.json['sub_type']
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                              target_event.sdk_event.json['message'])
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
-            target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                  target_event.sdk_event.json[
-                                                                                      'raw_message'])
+            target_event.data.raw_message = new_msg
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
             if 'user_id' in target_event.sdk_event.json['sender']:
@@ -194,20 +215,17 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message_sent'
+                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
                 target_event.data = target_event.group_message_sent(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['message'],
+                    new_msg,
                     target_event.sdk_event.json['sub_type']
                 )
-                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                  target_event.sdk_event.json[
-                                                                                      'message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
-                target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                      target_event.sdk_event.json[
-                                                                                          'raw_message'])
+                target_event.data.raw_message = new_msg
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
@@ -218,18 +236,16 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
+            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
             target_event.data = target_event.private_message(
                 str(target_event.sdk_event.json['user_id']),
-                target_event.sdk_event.json['message'],
+                new_msg,
                 target_event.sdk_event.json['sub_type']
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                              target_event.sdk_event.json['message'])
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
-            target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                  target_event.sdk_event.json[
-                                                                                      'raw_message'])
+            target_event.data.raw_message = new_msg
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.font = target_event.sdk_event.json['font']
             target_event.data.sender.update(target_event.sdk_event.json['sender'])
             if 'user_id' in target_event.sdk_event.json['sender']:
@@ -240,20 +256,17 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
+                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['message'],
+                    new_msg,
                     target_event.sdk_event.json['sub_type']
                 )
-                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                  target_event.sdk_event.json[
-                                                                                      'message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
-                target_event.data.raw_message = target_event.sdk_event.json['raw_message']
-                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                      target_event.sdk_event.json[
-                                                                                          'raw_message'])
+                target_event.data.raw_message = new_msg
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.font = target_event.sdk_event.json['font']
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
@@ -264,20 +277,17 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'channel':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
+                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['channel_id']),
                     str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['message'],
+                    new_msg,
                     target_event.sdk_event.json['sub_type']
                 )
-                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                  target_event.sdk_event.json[
-                                                                                      'message'])
+                target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
-                target_event.data.raw_message = target_event.sdk_event.json['message']
-                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                                      target_event.sdk_event.json[
-                                                                                          'message'])
+                target_event.data.raw_message = new_msg
+                target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.font = None
                 target_event.data.sender.update(target_event.sdk_event.json['sender'])
                 if 'user_id' in target_event.sdk_event.json['sender']:
