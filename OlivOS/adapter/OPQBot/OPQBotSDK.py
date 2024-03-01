@@ -23,6 +23,8 @@ import base64
 import requests as req
 from urllib import parse
 import traceback
+import os
+import struct
 
 import OlivOS
 
