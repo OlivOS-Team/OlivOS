@@ -23,6 +23,8 @@ import base64
 import requests as req
 from urllib import parse
 import traceback
+import os
+import struct
 
 import OlivOS
 
@@ -147,8 +149,7 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
-                if 'role' in target_event.data.sender:
-                    target_event.data.sender.pop('role')
+                target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
@@ -187,6 +188,7 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
+                target_event.data.sender['role'] = 'member'
                 target_event.data.host_id = None
         elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
@@ -514,7 +516,6 @@ class event_action(object):
                 control_queue
             )
 
-
     def send_msg(target_event, target_type, target_id, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],
@@ -548,6 +549,10 @@ class event_action(object):
                         type_chat = 2 if 'group' == target_type else 1
                     )
                     flag_now_type = 'image'
+                    try:
+                        width, height=get_image_size(data_this.data['file'])
+                    except:
+                        width, height=1920, 1080
                 if size_data == count_data\
                 or (flag_now_type_last != flag_now_type \
                 and flag_now_type_last == 'string' \
@@ -573,8 +578,8 @@ class event_action(object):
                                             "FileId": res[2],
                                             "FileMd5": res[0],
                                             "FileSize": res[1],
-                                            "Height": 1920,
-                                            "Width": 1080
+                                            "Height": height,
+                                            "Width": width
                                         }
                                     ]
                                 },
@@ -775,3 +780,66 @@ def waitForRes(echo:str):
             gResReg.pop(echo)
             break
     return res
+
+class UnknownImageFormat(Exception):
+    pass
+
+def get_image_size(file_path):
+    """
+    Return (width, height) for a given img file content - no external
+    dependencies except the os and struct modules from core
+    """
+    size = os.path.getsize(file_path)
+
+    with open(file_path, 'rb') as input:
+        height = -1
+        width = -1
+        data = input.read(30)
+
+        if (size >= 10) and data[:6] in ('GIF87a', 'GIF89a'):
+            # GIFs
+            w, h = struct.unpack("<HH", data[6:10])
+            width = int(w)
+            height = int(h)
+        elif ((size >= 24) and data.startswith(b'\211PNG\r\n\032\n')
+            and (data[12:16] == 'IHDR')):
+            # PNGs
+            w, h = struct.unpack(">LL", data[16:24])
+            width = int(w)
+            height = int(h)
+        elif (size >= 16) and data.startswith(b'\211PNG\r\n\032\n'):
+            # older PNGs?
+            w, h = struct.unpack(">LL", data[8:16])
+            width = int(w)
+            height = int(h)
+        elif (size >= 2) and data.startswith(b'\377\330'):
+            # JPEG
+            msg = " raised while trying to decode as JPEG."
+            input.seek(0)
+            input.read(2)
+            b = input.read(1)
+            try:
+                while (b and ord(b) != 0xDA):
+                    while (ord(b) != 0xFF): b = input.read(1)
+                    while (ord(b) == 0xFF): b = input.read(1)
+                    if (ord(b) >= 0xC0 and ord(b) <= 0xC3):
+                        input.read(3)
+                        h, w = struct.unpack(">HH", input.read(4))
+                        break
+                    else:
+                        input.read(int(struct.unpack(">H", input.read(2))[0])-2)
+                    b = input.read(1)
+                width = int(w)
+                height = int(h)
+            except struct.error:
+                raise UnknownImageFormat("StructError" + msg)
+            except ValueError:
+                raise UnknownImageFormat("ValueError" + msg)
+            except Exception as e:
+                raise UnknownImageFormat(e.__class__.__name__ + msg)
+        else:
+            raise UnknownImageFormat(
+                "Sorry, don't know how to get information from this file."
+            )
+
+    return width, height
