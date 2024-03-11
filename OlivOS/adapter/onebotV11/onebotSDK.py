@@ -61,7 +61,8 @@ class send_onebot_post_json_T(object):
             return None
         else:
             try:
-                json_str_tmp = json.dumps(obj=self.obj.__dict__, ensure_ascii=False)
+                clear_dict = {k: v for k, v in self.obj.__dict__.items() if v != -1}
+                json_str_tmp = json.dumps(obj=clear_dict, ensure_ascii=False)
                 tmp_host = self.bot_info.host
                 if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
                     pass
