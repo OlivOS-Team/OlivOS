@@ -32,6 +32,8 @@ gResReg = {}
 
 gUinfoReg = {}
 
+gMsgSeqToGroupCodeReg = {}
+
 class bot_info_T(object):
     def __init__(self, id=-1):
         self.id = id
@@ -188,6 +190,26 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
                 target_event.data.host_id = None
+        elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_INVITE':
+            if type(target_event.sdk_event.payload.EventData) is dict \
+            and 'MsgHead' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
+            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
+            and 'Event' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['Event']) is dict \
+            and 'Invitee' in target_event.sdk_event.payload.EventData['Event'] \
+            and type(target_event.sdk_event.payload.EventData['Event']['Invitee']) in [str, int] \
+            and 'Invitor' in target_event.sdk_event.payload.EventData['Event'] \
+            and type(target_event.sdk_event.payload.EventData['Event']['Invitor']) in [str, int]:
+                target_event.active = True
+                target_event.plugin_info['func_type'] = 'group_member_increase'
+                target_event.data = target_event.group_member_increase(
+                    str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
+                    str(target_event.sdk_event.payload.EventData['Event']['Invitor']),
+                    str(target_event.sdk_event.payload.EventData['Event']['Invitee'])
+                )
+                target_event.data.action = 'approve'
         elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
             if type(target_event.sdk_event.payload.EventData) is dict \
             and 'ReqUid' in target_event.sdk_event.payload.EventData \
@@ -210,32 +232,31 @@ def get_Event_from_SDK(target_event):
                     target_event.sdk_event.payload.EventData['MsgAdditional']
                 )
                 target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
-        elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_SYSTEM_MSG_NOTIFY':
+        elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_SYSTEM_MSG_NOTIFY':
             if type(target_event.sdk_event.payload.EventData) is dict \
+            and 'MsgType' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgType']) is int \
             and 'GroupCode' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['GroupCode']) is int \
-            and 'ReqUid' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['ReqUid']) is str \
+            and 'MsgSeq' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgSeq']) is int \
             and 'Status' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['Status']) is int \
-            and target_event.sdk_event.payload.EventData['Status'] in [1, 2] \
             and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str:
-                target_event.active = True
-                target_event.plugin_info['func_type'] = 'friend_add_request'
-                uin = str(target_event.sdk_event.payload.EventData['ReqUid'])
-                if OlivOS.pluginAPI.gProc is not None:
-                    uin = event_action.getUinfo(
-                        target_event = target_event,
-                        Uid = target_event.sdk_event.payload.EventData['ReqUid'],
-                        control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str \
+            and 'ActorUid' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['ActorUid']) in [str, int]:
+                if target_event.sdk_event.payload.EventData['MsgType'] == 2 \
+                and target_event.sdk_event.payload.EventData['Status'] == 1:
+                    target_event.active = True
+                    target_event.plugin_info['func_type'] = 'group_invite_request'
+                    target_event.data = target_event.group_invite_request(
+                        str(target_event.sdk_event.payload.EventData['GroupCode']),
+                        str(target_event.sdk_event.payload.EventData['ActorUid']),
+                        target_event.sdk_event.payload.EventData['MsgAdditional']
                     )
-                target_event.data = target_event.group_add_request(
-                    str(target_event.sdk_event.payload.EventData['GroupCode']),
-                    str(uin),
-                    target_event.sdk_event.payload.EventData['MsgAdditional']
-                )
-                target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
+                    target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgSeq'])
+                    gMsgSeqToGroupCodeReg[target_event.data.flag] = target_event.sdk_event.payload.EventData['GroupCode']
 
 
 '''
@@ -424,6 +445,23 @@ class PAYLOAD(object):
                 "CgiCmd": self.CgiCmd,
                 "CgiRequest": {
                     'Uids': UidQuery
+                }
+            }
+
+    class SystemMsgAction_Group(payload_template):
+        def __init__(self, MsgSeq:int, MsgType:int, GroupCode:int, OpCode:int, CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "SystemMsgAction.Group"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {
+                    "MsgSeq": MsgSeq,
+                    "MsgType": MsgType,
+                    "GroupCode": GroupCode,
+                    "OpCode": OpCode
                 }
             }
 
@@ -656,6 +694,40 @@ class event_action(object):
                 ).dump(),
                 control_queue
             )
+
+    def set_group_add_request(target_event, flag:str, sub_type:str, approve:bool, control_queue):
+        if target_event.bot_info != None:
+            plugin_event_bot_hash = OlivOS.API.getBotHash(
+                bot_id=target_event.base_info['self_id'],
+                platform_sdk=target_event.platform['sdk'],
+                platform_platform=target_event.platform['platform'],
+                platform_model=target_event.platform['model']
+            )
+            sub_type_int = None
+            OpCode_int = None
+            GroupCode_this = None
+            if sub_type == 'invite':
+                sub_type_int = 1
+                GroupCode_this = gMsgSeqToGroupCodeReg.get(str(flag), None)
+                if approve is True:
+                    OpCode_int = 1
+                else:
+                    OpCode_int = 2
+            elif sub_type == 'add':
+                pass
+            if sub_type_int is not None:
+                send_ws_event(
+                    plugin_event_bot_hash,
+                    PAYLOAD.SystemMsgAction_Group(
+                        MsgSeq = int(flag),
+                        MsgType = sub_type_int,
+                        GroupCode = GroupCode_this,
+                        OpCode = OpCode_int,
+                        CurrentQQ = target_event.base_info['self_id']
+                    ).dump(),
+                    control_queue
+                )
+
 
     def get_group_list(target_event:OlivOS.API.Event, control_queue):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()

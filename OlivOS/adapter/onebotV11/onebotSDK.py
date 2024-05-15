@@ -347,7 +347,7 @@ def get_Event_from_SDK(target_event):
             target_event.plugin_info['func_type'] = 'group_member_increase'
             target_event.data = target_event.group_member_increase(
                 str(target_event.sdk_event.json['group_id']),
-                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json.get('operator_id', '-1')),
                 str(target_event.sdk_event.json['user_id'])
             )
             if target_event.sdk_event.json['sub_type'] == 'approve':
