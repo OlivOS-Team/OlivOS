@@ -7,7 +7,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 \____/ /_____/___/  _____/  \____/ /____/
 
 @File      :   OlivOS/telegramSDK.py
-@Author    :   lunzhiPenxil仑质
+@Author    :   lunzhiPenxil仑质, MetaLeo元理
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
 @Copyright :   (C) 2020-2023, OlivOS-Team
@@ -222,10 +222,18 @@ def get_message_obj_from_SDK(target_event):
             checkInDictSafe('photo', target_event.sdk_event.json, ['message'])
         ]):
             message_list = []
-            if type(target_event.sdk_event.json['message']['photo']) == list:
+            if type(target_event.sdk_event.json['message']['photo']) is list:
                 message_list.append(
                     OlivOS.messageAPI.PARA.image(
                         target_event.sdk_event.json['message']['photo'][0]['file_id']
+                    )
+                )
+            if checkByListAnd([
+                checkInDictSafe('caption', target_event.sdk_event.json, ['message'])
+            ]):
+                message_list.append(
+                    OlivOS.messageAPI.PARA.text(
+                        text = str(target_event.sdk_event.json['message']['caption'])
                     )
                 )
             message_obj = OlivOS.messageAPI.Message_templet(
@@ -288,7 +296,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -324,7 +332,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -362,7 +370,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
