@@ -1227,6 +1227,8 @@ class Event(object):
                 OlivOS.onebotV12SDK.event_action.set_friend_add_request(self, flag, approve, remark)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
+            elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                OlivOS.OPQBotSDK.event_action.set_friend_add_request(self, flag, approve, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 

@@ -34,6 +34,8 @@ gUinfoReg = {}
 
 gMsgSeqToGroupCodeReg = {}
 
+gFriendReqTsReg = {}
+
 class bot_info_T(object):
     def __init__(self, id=-1):
         self.id = id
@@ -74,7 +76,7 @@ def get_message(Content:str, AtUinLists:list):
     return res_msg
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
+    global gFriendReqTsReg
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -156,6 +158,31 @@ def get_Event_from_SDK(target_event):
             if type(target_event.sdk_event.payload.EventData) is dict \
             and 'MsgHead' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
+            and 'MsgType' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and target_event.sdk_event.payload.EventData['MsgHead']['MsgType'] == 528 \
+            and 'C2cCmd' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and target_event.sdk_event.payload.EventData['MsgHead']['C2cCmd'] == 35 \
+            and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int \
+            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
+            and 'FromUid' in target_event.sdk_event.payload.EventData['MsgHead'] \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUid']) is str:
+                tmp_ToUin = str(target_event.sdk_event.payload.EventData['MsgHead']['ToUin'])
+                tmp_FromUin = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin'])
+                if tmp_ToUin != tmp_FromUin:
+                    if int(time.time()) - gFriendReqTsReg.get(tmp_FromUin, -1) >= 5:
+                        gFriendReqTsReg[tmp_FromUin] = int(time.time())
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'friend_add_request'
+                        target_event.data = target_event.friend_add_request(
+                            tmp_FromUin,
+                            ''
+                        )
+                        target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUid'])
+            elif type(target_event.sdk_event.payload.EventData) is dict \
+            and 'MsgHead' in target_event.sdk_event.payload.EventData \
+            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
             and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
             and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
             and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
@@ -210,23 +237,25 @@ def get_Event_from_SDK(target_event):
                     str(target_event.sdk_event.payload.EventData['Event']['Invitee'])
                 )
                 target_event.data.action = 'approve'
-        elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
+        elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_SYSTEM_MSG_NOTIFY':
             if type(target_event.sdk_event.payload.EventData) is dict \
             and 'ReqUid' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['ReqUid']) is str \
             and 'Status' in target_event.sdk_event.payload.EventData \
-            and target_event.sdk_event.payload.EventData['Status'] == 7 \
+            and type(target_event.sdk_event.payload.EventData['Status']) is int \
             and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
             and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str:
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'friend_add_request'
-                uin = str(target_event.sdk_event.payload.EventData['ReqUid'])
-                if OlivOS.pluginAPI.gProc is not None:
+                uin = None
+                if False and OlivOS.pluginAPI.gProc is not None:
                     uin = event_action.getUinfo(
                         target_event = target_event,
                         Uid = target_event.sdk_event.payload.EventData['ReqUid'],
                         control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
                     )
+                if uin is None:
+                    uin = -1
                 target_event.data = target_event.friend_add_request(
                     str(uin),
                     target_event.sdk_event.payload.EventData['MsgAdditional']
@@ -454,6 +483,21 @@ class PAYLOAD(object):
                 "CgiCmd": self.CgiCmd,
                 "CgiRequest": {
                     'Uids': UidQuery
+                }
+            }
+
+    class SystemMsgAction_Friend(payload_template):
+        def __init__(self, ReqUid:int, OpCode:int, CurrentQQ:'int|str'):
+            payload_template.__init__(self)
+            self.CgiCmd = "SystemMsgAction.Friend"
+            self.CurrentQQ = str(CurrentQQ)
+            self.data = {
+                "ReqId": self.ReqId,
+                "BotUin": str(self.CurrentQQ),
+                "CgiCmd": self.CgiCmd,
+                "CgiRequest": {
+                    "ReqUid": ReqUid,
+                    "OpCode": OpCode
                 }
             }
 
@@ -699,6 +743,25 @@ class event_action(object):
                 plugin_event_bot_hash,
                 PAYLOAD.exitGroup(
                     Uin = group_id,
+                    CurrentQQ = target_event.base_info['self_id']
+                ).dump(),
+                control_queue
+            )
+
+    def set_friend_add_request(target_event, flag:str, approve:bool, control_queue):
+        if target_event.bot_info != None:
+            plugin_event_bot_hash = OlivOS.API.getBotHash(
+                bot_id=target_event.base_info['self_id'],
+                platform_sdk=target_event.platform['sdk'],
+                platform_platform=target_event.platform['platform'],
+                platform_model=target_event.platform['model']
+            )
+            OpCode_int = 3 if approve is True else 5
+            send_ws_event(
+                plugin_event_bot_hash,
+                PAYLOAD.SystemMsgAction_Friend(
+                    ReqUid = flag,
+                    OpCode = OpCode_int,
                     CurrentQQ = target_event.base_info['self_id']
                 ).dump(),
                 control_queue
