@@ -707,7 +707,7 @@ class event_action(object):
             OpCode_int = None
             GroupCode_this = None
             if sub_type == 'invite':
-                sub_type_int = 1
+                sub_type_int = 2
                 GroupCode_this = gMsgSeqToGroupCodeReg.get(str(flag), None)
                 if approve is True:
                     OpCode_int = 1
