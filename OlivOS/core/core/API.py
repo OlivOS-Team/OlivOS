@@ -1244,6 +1244,8 @@ class Event(object):
                 OlivOS.onebotV12SDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+            elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                OlivOS.OPQBotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 

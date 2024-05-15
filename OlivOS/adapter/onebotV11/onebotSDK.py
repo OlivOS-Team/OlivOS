@@ -61,7 +61,11 @@ class send_onebot_post_json_T(object):
             return None
         else:
             try:
-                json_str_tmp = json.dumps(obj=self.obj.__dict__, ensure_ascii=False)
+                # clear_dict = {k: v for k, v in self.obj.__dict__.items() if v != -1}
+                clear_dict = self.obj.__dict__
+                if clear_dict.get('message_type')=='private':
+                    clear_dict.pop('group_id','No "group_id"')
+                json_str_tmp = json.dumps(obj=clear_dict, ensure_ascii=False)
                 tmp_host = self.bot_info.host
                 if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
                     pass
@@ -343,7 +347,7 @@ def get_Event_from_SDK(target_event):
             target_event.plugin_info['func_type'] = 'group_member_increase'
             target_event.data = target_event.group_member_increase(
                 str(target_event.sdk_event.json['group_id']),
-                str(target_event.sdk_event.json['operator_id']),
+                str(target_event.sdk_event.json.get('operator_id', '-1')),
                 str(target_event.sdk_event.json['user_id'])
             )
             if target_event.sdk_event.json['sub_type'] == 'approve':
