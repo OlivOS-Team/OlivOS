@@ -250,9 +250,18 @@ def get_Event_from_SDK(target_event):
                 and target_event.sdk_event.payload.EventData['Status'] == 1:
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_invite_request'
+                    uin = None
+                    if False and OlivOS.pluginAPI.gProc is not None:
+                        uin = event_action.getUinfo(
+                            target_event = target_event,
+                            Uid = target_event.sdk_event.payload.EventData['ActorUid'],
+                            control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                        )
+                    if uin is None:
+                        uin = -1
                     target_event.data = target_event.group_invite_request(
                         str(target_event.sdk_event.payload.EventData['GroupCode']),
-                        str(target_event.sdk_event.payload.EventData['ActorUid']),
+                        str(uin),
                         target_event.sdk_event.payload.EventData['MsgAdditional']
                     )
                     target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgSeq'])
