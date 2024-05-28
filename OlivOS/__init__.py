@@ -78,6 +78,7 @@ if platform.system() == 'Windows':
     from .libBooter import libWQEXEModelAPI
     from .libBooter import libCWCBEXEModelAPI
     from .libBooter import libOPQBotEXEModelAPI
+    from .libBooter import libNapCatEXEModelAPI
     from .nativeGUI import nativeWinUIAPI
     from .nativeGUI import webviewUIAPI
 from . import userModule

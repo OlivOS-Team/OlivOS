@@ -36,7 +36,11 @@ gCheckList = [
     'gocqhttp_show_Android_Watch',
     'gocqhttp_show_iPad',
     'gocqhttp_show_iMac',
-    'gocqhttp_show_old'
+    'gocqhttp_show_old',
+    'napcat',
+    'napcat_hide',
+    'napcat_show',
+    'napcat_show_old'
 ]
 
 class server(OlivOS.API.Proc_templet):
