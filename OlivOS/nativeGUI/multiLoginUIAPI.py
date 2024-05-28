@@ -359,11 +359,10 @@ class TreeEditUI(object):
             'edit_root_Entry_qsign_num': 1,
             'edit_root_Combobox_dict': {
                 'type_list': [
+                    'QQ/NapCat/默认',
+                    'QQ/OPQ/默认',
                     'KOOK',
                     'KOOK/消息兼容',
-                    '钉钉',
-                    '渡渡语音/Dodo/V2',
-                    '渡渡语音/Dodo/V1',
                     'QQ官方/公域/V2',
                     'QQ官方/公域/V2/纯频道',
                     'QQ官方/公域/V2/指定intents',
@@ -371,26 +370,12 @@ class TreeEditUI(object):
                     'QQ官方/私域/V2/指定intents',
                     'QQ官方/公域/V1',
                     'QQ官方/私域/V1',
-                    '米游社/大别野/公域',
-                    '米游社/大别野/私域',
-                    '米游社/大别野/沙盒',
                     'Discord',
                     'Discord/指定intents',
                     'Telegram',
                     'Fanbook',
                     'Hack.Chat',
                     'Hack.Chat/私有',
-                    'onebotV12/正向WS',
-                    'onebotV11/Http',
-                    'onebotV11/Http/Shamrock',
-                    'RED协议',
-                    'OPQBot/正向WS',
-                    'B站直播间/游客',
-                    'B站直播间/登录',
-                    'FF14终端',
-                    '虚拟终端',
-                    '接口终端',
-                    'QQ/OPQ/默认',
                     'QQ/OPQ/指定端口',
                     'QQ/GoCq/安卓手表',
                     'QQ/GoCq/安卓手机',
@@ -401,7 +386,24 @@ class TreeEditUI(object):
                     'QQ/Wq/安卓手表',
                     'QQ/Wq/安卓手机',
                     'QQ/Wq/安卓平板',
+                    'onebotV12/正向WS',
+                    'onebotV11/Http',
+                    'onebotV11/Http/Shamrock',
+                    'RED协议',
+                    'OPQBot/正向WS',
                     '微信/ComWeChat',
+                    '米游社/大别野/公域',
+                    '米游社/大别野/私域',
+                    '米游社/大别野/沙盒',
+                    '渡渡语音/Dodo/V2',
+                    '渡渡语音/Dodo/V1',
+                    '钉钉',
+                    'B站直播间/游客',
+                    'B站直播间/登录',
+                    'FF14终端',
+                    '虚拟终端',
+                    '接口终端',
+                    'QQ/NapCat/旧',
                     'QQ/OPQ/指定端口/旧',
                     'QQ/GoCq/旧',
                     'QQ/Wq/旧',
@@ -419,7 +421,9 @@ class TreeEditUI(object):
                     'RED协议': 'HTTP可以不填，反正也没实现',
                     'QQ/OPQ/默认': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
                     'QQ/OPQ/指定端口': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
-                    'QQ/OPQ/指定端口/旧': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责'
+                    'QQ/OPQ/指定端口/旧': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
+                    'QQ/NapCat/默认': '使用本方法需要已经安装较新版本QQ',
+                    'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ'
                 },
                 'type_clear_note_list': {
                     'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
@@ -435,7 +439,9 @@ class TreeEditUI(object):
                     'QQ/Wq/旧': './conf/walleq/{bothash}',
                     'QQ/OPQ/默认': './conf/OPQBot/{bothash}',
                     'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
-                    'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}'
+                    'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}',
+                    'QQ/NapCat/默认': './conf/napcat/{bothash}',
+                    'QQ/NapCat/旧': './conf/napcat/{bothash}'
                 },
                 'type_extend_note_list': {
                     #'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
@@ -527,6 +533,16 @@ class TreeEditUI(object):
                             'QQ号': 'edit_root_Entry_ID',
                             '服务端口': 'edit_root_Entry_Server_port',
                             'TOKEN': 'edit_root_Entry_Server_access_token',
+                        }
+                    ],
+                    'QQ/NapCat/默认': ['qq', 'onebot', 'napcat_show', 'True', 'post', {
+                            'QQ号': 'edit_root_Entry_ID',
+                        }
+                    ],
+                    'QQ/NapCat/旧': ['qq', 'onebot', 'napcat_show_old', 'True', 'post', {
+                            'QQ号': 'edit_root_Entry_ID',
+                            'TOKEN': 'edit_root_Entry_Server_access_token',
+                            '服务端口': 'edit_root_Entry_Server_port',
                         }
                     ],
                     'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
@@ -851,7 +867,11 @@ class TreeEditUI(object):
                             'opqbot_default',
                             'opqbot_auto',
                             'opqbot_port',
-                            'opqbot_port_old'
+                            'opqbot_port_old',
+                            'napcat',
+                            #'napcat_hide',
+                            'napcat_show',
+                            'napcat_show_old'
                         ]
                     },
                     'qqGuild': {

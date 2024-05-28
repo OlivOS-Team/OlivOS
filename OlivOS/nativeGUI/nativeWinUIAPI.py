@@ -88,6 +88,9 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_opqbot_terminal'] = {}
         self.UIObject['root_opqbot_terminal_data'] = {}
         self.UIObject['root_opqbot_terminal_data_max'] = 500
+        self.UIObject['root_napcat_terminal'] = {}
+        self.UIObject['root_napcat_terminal_data'] = {}
+        self.UIObject['root_napcat_terminal_data_max'] = 500
         self.UIObject['root_virtual_terminal_terminal'] = {}
         self.UIObject['root_virtual_terminal_terminal_data'] = {}
         self.UIObject['root_virtual_terminal_terminal_data_max'] = 150
@@ -103,6 +106,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIData['shallow_walleq_menu_list'] = None
         self.UIData['shallow_cwcb_menu_list'] = None
         self.UIData['shallow_opqbot_menu_list'] = None
+        self.UIData['shallow_napcat_menu_list'] = None
         self.UIData['shallow_virtual_terminal_menu_list'] = None
         self.UIData['shallow_plugin_data_dict'] = None
         self.updateShallowMenuList()
@@ -126,6 +130,7 @@ class dock(OlivOS.API.Proc_templet):
                         if 'data' in packet.key['data'] \
                         and type(packet.key['data']['data']) is dict:
                             self.bot_info = packet.key['data']['data']
+                        self.UIData['shallow_napcat_menu_list'] = None
                         self.UIData['shallow_opqbot_menu_list'] = None
                         self.UIData['shallow_gocqhttp_menu_list'] = None
                         self.UIData['shallow_walleq_menu_list'] = None
@@ -187,6 +192,64 @@ class dock(OlivOS.API.Proc_templet):
                                             if self.UIObject['root_OlivOS_terminal'] is not None:
                                                 self.UIObject['root_OlivOS_terminal'].tree_add_line(
                                                     rx_packet_data.key['data']['data'])
+                                        elif 'napcat' == rx_packet_data.key['data']['action']:
+                                            if 'event' in rx_packet_data.key['data']:
+                                                if 'init' == rx_packet_data.key['data']['event']:
+                                                    if self.UIData['shallow_napcat_menu_list'] is None:
+                                                        self.UIData['shallow_napcat_menu_list'] = []
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                                            tmp_title = '%s' % (
+                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                            )
+                                                            self.UIData['shallow_napcat_menu_list'].append(
+                                                                [
+                                                                    tmp_title,
+                                                                    rx_packet_data.key['data']['hash'],
+                                                                    '',
+                                                                    'napcat'
+                                                                ]
+                                                            )
+                                                            self.updateShallowMenuList()
+                                                    if self.UIObject['root_shallow'] is not None:
+                                                        self.updateShallow()
+                                                    self.startNapCatTerminalUISend(rx_packet_data.key['data']['hash'])
+                                                elif 'log' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
+                                                            rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash not in self.UIObject['root_napcat_terminal_data']:
+                                                            self.UIObject['root_napcat_terminal_data'][hash] = []
+                                                        self.UIObject['root_napcat_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_napcat_terminal_data'][hash]) > \
+                                                                self.UIObject['root_napcat_terminal_data_max']:
+                                                            self.UIObject['root_napcat_terminal_data'][hash].pop(0)
+                                                        if hash in self.UIObject['root_napcat_terminal']:
+                                                            self.UIObject['root_napcat_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data'])
+                                                elif 'qrcode' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] and 'path' in \
+                                                            rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        if hash in self.bot_info:
+                                                            if hash in self.UIObject['root_qrcode_window']:
+                                                                try:
+                                                                    self.UIObject['root_qrcode_window'][hash].stop()
+                                                                except:
+                                                                    pass
+                                                            self.UIObject['root_qrcode_window'][hash] = QRcodeUI(
+                                                                Model_name='qrcode_window',
+                                                                logger_proc=self.Proc_info.logger_proc.log,
+                                                                root=self,
+                                                                root_tk=None,
+                                                                bot=self.bot_info[hash],
+                                                                path=rx_packet_data.key['data']['path']
+                                                            )
+                                                            self.UIObject['root_qrcode_window'][hash].start()
+                                                elif 'napcat_terminal_on' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data']:
+                                                        self.startNapCatTerminalUI(rx_packet_data.key['data']['hash'])
                                         elif 'gocqhttp' == rx_packet_data.key['data']['action']:
                                             if 'event' in rx_packet_data.key['data']:
                                                 if 'init' == rx_packet_data.key['data']['event']:
@@ -450,6 +513,7 @@ class dock(OlivOS.API.Proc_templet):
             ['打开终端', self.startOlivOSTerminalUISend],
             #['账号管理', self.startAccountEditSendFunc()],
             #['账号管理', None],
+            ['NapCat管理', self.UIData['shallow_napcat_menu_list']],
             ['OPQBot管理', self.UIData['shallow_opqbot_menu_list']],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
             ['walleq管理', self.UIData['shallow_walleq_menu_list']],
@@ -463,12 +527,12 @@ class dock(OlivOS.API.Proc_templet):
             ['退出OlivOS', self.setOlivOSExit]
         ]
         for data_this in self.UIData['shallow_menu_list']:
-            if data_this[0] in ['OPQBot管理', 'gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
+            if data_this[0] in ['NapCat管理', 'OPQBot管理', 'gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
                 if data_this[1] is not None:
                     tmp_new.append(data_this)
             elif data_this[0] in ['更新OlivOS']:
                 if self.UIObject['flag_have_update']:
-                    data_this[0] = data_this[0] + '[有更新!]'
+                    data_this[0] += '[有更新!]'
                 tmp_new.append(data_this)
             else:
                 tmp_new.append(data_this)
@@ -507,6 +571,11 @@ class dock(OlivOS.API.Proc_templet):
     def startOPQBotTerminalUISendFunc(self, hash):
         def resFunc():
             self.startOPQBotTerminalUISend(hash)
+        return resFunc
+
+    def startNapCatTerminalUISendFunc(self, hash):
+        def resFunc():
+            self.startNapCatTerminalUISend(hash)
         return resFunc
 
     def startGoCqhttpTerminalUISend(self, hash):
@@ -560,6 +629,20 @@ class dock(OlivOS.API.Proc_templet):
                 'data': {
                     'action': 'opqbot',
                     'event': 'opqbot_terminal_on',
+                    'hash': hash,
+                }
+            }
+        )
+
+    def startNapCatTerminalUISend(self, hash):
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'napcat',
+                    'event': 'napcat_terminal_on',
                     'hash': hash,
                 }
             }
@@ -628,6 +711,22 @@ class dock(OlivOS.API.Proc_templet):
                 bot=self.bot_info[hash]
             )
             self.UIObject['root_opqbot_terminal'][hash].start()
+
+    def startNapCatTerminalUI(self, hash):
+        if hash in self.bot_info:
+            if hash in self.UIObject['root_napcat_terminal']:
+                try:
+                    self.UIObject['root_napcat_terminal'][hash].stop()
+                except:
+                    pass
+            self.UIObject['root_napcat_terminal'][hash] = napcatTerminalUI(
+                Model_name='napcat_terminal',
+                logger_proc=self.Proc_info.logger_proc.log,
+                root=self,
+                root_tk=None,
+                bot=self.bot_info[hash]
+            )
+            self.UIObject['root_napcat_terminal'][hash].start()
 
     def startVirtualTerminalUISendFunc(self, hash):
         def resFunc():
@@ -732,6 +831,19 @@ class dock(OlivOS.API.Proc_templet):
         self.sendControlEventSend('send', {
             'target': {
                 'type': 'opqbot_lib_exe_model',
+                'hash': hash
+            },
+            'data': {
+                'action': 'input',
+                'data': data
+            }
+        }
+                                  )
+
+    def setNapCatModelSend(self, hash, data):
+        self.sendControlEventSend('send', {
+            'target': {
+                'type': 'napcat_lib_exe_model',
                 'hash': hash
             },
             'data': {
@@ -1906,6 +2018,224 @@ class opqbotTerminalUI(object):
         self.root.UIObject['root_opqbot_terminal'].pop(self.bot.hash)
 
 
+class napcatTerminalUI(object):
+    def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
+        self.Model_name = Model_name
+        self.root = root
+        self.root_tk = root_tk
+        self.bot = bot
+        self.UIObject = {}
+        self.UIData = {}
+        self.UIConfig = {}
+        self.logger_proc = logger_proc
+        self.UIConfig.update(dictColorContext)
+
+    def start(self):
+        self.UIObject['root'] = tkinter.Toplevel()
+        self.UIObject['root'].title('NapCat 终端 - %s' % str(self.bot.id))
+        self.UIObject['root'].geometry('800x600')
+        self.UIObject['root'].minsize(800, 600)
+        self.UIObject['root'].grid_rowconfigure(0, weight=15)
+        self.UIObject['root'].grid_rowconfigure(1, weight=0)
+        self.UIObject['root'].grid_columnconfigure(0, weight=0)
+        self.UIObject['root'].grid_columnconfigure(1, weight=2)
+        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].resizable(
+            width=True,
+            height=True
+        )
+        self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
+
+        self.UIObject['style'] = ttk.Style()
+        fix_Treeview_color(self.UIObject['style'])
+
+        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree']['show'] = 'headings'
+        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
+        self.UIObject['tree'].heading('DATA', text='日志')
+        self.UIObject['tree']['selectmode'] = 'browse'
+        self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
+        self.UIObject['tree'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
+        # self.tree_load()
+        # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
+        self.UIObject['tree'].grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            rowspan=1,
+            columnspan=2,
+            padx=(15, 0),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree_yscroll'] = ttk.Scrollbar(
+            self.UIObject['root'],
+            orient="vertical",
+            command=self.UIObject['tree'].yview
+        )
+        # self.UIObject['tree_yscroll'].place(
+        #    x = 800 - 15 - 18,
+        #    y = 15,
+        #    width = 18,
+        #    height = 600 - 15 * 2 - 24 - 8
+        # )
+        self.UIObject['tree_yscroll'].grid(
+            row=0,
+            column=2,
+            sticky="nsw",
+            rowspan=1,
+            columnspan=1,
+            padx=(0, 15),
+            pady=(15, 0),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['tree'].configure(
+            yscrollcommand=self.UIObject['tree_yscroll'].set
+        )
+
+        self.root_Entry_init(
+            obj_root='root',
+            obj_name='root_input',
+            str_name='root_input_StringVar',
+            x=15,
+            y=600 - 15 * 1 - 24,
+            width_t=0,
+            width=800 - 15 * 2,
+            height=24,
+            action=None,
+            title='输入'
+        )
+        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].grid(
+            row=1,
+            column=1,
+            sticky="s",
+            rowspan=1,
+            columnspan=3,
+            padx=(15, 15),
+            pady=(8, 15),
+            ipadx=0,
+            ipady=0
+        )
+        self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
+        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+
+        self.tree_init_line()
+
+        self.UIObject['root'].mainloop()
+
+        self.exit()
+
+    def tree_rightKey(self, event):
+        # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
+        # iid = self.UIObject['tree'].identify_row(event.y)
+        # self.UIObject['tree'].selection_set(iid)
+        # self.UIObject['tree'].update()
+        self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
+        self.UIObject['tree_rightkey_menu'].add_command(label='查看', command=lambda: self.rightKey_action('show'))
+        self.UIObject['tree_rightkey_menu'].add_command(label='复制', command=lambda: self.rightKey_action('copy'))
+        self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
+
+    def rightKey_action(self, action: str):
+        if action == 'show':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                tkinter.messagebox.showinfo('日志内容', msg)
+        elif action == 'copy':
+            msg = get_tree_force(self.UIObject['tree'])['text']
+            if len(msg) > 0:
+                self.UIObject['root'].clipboard_clear()
+                self.UIObject['root'].clipboard_append(msg)
+                self.UIObject['root'].update()
+
+    def root_Entry_enter_Func(self, name):
+        def resFunc(event):
+            self.root_Entry_enter(name, event)
+
+        return resFunc
+
+    def root_Entry_enter(self, name, event):
+        if name == 'root_input':
+            input = self.UIData['root_input_StringVar'].get()
+            if len(input) >= 0 and len(input) < 1000:
+                self.root.setNapCatModelSend(self.bot.hash, input)
+            self.UIData['root_input_StringVar'].set('')
+
+    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
+                        mode='NONE'):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(
+            self.UIObject[obj_root],
+            text=title
+        )
+        self.UIObject[obj_name + '=Label'].configure(
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004']
+        )
+        # self.UIObject[obj_name + '=Label'].place(
+        #    x = x - width_t,
+        #    y = y,
+        #    width = width_t,
+        #    height = height
+        # )
+        self.UIData[str_name] = tkinter.StringVar()
+        self.UIObject[obj_name] = tkinter.Entry(
+            self.UIObject[obj_root],
+            textvariable=self.UIData[str_name]
+        )
+        self.UIObject[obj_name].configure(
+            bg=self.UIConfig['color_004'],
+            fg=self.UIConfig['color_005'],
+            bd=0
+        )
+        if mode == 'SAFE':
+            self.UIObject[obj_name].configure(
+                show='●'
+            )
+        self.UIObject[obj_name].configure(
+            width=width
+        )
+        # self.UIObject[obj_name].place(
+        #    x = x,
+        #    y = y,
+        #    width = width,
+        #    height = height
+        # )
+
+    def tree_init_line(self):
+        if self.bot.hash in self.root.UIObject['root_napcat_terminal_data']:
+            for line in self.root.UIObject['root_napcat_terminal_data'][self.bot.hash]:
+                self.tree_add_line(line, flagInit = True)
+
+    def tree_add_line(self, data, flagInit = False):
+        res_data = re.sub(r'\033\[[\d;]*m?', '', data)
+        res_data_raw = res_data
+        res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
+        res_data_1 = res_data
+        res_data = res_data.replace(' ', '\ ')
+        if len(res_data.replace('\ ', '')) > 0:
+            try:
+                iid = self.UIObject['tree'].insert(
+                    '',
+                    tkinter.END,
+                    text=res_data_1,
+                    values=(
+                        res_data
+                    )
+                )
+                self.UIObject['tree'].see(iid)
+                self.UIObject['tree'].update()
+            except:
+                pass
+
+    def stop(self):
+        self.exit()
+        self.UIObject['root'].destroy()
+
+    def exit(self):
+        self.root.UIObject['root_napcat_terminal'].pop(self.bot.hash)
 
 
 
@@ -2902,6 +3232,15 @@ class shallow(object):
                                         pystray.MenuItem(
                                             item_this[0],
                                             self.root.startVirtualTerminalUISendFunc(
+                                                item_this[1]
+                                            )
+                                        )
+                                    )
+                                elif item_this[3] == 'napcat':
+                                    list_new.append(
+                                        pystray.MenuItem(
+                                            item_this[0],
+                                            self.root.startNapCatTerminalUISendFunc(
                                                 item_this[1]
                                             )
                                         )
