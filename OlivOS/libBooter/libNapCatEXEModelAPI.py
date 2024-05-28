@@ -59,14 +59,14 @@ def startNapCatLibExeModel(
                 flagActive = True
         if flagActive:
             releaseDir('./lib')
-            #OlivOS.updateAPI.checkResouceFile(
-            #    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-            #    resouce_api=resourceUrlPath,
-            #    resouce_name='NapCat',
-            #    filePath='./lib/NapCat.zip',
-            #    filePathUpdate='./lib/NapCat.zip.tmp',
-            #    filePathFORCESKIP='./lib/FORCESKIP'
-            #)
+            OlivOS.updateAPI.checkResouceFile(
+                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                resouce_api=resourceUrlPath,
+                resouce_name='NapCat',
+                filePath='./lib/NapCat.zip',
+                filePathUpdate='./lib/NapCat.zip.tmp',
+                filePathFORCESKIP='./lib/FORCESKIP'
+            )
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
