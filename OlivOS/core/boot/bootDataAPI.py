@@ -529,7 +529,7 @@ default_Conf = {
             "rx_queue": "OlivOS_napcat_lib_rx_queue",
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
-            "target_proc": None,
+            "target_proc": "OlivOS_flask_post_rx",
             "control_queue": "OlivOS_control_queue",
             "debug": False
         },

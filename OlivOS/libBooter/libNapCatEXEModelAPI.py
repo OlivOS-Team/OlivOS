@@ -81,7 +81,7 @@ def startNapCatLibExeModel(
                     control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
                     logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
-                    target_proc=None,
+                    target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
                     debug_mode=False
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
@@ -127,7 +127,7 @@ class server(OlivOS.API.Proc_templet):
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
             unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-            napcatTypeConfig(self.Proc_data['bot_info_dict']).setConfig()
+            napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             if self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat',
                 'napcat_show'
@@ -317,8 +317,9 @@ class server(OlivOS.API.Proc_templet):
 
 
 class napcatTypeConfig(object):
-    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T):
+    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T, target_proc):
         self.bot_info_dict = bot_info_dict
+        self.target_proc = target_proc
         self.config_file_str = ''
         self.config_file_data = ''
         self.config_file_format = {}
@@ -327,7 +328,7 @@ class napcatTypeConfig(object):
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
         self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
-        self.config_file_format['postUrls'] = 'http://127.0.0.1:55001/OlivOSMsgApi/qq/onebot/default'
+        self.config_file_format['postUrls'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
 
         self.config_file_data = {
             "http": {
