@@ -113,7 +113,8 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
         for bot_info_dict_this in bot_info_dict:
             Account_data_this = bot_info_dict[bot_info_dict_this]
             if platform.system() == 'Windows':
-                if Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList:
+                if Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList \
+                or Account_data_this.platform['model'] in OlivOS.libNapCatEXEModelAPI.gCheckList:
                     if Account_data_this.post_info.auto == True:
                         Account_data_this.post_info.type = 'post'
                         Account_data_this.post_info.host = 'http://127.0.0.1'

@@ -69,8 +69,10 @@ class server(OlivOS.API.Proc_templet):
 
     def set_config(self):
         with self.Proc_config['Flask_app'].app_context():
-            @current_app.route(self.Proc_config['Flask_server_xpath'] + '/<platform_path>/<sdk_path>/<model_path>',
-                               methods=self.Proc_config['Flask_server_methods'])
+            @current_app.route(
+                f"{self.Proc_config['Flask_server_xpath']}/<platform_path>/<sdk_path>/<model_path>",
+                methods=self.Proc_config['Flask_server_methods']
+            )
             def Flask_server_func(sdk_path, platform_path, model_path):
                 sdk_event = OlivOS.onebotSDK.event(request.get_data(as_text=True))
                 sdk_event.platform['sdk'] = sdk_path
@@ -90,6 +92,11 @@ class server(OlivOS.API.Proc_templet):
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running on port [{1}]', [
                 self.Proc_config['Flask_name'],
                 str(self.Proc_config['Flask_server_port'])
+            ], modelName
+        ))
+        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running on [{1}]', [
+                self.Proc_config['Flask_name'],
+                f"http://127.0.0.1:{self.Proc_config['Flask_server_port']}{self.Proc_config['Flask_server_xpath']}/qq/onebot/default"
             ], modelName
         ))
         if self.Proc_config['config'].debug_mode:
