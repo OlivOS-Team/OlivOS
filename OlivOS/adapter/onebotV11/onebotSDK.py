@@ -29,6 +29,8 @@ paraMsgMap = [
     'para_default'
 ]
 
+gFlagCheckList = []
+
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
@@ -184,6 +186,7 @@ def format_cq_code_msg(msg):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
+    global gFlagCheckList
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -420,33 +423,37 @@ def get_Event_from_SDK(target_event):
                 elif target_event.sdk_event.json['honor_type'] == 'emotion':
                     target_event.data.type = 'emotion'
     elif target_event.base_info['type'] == 'request':
-        if target_event.sdk_event.json['request_type'] == 'friend':
-            target_event.active = True
-            target_event.plugin_info['func_type'] = 'friend_add_request'
-            target_event.data = target_event.friend_add_request(
-                str(target_event.sdk_event.json['user_id']),
-                target_event.sdk_event.json['comment']
-            )
-            target_event.data.flag = target_event.sdk_event.json['flag']
-        elif target_event.sdk_event.json['request_type'] == 'group':
-            if target_event.sdk_event.json['sub_type'] == 'add':
-                target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_add_request'
-                target_event.data = target_event.group_add_request(
-                    str(target_event.sdk_event.json['group_id']),
-                    str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['comment']
-                )
-                target_event.data.flag = target_event.sdk_event.json['flag']
-            elif target_event.sdk_event.json['sub_type'] == 'invite':
-                target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_invite_request'
-                target_event.data = target_event.group_invite_request(
-                    str(target_event.sdk_event.json['group_id']),
-                    str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['comment']
-                )
-                target_event.data.flag = target_event.sdk_event.json['flag']
+        if 'flag' in target_event.sdk_event.json:
+            tmp_flag = target_event.sdk_event.json['flag']
+            if tmp_flag not in gFlagCheckList:
+                gFlagCheckList.append(tmp_flag)
+                if target_event.sdk_event.json['request_type'] == 'friend':
+                    target_event.active = True
+                    target_event.plugin_info['func_type'] = 'friend_add_request'
+                    target_event.data = target_event.friend_add_request(
+                        str(target_event.sdk_event.json['user_id']),
+                        target_event.sdk_event.json['comment']
+                    )
+                    target_event.data.flag = tmp_flag
+                elif target_event.sdk_event.json['request_type'] == 'group':
+                    if target_event.sdk_event.json['sub_type'] == 'add':
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'group_add_request'
+                        target_event.data = target_event.group_add_request(
+                            str(target_event.sdk_event.json['group_id']),
+                            str(target_event.sdk_event.json['user_id']),
+                            target_event.sdk_event.json['comment']
+                        )
+                        target_event.data.flag = tmp_flag
+                    elif target_event.sdk_event.json['sub_type'] == 'invite':
+                        target_event.active = True
+                        target_event.plugin_info['func_type'] = 'group_invite_request'
+                        target_event.data = target_event.group_invite_request(
+                            str(target_event.sdk_event.json['group_id']),
+                            str(target_event.sdk_event.json['user_id']),
+                            target_event.sdk_event.json['comment']
+                        )
+                        target_event.data.flag = tmp_flag
     elif target_event.base_info['type'] == 'meta_event':
         if target_event.sdk_event.json['meta_event_type'] == 'lifecycle':
             target_event.active = True
