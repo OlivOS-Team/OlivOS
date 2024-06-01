@@ -29,6 +29,7 @@ default_Conf = {
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
+            "OlivOS_astralqsign_lib_exe_model",
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_walleq_lib_exe_model",
             "OlivOS_cwcb_lib_exe_model",
@@ -75,6 +76,7 @@ default_Conf = {
                 "OlivOS_account_config_update"
             ],
             "account_update": [
+                "OlivOS_astralqsign_lib_exe_model",
                 "OlivOS_gocqhttp_lib_exe_model",
                 "OlivOS_walleq_lib_exe_model",
                 "OlivOS_cwcb_lib_exe_model",
@@ -100,6 +102,7 @@ default_Conf = {
         },
         "type_event": {
             "account_update": [
+                "astralqsign_lib_exe_model",
                 "gocqhttp_lib_exe_model",
                 "walleq_lib_exe_model",
                 "cwcb_lib_exe_model",
@@ -478,6 +481,7 @@ default_Conf = {
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "target_proc": "OlivOS_flask_post_rx",
+            "sub_target_proc": "OlivOS_astralqsign_lib_exe_model",
             "control_queue": "OlivOS_control_queue",
             "debug": False
         },
@@ -532,6 +536,21 @@ default_Conf = {
             "target_proc": "OlivOS_flask_post_rx",
             "control_queue": "OlivOS_control_queue",
             "debug": False
+        },
+        "OlivOS_astralqsign_lib_exe_model": {
+            "enable": True,
+            "name": "OlivOS_astralqsign_lib_exe_model",
+            "type": "astralqsign_lib_exe_model",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "control_queue": "OlivOS_control_queue",
+            "debug": False,
+            "server": {
+                "auto": True,
+                "host": "0.0.0.0",
+                "port": 55011,
+                "token": "114514"
+            }
         },
         "OlivOS_webview_page": {
             "enable": True,

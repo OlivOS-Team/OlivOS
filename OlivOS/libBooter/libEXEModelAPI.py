@@ -48,123 +48,55 @@ gCheckList = [
 
 gProtocalInfo = {
     'android_pad': {
-        '8.9.58': '''{
+        'AstralQsign': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537161402,
-    "sub_app_id": 537161402,
+    "app_id": 537220362,
+    "sub_app_id": 537220362,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.58.11170",
-    "build_time": 1684467300,
+    "sort_version_name": "9.0.56.16830",
+    "build_time": 1713424357,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2545",
-    "sso_version": 20,
+    "sdk_version": "6.0.0.2560",
+    "sso_version": 21,
     "misc_bitmap": 150470524,
     "main_sig_map": 34869472,
     "sub_sig_map": 66560,
-    "dump_time": 1686334718,
-    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
+    "dump_time": 1713424357,
+    "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
     "protocol_type": 6
 }''',
-        '8.9.63': '''{
+        '9.0.56': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537164888,
-    "sub_app_id": 537164888,
+    "app_id": 537220362,
+    "sub_app_id": 537220362,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.63.11390",
-    "build_time": 1685069178,
+    "sort_version_name": "9.0.56.16830",
+    "build_time": 1713424357,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2546",
-    "sso_version": 20,
+    "sdk_version": "6.0.0.2560",
+    "sso_version": 21,
     "misc_bitmap": 150470524,
     "main_sig_map": 34869472,
     "sub_sig_map": 66560,
-    "dump_time": 1687796862,
-    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "dump_time": 1713424357,
+    "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
     "protocol_type": 6
 }''',
-        '8.9.68': '''{
+        '8.9.85': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537168361,
-    "sub_app_id": 537168361,
+    "app_id": 537180607,
+    "sub_app_id": 537180607,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.68.11565",
-    "build_time": 1688523354,
-    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
-    "sdk_version": "6.0.0.2549",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1689780543,
-    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
-    "protocol_type": 6
-}''',
-        '8.9.70': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537169976,
-    "sub_app_id": 537169976,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.70.11730",
-    "build_time": 1689956914,
-    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
-    "sdk_version": "6.0.0.2551",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1690350020,
-    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
-    "protocol_type": 6
-}''',
-        '8.9.71': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537170072,
-    "sub_app_id": 537170072,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.71.11735",
-    "build_time": 1688560152,
+    "sort_version_name": "8.9.85.12820",
+    "build_time": 1697015435,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2551",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 16724722,
-    "sub_sig_map": 66560,
-    "dump_time": 1688560152,
-    "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
-    "protocol_type": 1
-}''',
-        '8.9.73': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537171018,
-    "sub_app_id": 537171018,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.73.11790",
-    "build_time": 1690515318,
-    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
-    "sdk_version": "6.0.0.2553",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1690715354,
-    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
-    "protocol_type": 6
-}''',
-        '8.9.80': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537176902,
-    "sub_app_id": 537176902,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.80.12440",
-    "build_time": 1691565978,
-    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2554",
+    "sdk_version": "6.0.0.2556",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 16724722,
     "sub_sig_map": 66560,
     "dump_time": 1692110632,
-    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
+    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
     "protocol_type": 6
 }''',
         '8.9.83': '''{
@@ -184,97 +116,44 @@ gProtocalInfo = {
     "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
     "protocol_type": 6
 }''',
-        '8.9.85': '''{
+        '8.9.80': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537180607,
-    "sub_app_id": 537180607,
+    "app_id": 537176902,
+    "sub_app_id": 537176902,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.85.12820",
-    "build_time": 1697015435,
+    "sort_version_name": "8.9.80.12440",
+    "build_time": 1691565978,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2556",
+    "sdk_version": "6.0.0.2554",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 16724722,
     "sub_sig_map": 66560,
     "dump_time": 1692110632,
-    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
+    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
     "protocol_type": 6
-}'''
-    },
-    'android_phone': {
-        '8.9.58': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537163098,
-    "sub_app_id": 537163098,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.58.11170",
-    "build_time": 1684467300,
-    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2545",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1686334718,
-    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
-    "protocol_type": 1
 }''',
-        '8.9.63': '''{
+        '8.9.73': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537164840,
-    "sub_app_id": 537164840,
+    "app_id": 537171018,
+    "sub_app_id": 537171018,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.63.11390",
-    "build_time": 1685069178,
-    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2546",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 34869472,
     "sub_sig_map": 66560,
-    "dump_time": 1687796862,
-    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
-    "protocol_type": 1
-}''',
-        '8.9.68': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537168313,
-    "sub_app_id": 537168313,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.68.11565",
-    "build_time": 1688523354,
-    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
-    "sdk_version": "6.0.0.2549",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1689780543,
-    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
-    "protocol_type": 1
-}''',
-        '8.9.70': '''{
-    "apk_id": "com.tencent.mobileqq",
-    "app_id": 537169928,
-    "sub_app_id": 537169928,
-    "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.70.11730",
-    "build_time": 1689956914,
-    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
-    "sdk_version": "6.0.0.2551",
-    "sso_version": 20,
-    "misc_bitmap": 150470524,
-    "main_sig_map": 34869472,
-    "sub_sig_map": 66560,
-    "dump_time": 1690350020,
-    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
-    "protocol_type": 1
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 6
 }''',
         '8.9.71': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537170024,
-    "sub_app_id": 537170024,
+    "app_id": 537170072,
+    "sub_app_id": 537170072,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "8.9.71.11735",
     "build_time": 1688560152,
@@ -288,38 +167,125 @@ gProtocalInfo = {
     "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
     "protocol_type": 1
 }''',
-        '8.9.73': '''{
+        '8.9.70': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537171007,
-    "sub_app_id": 537171007,
+    "app_id": 537169976,
+    "sub_app_id": 537169976,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.73.11790",
-    "build_time": 1690515318,
-    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
-    "sdk_version": "6.0.0.2553",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 34869472,
     "sub_sig_map": 66560,
-    "dump_time": 1690715354,
-    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168361,
+    "sub_app_id": 537168361,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164888,
+    "sub_app_id": 537164888,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 6
+}''',
+        '8.9.58': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537161402,
+    "sub_app_id": 537161402,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.58.11170",
+    "build_time": 1684467300,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2545",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1686334718,
+    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
+    "protocol_type": 6
+}'''
+    },
+    'android_phone': {
+        'AstralQsign': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537220362,
+    "sub_app_id": 537220362,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "9.0.56.16830",
+    "build_time": 1713424357,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2560",
+    "sso_version": 21,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1713424357,
+    "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
     "protocol_type": 1
 }''',
-        '8.9.80': '''{
+        '9.0.56': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537176863,
-    "sub_app_id": 537176863,
+    "app_id": 537220362,
+    "sub_app_id": 537220362,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.80.12440",
-    "build_time": 1691565978,
+    "sort_version_name": "9.0.56.16830",
+    "build_time": 1713424357,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2554",
+    "sdk_version": "6.0.0.2560",
+    "sso_version": 21,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1713424357,
+    "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.85': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537180568,
+    "sub_app_id": 537180568,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.85.12820",
+    "build_time": 1697015435,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2556",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 16724722,
     "sub_sig_map": 66560,
     "dump_time": 1692110632,
-    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
+    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
     "protocol_type": 1
 }''',
         '8.9.83': '''{
@@ -339,21 +305,123 @@ gProtocalInfo = {
     "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
     "protocol_type": 1
 }''',
-        '8.9.85': '''{
+        '8.9.80': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537180568,
-    "sub_app_id": 537180568,
+    "app_id": 537176863,
+    "sub_app_id": 537176863,
     "app_key": "0S200MNJT807V3GE",
-    "sort_version_name": "8.9.85.12820",
-    "build_time": 1697015435,
+    "sort_version_name": "8.9.80.12440",
+    "build_time": 1691565978,
     "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
-    "sdk_version": "6.0.0.2556",
+    "sdk_version": "6.0.0.2554",
     "sso_version": 20,
     "misc_bitmap": 150470524,
     "main_sig_map": 16724722,
     "sub_sig_map": 66560,
     "dump_time": 1692110632,
-    "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
+    "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.73': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537171007,
+    "sub_app_id": 537171007,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.73.11790",
+    "build_time": 1690515318,
+    "apk_sign": "d4dd51c0a4a7a37f7fa9d791cd1c0377",
+    "sdk_version": "6.0.0.2553",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690715354,
+    "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
+    "protocol_type": 1
+}''',
+        '8.9.71': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537170024,
+    "sub_app_id": 537170024,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.71.11735",
+    "build_time": 1688560152,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 16724722,
+    "sub_sig_map": 66560,
+    "dump_time": 1688560152,
+    "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.70': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537169928,
+    "sub_app_id": 537169928,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.70.11730",
+    "build_time": 1689956914,
+    "apk_sign": "e686fa90d9a33950c46de9cfb4ec7e71",
+    "sdk_version": "6.0.0.2551",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1690350020,
+    "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.68': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537168313,
+    "sub_app_id": 537168313,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.68.11565",
+    "build_time": 1688523354,
+    "apk_sign": "7772804f3cb4961f57cb764fbe4973e6",
+    "sdk_version": "6.0.0.2549",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1689780543,
+    "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.63': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537164840,
+    "sub_app_id": 537164840,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.63.11390",
+    "build_time": 1685069178,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2546",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1687796862,
+    "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
+    "protocol_type": 1
+}''',
+        '8.9.58': '''{
+    "apk_id": "com.tencent.mobileqq",
+    "app_id": 537163098,
+    "sub_app_id": 537163098,
+    "app_key": "0S200MNJT807V3GE",
+    "sort_version_name": "8.9.58.11170",
+    "build_time": 1684467300,
+    "apk_sign": "a6b745bf24a2c277527716f6f36eb68d",
+    "sdk_version": "6.0.0.2545",
+    "sso_version": 20,
+    "misc_bitmap": 150470524,
+    "main_sig_map": 34869472,
+    "sub_sig_map": 66560,
+    "dump_time": 1686334718,
+    "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
     "protocol_type": 1
 }'''
     }
@@ -398,14 +466,27 @@ def startGoCqhttpLibExeModel(
                     logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                     target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
+                    sub_target_proc=basic_conf_models.get(basic_conf_models_this.get('sub_target_proc', None), None),
                     debug_mode=False
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
-                 control_queue=None, logger_proc=None, target_proc=None, debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        control_queue=None,
+        logger_proc=None,
+        target_proc=None,
+        sub_target_proc=None,
+        debug_mode=False,
+        bot_info_dict=None
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -420,6 +501,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_config['target_proc'] = target_proc
+        self.Proc_config['sub_target_proc'] = sub_target_proc
         self.Proc_data['check_qrcode_flag'] = False
         self.Proc_data['check_stdin'] = False
         self.Proc_data['model_Proc'] = None
@@ -448,7 +530,7 @@ class server(OlivOS.API.Proc_templet):
             with open('./conf/gocqhttp/filter.json', 'w+') as tmp:
                 tmp.write('{}')
             releaseDir('./conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash)
-            goTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
+            goTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], self.Proc_config['sub_target_proc']).setConfig()
             if False and (self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp',
                 'gocqhttp_hide'
@@ -664,9 +746,10 @@ class server(OlivOS.API.Proc_templet):
 
 
 class goTypeConfig(object):
-    def __init__(self, bot_info_dict, target_proc):
+    def __init__(self, bot_info_dict, target_proc, sub_target_proc):
         self.bot_info_dict = bot_info_dict
         self.target_proc = target_proc
+        self.sub_target_proc = sub_target_proc
         self.config_file_str = ''
         self.config_file_format = {}
 
@@ -868,7 +951,17 @@ database: # 数据库相关设置
                     self.config_file_format['sign-servers-data'] += '''
     - url: '%s'
       key: '%s'
-      authorization: '-' ''' % (tmp_data_this['addr'], tmp_data_this['key'])
+      authorization: '-'
+''' % (tmp_data_this['addr'], tmp_data_this['key'])
+
+        if 'qsign-server-protocal' in self.bot_info_dict.extends \
+        and type(self.bot_info_dict.extends['qsign-server-protocal']) is str \
+        and self.bot_info_dict.extends['qsign-server-protocal'] == 'AstralQsign':
+                    self.config_file_format['sign-servers-data'] = '''
+    - url: 'http://localhost:%s/'
+      key: '%s'
+      authorization: '-'
+''' % (str(self.sub_target_proc['server']['port']), str(self.sub_target_proc['server']['token']))
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 
@@ -932,17 +1025,21 @@ def accountFix(bot_info_dict, logger_proc):
             if 'qsign-server-protocal' in bot_info_dict[bot_hash].extends \
             and type(bot_info_dict[bot_hash].extends['qsign-server-protocal']) is str:
                 if bot_info_dict[bot_hash].platform['model'] in [
-                    'gocqhttp_show_Android_Pad'
-                ]:
-                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_pad']:
-                        protocal_info = gProtocalInfo['android_pad'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
-                    protocal_num = 6
-                if bot_info_dict[bot_hash].platform['model'] in [
+                    'gocqhttp_show_Android_Pad',
                     'gocqhttp_show_Android_Phone'
                 ]:
-                    if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
-                        protocal_info = gProtocalInfo['android_phone'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
-                    protocal_num = 1
+                    if bot_info_dict[bot_hash].platform['model'] in [
+                        'gocqhttp_show_Android_Pad',
+                    ]:
+                        if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_pad']:
+                            protocal_info = gProtocalInfo['android_pad'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                        protocal_num = 6
+                    elif bot_info_dict[bot_hash].platform['model'] in [
+                        'gocqhttp_show_Android_Phone'
+                    ]:
+                        if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
+                            protocal_info = gProtocalInfo['android_phone'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                        protocal_num = 1
             if protocal_info is not None:
                 file_path = './conf/gocqhttp/' + bot_hash + '/data/versions/%d.json' % protocal_num
                 try:

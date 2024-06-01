@@ -776,9 +776,27 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     'tmp_proc_mode': tmp_proc_mode
                                 }
                             ).start()
+                    elif basic_conf_models_this['type'] == 'astralqsign_lib_exe_model':
+                        if not OlivOS.libAstralQsignEXEModelAPI.isBotActive(plugin_bot_info_dict):
+                            continue
+                        if platform.system() == 'Windows':
+                            threading.Thread(
+                                target = OlivOS.libAstralQsignEXEModelAPI.startAstralQsignLibExeModel,
+                                kwargs = {
+                                    'plugin_bot_info_dict': plugin_bot_info_dict,
+                                    'basic_conf_models_this': basic_conf_models_this,
+                                    'multiprocessing_dict': multiprocessing_dict,
+                                    'Proc_dict': Proc_dict,
+                                    'Proc_Proc_dict': Proc_Proc_dict,
+                                    'basic_conf_models': basic_conf_models,
+                                    'tmp_proc_mode': tmp_proc_mode
+                                }
+                            ).start()
                     elif basic_conf_models_this['type'] == 'update_get':
-                        threading.Thread(target=update_get_func,
-                                         args=(Proc_dict, basic_conf_models, basic_conf_models_this)).start()
+                        threading.Thread(
+                            target=update_get_func,
+                            args=(Proc_dict, basic_conf_models, basic_conf_models_this)
+                        ).start()
                     elif basic_conf_models_this['type'] == 'update_replace':
                         OlivOS.updateAPI.OlivOSUpdateReplace(
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]

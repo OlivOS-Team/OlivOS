@@ -102,14 +102,23 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
     res = {}
     with free_port_selector() as g:         # 在端口选择过程中使用上下文
         for basic_conf_models_this in basic_conf_models:
-            if basic_conf_models[basic_conf_models_this]['type'] == 'post':
-                if basic_conf_models[basic_conf_models_this]['server']['auto'] == True:
-                    basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
-                    if isInuse(
-                            '127.0.0.1',
-                            basic_conf_models[basic_conf_models_this]['server']['port']
-                    ):
-                        basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
+            if basic_conf_models[basic_conf_models_this]['type'] == 'post' \
+            and basic_conf_models[basic_conf_models_this]['server']['auto'] is True:
+                basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
+                if isInuse(
+                        '127.0.0.1',
+                        basic_conf_models[basic_conf_models_this]['server']['port']
+                ):
+                    basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
+            if platform.system() == 'Windows' \
+            and basic_conf_models[basic_conf_models_this]['type'] == 'astralqsign_lib_exe_model' \
+            and basic_conf_models[basic_conf_models_this]['server']['auto'] is True:
+                basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
+                if isInuse(
+                        '127.0.0.1',
+                        basic_conf_models[basic_conf_models_this]['server']['port']
+                ):
+                    basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
         for bot_info_dict_this in bot_info_dict:
             Account_data_this = bot_info_dict[bot_info_dict_this]
             if platform.system() == 'Windows':
