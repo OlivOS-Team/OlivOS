@@ -777,9 +777,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 }
                             ).start()
                     elif basic_conf_models_this['type'] == 'astralqsign_lib_exe_model':
-                        if not OlivOS.libAstralQsignEXEModelAPI.isBotActive(plugin_bot_info_dict):
-                            continue
                         if platform.system() == 'Windows':
+                            if not OlivOS.libAstralQsignEXEModelAPI.isBotActive(plugin_bot_info_dict):
+                                continue
                             threading.Thread(
                                 target = OlivOS.libAstralQsignEXEModelAPI.startAstralQsignLibExeModel,
                                 kwargs = {
