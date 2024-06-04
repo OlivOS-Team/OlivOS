@@ -1231,8 +1231,7 @@ class TreeEditUI(object):
                         tmp_offset += 1
                 if type_this is not None \
                 and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
-                    tmp_res_bot_info.extends['qsign-server-protocal'] = self.UIData[
-                        'edit_root_Combobox_qsign_protocal_StringVar'].get()
+                    tmp_res_bot_info.extends['qsign-server-protocal'] = self.UIData['edit_root_Combobox_qsign_protocal_StringVar'].get()
                     tmp_res_bot_info.extends['qsign-server'] = []
                     for tmp_i in range(self.UIData['edit_root_Entry_qsign_num']):
                         key_pare = [
@@ -1240,6 +1239,8 @@ class TreeEditUI(object):
                             'edit_root_Entry_qsign_key_%d' % tmp_i
                         ]
                         tmp_data = {}
+                        tmp_data['addr'] = ''
+                        tmp_data['key'] = ''
                         if key_pare[0] + '_StringVar' in self.UIData:
                             tmp_data['addr'] = self.UIData[key_pare[0] + '_StringVar'].get()
                         if key_pare[1] + '_StringVar' in self.UIData:
@@ -1434,10 +1435,12 @@ class TreeEditUI(object):
             height=height
         )
         self.UIObject[obj_name].configure(state='readonly')
-        self.UIObject[obj_name].bind('<<ComboboxSelected>>',
-                                     lambda x: self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name))
+        self.UIObject[obj_name].bind(
+            '<<ComboboxSelected>>',
+            lambda x: self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name)
+        )
 
-    def tree_edit_UI_Combobox_ComboboxSelected(self, action, event, target):
+    def tree_edit_UI_Combobox_ComboboxSelected(self, event, action, target):
         if target == 'edit_root_Combobox_Account_type':
             self.tree_edit_UI_Combobox_update(action, 'type')
         elif target == 'edit_root_Combobox_platform':
@@ -1446,6 +1449,8 @@ class TreeEditUI(object):
             self.tree_edit_UI_Combobox_update(action, 'sdk')
         elif target == 'edit_root_Combobox_model':
             self.tree_edit_UI_Combobox_update(action, 'model')
+        elif target == 'edit_root_Combobox_qsign_protocal':
+            self.tree_edit_UI_Combobox_update(action, 'qsign_protocal')
 
     def tree_edit_UI_type_clear_note_GEN(self, tmp_type:str):
         def tree_edit_UI_type_clear_note():
@@ -1467,7 +1472,7 @@ class TreeEditUI(object):
                 self.UIData['edit_root_Entry_qsign_num'] = 1
             if self.UIData['edit_root_Entry_qsign_num'] > 10:
                 self.UIData['edit_root_Entry_qsign_num'] = 10
-            self.tree_edit_UI_Combobox_update(self.action, 'type')
+            self.tree_edit_UI_Combobox_update(self.action, 'qsign_protocal')
         return tree_edit_UI_qsign_list_set
 
     def tree_edit_UI_Combobox_update(self, action, con_action):
@@ -1536,7 +1541,7 @@ class TreeEditUI(object):
                         self.UIData['edit_root_Combobox_dict']['type_list'].index('自定义')
                     )
         tmp_type = self.UIObject['edit_root_Combobox_Account_type'].get()
-        if con_action in ['init', 'type', 'platform', 'sdk', 'model']:
+        if con_action in ['init', 'type', 'platform', 'sdk', 'model', 'qsign_protocal']:
             if tmp_type in self.UIData['edit_root_Combobox_dict']['type_mapping_list']:
                 count = 1
                 if tmp_type != '自定义':
@@ -1649,7 +1654,7 @@ class TreeEditUI(object):
                         y=40 + count * (24 + 6),
                         width=200,
                         height=24,
-                        title='QSign服务器列表'
+                        title='Qsign 服务器设置'
                     )
                     count += 1
                     self.tree_edit_UI_Combobox_init(
@@ -1666,6 +1671,7 @@ class TreeEditUI(object):
                     self.UIObject['edit_root_Combobox_qsign_protocal']['value'] = tuple(
                         self.UIData['edit_root_Combobox_qsign_protocal_list']
                     )
+                    tmp_qsign_protocal = self.UIData['edit_root_Combobox_qsign_protocal_StringVar'].get()
                     self.UIObject['edit_root_Combobox_qsign_protocal'].current(0)
                     if con_action == 'init':
                         if action == 'update':
@@ -1679,63 +1685,89 @@ class TreeEditUI(object):
                                             Account_data_this.extends['qsign-server-protocal']
                                         )
                                     )
+                    if con_action == 'qsign_protocal':
+                        if action == 'update':
+                            if tmp_qsign_protocal in self.UIData['edit_root_Combobox_qsign_protocal_list']:
+                                self.UIObject['edit_root_Combobox_qsign_protocal'].current(
+                                    self.UIData['edit_root_Combobox_qsign_protocal_list'].index(
+                                        tmp_qsign_protocal
+                                    )
+                                )
+                    tmp_qsign_protocal = self.UIData['edit_root_Combobox_qsign_protocal_StringVar'].get()
                     count += 1
-                    self.tree_UI_Button_init(
-                        name='edit_root_Button_qsign_list_set_+',
-                        text='增加一行',
-                        command=self.tree_edit_UI_qsign_list_set_GEN('+'),
-                        x=310,
-                        y=40 + 5 * (24 + 6),
-                        width=70,
-                        height=24
-                    )
-                    self.tree_UI_Button_init(
-                        name='edit_root_Button_qsign_list_set_-',
-                        text='减少一行',
-                        command=self.tree_edit_UI_qsign_list_set_GEN('-'),
-                        x=310,
-                        y=40 + 6 * (24 + 6),
-                        width=70,
-                        height=24
-                    )
-                    array_num = self.UIData['edit_root_Entry_qsign_num']
-                    for tmp_i in range(array_num):
-                        key_pare = [
-                            'edit_root_Entry_qsign_addr_%d' % tmp_i,
-                            'edit_root_Entry_qsign_key_%d' % tmp_i
-                        ]
-                        self.UIData['edit_root_Entry_qsign_list'].append(key_pare[0])
-                        self.UIData['edit_root_Entry_qsign_list'].append(key_pare[1])
-                        if key_pare[0] + '_StringVar' not in self.UIData:
-                            self.UIData[key_pare[0] + '_StringVar'] = tkinter.StringVar()
-                        self.tree_edit_UI_Entry_init(
+                    if tmp_qsign_protocal in self.UIData['edit_root_Combobox_qsign_protocal_list_exemod']:
+                        tmp_note_name = 'edit_root_Label_qsign_note_astalqsign_will_set'
+                        if tmp_note_name not in self.UIData['edit_root_Entry_qsign_list']:
+                            self.UIData['edit_root_Entry_qsign_list'].append(tmp_note_name)
+                        self.tree_edit_UI_Label_init(
                             obj_root='edit_root',
-                            obj_name=key_pare[0],
-                            str_name=key_pare[0] + '_StringVar',
-                            x=100,
+                            obj_name=tmp_note_name,
+                            x=15,
                             y=40 + count * (24 + 6),
-                            width=200,
+                            width=400 - 15 * 2,
                             height=24,
-                            action=self.action,
-                            title='地址',
-                            mode='NONE'
+                            title='OlivOS 将会同步为你自动配置本地 AstralQsign 服务'
                         )
                         count += 1
-                        if key_pare[1] + '_StringVar' not in self.UIData:
-                            self.UIData[key_pare[1] + '_StringVar'] = tkinter.StringVar()
-                        self.tree_edit_UI_Entry_init(
-                            obj_root='edit_root',
-                            obj_name=key_pare[1],
-                            str_name=key_pare[1] + '_StringVar',
-                            x=100,
-                            y=40 + count * (24 + 6),
-                            width=200,
-                            height=24,
-                            action=self.action,
-                            title='KEY',
-                            mode='NONE'
+                    else:
+                        self.tree_UI_Button_init(
+                            name='edit_root_Button_qsign_list_set_+',
+                            text='增加一行',
+                            command=self.tree_edit_UI_qsign_list_set_GEN('+'),
+                            x=310,
+                            y=40 + 5 * (24 + 6),
+                            width=70,
+                            height=24
                         )
-                        count += 1
+                        self.tree_UI_Button_init(
+                            name='edit_root_Button_qsign_list_set_-',
+                            text='减少一行',
+                            command=self.tree_edit_UI_qsign_list_set_GEN('-'),
+                            x=310,
+                            y=40 + 6 * (24 + 6),
+                            width=70,
+                            height=24
+                        )
+                        array_num = self.UIData['edit_root_Entry_qsign_num']
+                        for tmp_i in range(array_num):
+                            key_pare = [
+                                'edit_root_Entry_qsign_addr_%d' % tmp_i,
+                                'edit_root_Entry_qsign_key_%d' % tmp_i
+                            ]
+                            if key_pare[0] not in self.UIData['edit_root_Entry_qsign_list']:
+                                self.UIData['edit_root_Entry_qsign_list'].append(key_pare[0])
+                            if key_pare[1] not in self.UIData['edit_root_Entry_qsign_list']:
+                                self.UIData['edit_root_Entry_qsign_list'].append(key_pare[1])
+                            if key_pare[0] + '_StringVar' not in self.UIData:
+                                self.UIData[key_pare[0] + '_StringVar'] = tkinter.StringVar()
+                            self.tree_edit_UI_Entry_init(
+                                obj_root='edit_root',
+                                obj_name=key_pare[0],
+                                str_name=key_pare[0] + '_StringVar',
+                                x=100,
+                                y=40 + count * (24 + 6),
+                                width=200,
+                                height=24,
+                                action=self.action,
+                                title='地址',
+                                mode='NONE'
+                            )
+                            count += 1
+                            if key_pare[1] + '_StringVar' not in self.UIData:
+                                self.UIData[key_pare[1] + '_StringVar'] = tkinter.StringVar()
+                            self.tree_edit_UI_Entry_init(
+                                obj_root='edit_root',
+                                obj_name=key_pare[1],
+                                str_name=key_pare[1] + '_StringVar',
+                                x=100,
+                                y=40 + count * (24 + 6),
+                                width=200,
+                                height=24,
+                                action=self.action,
+                                title='KEY',
+                                mode='NONE'
+                            )
+                            count += 1
                     count -= 1
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1

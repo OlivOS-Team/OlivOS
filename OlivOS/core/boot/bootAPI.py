@@ -831,7 +831,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 flag_fliter = rx_packet_data.key['target']['fliter']
                             for tmp_Proc_name in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[tmp_Proc_name]
-                                
                                 if flag_target_all or basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
                                     model_name = basic_conf_models_this['name']
                                     if 'hash' in rx_packet_data.key['target']:

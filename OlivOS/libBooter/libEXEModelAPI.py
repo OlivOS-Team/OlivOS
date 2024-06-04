@@ -46,6 +46,10 @@ gCheckList = [
     'gocqhttp_show_old'
 ]
 
+gProtocalEXECheckList = [
+    'AstralQsign'
+]
+
 gProtocalInfo = {
     'android_pad': {
         'AstralQsign': '''{
@@ -531,10 +535,15 @@ class server(OlivOS.API.Proc_templet):
                 tmp.write('{}')
             releaseDir('./conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash)
             goTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], self.Proc_config['sub_target_proc']).setConfig()
-            if False and (self.Proc_data['bot_info_dict'].platform['model'] in [
-                'gocqhttp',
-                'gocqhttp_hide'
-            ]):
+            if 'qsign-server-protocal' in self.Proc_data['bot_info_dict'].extends \
+            and type(self.Proc_data['bot_info_dict'].extends['qsign-server-protocal']) is str \
+            and self.Proc_data['bot_info_dict'].extends['qsign-server-protocal'] in gProtocalEXECheckList:
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS libEXEModel server [{0}] will run in {1}s...',
+                    [self.Proc_name, str(8)], modelName
+                ))
+                self.check_protocalEXE(8, 0.25)
+            if False and (self.Proc_data['bot_info_dict'].platform['model'] in ['gocqhttp', 'gocqhttp_hide']):
                 model_Proc = subprocess.Popen(
                     '..\\..\\..\\lib\\go-cqhttp.exe faststart',
                     cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
@@ -720,6 +729,25 @@ class server(OlivOS.API.Proc_templet):
         }
                                   )
 
+    def check_protocalEXE(self, delayS:int, interval:int):
+        flag_skip = False
+        for i in range(int(delayS / interval)):
+            if self.Proc_info.rx_queue.empty():
+                time.sleep(interval)
+            else:
+                try:
+                    rx_packet_data = self.Proc_info.rx_queue.get(block=False)
+                    if type(rx_packet_data.key) is dict \
+                    and 'data' in rx_packet_data.key \
+                    and 'action' in rx_packet_data.key['data'] \
+                    and 'skipDelay' == rx_packet_data.key['data']['action']:
+                        flag_skip = True
+                        break
+                except:
+                    rx_packet_data = None
+        if flag_skip:
+            time.sleep(2)
+
     def send_log_event(self, data):
         self.sendControlEventSend('send', {
             'target': {
@@ -754,6 +782,7 @@ class goTypeConfig(object):
         self.config_file_format = {}
 
     def setConfig(self):
+        global gProtocalEXECheckList
         self.config_file_str = '''
 account: # 账号相关
   uin: {uin} # QQ账号
@@ -956,7 +985,7 @@ database: # 数据库相关设置
 
         if 'qsign-server-protocal' in self.bot_info_dict.extends \
         and type(self.bot_info_dict.extends['qsign-server-protocal']) is str \
-        and self.bot_info_dict.extends['qsign-server-protocal'] == 'AstralQsign':
+        and self.bot_info_dict.extends['qsign-server-protocal'] in gProtocalEXECheckList:
                     self.config_file_format['sign-servers-data'] = '''
     - url: 'http://localhost:%s/'
       key: '%s'

@@ -56,18 +56,17 @@ def startAstralQsignLibExeModel(
                 filePathUpdate='./lib/astral-qsign.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
             )
-        for bot_info_key in plugin_bot_info_dict:
-            if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
-                tmp_Proc_name = basic_conf_models_this['name']
-                Proc_dict[tmp_Proc_name] = OlivOS.libAstralQsignEXEModelAPI.server(
-                    Proc_name=tmp_Proc_name,
-                    tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
-                    control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
-                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                    server_data=basic_conf_models_this['server'],
-                    debug_mode=False
-                )
-                Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+            tmp_Proc_name = basic_conf_models_this['name']
+            Proc_dict[tmp_Proc_name] = OlivOS.libAstralQsignEXEModelAPI.server(
+                Proc_name=tmp_Proc_name,
+                tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
+                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                server_data=basic_conf_models_this['server'],
+                bot_info_dict=plugin_bot_info_dict,
+                debug_mode=False
+            )
+            Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
 class server(OlivOS.API.Proc_templet):
     def __init__(
@@ -80,6 +79,7 @@ class server(OlivOS.API.Proc_templet):
         control_queue=None,
         logger_proc=None,
         server_data=None,
+        bot_info_dict=None,
         debug_mode=False
     ):
         OlivOS.API.Proc_templet.__init__(
@@ -94,16 +94,20 @@ class server(OlivOS.API.Proc_templet):
             logger_proc=logger_proc
         )
         self.Proc_config['debug_mode'] = debug_mode
+        self.Proc_data['bot_info_dict'] = {}
+        if type(bot_info_dict) is dict:
+            self.Proc_data['bot_info_dict'] = bot_info_dict
         self.server_data=server_data
         self.flag_run = True
 
     def run(self):
         while self.flag_run:
-            self.sendLog(
+            self.sendLogSim(
                 2, 'OlivOS libAstralQsignEXEModel server [{0}] will run under visiable mode',
                 [self.Proc_name]
             )
             time.sleep(2)
+            self.setGoCqhttpModelEnableSendAll()
             releaseDir("./conf")
             releaseDir("./conf/astral-qsign")
             unzip('./lib/astral-qsign.zip', "./conf/astral-qsign")
@@ -126,17 +130,17 @@ class server(OlivOS.API.Proc_templet):
             self.Proc_data['model_Proc'] = model_Proc
             self.get_model_stdout(model_Proc)
             # model_Proc.communicate(timeout = None)
-            self.log(3, OlivOS.L10NAPI.getTrans(
-                'OlivOS libAstralQsignEXEModel server [{0}] will retry in 10s...',
-                [self.Proc_name], modelName
-            ))
+            self.sendLogSim(
+                3, 'OlivOS libAstralQsignEXEModel server [{0}] will retry in 10s...',
+                [self.Proc_name]
+            )
             self.Proc_data['model_Proc'] = None
             time.sleep(8)
 
     def get_model_stdout(self, model_Proc: subprocess.Popen):
         for line in iter(model_Proc.stdout.readline, b''):
             try:
-                log_data = ('%s' % line.decode('utf-8', errors='replace')).rstrip('\n').rstrip('\r')
+                log_data = ('%s' % line.decode('gbk', errors='replace')).rstrip('\n').rstrip('\r')
                 self.log(2, log_data, [('AstralQsign', 'default')])
             except Exception as e:
                 self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libAstralQsignEXEModel failed: %s\n%s' % [
@@ -160,6 +164,18 @@ class server(OlivOS.API.Proc_templet):
             }
         )
 
+    def setGoCqhttpModelEnableSend(self, hash):
+        self.sendControlEventSend('send', {
+                'target': {
+                    'type': 'gocqhttp_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'skipDelay'
+                }
+            }
+        )
+
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
@@ -169,6 +185,11 @@ class server(OlivOS.API.Proc_templet):
                 ),
                 block=False
             )
+
+    def setGoCqhttpModelEnableSendAll(self):
+        for bot_info_key in self.Proc_data['bot_info_dict']:
+            if self.Proc_data['bot_info_dict'][bot_info_key].platform['model'] in gCheckList:
+                self.setGoCqhttpModelEnableSend(self.Proc_data['bot_info_dict'][bot_info_key].hash)
 
     def sendLog(self, log_level:int, log_message:str, log_message_list:list):
         self.log(
@@ -181,6 +202,16 @@ class server(OlivOS.API.Proc_templet):
             [('AstralQsign', 'default')]
         )
 
+    def sendLogSim(self, log_level:int, log_message:str, log_message_list:list):
+        self.log(
+            log_level,
+            OlivOS.L10NAPI.getTrans(
+                log_message,
+                log_message_list,
+                modelName
+            ),
+            []
+        )
 
 
 def isBotActive(plugin_bot_info_dict:dict):
