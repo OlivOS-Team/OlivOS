@@ -27,6 +27,7 @@ import uuid
 import hashlib
 import platform
 import shutil
+import webview
 
 import OlivOS
 
@@ -1173,3 +1174,142 @@ def getRandomStringRange(length:int, string:str):
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+
+
+def setGoCqhttpTokenSend(
+    control_queue,
+    hash,
+    token
+):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet('send', {
+                    'target': {
+                        'type': 'nativeWinUI'
+                    },
+                    'data': {
+                        'action': 'gocqhttp',
+                        'event': 'token_get',
+                        'token': token,
+                        'hash': hash,
+                    }
+                }
+            ),
+            block=False
+        )
+
+def sendOpentxTuringTestPage(
+    control_queue,
+    name:str,
+    title:str,
+    url:str
+):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                'init_type_open_tx_turingTest_webview_page',
+                {
+                    'target': {
+                        'action': 'init',
+                        'name': name
+                    },
+                    'data': {
+                        'title': title,
+                        'url': url
+                    }
+                }
+            ),
+            block=False
+        )
+
+def sendStopTxTuringTestPage(control_queue, Proc_name):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet('stop', Proc_name),
+            block=False
+        )
+
+def txTuringTest_evaluate_js(window):
+    window.evaluate_js(
+        r"""
+        mqq.invoke = function(a,b,c){return pywebview.api.invoke(b, JSON.stringify(c))};
+        """
+    )
+
+class txTuringTestApi(object):
+    def __init__(self, Proc_name, hash, control_queue):
+        self.Proc_name = Proc_name
+        self.hash = hash
+        self.control_queue = control_queue
+
+    def invoke(self, b, c):
+        data = json.loads(c)
+        if type(data) is dict \
+        and 'ticket' in data \
+        and type(data['ticket']) is str:
+            setGoCqhttpTokenSend(
+                self.control_queue,
+                self.hash,
+                data['ticket']
+            )
+            sendStopTxTuringTestPage(
+                self.control_queue,
+                self.Proc_name
+            )
+
+class txTuringTestPage(OlivOS.API.Proc_templet):
+    def __init__(
+            self,
+            Proc_name='tx_turingTest_webview_page',
+            scan_interval=0.001,
+            dead_interval=1,
+            rx_queue=None,
+            tx_queue=None,
+            logger_proc=None,
+            control_queue=None,
+            title='OlivOS Turing Test Page',
+            url=None
+    ):
+        OlivOS.API.Proc_templet.__init__(
+            self,
+            Proc_name=Proc_name,
+            Proc_type='tx_turingTest_webview_page',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=rx_queue,
+            tx_queue=tx_queue,
+            control_queue=control_queue,
+            logger_proc=logger_proc
+        )
+        self.UIObject = {}
+        self.UIData = {
+            'title': title,
+            'url': url,
+            'control_queue': control_queue
+        }
+
+    def run(self):
+        releaseDir('./data')
+        releaseDir('./data/webview')
+        releaseDir('./data/webview/%s' % self.Proc_name)
+        if self.UIData['url'] != None:
+            txTuringTestApi_obj = txTuringTestApi(
+                self.Proc_name,
+                self.Proc_name.split('=')[-1],
+                self.UIData['control_queue'],
+            )
+            window = webview.create_window(
+                title=self.UIData['title'],
+                url=self.UIData['url'],
+                background_color='#00A0EA',
+                js_api=txTuringTestApi_obj
+            )
+            webview.start(
+                txTuringTest_evaluate_js,
+                window,
+                private_mode=False,
+                storage_path='./data/webview/%s' % self.Proc_name,
+            )
+
+        # 发送并等待结束
+        sendStopTxTuringTestPage(self.Proc_info.control_queue, self.Proc_name)

@@ -890,6 +890,39 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         )
                                     if model_name not in Proc_Proc_dict:
                                         Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('processing')
+            elif rx_packet_data.action == 'init_type_open_tx_turingTest_webview_page':
+                if platform.system() == 'Windows':
+                    if type(rx_packet_data.key) is dict \
+                    and 'target' in rx_packet_data.key \
+                    and type(rx_packet_data.key['target']) is dict \
+                    and 'data' in rx_packet_data.key \
+                    and type(rx_packet_data.key['data']) is dict \
+                    and 'action' in rx_packet_data.key['target'] \
+                    and 'name' in rx_packet_data.key['target'] \
+                    and 'title' in rx_packet_data.key['data'] \
+                    and 'url' in rx_packet_data.key['data']:
+                        if 'init' == rx_packet_data.key['target']['action']:
+                            for basic_conf_models_this_key in basic_conf_models:
+                                basic_conf_models_this = basic_conf_models[basic_conf_models_this_key]
+                                if 'tx_turingTest_webview_page' == basic_conf_models_this['type']:
+                                    if basic_conf_models_this['name'] not in Proc_dict:
+                                        model_name = '%s+%s' % (
+                                            basic_conf_models_this['name'],
+                                            rx_packet_data.key['target']['name']
+                                        )
+                                        Proc_dict[model_name] = OlivOS.libEXEModelAPI.txTuringTestPage(
+                                            Proc_name=model_name,
+                                            scan_interval=basic_conf_models_this['interval'],
+                                            dead_interval=basic_conf_models_this['dead_interval'],
+                                            rx_queue=None,
+                                            tx_queue=None,
+                                            control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
+                                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                            title=rx_packet_data.key['data']['title'],
+                                            url=rx_packet_data.key['data']['url']
+                                        )
+                                    if model_name not in Proc_Proc_dict:
+                                        Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('processing')
             elif rx_packet_data.action == 'call_system_event':
                 if type(rx_packet_data.key) is dict \
                 and 'action' in rx_packet_data.key \

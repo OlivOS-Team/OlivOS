@@ -305,6 +305,14 @@ class dock(OlivOS.API.Proc_templet):
                                                                 path=rx_packet_data.key['data']['path']
                                                             )
                                                             self.UIObject['root_qrcode_window'][hash].start()
+                                                elif 'token_get' == rx_packet_data.key['data']['event']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'token' in rx_packet_data.key['data']:
+                                                        hash = rx_packet_data.key['data']['hash']
+                                                        self.setGoCqhttpModelSend(
+                                                            hash=rx_packet_data.key['data']['hash'],
+                                                            data=rx_packet_data.key['data']['token']
+                                                        )
                                                 elif 'gocqhttp_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startGoCqhttpTerminalUI(rx_packet_data.key['data']['hash'])
@@ -1224,10 +1232,13 @@ class gocqhttpTerminalUI(object):
 
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
-            input = self.UIData['root_input_StringVar'].get()
-            if len(input) >= 0 and len(input) < 1000:
-                self.root.setGoCqhttpModelSend(self.bot.hash, input)
+            input_data = self.UIData['root_input_StringVar'].get()
+            if len(input_data) >= 0 and len(input_data) < 1000:
+                self.root_setGoCqhttpModelSend(input_data)
             self.UIData['root_input_StringVar'].set('')
+
+    def root_setGoCqhttpModelSend(self, input_data):
+        self.root.setGoCqhttpModelSend(self.bot.hash, input_data)
 
     def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
                         mode='NONE'):
@@ -1270,19 +1281,17 @@ class gocqhttpTerminalUI(object):
         # )
 
     def show_url_webbrowser(self, url):
-        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置人机验证助手访问 \"" + url + "\" ?")
         try:
             if res == 'yes':
-                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
-                if res == 'yes':
-                    OlivOS.webviewUIAPI.sendOpenWebviewPage(
-                        control_queue=self.root.Proc_info.control_queue,
-                        name='slider_verification_code=%s' % self.bot.hash,
-                        title='请完成验证',
-                        url=url
-                    )
-                else:
-                    webbrowser.open(url)
+                OlivOS.libEXEModelAPI.sendOpentxTuringTestPage(
+                    control_queue=self.root.Proc_info.control_queue,
+                    name='slider_verification_code=%s' % self.bot.hash,
+                    title='请完成验证',
+                    url=url
+                )
+            else:
+                webbrowser.open(url)
         except webbrowser.Error as error_info:
             tkinter.messagebox.showerror("webbrowser.Error", error_info)
 
@@ -1315,7 +1324,15 @@ class gocqhttpTerminalUI(object):
         if not flagInit and platform.system() == 'Windows':
             try:
                 matchRes = re.match(
-                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请选择提交滑块ticket方式:.*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    self.tree_add_line('=================================================================')
+                    self.tree_add_line('        【推荐】　选择手动抓取ticket方式将会允许OlivOS接管验证流程　【推荐】')
+                    self.tree_add_line('=================================================================')
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://ti\.qq\.com/safe/tools/captcha/sms-verify-login\?[^\s]+).*$',
                     res_data_raw
                 )
                 if matchRes != None:

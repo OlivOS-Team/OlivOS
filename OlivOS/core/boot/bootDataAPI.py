@@ -562,6 +562,16 @@ default_Conf = {
             "control_queue": "OlivOS_control_queue",
             "debug": False
         },
+        "OlivOS_tx_turingTest_webview_page": {
+            "enable": True,
+            "name": "OlivOS_tx_turingTest_webview_page",
+            "type": "tx_turingTest_webview_page",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "logger_proc": "OlivOS_logger",
+            "control_queue": "OlivOS_control_queue",
+            "debug": False
+        },
         "OlivOS_update_get": {
             "enable": True,
             "name": "OlivOS_update_get",
