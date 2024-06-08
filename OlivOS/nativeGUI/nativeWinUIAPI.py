@@ -1280,7 +1280,7 @@ class gocqhttpTerminalUI(object):
         #    height = height
         # )
 
-    def show_url_webbrowser(self, url):
+    def show_tx_url_webbrowser(self, url):
         res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置人机验证助手访问 \"" + url + "\" ?")
         try:
             if res == 'yes':
@@ -1292,6 +1292,23 @@ class gocqhttpTerminalUI(object):
                 )
             else:
                 webbrowser.open(url)
+        except webbrowser.Error as error_info:
+            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+
+    def show_url_webbrowser(self, url):
+        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        try:
+            if res == 'yes':
+                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
+                if res == 'yes':
+                    OlivOS.webviewUIAPI.sendOpenWebviewPage(
+                        control_queue=self.root.Proc_info.control_queue,
+                        name='slider_verification_code=%s' % self.bot.hash,
+                        title='请完成验证',
+                        url=url
+                    )
+                else:
+                    webbrowser.open(url)
         except webbrowser.Error as error_info:
             tkinter.messagebox.showerror("webbrowser.Error", error_info)
 
@@ -1331,6 +1348,7 @@ class gocqhttpTerminalUI(object):
                     self.tree_add_line('=================================================================')
                     self.tree_add_line('        【推荐】　选择手动抓取ticket方式将会允许OlivOS接管验证流程　【推荐】')
                     self.tree_add_line('=================================================================')
+
                 matchRes = re.match(
                     r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://ti\.qq\.com/safe/tools/captcha/sms-verify-login\?[^\s]+).*$',
                     res_data_raw
@@ -1339,6 +1357,17 @@ class gocqhttpTerminalUI(object):
                     matchResList = list(matchRes.groups())
                     if len(matchResList) == 1:
                         matchResUrl = matchResList[0]
+                        self.show_tx_url_webbrowser(matchResUrl)
+
+                matchRes = re.match(
+                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s账号已开启设备锁，请前往\s+->\s+(http[s]{0,1}://accounts\.qq\.com/safe/verify[^\s]+).*$',
+                    res_data_raw
+                )
+                if matchRes != None:
+                    matchResList = list(matchRes.groups())
+                    if len(matchResList) == 1:
+                        matchResUrl = matchResList[0]
+                        matchResUrl = matchResUrl.replace('accounts.qq.com/safe/verify', 'accounts.qq.com/safe/qrcode')
                         self.show_url_webbrowser(matchResUrl)
             except:
                 pass

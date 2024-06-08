@@ -111,6 +111,7 @@ class server(OlivOS.API.Proc_templet):
             releaseDir("./conf")
             releaseDir("./conf/astral-qsign")
             unzip('./lib/astral-qsign.zip', "./conf/astral-qsign")
+            time.sleep(1)
             tmp_env = dict(os.environ)
             tmp_env['FORCE_TTY'] = ''
             model_Proc = subprocess.Popen(
