@@ -1309,6 +1309,7 @@ class txTuringTestPage(OlivOS.API.Proc_templet):
                 window,
                 private_mode=False,
                 storage_path='./data/webview/%s' % self.Proc_name,
+                gui='edgechromium'
             )
 
         # 发送并等待结束
