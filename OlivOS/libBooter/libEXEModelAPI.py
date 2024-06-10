@@ -839,7 +839,7 @@ account: # 账号相关
   # 为 false 时，将不会自动注册实例，在签名服务器重启或实例被销毁后需要重启 go-cqhttp 以获取实例
   # 否则后续消息将不会正常签名。关闭此项后可以考虑开启签名服务器端 auto_register 避免需要重启
   # 由于实现问题，当前建议关闭此项，推荐开启签名服务器的自动注册实例
-  auto-register: false
+  auto-register: {auto-register}
   # 是否在 token 过期后立即自动刷新签名 token（在需要签名时才会检测到，主要防止 token 意外丢失）
   # 独立于定时刷新
   auto-refresh-token: false
@@ -970,6 +970,7 @@ database: # 数据库相关设置
       key: '-'
       authorization: '-'
 '''
+        self.config_file_format['auto-register'] = 'false'
         if 'qsign-server' in self.bot_info_dict.extends \
         and type(self.bot_info_dict.extends['qsign-server']) is list \
         and len(self.bot_info_dict.extends['qsign-server']) > 0:
@@ -992,6 +993,7 @@ database: # 数据库相关设置
       key: '%s'
       authorization: '-'
 ''' % (str(self.sub_target_proc['server']['port']), str(self.sub_target_proc['server']['token']))
+                    self.config_file_format['auto-register'] = 'true'
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 

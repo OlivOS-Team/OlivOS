@@ -115,7 +115,7 @@ class server(OlivOS.API.Proc_templet):
             tmp_env = dict(os.environ)
             tmp_env['FORCE_TTY'] = ''
             model_Proc = subprocess.Popen(
-                f".\\start.bat {self.server_data['port']}",
+                f".\\start.bat \"localhost\" \"{self.server_data['port']}\" \"{self.server_data['token']}\"",
                 cwd='.\\conf\\astral-qsign',
                 shell=True,
                 stdin=subprocess.PIPE,
