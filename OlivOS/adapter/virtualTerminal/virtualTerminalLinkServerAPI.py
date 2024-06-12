@@ -14,6 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import gevent
 from gevent import pywsgi
 from flask import Flask
 from flask import current_app
@@ -139,10 +140,13 @@ class server(OlivOS.API.Proc_templet):
                             res = json.dumps(self.Proc_data['reply_event_pool'][event_id])
                             self.Proc_data['reply_event_pool'].pop(event_id)
                             break
-                        time.sleep(0.25)
+                        gevent.sleep(0.25)
                 return res, status, header
-        server = pywsgi.WSGIServer(('0.0.0.0', self.Proc_data['bot_info_dict'].post_info.port),
-                                   self.Proc_config['Flask_app'], log=None)
+        server = pywsgi.WSGIServer(
+            ('0.0.0.0', self.Proc_data['bot_info_dict'].post_info.port),
+            self.Proc_config['Flask_app'],
+            log=None
+        )
         server.serve_forever()
 
     def send_init_event(self):
