@@ -2298,7 +2298,7 @@ class OlivOSTerminalUI(object):
 
     def start(self):
         self.UIObject['root'] = tkinter.Toplevel()
-        self.UIObject['root'].title('OlivOS 终端')
+        self.UIObject['root'].title('OlivOS 终端 - %s' % OlivOS.infoAPI.OlivOS_Version_Title)
         self.UIObject['root'].geometry('900x600')
         self.UIObject['root'].minsize(900, 600)
         self.UIObject['root'].grid_rowconfigure(0, weight=15)

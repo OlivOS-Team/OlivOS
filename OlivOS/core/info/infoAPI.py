@@ -17,8 +17,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.11.39'
-OlivOS_SVN = 159
+OlivOS_Version = '0.11.40'
+OlivOS_SVN = 160
+OlivOS_Version_Slogan = '夏至'
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
 # OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn
@@ -28,6 +29,7 @@ OlivOS_SVN_OldCompatible = -1
 OlivOS_compatible_svn_default = 0
 
 OlivOS_Version_Short = '%s(%s)' % (OlivOS_Version, str(OlivOS_SVN))
+OlivOS_Version_Title = '%s(%s) - %s' % (OlivOS_Version, str(OlivOS_SVN), OlivOS_Version_Slogan)
 
 OlivOS_Header_UA = 'OlivOS/' + OlivOS_Version
 

@@ -139,7 +139,7 @@ class HostUI(object):
             self.UIObject['root'] = tkinter.Tk()
         else:
             self.UIObject['root'] = tkinter.Toplevel()
-        self.UIObject['root'].title('OlivOS 登录管理器')
+        self.UIObject['root'].title('OlivOS 登录管理器 - %s' % OlivOS.infoAPI.OlivOS_Version_Title)
         self.UIObject['root'].geometry('518x400')
         self.UIObject['root'].resizable(
             width=False,
