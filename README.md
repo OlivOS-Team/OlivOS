@@ -152,4 +152,4 @@ if __name__ == '__main__':
 
 + [Github - OlivOS-Team/OlivOS](https://github.com/OlivOS-Team/OlivOS)
 
-任何未经本仓库所属的组织允许的超出以上代码托管平台的冒充行为，都是侵权的。
+任何未经本仓库所属的组织允许的超出以上代码托管平台的冒充行为，都是未授权的，请警惕。
