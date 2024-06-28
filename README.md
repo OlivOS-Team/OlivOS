@@ -146,3 +146,8 @@ if __name__ == '__main__':
 
 - 若引用 OlivOS 发布的软件包而不修改 OlivOS，则衍生项目需在描述的任意部位提及使用 OlivOS。
 - 若修改 OlivOS 源代码再发布，**或参考 OlivOS 内部实现发布另一个项目**，则衍生项目必须在**文章首部**或 'OlivOS' 相关内容**首次出现**的位置**明确声明**来源于本仓库 (`https://github.com/OlivOS-Team/OlivOS`)。不得扭曲或隐藏免费且开源的事实。
+
+## 特别声明
+有[CSDN旗下GitCode被曝批量搬运Github项目](https://tech.ifeng.com/c/8ako6om7AC7)的珠玉在前，本项目特别在此声明，本项目的官方源代码仅在以下平台发布：
++ [Github - OlivOS-Team/OlivOS](https://github.com/OlivOS-Team/OlivOS)
+任何未经本仓库所属的组织允许的超出以上代码托管平台的冒充行为，都是侵权的。
