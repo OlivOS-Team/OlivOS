@@ -51,7 +51,14 @@ dictMessageType = {
             'walleq_show_iPad': 'obv12_para',
             'walleq_show_iMac': 'obv12_para',
             'walleq_show_old': 'obv12_para',
-            'opqbot_default': 'olivos_string'
+            'opqbot_default': 'olivos_string',
+            'opqbot_auto': 'old_string',
+            'opqbot_port': 'old_string',
+            'opqbot_port_old': 'old_string',
+            'napcat': 'old_string',
+            'napcat_hide': 'old_string',
+            'napcat_show': 'old_string',
+            'napcat_show_old': 'old_string'
         }
     },
     'qqGuild': {
