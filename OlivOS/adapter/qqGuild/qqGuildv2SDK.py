@@ -181,12 +181,12 @@ class PAYLOAD(object):
             if bot_info.model == 'private':
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
                 #tmp_intents |= int(intents_T.QQ_MESSAGES)
-            elif bot_info.model == 'public':
+            elif bot_info.model == ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
             elif bot_info.model == 'public_guild_only':
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
-            elif bot_info.model in ['private_intents', 'public_intents']:
+            elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
                 tmp_intents = bot_info.intents
             payload_template.__init__(self)
             self.data.op = 2
@@ -232,8 +232,15 @@ class api_templet(object):
         self.route = None
         self.res = None
 
+    def __switch_host(self):
+        global sdkAPIHost
+        if self.bot_info.model in ['sandbox', 'sandbox_intents']:
+            if self.host == sdkAPIHost['default']:
+                self.host = sdkAPIHost['sandbox']
+
     def do_api_plant(self, req_type='POST'):
         try:
+            self.__switch_host()
             tmp_payload_dict = {}
             tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
             if self.metadata is not None:
@@ -264,6 +271,7 @@ class api_templet(object):
 
     def do_api(self, req_type='POST'):
         try:
+            self.__switch_host()
             tmp_payload_dict = {}
             tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
             if self.metadata is not None:

@@ -375,6 +375,8 @@ class TreeEditUI(object):
                     'QQ官方/公域/V2/指定intents',
                     'QQ官方/私域/V2',
                     'QQ官方/私域/V2/指定intents',
+                    'QQ官方/沙盒/V2',
+                    'QQ官方/沙盒/V2/指定intents',
                     'QQ官方/公域/V1',
                     'QQ官方/私域/V1',
                     'Discord',
@@ -710,6 +712,17 @@ class TreeEditUI(object):
                             'intents': 'edit_root_Entry_Server_port'
                         }
                     ],
+                    'QQ官方/沙盒/V2': ['qqGuild', 'qqGuildv2_link', 'sandbox', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token'
+                        }
+                    ],
+                    'QQ官方/沙盒/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'sandbox_intents', 'True', 'websocket', {
+                            'AppID': 'edit_root_Entry_ID',
+                            'AppSecret': 'edit_root_Entry_Server_access_token',
+                            'intents': 'edit_root_Entry_Server_port'
+                        }
+                    ],
                     'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
                             'TOKEN': 'edit_root_Entry_Server_access_token'
                         }
@@ -891,6 +904,8 @@ class TreeEditUI(object):
                             'public_intents',
                             'private',
                             'private_intents',
+                            'sandbox',
+                            'sandbox_intents',
                             'default'
                         ]
                     },
@@ -1046,7 +1061,8 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_platform_model not in [
                     'public_intents',
-                    'private_intents'
+                    'private_intents',
+                    'sandbox_intents'
                 ]:
                     if tmp_port == '':
                         tmp_port = '0'
