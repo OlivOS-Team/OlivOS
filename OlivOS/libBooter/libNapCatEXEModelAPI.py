@@ -39,6 +39,7 @@ gCheckList = [
     'napcat',
     'napcat_hide',
     'napcat_show',
+    'napcat_show_new',
     'napcat_show_old'
 ]
 
@@ -62,8 +63,16 @@ def startNapCatLibExeModel(
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 resouce_api=resourceUrlPath,
-                resouce_name='NapCat-QQ-Win-9.9.11-24568', # resouce_name='NapCat-QQ-Win-9.9.12-26000',
+                resouce_name='NapCat-QQ-Win-9.9.11-24568',
                 filePath='./lib/NapCat.zip',
+                filePathUpdate='./lib/NapCat.zip.tmp',
+                filePathFORCESKIP='./lib/FORCESKIP'
+            )
+            OlivOS.updateAPI.checkResouceFile(
+                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                resouce_api=resourceUrlPath,
+                resouce_name='NapCat-QQ-Win-9.9.12-26000',
+                filePath='./lib/NapCatNew.zip',
                 filePathUpdate='./lib/NapCat.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
             )
@@ -126,10 +135,16 @@ class server(OlivOS.API.Proc_templet):
             releaseDir('./conf/napcat')
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
-            unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+            if self.Proc_data['bot_info_dict'].platform['model'] in [
+                'napcat_show_new'
+            ]:
+                unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+            else:
+                unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
             napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             if self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat',
+                'napcat_show_new',
                 'napcat_show'
             ]:
                 self.log(2, OlivOS.L10NAPI.getTrans(
@@ -147,31 +162,43 @@ class server(OlivOS.API.Proc_templet):
                     args=(),
                     daemon=self.deamon
                 ).start()
-                tmp_env = dict(os.environ)
-                model_Proc = subprocess.Popen(
-                    f".\\napcat-utf8.bat -q {self.Proc_data['bot_info_dict'].id}",
-                    cwd=f".\\conf\\napcat\\{self.Proc_data['bot_info_dict'].hash}",
-                    shell=True,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE,
-                    env=tmp_env
-                )
-                self.Proc_data['model_Proc'] = model_Proc
-                threading.Thread(
-                    target=self.check_stdin,
-                    args=(model_Proc,),
-                    daemon=self.deamon
-                ).start()
-                self.get_model_stdout(model_Proc)
-                # model_Proc.communicate(timeout = None)
-                self.log(3, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...',
-                    [self.Proc_name], modelName
-                ))
-                self.Proc_data['model_Proc'] = None
-                time.sleep(8)
+                if self.Proc_data['bot_info_dict'].platform['model'] in [
+                    'napcat_show_new'
+                ]:
+                    tmp_env = dict(os.environ)
+                    subprocess.call(
+                        'start powershell .\\BootWay05.ps1',
+                        shell=True,
+                        cwd='.\\conf\\napcat\\' + self.Proc_data['bot_info_dict'].hash,
+                        env=tmp_env
+                    )
+                    self.flag_run = False
+                else:
+                    tmp_env = dict(os.environ)
+                    model_Proc = subprocess.Popen(
+                        f".\\napcat-utf8.bat -q {self.Proc_data['bot_info_dict'].id}",
+                        cwd=f".\\conf\\napcat\\{self.Proc_data['bot_info_dict'].hash}",
+                        shell=True,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        creationflags=subprocess.CREATE_NEW_CONSOLE,
+                        env=tmp_env
+                    )
+                    self.Proc_data['model_Proc'] = model_Proc
+                    threading.Thread(
+                        target=self.check_stdin,
+                        args=(model_Proc,),
+                        daemon=self.deamon
+                    ).start()
+                    self.get_model_stdout(model_Proc)
+                    # model_Proc.communicate(timeout = None)
+                    self.log(3, OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...',
+                        [self.Proc_name], modelName
+                    ))
+                    self.Proc_data['model_Proc'] = None
+                    time.sleep(8)
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat_show_old'
             ]:

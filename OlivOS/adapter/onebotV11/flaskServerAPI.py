@@ -40,6 +40,7 @@ gCheckList = [
     'napcat',
     'napcat_hide',
     'napcat_show',
+    'napcat_show_new',
     'napcat_show_old'
 ]
 

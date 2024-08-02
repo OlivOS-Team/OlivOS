@@ -365,6 +365,7 @@ class TreeEditUI(object):
             'edit_root_Combobox_dict': {
                 'type_list': [
                     'QQ/NapCat/默认',
+                    'QQ/NapCat/9.9.11',
                     'QQ/OPQ/默认',
                     'QQ/GoCq/安卓平板',
                     'QQ/GoCq/安卓手机',
@@ -429,7 +430,8 @@ class TreeEditUI(object):
                     'QQ/OPQ/默认': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
                     'QQ/OPQ/指定端口': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
                     'QQ/OPQ/指定端口/旧': '简单对接OPQ，使用闭源框架有账号安全风险，OlivOS不对此负责',
-                    'QQ/NapCat/默认': '使用本方法需要已经安装较新版本QQ',
+                    'QQ/NapCat/默认': '需要已经安装不低于9.9.12版本QQ',
+                    'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
                     'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ'
                 },
                 'type_clear_note_list': {
@@ -448,6 +450,7 @@ class TreeEditUI(object):
                     'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
                     'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}',
                     'QQ/NapCat/默认': './conf/napcat/{bothash}',
+                    'QQ/NapCat/9.9.11': './conf/napcat/{bothash}',
                     'QQ/NapCat/旧': './conf/napcat/{bothash}'
                 },
                 'type_extend_note_list': {
@@ -542,7 +545,11 @@ class TreeEditUI(object):
                             'TOKEN': 'edit_root_Entry_Server_access_token',
                         }
                     ],
-                    'QQ/NapCat/默认': ['qq', 'onebot', 'napcat_show', 'True', 'post', {
+                    'QQ/NapCat/默认': ['qq', 'onebot', 'napcat_show_new', 'True', 'post', {
+                            'QQ号': 'edit_root_Entry_ID',
+                        }
+                    ],
+                    'QQ/NapCat/9.9.11': ['qq', 'onebot', 'napcat_show', 'True', 'post', {
                             'QQ号': 'edit_root_Entry_ID',
                         }
                     ],
@@ -889,6 +896,7 @@ class TreeEditUI(object):
                             'napcat',
                             #'napcat_hide',
                             'napcat_show',
+                            'napcat_show_new',
                             'napcat_show_old'
                         ]
                     },
