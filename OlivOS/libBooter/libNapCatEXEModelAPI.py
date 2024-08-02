@@ -62,7 +62,7 @@ def startNapCatLibExeModel(
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 resouce_api=resourceUrlPath,
-                resouce_name='NapCat-QQ-Win-9.9.12-26000',
+                resouce_name='NapCat-QQ-Win-9.9.11-24568', # resouce_name='NapCat-QQ-Win-9.9.12-26000',
                 filePath='./lib/NapCat.zip',
                 filePathUpdate='./lib/NapCat.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
