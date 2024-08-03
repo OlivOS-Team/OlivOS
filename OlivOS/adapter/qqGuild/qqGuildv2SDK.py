@@ -178,13 +178,13 @@ class PAYLOAD(object):
     class sendIdentify(payload_template):
         def __init__(self, bot_info:bot_info_T, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
             tmp_intents = intents
-            if bot_info.model == 'private':
+            if bot_info.model in ['private']:
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
                 #tmp_intents |= int(intents_T.QQ_MESSAGES)
-            elif bot_info.model == ['public', 'sandbox']:
+            elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
-            elif bot_info.model == 'public_guild_only':
+            elif bot_info.model in ['public_guild_only']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
                 tmp_intents = bot_info.intents
