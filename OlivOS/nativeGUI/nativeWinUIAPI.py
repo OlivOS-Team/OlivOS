@@ -1112,7 +1112,8 @@ class gocqhttpTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -1137,7 +1138,7 @@ class gocqhttpTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -1156,7 +1157,7 @@ class gocqhttpTerminalUI(object):
         # )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -1185,15 +1186,37 @@ class gocqhttpTerminalUI(object):
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -1235,8 +1258,8 @@ class gocqhttpTerminalUI(object):
                 self.UIObject['root'].update()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
@@ -1269,7 +1292,8 @@ class gocqhttpTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -1383,6 +1407,29 @@ class gocqhttpTerminalUI(object):
             except:
                 pass
 
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
@@ -1412,7 +1459,8 @@ class walleqTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -1437,7 +1485,7 @@ class walleqTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -1456,7 +1504,7 @@ class walleqTerminalUI(object):
         # )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -1485,15 +1533,37 @@ class walleqTerminalUI(object):
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -1535,8 +1605,8 @@ class walleqTerminalUI(object):
                 self.UIObject['root'].update()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
@@ -1566,7 +1636,8 @@ class walleqTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -1636,6 +1707,29 @@ class walleqTerminalUI(object):
             except:
                 pass
 
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
@@ -1666,7 +1760,8 @@ class CWCBTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -1691,7 +1786,7 @@ class CWCBTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -1710,7 +1805,7 @@ class CWCBTerminalUI(object):
         # )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -1739,15 +1834,37 @@ class CWCBTerminalUI(object):
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -1789,8 +1906,8 @@ class CWCBTerminalUI(object):
                 self.UIObject['root'].update()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
@@ -1820,7 +1937,8 @@ class CWCBTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -1868,6 +1986,29 @@ class CWCBTerminalUI(object):
             except:
                 pass
 
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
@@ -1898,7 +2039,8 @@ class opqbotTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -1923,7 +2065,7 @@ class opqbotTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -1942,7 +2084,7 @@ class opqbotTerminalUI(object):
         # )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -1971,15 +2113,37 @@ class opqbotTerminalUI(object):
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -2021,8 +2185,8 @@ class opqbotTerminalUI(object):
                 self.UIObject['root'].update()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
@@ -2052,7 +2216,8 @@ class opqbotTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -2100,6 +2265,29 @@ class opqbotTerminalUI(object):
             except:
                 pass
 
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
@@ -2129,7 +2317,8 @@ class napcatTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -2154,7 +2343,7 @@ class napcatTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -2173,7 +2362,7 @@ class napcatTerminalUI(object):
         # )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -2202,15 +2391,37 @@ class napcatTerminalUI(object):
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -2252,8 +2463,8 @@ class napcatTerminalUI(object):
                 self.UIObject['root'].update()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
@@ -2283,7 +2494,8 @@ class napcatTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -2330,6 +2542,30 @@ class napcatTerminalUI(object):
                     #self.UIObject['tree'].update()
             except:
                 pass
+
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
+
 
     def stop(self):
         self.exit()
@@ -3048,7 +3284,8 @@ class VirtualTerminalUI(object):
         self.UIObject['root'].grid_rowconfigure(1, weight=0)
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
-        self.UIObject['root'].grid_columnconfigure(2, weight=0)
+        self.UIObject['root'].grid_columnconfigure(2, weight=2)
+        self.UIObject['root'].grid_columnconfigure(3, weight=0)
         self.UIObject['root'].resizable(
             width=True,
             height=True
@@ -3071,7 +3308,7 @@ class VirtualTerminalUI(object):
             column=0,
             sticky="nsew",
             rowspan=1,
-            columnspan=2,
+            columnspan=3,
             padx=(15, 0),
             pady=(15, 0),
             ipadx=0,
@@ -3084,7 +3321,7 @@ class VirtualTerminalUI(object):
         )
         self.UIObject['tree_yscroll'].grid(
             row=0,
-            column=2,
+            column=3,
             sticky="nsw",
             rowspan=1,
             columnspan=1,
@@ -3111,18 +3348,39 @@ class VirtualTerminalUI(object):
             title='输入'
         )
         self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
-
         self.UIObject['root_input'].grid(
             row=1,
-            column=1,
+            column=0,
             sticky="s",
             rowspan=1,
-            columnspan=3,
-            padx=(15, 15),
+            columnspan=2,
+            padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
             ipady=0
         )
+
+        self.root_Button_init(
+            name='root_button_save',
+            text='>',
+            command=self.root_Entry_enter_Func('root_input'),
+            x=800 - 15 * 2 - 5,
+            y=600 - 15 * 1 - 24,
+            width=16,
+            height=1
+        )
+        self.UIObject['root_button_save'].grid(
+            row=1,
+            column=2,
+            sticky="swe",
+            rowspan=1,
+            columnspan=2,
+            padx=(0, 15),
+            pady=(8, 15),
+            ipadx=8,
+            ipady=0
+        )
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
         self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
 
@@ -3180,17 +3438,16 @@ class VirtualTerminalUI(object):
         self.UIObject['root_terminal_account_edit'].start()
 
     def root_Entry_enter_Func(self, name):
-        def resFunc(event):
-            self.root_Entry_enter(name, event)
+        def resFunc(*arg, **kwarg):
+            self.root_Entry_enter(name, None)
 
         return resFunc
 
     def root_Entry_enter(self, name, event):
         if name == 'root_input':
             input = self.UIData['root_input_StringVar'].get()
-            if len(input) >= 0 and len(input) < 1000:
+            if len(input) > 0 and len(input) < 1000:
                 self.root.setVirtualModelSend(self.bot.hash, input, self.user_conf_data)
-                pass
             self.UIData['root_input_StringVar'].set('')
 
     def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
@@ -3206,7 +3463,8 @@ class VirtualTerminalUI(object):
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
+            textvariable=self.UIData[str_name],
+            font=('TkDefaultFont 18')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -3257,6 +3515,29 @@ class VirtualTerminalUI(object):
                     #self.UIObject['tree'].update()
             except:
                 pass
+
+    def buttom_action(self, name, action):
+        if name in self.UIObject:
+            if action == '<Enter>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_006'])
+            if action == '<Leave>':
+                self.UIObject[name].configure(bg=self.UIConfig['color_003'])
+
+    def root_Button_init(self, name, text, command, x, y, width, height):
+        self.UIObject[name] = tkinter.Button(
+            self.UIObject['root'],
+            text=text,
+            command=command,
+            bd=0,
+            activebackground=self.UIConfig['color_002'],
+            activeforeground=self.UIConfig['color_001'],
+            bg=self.UIConfig['color_003'],
+            fg=self.UIConfig['color_004'],
+            relief='groove',
+            height=height
+        )
+        self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
+        self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
 
     def stop(self):
         self.exit()
