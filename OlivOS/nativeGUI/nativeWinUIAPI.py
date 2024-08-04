@@ -1165,8 +1165,9 @@ class gocqhttpTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -1201,6 +1202,15 @@ class gocqhttpTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -1333,8 +1343,9 @@ class gocqhttpTerminalUI(object):
                         res_data
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
@@ -1454,8 +1465,9 @@ class walleqTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -1490,6 +1502,15 @@ class walleqTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -1595,8 +1616,9 @@ class walleqTerminalUI(object):
                         res_data
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
@@ -1697,8 +1719,9 @@ class CWCBTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -1733,6 +1756,15 @@ class CWCBTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -1830,8 +1862,9 @@ class CWCBTerminalUI(object):
                         res_data
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
@@ -1918,8 +1951,9 @@ class opqbotTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -1954,6 +1988,15 @@ class opqbotTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -2051,8 +2094,9 @@ class opqbotTerminalUI(object):
                         res_data
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
@@ -2138,8 +2182,9 @@ class napcatTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -2174,6 +2219,15 @@ class napcatTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -2271,8 +2325,9 @@ class napcatTerminalUI(object):
                         res_data
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
@@ -2372,8 +2427,9 @@ class OlivOSTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.tree_edit_UI_Combobox_init(
@@ -2441,6 +2497,15 @@ class OlivOSTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         # 右键设置的选择在后续流程中未生效，不知为何，等后续解决
@@ -2596,8 +2661,9 @@ class OlivOSTerminalUI(object):
                         ),
                         tag=log_level
                     )
-                    self.UIObject['tree'].see(iid)
-                    self.UIObject['tree'].update()
+                    if self.UIData['flag_tree_is_bottom']:
+                        self.UIObject['tree'].see(iid)
+                        #self.UIObject['tree'].update()
                 except:
                     pass
 
@@ -3027,8 +3093,9 @@ class VirtualTerminalUI(object):
             ipadx=0,
             ipady=0
         )
+        self.UIData['flag_tree_is_bottom'] = True
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
         )
 
         self.root_Entry_init(
@@ -3064,6 +3131,15 @@ class VirtualTerminalUI(object):
         self.UIObject['root'].mainloop()
 
         self.exit()
+
+    def scroll_onChange(self, command):
+        def res(*arg, **kwarg):
+            if arg[1] == '1.0':
+                self.UIData['flag_tree_is_bottom'] = True
+            else:
+                self.UIData['flag_tree_is_bottom'] = False
+            return command(*arg, **kwarg)
+        return res
 
     def tree_rightKey(self, event):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
@@ -3176,8 +3252,9 @@ class VirtualTerminalUI(object):
                         res_data_list_this
                     )
                 )
-                self.UIObject['tree'].see(iid)
-                self.UIObject['tree'].update()
+                if self.UIData['flag_tree_is_bottom']:
+                    self.UIObject['tree'].see(iid)
+                    #self.UIObject['tree'].update()
             except:
                 pass
 
