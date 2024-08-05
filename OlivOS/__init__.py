@@ -31,6 +31,7 @@ from .core.core import metadataAPI
 from .core.core import API
 from . import thirdPartyModule
 from .core.core import accountAPI
+from .core.core import accountMetadataAPI
 from .core.core import diagnoseAPI
 from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK

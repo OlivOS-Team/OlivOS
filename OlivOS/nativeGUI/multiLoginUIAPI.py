@@ -23,6 +23,7 @@ import shutil
 import platform
 import traceback
 import json
+import copy
 
 from tkinter import ttk
 from tkinter import messagebox
@@ -149,15 +150,18 @@ class HostUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
-        self.UIObject['tree'].column('ID', width=100)
-        self.UIObject['tree'].column('PLATFORM', width=100)
-        self.UIObject['tree'].column('SDK', width=100)
-        self.UIObject['tree'].column('MODEL', width=100)
+        #self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
+        self.UIObject['tree']['columns'] = ('ID', 'TYPE')
+        self.UIObject['tree'].column('ID', width=200)
+        self.UIObject['tree'].column('TYPE', width=200)
+        #self.UIObject['tree'].column('PLATFORM', width=100)
+        #self.UIObject['tree'].column('SDK', width=100)
+        #self.UIObject['tree'].column('MODEL', width=100)
         self.UIObject['tree'].heading('ID', text='ID')
-        self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
-        self.UIObject['tree'].heading('SDK', text='SDK')
-        self.UIObject['tree'].heading('MODEL', text='MODEL')
+        self.UIObject['tree'].heading('TYPE', text='账号类型')
+        #self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
+        #self.UIObject['tree'].heading('SDK', text='SDK')
+        #self.UIObject['tree'].heading('MODEL', text='MODEL')
         self.UIObject['tree']['selectmode'] = 'browse'
         self.tree_load()
         self.UIObject['tree'].place(x=0, y=0, width=500, height=350)
@@ -272,9 +276,10 @@ class HostUI(object):
                 text=Account_hash_this,
                 values=(
                     self.UIData['Account_data'][Account_hash_this].id,
-                    self.UIData['Account_data'][Account_hash_this].platform['platform'],
-                    self.UIData['Account_data'][Account_hash_this].platform['sdk'],
-                    self.UIData['Account_data'][Account_hash_this].platform['model']
+                    self.get_account_data_type_name(Account_hash_this)
+                    #self.UIData['Account_data'][Account_hash_this].platform['platform'],
+                    #self.UIData['Account_data'][Account_hash_this].platform['sdk'],
+                    #self.UIData['Account_data'][Account_hash_this].platform['model']
                 )
             )
 
@@ -313,6 +318,27 @@ class HostUI(object):
         sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
 
+    def get_account_data_type_name(self, hash_key):
+        res = '自定义'
+        list_data_check = [
+            str(self.UIData['Account_data'][hash_key].platform['platform']),
+            str(self.UIData['Account_data'][hash_key].platform['sdk']),
+            str(self.UIData['Account_data'][hash_key].platform['model']),
+            str(self.UIData['Account_data'][hash_key].post_info.auto),
+            str(self.UIData['Account_data'][hash_key].post_info.type)
+        ]
+        for type_this in OlivOS.accountMetadataAPI.accountTypeList:
+            flag_hit = True
+            for list_data_check_i in range(len(list_data_check)):
+                if list_data_check[list_data_check_i] \
+                != OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]:
+                    flag_hit = False
+                    break
+            if flag_hit:
+                break
+        if flag_hit:
+            res = type_this
+        return res
 
 class TreeEditUI(object):
     def __init__(self, action, Account_data, hash_key=None, edit_commit_callback=None):
@@ -363,62 +389,7 @@ class TreeEditUI(object):
             'edit_root_Entry_qsign_list': [],
             'edit_root_Entry_qsign_num': 1,
             'edit_root_Combobox_dict': {
-                'type_list': [
-                    'QQ/NapCat/默认',
-                    'QQ/NapCat/9.9.11',
-                    'QQ/OPQ/默认',
-                    'QQ/GoCq/安卓平板',
-                    'QQ/GoCq/安卓手机',
-                    'KOOK',
-                    'KOOK/消息兼容',
-                    'QQ官方/公域/V2',
-                    'QQ官方/公域/V2/纯频道',
-                    'QQ官方/公域/V2/指定intents',
-                    'QQ官方/私域/V2',
-                    'QQ官方/私域/V2/指定intents',
-                    'QQ官方/沙盒/V2',
-                    'QQ官方/沙盒/V2/指定intents',
-                    'QQ官方/公域/V1',
-                    'QQ官方/私域/V1',
-                    'Discord',
-                    'Discord/指定intents',
-                    'Telegram',
-                    'Fanbook',
-                    'Hack.Chat',
-                    'Hack.Chat/私有',
-                    'onebotV12/正向WS',
-                    'onebotV11/Http',
-                    'onebotV11/Http/Shamrock',
-                    'RED协议',
-                    'OPQBot/正向WS',
-                    '微信/ComWeChat',
-                    '米游社/大别野/公域',
-                    '米游社/大别野/私域',
-                    '米游社/大别野/沙盒',
-                    '渡渡语音/Dodo/V2',
-                    '渡渡语音/Dodo/V1',
-                    '钉钉',
-                    'B站直播间/游客',
-                    'B站直播间/登录',
-                    'FF14终端',
-                    '虚拟终端',
-                    'QQ/OPQ/指定端口',
-                    'QQ/GoCq/安卓手表',
-                    'QQ/GoCq/默认',
-                    'QQ/GoCq/iPad',
-                    'QQ/GoCq/iMac',
-                    'QQ/Wq/安卓手表',
-                    'QQ/Wq/安卓手机',
-                    'QQ/Wq/安卓平板',
-                    '接口终端',
-                    'QQ/NapCat/旧',
-                    'QQ/OPQ/指定端口/旧',
-                    'QQ/GoCq/旧',
-                    'QQ/Wq/旧',
-                    '自定义'
-                ],
-                # 各类账号组合的匹配与注册表
-                # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+                'type_list': OlivOS.accountMetadataAPI.accountTypeList,
                 'type_note_list': {
                     'QQ/GoCq/安卓手表': '密码留空即尝试使用扫码登录',
                     'QQ/GoCq/旧': '密码留空即尝试使用扫码登录',
@@ -486,514 +457,274 @@ class TreeEditUI(object):
                     'QQ/GoCq/安卓平板': {'地址': 'sign-server', 'KEY': 'key'},
                     'QQ/GoCq/旧': {'地址': 'sign-server', 'KEY': 'key'}
                 },
-                'type_mapping_list': {
-                    'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '地址': 'edit_root_Entry_Server_host',
-                            '端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '地址': 'edit_root_Entry_Server_host',
-                            '端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'onebotV11/Http/消息段': ['qq', 'onebot', 'array_default', 'False', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '地址': 'edit_root_Entry_Server_host',
-                            '端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '地址': 'edit_root_Entry_Server_host',
-                            '端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            'WS地址': 'edit_root_Entry_Server_host',
-                            'WS端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket', {
-                            'QQ号': 'edit_root_Entry_ID',
-                            '服务地址': 'edit_root_Entry_Server_host',
-                            '服务端口': 'edit_root_Entry_Server_port',
-                        }
-                    ],
-                    'QQ/OPQ/默认': ['qq', 'onebot', 'opqbot_auto', 'True', 'websocket', {
-                            'QQ号': 'edit_root_Entry_ID',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'QQ/OPQ/指定端口': ['qq', 'onebot', 'opqbot_port', 'True', 'websocket', {
-                            'QQ号': 'edit_root_Entry_ID',
-                            '服务端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'QQ/OPQ/指定端口/旧': ['qq', 'onebot', 'opqbot_port_old', 'True', 'websocket', {
-                            'QQ号': 'edit_root_Entry_ID',
-                            '服务端口': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                        }
-                    ],
-                    'QQ/NapCat/默认': ['qq', 'onebot', 'napcat_show_new', 'True', 'post', {
-                            'QQ号': 'edit_root_Entry_ID',
-                        }
-                    ],
-                    'QQ/NapCat/9.9.11': ['qq', 'onebot', 'napcat_show', 'True', 'post', {
-                            'QQ号': 'edit_root_Entry_ID',
-                        }
-                    ],
-                    'QQ/NapCat/旧': ['qq', 'onebot', 'napcat_show_old', 'True', 'post', {
-                            'QQ号': 'edit_root_Entry_ID',
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                            '服务端口': 'edit_root_Entry_Server_port',
-                        }
-                    ],
-                    'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/安卓手机': ['qq', 'onebot', 'gocqhttp_show_Android_Phone', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/安卓平板': ['qq', 'onebot', 'gocqhttp_show_Android_Pad', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/安卓手表': ['qq', 'onebot', 'gocqhttp_show_Android_Watch', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/iPad': ['qq', 'onebot', 'gocqhttp_show_iPad', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/iMac': ['qq', 'onebot', 'gocqhttp_show_iMac', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/GoCq/旧': ['qq', 'onebot', 'gocqhttp_show_old', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/默认': ['qq', 'onebot', 'walleq_show', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/安卓手机': ['qq', 'onebot', 'walleq_show_Android_Phone', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/安卓平板': ['qq', 'onebot', 'walleq_show_Android_Pad', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/安卓手表': ['qq', 'onebot', 'walleq_show_Android_Watch', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/iPad': ['qq', 'onebot', 'walleq_show_iPad', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/iMac': ['qq', 'onebot', 'walleq_show_iMac', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    'QQ/Wq/旧': ['qq', 'onebot', 'walleq_show_old', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID',
-                            '密码': 'edit_root_Entry_Password',
-                            # 推荐使用扫码登录时，可以隐藏密码栏
-                        }
-                    ],
-                    '微信/ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket', {
-                            '微信号': 'edit_root_Entry_ID'
-                        }
-                    ],
-                    'KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket', {
-                            'Token': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'KOOK/消息兼容': ['kaiheila', 'kaiheila_link', 'text', 'True', 'websocket', {
-                            'Token': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    '米游社/大别野/公域': ['mhyVila', 'mhyVila_link', 'public', 'True', 'websocket', {
-                            'Bot_Id': 'edit_root_Entry_ID',
-                            'Secret': 'edit_root_Entry_Password',
-                            'Pub_Key': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    '米游社/大别野/私域': ['mhyVila', 'mhyVila_link', 'private', 'True', 'websocket', {
-                            'Bot_Id': 'edit_root_Entry_ID',
-                            'Secret': 'edit_root_Entry_Password',
-                            'Pub_Key': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    '米游社/大别野/沙盒': ['mhyVila', 'mhyVila_link', 'sandbox', 'True', 'websocket', {
-                            'Bot_Id': 'edit_root_Entry_ID',
-                            'Secret': 'edit_root_Entry_Password',
-                            'Pub_Key': 'edit_root_Entry_Server_access_token',
-                            '别野号': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    'B站直播间/游客': ['biliLive', 'biliLive_link', 'default', 'True', 'websocket', {
-                            '直播间ID': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'B站直播间/登录': ['biliLive', 'biliLive_link', 'login', 'True', 'websocket', {
-                            '直播间ID': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/公域/V1': ['qqGuild', 'qqGuild_link', 'public', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            '机器人令牌': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/私域/V1': ['qqGuild', 'qqGuild_link', 'private', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            '机器人令牌': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/公域/V2': ['qqGuild', 'qqGuildv2_link', 'public', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/公域/V2/纯频道': ['qqGuild', 'qqGuildv2_link', 'public_guild_only', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/公域/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'public_intents', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token',
-                            'intents': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    'QQ官方/私域/V2': ['qqGuild', 'qqGuildv2_link', 'private', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/私域/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'private_intents', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token',
-                            'intents': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    'QQ官方/沙盒/V2': ['qqGuild', 'qqGuildv2_link', 'sandbox', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'QQ官方/沙盒/V2/指定intents': ['qqGuild', 'qqGuildv2_link', 'sandbox_intents', 'True', 'websocket', {
-                            'AppID': 'edit_root_Entry_ID',
-                            'AppSecret': 'edit_root_Entry_Server_access_token',
-                            'intents': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    'Telegram': ['telegram', 'telegram_poll', 'default', 'True', 'post', {
-                            'TOKEN': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'Discord': ['discord', 'discord_link', 'default', 'True', 'websocket', {
-                            'TOKEN': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'Discord/指定intents': ['discord', 'discord_link', 'intents', 'True', 'websocket', {
-                            'TOKEN': 'edit_root_Entry_Server_access_token',
-                            'intents': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    '渡渡语音/Dodo/V2': ['dodo', 'dodo_link', 'default', 'True', 'websocket', {
-                            'BotID': 'edit_root_Entry_ID',
-                            'Bot私钥': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    '渡渡语音/Dodo/V1': ['dodo', 'dodo_link', 'v1', 'True', 'websocket', {
-                            'BotID': 'edit_root_Entry_ID',
-                            'Bot私钥': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'Fanbook': ['fanbook', 'fanbook_poll', 'default', 'True', 'post', {
-                            'Token': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    'Hack.Chat': ['hackChat', 'hackChat_link', 'default', 'True', 'websocket', {
-                            '房间名称': 'edit_root_Entry_Server_host',
-                            'Bot名称': 'edit_root_Entry_Server_access_token',
-                            '密码': 'edit_root_Entry_Password'
-                        }
-                    ],
-                    'Hack.Chat/私有': ['hackChat', 'hackChat_link', 'private', 'True', 'websocket', {
-                            '房间名称': 'edit_root_Entry_Server_host',
-                            'Bot名称': 'edit_root_Entry_Server_access_token',
-                            '密码': 'edit_root_Entry_Password'
-                        }
-                    ],
-                    '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket', {
-                            '账号': 'edit_root_Entry_ID'
-                        }
-                    ],
-                    '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '端口': 'edit_root_Entry_Server_port'
-                        }
-                    ],
-                    'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post', {
-                            '账号': 'edit_root_Entry_ID',
-                            '端口': 'edit_root_Entry_Server_port',
-                            '回调端口': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
-                    "钉钉": ["dingtalk", "dingtalk_link", "default",  "True", "websocket", {
-                            "Robot Code": 'edit_root_Entry_ID',
-                            # ""
-                        }
-                    ],
-                    '自定义': ['qq', 'default', 'default', 'True', 'post', {
-                            'ID': 'edit_root_Entry_ID',
-                            'PASSWORD': 'edit_root_Entry_Password',
-                            'HOST': 'edit_root_Entry_Server_host',
-                            'PORT': 'edit_root_Entry_Server_port',
-                            'TOKEN': 'edit_root_Entry_Server_access_token'
-                        }
-                    ],
+                # 各类账号组合的匹配与注册表
+                # 原本为合并格式，并在此处维护
+                # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+                # 现拆分为两个表，使用时合并，以便于维护
+                # type: [platform, sdk, model, server_auto, server_type] + [{data_dict}]
+                # 前半位于 OlivOS.accountMetadataAPI
+                # 后半位于此处
+                'type_mapping_list': {},
+                'type_mapping_list_Entry_slot': {
+                    'onebotV11/Http': {
+                        '账号': 'edit_root_Entry_ID',
+                        '地址': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'onebotV11/Http/Shamrock': {
+                        '账号': 'edit_root_Entry_ID',
+                        '地址': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'onebotV11/Http/消息段': {
+                        '账号': 'edit_root_Entry_ID',
+                        '地址': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'onebotV12/正向WS': {
+                        '账号': 'edit_root_Entry_ID',
+                        '地址': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'RED协议': {
+                        '账号': 'edit_root_Entry_ID',
+                        'WS地址': 'edit_root_Entry_Server_host',
+                        'WS端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'OPQBot/正向WS': {
+                        'QQ号': 'edit_root_Entry_ID',
+                        '服务地址': 'edit_root_Entry_Server_host',
+                        '服务端口': 'edit_root_Entry_Server_port',
+                    },
+                    'QQ/OPQ/默认': {
+                        'QQ号': 'edit_root_Entry_ID',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'QQ/OPQ/指定端口': {
+                        'QQ号': 'edit_root_Entry_ID',
+                        '服务端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'QQ/OPQ/指定端口/旧': {
+                        'QQ号': 'edit_root_Entry_ID',
+                        '服务端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'QQ/NapCat/默认': {
+                        'QQ号': 'edit_root_Entry_ID',
+                    },
+                    'QQ/NapCat/9.9.11': {
+                        'QQ号': 'edit_root_Entry_ID',
+                    },
+                    'QQ/NapCat/旧': {
+                        'QQ号': 'edit_root_Entry_ID',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                        '服务端口': 'edit_root_Entry_Server_port',
+                    },
+                    'QQ/GoCq/默认': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/安卓手机': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/安卓平板': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/安卓手表': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/iPad': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/iMac': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/GoCq/旧': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/默认': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/安卓手机': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/安卓平板': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/安卓手表': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/iPad': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/iMac': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    'QQ/Wq/旧': {
+                        '账号': 'edit_root_Entry_ID',
+                        '密码': 'edit_root_Entry_Password',
+                    },
+                    '微信/ComWeChat': {
+                        '微信号': 'edit_root_Entry_ID'
+                    },
+                    'KOOK': {
+                        'Token': 'edit_root_Entry_Server_access_token'
+                    },
+                    'KOOK/消息兼容': {
+                        'Token': 'edit_root_Entry_Server_access_token'
+                    },
+                    '米游社/大别野/公域': {
+                        'Bot_Id': 'edit_root_Entry_ID',
+                        'Secret': 'edit_root_Entry_Password',
+                        'Pub_Key': 'edit_root_Entry_Server_access_token'
+                    },
+                    '米游社/大别野/私域': {
+                        'Bot_Id': 'edit_root_Entry_ID',
+                        'Secret': 'edit_root_Entry_Password',
+                        'Pub_Key': 'edit_root_Entry_Server_access_token'
+                    },
+                    '米游社/大别野/沙盒': {
+                        'Bot_Id': 'edit_root_Entry_ID',
+                        'Secret': 'edit_root_Entry_Password',
+                        'Pub_Key': 'edit_root_Entry_Server_access_token',
+                        '别野号': 'edit_root_Entry_Server_port'
+                    },
+                    'B站直播间/游客': {
+                        '直播间ID': 'edit_root_Entry_Server_access_token'
+                    },
+                    'B站直播间/登录': {
+                        '直播间ID': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/公域/V1': {
+                        'AppID': 'edit_root_Entry_ID',
+                        '机器人令牌': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/私域/V1': {
+                        'AppID': 'edit_root_Entry_ID',
+                        '机器人令牌': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/公域/V2': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/公域/V2/纯频道': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/公域/V2/指定intents': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token',
+                        'intents': 'edit_root_Entry_Server_port'
+                    },
+                    'QQ官方/私域/V2': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/私域/V2/指定intents': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token',
+                        'intents': 'edit_root_Entry_Server_port'
+                    },
+                    'QQ官方/沙盒/V2': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/沙盒/V2/指定intents': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token',
+                        'intents': 'edit_root_Entry_Server_port'
+                    },
+                    'Telegram': {
+                        'TOKEN': 'edit_root_Entry_Server_access_token'
+                    },
+                    'Discord': {
+                        'TOKEN': 'edit_root_Entry_Server_access_token'
+                    },
+                    'Discord/指定intents': {
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                        'intents': 'edit_root_Entry_Server_port'
+                    },
+                    '渡渡语音/Dodo/V2': {
+                        'BotID': 'edit_root_Entry_ID',
+                        'Bot私钥': 'edit_root_Entry_Server_access_token'
+                    },
+                    '渡渡语音/Dodo/V1': {
+                        'BotID': 'edit_root_Entry_ID',
+                        'Bot私钥': 'edit_root_Entry_Server_access_token'
+                    },
+                    'Fanbook': {
+                        'Token': 'edit_root_Entry_Server_access_token'
+                    },
+                    'Hack.Chat': {
+                        '房间名称': 'edit_root_Entry_Server_host',
+                        'Bot名称': 'edit_root_Entry_Server_access_token',
+                        '密码': 'edit_root_Entry_Password'
+                    },
+                    'Hack.Chat/私有': {
+                        '房间名称': 'edit_root_Entry_Server_host',
+                        'Bot名称': 'edit_root_Entry_Server_access_token',
+                        '密码': 'edit_root_Entry_Password'
+                    },
+                    '虚拟终端': {
+                        '账号': 'edit_root_Entry_ID'
+                    },
+                    '接口终端': {
+                        '账号': 'edit_root_Entry_ID',
+                        '端口': 'edit_root_Entry_Server_port'
+                    },
+                    'FF14终端': {
+                        '账号': 'edit_root_Entry_ID',
+                        '端口': 'edit_root_Entry_Server_port',
+                        '回调端口': 'edit_root_Entry_Server_access_token'
+                    },
+                    "钉钉": {
+                        "Robot Code": 'edit_root_Entry_ID'
+                    },
+                    '自定义': {
+                        'ID': 'edit_root_Entry_ID',
+                        'PASSWORD': 'edit_root_Entry_Password',
+                        'HOST': 'edit_root_Entry_Server_host',
+                        'PORT': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token'
+                    },
                 },
-                'platform_list': [
-                    'wechat',
-                    'qq',
-                    'qqGuild',
-                    'kaiheila',
-                    'mhyVila',
-                    'telegram',
-                    'dodo',
-                    'fanbook',
-                    'discord',
-                    'terminal',
-                    'hackChat',
-                    'biliLive',
-                    "dingtalk"
-                ],
-                'platform_sdk_list': {
-                    'wechat': [
-                        'onebot'
-                    ],
-                    'qq': [
-                        'onebot'
-                    ],
-                    'qqGuild': [
-                        'qqGuild_link',
-                        'qqGuildv2_link'
-                    ],
-                    'kaiheila': [
-                        'kaiheila_link'
-                    ],
-                    'telegram': [
-                        'telegram_poll'
-                    ],
-                    'dodo': [
-                        'dodo_link'
-                        # 'dodo_poll',
-                        # 'dodobot_ea'
-                    ],
-                    'mhyVila': [
-                        'mhyVila_link'
-                    ],
-                    'fanbook': [
-                        'fanbook_poll'
-                    ],
-                    'discord': [
-                        'discord_link'
-                    ],
-                    'terminal': [
-                        'terminal_link'
-                    ],
-                    'hackChat': [
-                        'hackChat_link'
-                    ],
-                    'biliLive': [
-                        'biliLive_link'
-                    ],
-                    "dingtalk": [
-                        "dingtalk_link"
-                    ]
-                },
-                'platform_sdk_model_list': {
-                    'wechat': {
-                        'onebot': [
-                            'onebotV12',
-                            'ComWeChatBotClient'
-                        ]
-                    },
-                    'qq': {
-                        'onebot': [
-                            # 'gocqhttp',
-                            # 'gocqhttp_hide',
-                            'default',
-                            'shamrock_default',
-                            'para_default',
-                            'onebotV12',
-                            'red',
-                            'gocqhttp_show',
-                            'gocqhttp_show_Android_Phone',
-                            'gocqhttp_show_Android_Pad',
-                            'gocqhttp_show_Android_Watch',
-                            'gocqhttp_show_iPad',
-                            'gocqhttp_show_iMac',
-                            'gocqhttp_show_old',
-                            'walleq',
-                            'walleq_hide',
-                            'walleq_show',
-                            'walleq_show_Android_Phone',
-                            #'walleq_show_Android_Pad',
-                            'walleq_show_Android_Watch',
-                            'walleq_show_iPad',
-                            'walleq_show_iMac',
-                            'walleq_show_old',
-                            'opqbot_default',
-                            'opqbot_auto',
-                            'opqbot_port',
-                            'opqbot_port_old',
-                            'napcat',
-                            #'napcat_hide',
-                            'napcat_show',
-                            'napcat_show_new',
-                            'napcat_show_old'
-                        ]
-                    },
-                    'qqGuild': {
-                        'qqGuild_link': [
-                            'private',
-                            'public',
-                            'default'
-                        ],
-                        'qqGuildv2_link': [
-                            'public',
-                            'public_guild_only',
-                            'public_intents',
-                            'private',
-                            'private_intents',
-                            'sandbox',
-                            'sandbox_intents',
-                            'default'
-                        ]
-                    },
-                    'kaiheila': {
-                        'kaiheila_link': [
-                            'default',
-                            'card',
-                            'text'
-                        ]
-                    },
-                    'mhyVila': {
-                        'mhyVila_link': [
-                            'private',
-                            'public',
-                            'sandbox',
-                            'default'
-                        ]
-                    },
-                    'telegram': {
-                        'telegram_poll': [
-                            'default'
-                        ]
-                    },
-                    'discord': {
-                        'discord_link': [
-                            'default',
-                            'intents'
-                        ]
-                    },
-                    'dodo': {
-                        'dodo_link': [
-                            'default',
-                            'v1',
-                            'v2'
-                        ],
-                        'dodo_poll': [
-                            'default'
-                        ],
-                        'dodobot_ea': [
-                            'default'
-                        ]
-                    },
-                    'fanbook': {
-                        'fanbook_poll': [
-                            'default',
-                            'private'
-                        ]
-                    },
-                    'terminal': {
-                        'terminal_link': [
-                            'default',
-                            'postapi',
-                            'ff14'
-                        ]
-                    },
-                    'hackChat': {
-                        'hackChat_link': [
-                            'default',
-                            'private'
-                        ]
-                    },
-                    'biliLive': {
-                        'biliLive_link': [
-                            'default',
-                            'login'
-                        ]
-                    },
-                    "dingtalk": {
-                        "dingtalk_link": [
-                            "default"
-                        ]
-                    }
-                }
-            }, 'edit_root_Combobox_Server_auto_list': [
-                'True',
-                'False'
-            ], 'edit_root_Combobox_Server_type_list': [
-                'post',
-                'websocket'
-            ]}
+                'platform_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform,
+                'platform_sdk_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform_sdk,
+                'platform_sdk_model_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform_sdk_model,
+            },
+            'edit_root_Combobox_Server_auto_list': OlivOS.accountMetadataAPI.accountTypeDataList_server_auto,
+            'edit_root_Combobox_Server_type_list': OlivOS.accountMetadataAPI.accountTypeDataList_server_type
+        }
+        # 此处进行type_mapping_list的拼合
+        tmp_type_mapping_list = {}
+        for key_this in OlivOS.accountMetadataAPI.accountTypeMappingList:
+            tmp_mapping_slot = copy.deepcopy(OlivOS.accountMetadataAPI.accountTypeMappingList[key_this])
+            tmp_Entry_slot = None
+            if key_this in self.UIData['edit_root_Combobox_dict']['type_mapping_list_Entry_slot']:
+                tmp_Entry_slot = self.UIData['edit_root_Combobox_dict']['type_mapping_list_Entry_slot'][key_this]
+            else:
+                tmp_Entry_slot = {}
+            tmp_mapping_slot.append(copy.deepcopy(tmp_Entry_slot))
+            tmp_type_mapping_list[key_this] = tmp_mapping_slot
+        self.UIData['edit_root_Combobox_dict']['type_mapping_list'] = tmp_type_mapping_list
 
     def tree_edit_commit(self):
         miss_key_list = None
