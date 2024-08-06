@@ -1193,7 +1193,7 @@ class gocqhttpTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -1293,7 +1293,7 @@ class gocqhttpTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -1540,7 +1540,7 @@ class walleqTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -1637,7 +1637,7 @@ class walleqTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -1841,7 +1841,7 @@ class CWCBTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -1938,7 +1938,7 @@ class CWCBTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -2120,7 +2120,7 @@ class opqbotTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -2217,7 +2217,7 @@ class opqbotTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -2398,7 +2398,7 @@ class napcatTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -2495,7 +2495,7 @@ class napcatTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
@@ -2722,7 +2722,7 @@ class OlivOSTerminalUI(object):
             padx=(0, 15),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=2
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
@@ -3357,7 +3357,7 @@ class VirtualTerminalUI(object):
             padx=(15, 0),
             pady=(8, 15),
             ipadx=0,
-            ipady=0
+            ipady=4
         )
 
         self.root_Button_init(
@@ -3464,7 +3464,7 @@ class VirtualTerminalUI(object):
         self.UIObject[obj_name] = tkinter.Entry(
             self.UIObject[obj_root],
             textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 18')
+            font=('TkDefaultFont 12')
         )
         self.UIObject[obj_name].configure(
             bg=self.UIConfig['color_004'],
