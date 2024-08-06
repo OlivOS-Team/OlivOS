@@ -163,7 +163,9 @@ class HostUI(object):
         #self.UIObject['tree'].heading('SDK', text='SDK')
         #self.UIObject['tree'].heading('MODEL', text='MODEL')
         self.UIObject['tree']['selectmode'] = 'browse'
-        self.tree_load()
+        # 这个加载流程现在需要后置
+        # 因为它现在需要同时控制 self.UIObject['root_frame_first_root'] 这个遮罩层是否显示
+        #self.tree_load()
         self.UIObject['tree'].place(x=0, y=0, width=500, height=350)
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
         self.UIObject['root'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
@@ -215,7 +217,7 @@ class HostUI(object):
 
         self.tree_UI_Button_init(
             name='root_Button_COMMIT',
-            text='确认',
+            text='启动 OlivOS',
             command=lambda: self.account_data_commit(),
             x=391,
             y=358,
@@ -223,11 +225,168 @@ class HostUI(object):
             height=34
         )
 
+        # 无账号时的引导遮罩层
+        self.UIObject['root_frame_first_root'] = tkinter.Frame(self.UIObject['root'])
+        self.UIObject['root_frame_first_root'].configure(relief = tkinter.FLAT)
+        self.UIObject['root_frame_first_root'].configure(bg = self.UIConfig['color_001'], borderwidth = 0)
+        # 这个组件使用这两个方法进行显示和隐藏
+        # 位置信息依赖此处的数据
+        # 是否显示通常受到数据控制其是否显示
+        # self.frame_show('root_frame_first_root')
+        # self.frame_hide('root_frame_first_root')
+        self.UIConfig['root_frame_first_root_place'] = {
+            'x': 0,
+            'y': 0,
+            'width': 518,
+            'height': 400
+        }
+
+        self.UIObject['root_frame_first_root_label_note_new'] = tkinter.Label(
+            self.UIObject['root_frame_first_root'],
+            text = '\n'.join(
+                [
+                    '欢迎使用 OlivOS',
+                    '',
+                    '你可以在这里创建你的第一个账号'
+                ]
+            )
+        )
+        self.UIObject['root_frame_first_root_label_note_new'].configure(
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004'],
+            font = ('等线', 16, 'bold')
+        )
+        self.UIObject['root_frame_first_root_label_note_new'].place(
+            x=int(518/2 - 518/2),
+            y=int(400/2/2 + 20 - 200/2),
+            width=518,
+            height=200
+        )
+
+        self.tree_UI_Button_init(
+            name='root_frame_first_root_Button_FIRST_NEW',
+            text='创建一个账号',
+            command=lambda: self.tree_edit('create'),
+            x=int(518/2 - 250/2),
+            y=int(400/2 + 20 - 48/2),
+            width=250,
+            height=48,
+            root='root_frame_first_root'
+        )
+        self.UIObject['root_frame_first_root_Button_FIRST_NEW'].configure(font='等线 16 bold')
+
+        self.UIObject['root_frame_first_root_label_note_commit'] = tkinter.Label(
+            self.UIObject['root_frame_first_root'],
+            text = '\n'.join(
+                [
+                    '或者你也可以'
+                ]
+            )
+        )
+        self.UIObject['root_frame_first_root_label_note_commit'].configure(
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004'],
+            font = ('等线', 12, 'bold')
+        )
+        self.UIObject['root_frame_first_root_label_note_commit'].place(
+            x=391 - 16 * 6 - 8,
+            y=358,
+            width=16 * 6,
+            height=34
+        )
+
+        self.tree_UI_Button_init(
+            name='root_frame_first_root_Button_FIRST_COMMIT',
+            text='直接启动',
+            command=lambda: self.frame_show('root_frame_skip_root'),
+            x=391,
+            y=358,
+            width=117,
+            height=34,
+            root='root_frame_first_root'
+        )
+
+        # 确认真的要无账号启动时的引导遮罩层
+        self.UIObject['root_frame_skip_root'] = tkinter.Frame(self.UIObject['root'])
+        self.UIObject['root_frame_skip_root'].configure(relief = tkinter.FLAT)
+        self.UIObject['root_frame_skip_root'].configure(bg = self.UIConfig['color_001'], borderwidth = 0)
+        # 这个组件使用这两个方法进行显示和隐藏
+        # 位置信息依赖此处的数据
+        # 需要按钮流程控制其是否显示
+        # self.frame_show('root_frame_skip_root')
+        # self.frame_hide('root_frame_skip_root')
+        self.UIConfig['root_frame_skip_root_place'] = {
+            'x': 0,
+            'y': 0,
+            'width': 518,
+            'height': 400
+        }
+
+        self.UIObject['root_frame_skip_root_label_note_commit'] = tkinter.Label(
+            self.UIObject['root_frame_skip_root'],
+            text = '\n'.join(
+                [
+                    'OlivOS 的大部分功能都是基于账号进行的',
+                    '',
+                    '无账号的确可以正常运行',
+                    '但请确保你真的明白你要做什么',
+                    '',
+                    '你真的要这么做吗？'
+                ]
+            )
+        )
+        self.UIObject['root_frame_skip_root_label_note_commit'].configure(
+            bg = self.UIConfig['color_001'],
+            fg = self.UIConfig['color_004'],
+            font = ('等线', 16, 'bold')
+        )
+        self.UIObject['root_frame_skip_root_label_note_commit'].place(
+            x=int(518/2 - 518/2),
+            y=int(400/2/2 - 200/2),
+            width=518,
+            height=200
+        )
+
+        self.tree_UI_Button_init(
+            name='root_frame_skip_root_Button_FIRST_COMMIT',
+            text='是的，我要直接启动',
+            command=lambda: self.account_data_commit(),
+            x=int(518/2 - 250/2),
+            y=int(400/2 + 20 - 48/2),
+            width=250,
+            height=48,
+            root='root_frame_skip_root'
+        )
+        self.UIObject['root_frame_skip_root_Button_FIRST_COMMIT'].configure(font='等线 16 bold')
+
+        self.tree_UI_Button_init(
+            name='root_frame_skip_root_Button_FIRST_COMMIT_BACK',
+            text='我点错了，让我回去',
+            command=lambda: self.frame_hide('root_frame_skip_root'),
+            x=int(518/2 - 250/2),
+            y=int(400/2 + 20 + 48 * 1 + 15 - 48/2),
+            width=250,
+            height=48,
+            root='root_frame_skip_root'
+        )
+        self.UIObject['root_frame_skip_root_Button_FIRST_COMMIT_BACK'].configure(font='等线 16 bold')
+
+        # 这个数据加载过程会在后续多次反复执行
+        self.tree_load()
+
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
 
         self.UIObject['root'].mainloop()
 
         return self.res
+
+    def frame_show(self, name):
+        if name in ['root_frame_first_root', 'root_frame_skip_root']:
+            self.UIObject[name].place(**self.UIConfig[f'{name}_place'])
+
+    def frame_hide(self, name):
+        if name in ['root_frame_first_root', 'root_frame_skip_root']:
+            self.UIObject[name].place_forget()
 
     def buttom_action(self, name, action):
         if name in self.UIObject:
@@ -236,9 +395,9 @@ class HostUI(object):
             if action == '<Leave>':
                 self.UIObject[name].configure(bg=self.UIConfig['color_003'])
 
-    def tree_UI_Button_init(self, name, text, command, x, y, width, height):
+    def tree_UI_Button_init(self, name, text, command, x, y, width, height, root='root'):
         self.UIObject[name] = tkinter.Button(
-            self.UIObject['root'],
+            self.UIObject[root],
             text=text,
             command=command,
             bd=0,
@@ -246,7 +405,8 @@ class HostUI(object):
             activeforeground=self.UIConfig['color_001'],
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
-            relief='groove'
+            relief='groove',
+            font='等线 12 bold'
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -282,6 +442,10 @@ class HostUI(object):
                     #self.UIData['Account_data'][Account_hash_this].platform['model']
                 )
             )
+        if len(self.UIData['Account_data']) <= 0:
+            self.frame_show('root_frame_first_root')
+        else:
+            self.frame_hide('root_frame_first_root')
 
     def tree_edit(self, action):
         hash_key_how = None
