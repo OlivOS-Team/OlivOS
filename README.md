@@ -43,6 +43,12 @@
 [![OnebotV11](https://img.shields.io/badge/-OnebotV11-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![OnebotV12](https://img.shields.io/badge/-OnebotV12-111111?style=flat-square&logoColor=white)](https://github.com/botuniverse/onebot)
 [![RED](https://img.shields.io/badge/-RED-111111?style=flat-square&logoColor=white)](https://chrononeko.github.io/QQNTRedProtocol/)
+[![QQ](https://img.shields.io/badge/-QQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://im.qq.com/index/)
+[![NapCat](https://img.shields.io/badge/-NapCat-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/NapNeko/NapCatQQ)
+[![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
+[![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
+[![WeChat](https://img.shields.io/badge/-WeChat-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
+[![ComWeChatBotClient](https://img.shields.io/badge/-ComWeChatBotClient-07C160?style=flat-square&logo=wechat&logoColor=white)](https://github.com/JustUndertaker/ComWeChatBotClient)
 [![QQ全域](https://img.shields.io/badge/-QQ%E5%85%A8%E5%9F%9F-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![QQ频道](https://img.shields.io/badge/-QQ%E9%A2%91%E9%81%93-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://bot.q.qq.com/wiki/)
 [![DingTalk](https://img.shields.io/badge/-%E9%92%89%E9%92%89-007FFF?style=flat-square&logo=alibabadotcom&logoColor=white)](https://open.dingtalk.com/)
@@ -63,6 +69,10 @@
 
 ## 方针
 技术路线上，基于Python、采用模块化框架、进程分离、消息队列通信、前后端分离、响应式布局、渐进式渲染的基本思路，实现一个高并发性、高可靠性、高适应性的整体方案。
+
+## 欢迎点击Star，这对我们将带来很大的支持！
+[![Star History Chart](https://api.star-history.com/svg?repos=OlivOS-Team/OlivOS&type=Date)](https://star-history.com/#OlivOS-Team/OlivOS&Date)
+
 
 ## 开始使用
 ### 发布版本
@@ -125,7 +135,7 @@ if __name__ == '__main__':
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-`OlivOS` 采用 `AGPLv3` 协议开源。为了整个社区的良性发展，我们**强烈建议**您做到以下几点：
+`OlivOS` 采用 `AGPLv3` 协议开源。为了整个社区的良性发展，我们**强烈建议**您做到以下几点（此声明继承自[Mirai](https://github.com/mamoe/mirai)）：
 
 - **间接接触（包括但不限于使用 `Http API` 或 跨进程技术）到 `OlivOS` 的软件使用 `AGPLv3` 开源**
 
@@ -136,3 +146,10 @@ if __name__ == '__main__':
 
 - 若引用 OlivOS 发布的软件包而不修改 OlivOS，则衍生项目需在描述的任意部位提及使用 OlivOS。
 - 若修改 OlivOS 源代码再发布，**或参考 OlivOS 内部实现发布另一个项目**，则衍生项目必须在**文章首部**或 'OlivOS' 相关内容**首次出现**的位置**明确声明**来源于本仓库 (`https://github.com/OlivOS-Team/OlivOS`)。不得扭曲或隐藏免费且开源的事实。
+
+## 特别声明
+有[CSDN旗下GitCode被曝批量搬运Github项目](https://tech.ifeng.com/c/8ako6om7AC7)的珠玉在前，本项目特别在此声明，本项目的官方源代码仅在以下平台发布：  
+
++ [Github - OlivOS-Team/OlivOS](https://github.com/OlivOS-Team/OlivOS)
+
+任何未经本仓库所属的组织允许的超出以上代码托管平台的冒充行为，都是未授权的，请警惕。

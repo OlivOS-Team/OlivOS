@@ -22,6 +22,9 @@ from PIL import Image
 # sqlite
 import sqlite3
 
+# pyjson5
+import pyjson5
+
 # win
 if platform.system() == 'Windows':
     import win32com.client

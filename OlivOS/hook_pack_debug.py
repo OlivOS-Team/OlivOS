@@ -35,6 +35,9 @@ from lxml import etree
 # yaml
 import yaml
 
+# pyjson5
+import pyjson5
+
 # openpyxl
 import openpyxl
 
@@ -50,5 +53,7 @@ import httpx
 import prompt_toolkit
 import regex
 import rich
+import smtplib
+import email
 
 import sys

@@ -1,4 +1,4 @@
-pyinstaller
+pyinstaller==6.9.0
 flask
 Werkzeug==2.2.2
 gevent
