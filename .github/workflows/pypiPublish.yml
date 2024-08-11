@@ -9,8 +9,8 @@ jobs:
     steps: 
       - uses: actions/checkout@v2
       - name: Deploy Pypi
-        uses: pypa/gh-action-pypi-publish@v1.9.0
+        uses: remorses/pypi@v3
         with:
-          # PyPI user
-          user: ${{ secrets.OWNERPYPITOKEN }}
-          print-hash: true
+          setup_file: ./setup.py
+          username: ${{ secrets.OWNERPYPIUSERNAME }}
+          password: ${{ secrets.OWNERPYPIPASSWORD }}
