@@ -167,7 +167,7 @@ class server(OlivOS.API.Proc_templet):
                 ]:
                     tmp_env = dict(os.environ)
                     subprocess.call(
-                        'start powershell .\\BootWay05.ps1',
+                        f"start powershell .\\BootWay05.ps1 -q {self.Proc_data['bot_info_dict'].id}",
                         shell=True,
                         cwd='.\\conf\\napcat\\' + self.Proc_data['bot_info_dict'].hash,
                         env=tmp_env
