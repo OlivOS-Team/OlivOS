@@ -12,5 +12,5 @@ jobs:
         uses: remorses/pypi@v3
         with:
           setup_file: ./setup.py
-          username: ${{ secrets.OWNERPYPIUSERNAME }}
-          password: ${{ secrets.OWNERPYPIPASSWORD }}
+          username: __token__
+          password: ${{ secrets.OWNERPYPITOKEN }}
