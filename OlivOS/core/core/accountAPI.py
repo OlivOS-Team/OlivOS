@@ -18,6 +18,8 @@ import json
 import socket
 from contextlib import closing
 import platform
+import random
+import hashlib
 
 import OlivOS
 
@@ -114,6 +116,8 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
             and basic_conf_models[basic_conf_models_this]['type'] == 'astralqsign_lib_exe_model' \
             and basic_conf_models[basic_conf_models_this]['server']['auto'] is True:
                 basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
+                basic_conf_models[basic_conf_models_this]['server']['port'] = random.randint(10000, 65535)
+                basic_conf_models[basic_conf_models_this]['server']['token'] = getToken(str(random.randint(10000, 65535)))
                 if isInuse(
                         '127.0.0.1',
                         basic_conf_models[basic_conf_models_this]['server']['port']
@@ -189,3 +193,9 @@ def get_free_port():
         s.bind(('', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+def getToken(src:str):
+    hash_tmp = hashlib.new('md5')
+    hash_tmp.update(str(src).encode(encoding='UTF-8'))
+    hash_tmp.update(str(114514666).encode(encoding='UTF-8'))
+    return hash_tmp.hexdigest()

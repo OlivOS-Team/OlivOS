@@ -548,7 +548,7 @@ default_Conf = {
             "server": {
                 "auto": True,
                 "host": "0.0.0.0",
-                "port": 55011,
+                "port": 55666,
                 "token": "114514"
             }
         },
