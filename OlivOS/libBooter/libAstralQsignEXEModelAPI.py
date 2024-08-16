@@ -51,7 +51,7 @@ def startAstralQsignLibExeModel(
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 resouce_api=resourceUrlPath,
-                resouce_name='astral-qsign',
+                resouce_name='astral-qsign-20240816001',
                 filePath='./lib/astral-qsign.zip',
                 filePathUpdate='./lib/astral-qsign.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
