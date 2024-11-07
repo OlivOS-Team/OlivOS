@@ -25,6 +25,7 @@ import sqlite3
 # win
 if platform.system() == 'Windows':
     import win32com.client
+    import winsound
     import pythoncom
     import webview
 
