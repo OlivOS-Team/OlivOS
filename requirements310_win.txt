@@ -26,7 +26,7 @@ httpx
 prompt_toolkit
 regex
 rich
-pywebview
+pywebview==4.0.2
 filetype
 grpcio
 grpcio-tools
