@@ -532,6 +532,7 @@ class TreeEditUI(object):
             'edit_root_Combobox_qsign_protocal_list': [
                 'AstralQsign',
                 '手动',
+                '9.0.95',
                 '9.0.56',
                 '8.9.85',
                 '8.9.83',
