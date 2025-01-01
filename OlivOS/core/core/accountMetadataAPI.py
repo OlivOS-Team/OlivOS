@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   MetaLeo元理
 @Contact   :   
 @License   :   AGPL
-@Copyright :   (C) 2020-2024, OlivOS-Team
+@Copyright :   (C) 2020-2025, OlivOS-Team
 @Desc      :   None
 '''
 

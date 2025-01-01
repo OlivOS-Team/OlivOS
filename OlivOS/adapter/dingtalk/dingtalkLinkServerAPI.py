@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   RainyZhou雨舟, OlivOS-Team
 @Contact   :   thunderain_zhou@163.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2023, OlivOS-Team
+@Copyright :   (C) 2020-2025, OlivOS-Team
 @Desc      :   None
 '''
 

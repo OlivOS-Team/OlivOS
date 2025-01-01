@@ -10,7 +10,7 @@
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL3
-@Copyright :   (C) 2020-2023, OlivOS-Team
+@Copyright :   (C) 2020-2025, OlivOS-Team
 @Desc      :   None
 '''
 
