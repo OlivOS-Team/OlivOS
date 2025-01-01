@@ -485,7 +485,7 @@ def startGoCqhttpLibExeModel(
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 resouce_api=resourceUrlPath,
-                resouce_name='go-cqhttp',
+                resouce_name='AstralGocq',
                 filePath='./lib/go-cqhttp.exe',
                 filePathUpdate='./lib/go-cqhttp.exe.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
