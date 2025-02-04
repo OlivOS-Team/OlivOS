@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2023, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -55,8 +55,8 @@ gProtocalInfo = {
     'android_pad': {
         'AstralQsign': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537242075,
-    "sub_app_id": 537242075,
+    "app_id": 537241756,
+    "sub_app_id": 537241756,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.0.95.19320",
     "build_time": 1713424357,
@@ -72,8 +72,8 @@ gProtocalInfo = {
 }''',
         '9.0.95': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537242075,
-    "sub_app_id": 537242075,
+    "app_id": 537241756,
+    "sub_app_id": 537241756,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.0.95.19320",
     "build_time": 1713424357,
