@@ -46,6 +46,7 @@
 [![QQ](https://img.shields.io/badge/-QQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://im.qq.com/index/)
 [![NapCat](https://img.shields.io/badge/-NapCat-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/NapNeko/NapCatQQ)
 [![Go-CQHttp](https://img.shields.io/badge/-GoCQHttp-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/Mrs4s/go-cqhttp)
+[![AstraGoCQ](https://img.shields.io/badge/-AstraGoCQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/ProtocolScience/AstralGocq)
 [![Walle-Q](https://img.shields.io/badge/-WalleQ-EB1923?style=flat-square&logo=Tencent%20QQ&logoColor=white)](https://github.com/onebot-walle/walle-q)
 [![WeChat](https://img.shields.io/badge/-WeChat-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
 [![ComWeChatBotClient](https://img.shields.io/badge/-ComWeChatBotClient-07C160?style=flat-square&logo=wechat&logoColor=white)](https://github.com/JustUndertaker/ComWeChatBotClient)
