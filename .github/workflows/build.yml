@@ -27,7 +27,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-old-origin
         path: ./OlivOS-Win
@@ -39,7 +39,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-old
         path: ./OlivOS-Win
@@ -68,7 +68,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-64-old-debug-origin
         path: ./OlivOS-Win
@@ -80,7 +80,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-64-old-debug
         path: ./OlivOS-Win
@@ -109,7 +109,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-32-old-origin
         path: ./OlivOS-Win
@@ -121,7 +121,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-32-old
         path: ./OlivOS-Win
@@ -150,7 +150,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-32-old-debug-origin
         path: ./OlivOS-Win
@@ -162,7 +162,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-32-old-debug
         path: ./OlivOS-Win
@@ -191,7 +191,7 @@ jobs:
         mkdir OlivOS-PKG
         cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Linux-old
         path: ./OlivOS-PKG
@@ -220,7 +220,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-origin
         path: ./OlivOS-Win
@@ -232,7 +232,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win
         path: ./OlivOS-Win
@@ -261,7 +261,7 @@ jobs:
         mkdir OlivOS-Win
         cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Packing OlivOS-Win
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-64-debug-origin
         path: ./OlivOS-Win
@@ -273,7 +273,7 @@ jobs:
       run: |
         mkdir ./OlivOS-Win/lib
     - name: Packing OlivOS-Win-with-lib
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Win-64-debug
         path: ./OlivOS-Win
@@ -302,7 +302,7 @@ jobs:
   #      mkdir OlivOS-Win
   #      cp ./dist/main.exe ./OlivOS-win/OlivOS.exe
   #  - name: Packing OlivOS-Win
-  #    uses: actions/upload-artifact@v3
+  #    uses: actions/upload-artifact@v4
   #    with:
   #      name: OlivOS-Win-32-origin
   #      path: ./OlivOS-Win
@@ -312,7 +312,7 @@ jobs:
   #      curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
   #      curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
   #  - name: Packing OlivOS-Win-with-lib
-  #    uses: actions/upload-artifact@v3
+  #    uses: actions/upload-artifact@v4
   #    with:
   #      name: OlivOS-Win-32
   #      path: ./OlivOS-Win
@@ -341,7 +341,7 @@ jobs:
   #      mkdir OlivOS-Win
   #      cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
   #  - name: Packing OlivOS-Win
-  #    uses: actions/upload-artifact@v3
+  #    uses: actions/upload-artifact@v4
   #    with:
   #      name: OlivOS-Win-32-debug-origin
   #      path: ./OlivOS-Win
@@ -351,7 +351,7 @@ jobs:
   #      curl -L https://github.com/Mrs4s/go-cqhttp/releases/latest/download/go-cqhttp_windows_386.exe -o ./OlivOS-Win/lib/go-cqhttp.exe
   #      curl -L https://github.com/onebot-walle/walle-q/releases/latest/download/walle-q-i686-windows-gnu.exe -o ./OlivOS-Win/lib/walle-q.exe
   #  - name: Packing OlivOS-Win-with-lib
-  #    uses: actions/upload-artifact@v3
+  #    uses: actions/upload-artifact@v4
   #    with:
   #      name: OlivOS-Win-32-debug
   #      path: ./OlivOS-Win
@@ -380,7 +380,7 @@ jobs:
         mkdir OlivOS-PKG
         cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Linux
         path: ./OlivOS-PKG
@@ -409,7 +409,7 @@ jobs:
         mkdir OlivOS-PKG
         cp ./dist/main ./OlivOS-PKG/OlivOS
     - name: Packing OlivOS-PKG
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OlivOS-MacOS
         path: ./OlivOS-PKG
