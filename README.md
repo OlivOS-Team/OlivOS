@@ -34,7 +34,7 @@
     ·
     <a href="https://github.com/OlivOS-Team/OlivOS/releases">下载</a>
     ·
-    <a href="https://afdian.net/a/OlivOS">赞助</a>
+    <a href="https://afdian.com/a/OlivOS">赞助</a>
   </p>
 
 </div>
