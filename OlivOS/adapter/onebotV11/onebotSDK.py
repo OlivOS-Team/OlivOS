@@ -65,7 +65,7 @@ class send_onebot_post_json_T(object):
             try:
                 # clear_dict = {k: v for k, v in self.obj.__dict__.items() if v != -1}
                 clear_dict = self.obj.__dict__
-                if clear_dict.get('message_type')=='private':
+                if clear_dict.get('message_type') == 'private':
                     clear_dict.pop('group_id','No "group_id"')
                 json_str_tmp = json.dumps(obj=clear_dict, ensure_ascii=False)
                 tmp_host = self.bot_info.host
