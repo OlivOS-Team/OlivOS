@@ -55,8 +55,8 @@ gProtocalInfo = {
     'android_pad': {
         'AstralQsign': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537272373,
-    "sub_app_id": 537272373,
+    "app_id": 537272384,
+    "sub_app_id": 537272384,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.1.55.23840",
     "build_time": 1728390173,
@@ -72,8 +72,8 @@ gProtocalInfo = {
 }''',
         '9.1.55': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537272373,
-    "sub_app_id": 537272373,
+    "app_id": 537272384,
+    "sub_app_id": 537272384,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.1.55.23840",
     "build_time": 1728390173,
@@ -278,8 +278,8 @@ gProtocalInfo = {
     'android_phone': {
         'AstralQsign': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537272384,
-    "sub_app_id": 537272384,
+    "app_id": 537272373,
+    "sub_app_id": 537272373,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.1.55.23840",
     "build_time": 1728390173,
@@ -295,8 +295,8 @@ gProtocalInfo = {
 }''',
         '9.1.55': '''{
     "apk_id": "com.tencent.mobileqq",
-    "app_id": 537272384,
-    "sub_app_id": 537272384,
+    "app_id": 537272373,
+    "sub_app_id": 537272373,
     "app_key": "0S200MNJT807V3GE",
     "sort_version_name": "9.1.55.23840",
     "build_time": 1728390173,
