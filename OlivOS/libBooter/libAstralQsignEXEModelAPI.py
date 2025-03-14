@@ -20,6 +20,8 @@ import os
 import traceback
 import platform
 import zipfile
+import hashlib
+import re
 
 import OlivOS
 
@@ -51,7 +53,7 @@ def startAstralQsignLibExeModel(
             OlivOS.updateAPI.checkResouceFile(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 resouce_api=resourceUrlPath,
-                resouce_name='astral-qsign-20240816001',
+                resouce_name='astral-qsign-20250316001',
                 filePath='./lib/astral-qsign.zip',
                 filePathUpdate='./lib/astral-qsign.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
@@ -107,7 +109,6 @@ class server(OlivOS.API.Proc_templet):
                 [self.Proc_name]
             )
             time.sleep(2)
-            self.setGoCqhttpModelEnableSendAll()
             releaseDir("./conf")
             releaseDir("./conf/astral-qsign")
             unzip('./lib/astral-qsign.zip', "./conf/astral-qsign")
@@ -115,7 +116,7 @@ class server(OlivOS.API.Proc_templet):
             tmp_env = dict(os.environ)
             tmp_env['FORCE_TTY'] = ''
             model_Proc = subprocess.Popen(
-                f".\\start.bat \"localhost\" \"{self.server_data['port']}\" \"{self.server_data['token']}\"",
+                f".\\uninstall.bat \"localhost\" \"{self.server_data['port']}\" \"{getOTPPASSWORD()}\" \"{self.server_data['token']}\"",
                 cwd='.\\conf\\astral-qsign',
                 shell=True,
                 stdin=subprocess.PIPE,
@@ -125,10 +126,11 @@ class server(OlivOS.API.Proc_templet):
                 env=tmp_env
             )
             self.sendLog(
-                2, 'OlivOS libAstralQsignEXEModel server [{0}] is running on port [{1}]',
+                2, 'OlivOS libAstralQsignEXEModel server [{0}] is running',
                 [self.Proc_name, str(self.server_data['port'])]
             )
             self.Proc_data['model_Proc'] = model_Proc
+            self.setGoCqhttpModelEnableSendAll()
             self.get_model_stdout(model_Proc)
             # model_Proc.communicate(timeout = None)
             self.sendLogSim(
@@ -141,7 +143,8 @@ class server(OlivOS.API.Proc_templet):
     def get_model_stdout(self, model_Proc: subprocess.Popen):
         for line in iter(model_Proc.stdout.readline, b''):
             try:
-                log_data = ('%s' % line.decode('gbk', errors='replace')).rstrip('\n').rstrip('\r')
+                log_data = ('%s' % line.decode('utf-8', errors='replace')).rstrip('\n').rstrip('\r')
+                log_data = re.sub(r'\033\[[\d;]*m?', '', log_data)
                 self.log(2, log_data, [('AstralQsign', 'default')])
             except Exception as e:
                 self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libAstralQsignEXEModel failed: %s\n%s' % [
@@ -224,6 +227,14 @@ def isBotActive(plugin_bot_info_dict:dict):
         and plugin_bot_info_dict[bot_info_key].extends.get('qsign-server-protocal', None) == 'AstralQsign':
             flag_need_enable = True
     return flag_need_enable
+
+def getOTPPASSWORD():
+    ts = str(int(time.time()))
+    res = f'{ts}OTP_AstralQSign_Private_Package_OlivOS'
+    hash_tmp = hashlib.new('md5')
+    hash_tmp.update(str(res).encode(encoding='UTF-8'))
+    res = f'{ts}{hash_tmp.hexdigest()}'
+    return res
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
