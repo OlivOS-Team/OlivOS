@@ -17,11 +17,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 accountTypeList = [
-    'QQ/NapCat/默认',
-    'QQ/NapCat/9.9.11',
-    'QQ/OPQ/默认',
     'QQ/GoCq/安卓平板',
     'QQ/GoCq/安卓手机',
+    'QQ/NapCat/默认',
+    'QQ/NapCat/9.9.11',
     'KOOK',
     'KOOK/消息兼容',
     'QQ官方/公域/V2',
@@ -43,7 +42,6 @@ accountTypeList = [
     'onebotV11/Http',
     'onebotV11/Http/Shamrock',
     'RED协议',
-    'OPQBot/正向WS',
     '微信/ComWeChat',
     '米游社/大别野/公域',
     '米游社/大别野/私域',
@@ -55,7 +53,7 @@ accountTypeList = [
     'B站直播间/登录',
     'FF14终端',
     '虚拟终端',
-    'QQ/OPQ/指定端口',
+    '接口终端',
     'QQ/GoCq/安卓手表',
     'QQ/GoCq/默认',
     'QQ/GoCq/iPad',
@@ -63,11 +61,13 @@ accountTypeList = [
     'QQ/Wq/安卓手表',
     'QQ/Wq/安卓手机',
     'QQ/Wq/安卓平板',
-    '接口终端',
-    'QQ/NapCat/旧',
-    'QQ/OPQ/指定端口/旧',
+    'QQ/OPQ/默认',
+    'QQ/OPQ/指定端口',
     'QQ/GoCq/旧',
     'QQ/Wq/旧',
+    'QQ/NapCat/旧',
+    'QQ/OPQ/指定端口/旧',
+    'OPQBot/正向WS',
     '自定义'
 ]
 
