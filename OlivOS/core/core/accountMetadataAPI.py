@@ -17,9 +17,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 accountTypeList = [
+    'QQ/NapCat/默认',
     'QQ/GoCq/安卓平板',
     'QQ/GoCq/安卓手机',
-    'QQ/NapCat/默认',
     'QQ/NapCat/9.9.11',
     'KOOK',
     'KOOK/消息兼容',

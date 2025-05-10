@@ -73,7 +73,15 @@ def startNapCatLibExeModel(
                 resouce_api=resourceUrlPath,
                 resouce_name='NapCat-QQ-Win-9.9.12-26000',
                 filePath='./lib/NapCatNew.zip',
-                filePathUpdate='./lib/NapCat.zip.tmp',
+                filePathUpdate='./lib/NapCatNew.zip.tmp',
+                filePathFORCESKIP='./lib/FORCESKIP'
+            )
+            OlivOS.updateAPI.checkResouceFile(
+                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                resouce_api=resourceUrlPath,
+                resouce_name='NapCat-QQ-Win-9.9.19-34740',
+                filePath='./lib/NapCat-QQ-Win-9.9.19-34740.zip',
+                filePathUpdate='./lib/NapCat-QQ-Win-9.9.19-34740.zip.tmp',
                 filePathFORCESKIP='./lib/FORCESKIP'
             )
         for bot_info_key in plugin_bot_info_dict:
@@ -120,7 +128,8 @@ class server(OlivOS.API.Proc_templet):
     def run(self):
         if self.Proc_data['bot_info_dict'].platform['model'] in [
             'napcat',
-            'napcat_show'
+            'napcat_show',
+            'napcat_show_new'
         ]:
             self.send_init_event()
         while self.flag_run:
@@ -136,14 +145,23 @@ class server(OlivOS.API.Proc_templet):
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
             if self.Proc_data['bot_info_dict'].platform['model'] in [
+                'napcat_show_new_9_9_19',
                 'napcat_show_new'
             ]:
+                unzip('./lib/NapCat-QQ-Win-9.9.19-34740.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+            elif self.Proc_data['bot_info_dict'].platform['model'] in [
+                'napcat_show_new_9_9_12'
+            ]:
                 unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             else:
                 unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-            napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
+                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             if self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat',
+                'napcat_show_new_9_9_12',
+                'napcat_show_new_9_9_19',
                 'napcat_show_new',
                 'napcat_show'
             ]:
@@ -157,13 +175,43 @@ class server(OlivOS.API.Proc_templet):
                 time.sleep(2)
                 self.Proc_data['check_qrcode_flag'] = True
                 self.Proc_data['check_stdin'] = True
-                threading.Thread(
-                    target=self.check_qrcode,
-                    args=(),
-                    daemon=self.deamon
-                ).start()
                 if self.Proc_data['bot_info_dict'].platform['model'] in [
+                    'napcat_show_new_9_9_19',
                     'napcat_show_new'
+                ]:
+                    threading.Thread(
+                        target=self.check_qrcode,
+                        args=(),
+                        kwargs={'version': '9.9.19'},
+                        daemon=self.deamon
+                    ).start()
+                    tmp_env = dict(os.environ)
+                    model_Proc = subprocess.Popen(
+                        f".\\launcher-win10-user.bat {self.Proc_data['bot_info_dict'].id}",
+                        cwd=f".\\conf\\napcat\\{self.Proc_data['bot_info_dict'].hash}",
+                        shell=True,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        creationflags=subprocess.CREATE_NEW_CONSOLE,
+                        env=tmp_env
+                    )
+                    self.Proc_data['model_Proc'] = model_Proc
+                    threading.Thread(
+                        target=self.check_stdin,
+                        args=(model_Proc,),
+                        daemon=self.deamon
+                    ).start()
+                    self.get_model_stdout(model_Proc)
+                    # model_Proc.communicate(timeout = None)
+                    self.log(3, OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...',
+                        [self.Proc_name], modelName
+                    ))
+                    self.Proc_data['model_Proc'] = None
+                    time.sleep(8)
+                elif self.Proc_data['bot_info_dict'].platform['model'] in [
+                    'napcat_show_new_9_9_12'
                 ]:
                     tmp_env = dict(os.environ)
                     subprocess.call(
@@ -174,6 +222,11 @@ class server(OlivOS.API.Proc_templet):
                     )
                     self.flag_run = False
                 else:
+                    threading.Thread(
+                        target=self.check_qrcode,
+                        args=(),
+                        daemon=self.deamon
+                    ).start()
                     tmp_env = dict(os.environ)
                     model_Proc = subprocess.Popen(
                         f".\\napcat-utf8.bat -q {self.Proc_data['bot_info_dict'].id}",
@@ -291,9 +344,16 @@ class server(OlivOS.API.Proc_templet):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-    def check_qrcode(self):
+    def check_qrcode(self, version='9.9.11'):
         count = 2 * 60
         file_path = f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/qrcode.png"
+        if version == '9.9.19':
+            file_path = f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/cache/qrcode.png"
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
         while count > 0 and self.Proc_data['check_qrcode_flag']:
             if os.path.exists(file_path):
                 self.send_QRCode_event(file_path)
@@ -344,53 +404,99 @@ class server(OlivOS.API.Proc_templet):
 
 
 class napcatTypeConfig(object):
-    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T, target_proc):
+    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T, target_proc, version='9.9.11'):
         self.bot_info_dict = bot_info_dict
         self.target_proc = target_proc
         self.config_file_str = ''
         self.config_file_data = ''
         self.config_file_format = {}
+        self.config_file_version = version
 
     def setConfig(self):
-        self.config_file_format['uin'] = str(self.bot_info_dict.id)
-        self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
-        self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
-        self.config_file_format['postUrls'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+        if self.config_file_version == '9.9.19':
+            self.config_file_format['uin'] = str(self.bot_info_dict.id)
+            self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
+            self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
+            self.config_file_format['url'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
 
-        self.config_file_data = {
-            "http": {
-                "enable": True,
-                "host": "",
-                "port": self.config_file_format['port'],
-                "secret": self.config_file_format['token'],
-                "enableHeart": False,
-                "enablePost": True,
-                "postUrls": [
-                    self.config_file_format['postUrls']
-                ]
-            },
-            "ws": {
-                "enable": False,
-                "host": "",
-                "port": 3001
-            },
-            "reverseWs": {
-                "enable": False,
-                "urls": []
-            },
-            "debug": False,
-            "heartInterval": 30000,
-            "messagePostFormat": "array",
-            "enableLocalFile2Url": True,
-            "musicSignUrl": "",
-            "reportSelfMessage": False,
-            "token": ""
-        }
+            self.config_file_data = {
+                "network": {
+                    "httpServers": [
+                        {
+                            "name": f"httpServer-{self.config_file_format['uin']}",
+                            "enable": True,
+                            "port": self.config_file_format['port'],
+                            "host": "0.0.0.0",
+                            "enableCors": True,
+                            "enableWebsocket": True,
+                            "messagePostFormat": "array",
+                            "token": self.config_file_format['token'],
+                            "debug": False,
+                        }
+                    ],
+                    "httpClients": [
+                        {
+                            "name": f"httpClient-{self.config_file_format['uin']}",
+                            "enable": True,
+                            "url": self.config_file_format['url'],
+                            "messagePostFormat": "array",
+                            "reportSelfMessage": False,
+                            "token": self.config_file_format['token'],
+                            "debug": False,
+                        }
+                    ],
+                    "websocketServers": [],
+                    "websocketClients": []
+                },
+                "musicSignUrl": "",
+                "enableLocalFile2Url": False,
+                "parseMultMsg": False
+            }
 
-        self.config_file_str = json.dumps(self.config_file_data, ensure_ascii = False, indent = 4)
+            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii = False, indent = 4)
 
-        with open(f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json', 'w+', encoding='utf-8') as tmp:
-            tmp.write(self.config_file_str)
+            with open(f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json', 'w+', encoding='utf-8') as tmp:
+                tmp.write(self.config_file_str)
+        else:
+            self.config_file_format['uin'] = str(self.bot_info_dict.id)
+            self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
+            self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
+            self.config_file_format['postUrls'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+
+            self.config_file_data = {
+                "http": {
+                    "enable": True,
+                    "host": "",
+                    "port": self.config_file_format['port'],
+                    "secret": self.config_file_format['token'],
+                    "enableHeart": False,
+                    "enablePost": True,
+                    "postUrls": [
+                        self.config_file_format['postUrls']
+                    ]
+                },
+                "ws": {
+                    "enable": False,
+                    "host": "",
+                    "port": 3001
+                },
+                "reverseWs": {
+                    "enable": False,
+                    "urls": []
+                },
+                "debug": False,
+                "heartInterval": 30000,
+                "messagePostFormat": "array",
+                "enableLocalFile2Url": True,
+                "musicSignUrl": "",
+                "reportSelfMessage": False,
+                "token": ""
+            }
+
+            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii = False, indent = 4)
+
+            with open(f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json', 'w+', encoding='utf-8') as tmp:
+                tmp.write(self.config_file_str)
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
