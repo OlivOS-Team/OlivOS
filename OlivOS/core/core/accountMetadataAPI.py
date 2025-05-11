@@ -18,8 +18,6 @@ import OlivOS
 
 accountTypeList = [
     'QQ/NapCat/默认',
-    'QQ/GoCq/安卓平板',
-    'QQ/GoCq/安卓手机',
     'QQ/NapCat/9.9.11',
     'KOOK',
     'KOOK/消息兼容',
@@ -54,6 +52,8 @@ accountTypeList = [
     'FF14终端',
     '虚拟终端',
     '接口终端',
+    'QQ/GoCq/安卓平板',
+    'QQ/GoCq/安卓手机',
     'QQ/GoCq/安卓手表',
     'QQ/GoCq/默认',
     'QQ/GoCq/iPad',
