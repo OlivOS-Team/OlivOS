@@ -549,6 +549,8 @@ class event_action(object):
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
         this_msg.data.group_id = str(group_id)
+        if hasattr(this_msg.data, 'user_id'):
+            del this_msg.data.user_id
         if target_event.bot_info.platform['model'] in paraMsgMap:
             msgType = 'para'
         this_msg.data.message = formatMessage(data = message, msgType = msgType)
