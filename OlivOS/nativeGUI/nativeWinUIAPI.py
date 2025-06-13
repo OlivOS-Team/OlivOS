@@ -3410,10 +3410,12 @@ class VirtualTerminalUI(object):
         if action == 'show':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
+                msg = msg.replace('\ ', ' ')
                 messagebox.showinfo('日志内容', msg)
         elif action == 'copy':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
+                msg = msg.replace('\ ', ' ')
                 self.UIObject['root'].clipboard_clear()
                 self.UIObject['root'].clipboard_append(msg)
                 self.UIObject['root'].update()
