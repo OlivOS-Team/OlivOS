@@ -1065,8 +1065,10 @@ class QRcodeUI(object):
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['root_qrcode_img_data'] = Image.open(self.path)
-        self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize((500, 500),
-                                                                                             Image.ANTIALIAS)
+        try:
+            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize((500, 500), Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
+        except AttributeError:
+            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize((500, 500), Image.ANTIALIAS)
         self.UIObject['root_qrcode_img'] = ImageTk.PhotoImage(self.UIObject['root_qrcode_img_data'])
         self.UIObject['root_qrcode_label'] = tkinter.Label(self.UIObject['root'])
         self.UIObject['root_qrcode_label'].config(image=self.UIObject['root_qrcode_img'])
