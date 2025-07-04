@@ -9,10 +9,12 @@
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
+            "OlivOS_astralqsign_lib_exe_model",
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_walleq_lib_exe_model",
             "OlivOS_cwcb_lib_exe_model",
             "OlivOS_opqbot_lib_exe_model",
+            "OlivOS_napcat_lib_exe_model",
             "OlivOS_hackChat_link",
             "OlivOS_OPQBot_link",
             "OlivOS_qqRed_link",
@@ -54,10 +56,12 @@
                 "OlivOS_account_config_update"
             ],
             "account_update": [
+                "OlivOS_astralqsign_lib_exe_model",
                 "OlivOS_gocqhttp_lib_exe_model",
                 "OlivOS_walleq_lib_exe_model",
                 "OlivOS_cwcb_lib_exe_model",
                 "OlivOS_opqbot_lib_exe_model",
+                "OlivOS_napcat_lib_exe_model",
                 "OlivOS_hackChat_link",
                 "OlivOS_OPQBot_link",
                 "OlivOS_qqRed_link",
@@ -78,10 +82,12 @@
         },
         "type_event": {
             "account_update": [
+                "astralqsign_lib_exe_model",
                 "gocqhttp_lib_exe_model",
                 "walleq_lib_exe_model",
                 "cwcb_lib_exe_model",
                 "opqbot_lib_exe_model",
+                "napcat_lib_exe_model",
                 "hackChat_link",
                 "OPQBot_link",
                 "qqRed_link",
@@ -114,6 +120,7 @@
         "OlivOS_walleq_lib_rx_queue",
         "OlivOS_cwcb_lib_rx_queue",
         "OlivOS_opqbot_lib_rx_queue",
+        "OlivOS_napcat_lib_rx_queue",
         "OlivOS_virtual_terminal_queue",
         "OlivOS_hackChat_queue",
         "OlivOS_OPQBot_queue",
@@ -454,6 +461,7 @@
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "target_proc": "OlivOS_flask_post_rx",
+            "sub_target_proc": "OlivOS_astralqsign_lib_exe_model",
             "control_queue": "OlivOS_control_queue",
             "debug": false
         },
@@ -496,10 +504,48 @@
             "control_queue": "OlivOS_control_queue",
             "debug": false
         },
+        "OlivOS_napcat_lib_exe_model": {
+            "enable": true,
+            "name": "OlivOS_napcat_lib_exe_model",
+            "type": "napcat_lib_exe_model",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_napcat_lib_rx_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "target_proc": "OlivOS_flask_post_rx",
+            "control_queue": "OlivOS_control_queue",
+            "debug": false
+        },
+        "OlivOS_astralqsign_lib_exe_model": {
+            "enable": true,
+            "name": "OlivOS_astralqsign_lib_exe_model",
+            "type": "astralqsign_lib_exe_model",
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "control_queue": "OlivOS_control_queue",
+            "debug": false,
+            "server": {
+                "auto": true,
+                "host": "0.0.0.0",
+                "port": 55666,
+                "token": "114514"
+            }
+        },
         "OlivOS_webview_page": {
             "enable": true,
             "name": "OlivOS_webview_page",
             "type": "webview_page",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "logger_proc": "OlivOS_logger",
+            "control_queue": "OlivOS_control_queue",
+            "debug": false
+        },
+        "OlivOS_tx_turingTest_webview_page": {
+            "enable": true,
+            "name": "OlivOS_tx_turingTest_webview_page",
+            "type": "tx_turingTest_webview_page",
             "interval": 0.2,
             "dead_interval": 1,
             "logger_proc": "OlivOS_logger",
