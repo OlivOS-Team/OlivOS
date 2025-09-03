@@ -1,1 +1,7 @@
 __pycache__
+plugin/app/*
+plugin/conf/*
+plugin/data/*
+plugin/tmp/*
+resource/tmp_*
+logfile/*
