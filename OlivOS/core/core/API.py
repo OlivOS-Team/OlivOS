@@ -199,6 +199,8 @@ class Event(object):
             OlivOS.contentAPI.get_Event_from_fake_SDK(self)
         elif self.sdk_event_type is OlivOS.kaiheilaSDK.event:
             OlivOS.kaiheilaSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.xiaoheiheSDK.event:
+            OlivOS.xiaoheiheSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.mhyVilaSDK.event:
             OlivOS.mhyVilaSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.qqRedSDK.event:
@@ -221,8 +223,8 @@ class Event(object):
             'group_message',
             'group_message_sent'
         ]:
-            if self.plugin_info['message_mode_tx'] == 'olivos_para' or self.data.message_sdk.mode_rx != \
-                    self.plugin_info['message_mode_tx']:
+            if self.plugin_info['message_mode_tx'] == 'olivos_para' \
+            or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
                 self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
                 self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
             else:
@@ -905,6 +907,11 @@ class Event(object):
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct=False)
             elif flag_type == 'private':
                 OlivOS.kaiheilaSDK.event_action.send_msg(self, target_id, tmp_message, flag_direct=True)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            if flag_type == 'group':
+                OlivOS.xiaoheiheSDK.event_action.send_msg(self, target_id, host_id, tmp_message, flag_direct=False)
+            elif flag_type == 'private':
+                pass
         elif self.platform['sdk'] == 'mhyVila_link':
             if flag_type == 'group':
                 if host_id is not None:

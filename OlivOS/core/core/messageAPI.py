@@ -96,6 +96,11 @@ dictMessageType = {
             'text': 'olivos_para'
         }
     },
+    'xiaoheihe': {
+        'xiaoheihe_link': {
+            'default': 'old_string'
+        }
+    },
     'mhyVila': {
         'mhyVila_link': {
             'default': 'olivos_string',

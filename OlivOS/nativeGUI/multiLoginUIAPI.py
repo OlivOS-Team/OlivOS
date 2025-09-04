@@ -761,6 +761,10 @@ class TreeEditUI(object):
                     'KOOK/消息兼容': {
                         'Token': 'edit_root_Entry_Server_access_token'
                     },
+                    '黑盒语音': {
+                        '机器人ID': 'edit_root_Entry_ID',
+                        '机器人令牌': 'edit_root_Entry_Server_access_token'
+                    },
                     '米游社/大别野/公域': {
                         'Bot_Id': 'edit_root_Entry_ID',
                         'Secret': 'edit_root_Entry_Password',
@@ -1021,6 +1025,14 @@ class TreeEditUI(object):
             and tmp_platform_sdk == 'kaiheila_link':
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
+                if tmp_password == '':
+                    tmp_password = 'NONEED'
+                if tmp_host == '':
+                    tmp_host = 'NONEED'
+                if tmp_port == '':
+                    tmp_port = '0'
+            if tmp_platform_platform == 'xiaoheihe' \
+            and tmp_platform_sdk == 'xiaoheihe_link':
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':

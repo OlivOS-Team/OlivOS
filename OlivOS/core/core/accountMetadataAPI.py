@@ -21,6 +21,7 @@ accountTypeList = [
     'QQ/NapCat/9.9.11',
     'KOOK',
     'KOOK/消息兼容',
+    '黑盒语音',
     'QQ官方/公域/V2',
     'QQ官方/公域/V2/纯频道',
     'QQ官方/公域/V2/指定intents',
@@ -101,6 +102,7 @@ accountTypeMappingList = {
     '微信/ComWeChat': ['wechat', 'onebot', 'ComWeChatBotClient', 'True', 'websocket'],
     'KOOK': ['kaiheila', 'kaiheila_link', 'default', 'True', 'websocket'],
     'KOOK/消息兼容': ['kaiheila', 'kaiheila_link', 'text', 'True', 'websocket'],
+    '黑盒语音': ['xiaoheihe', 'xiaoheihe_link', 'default', 'True', 'websocket'],
     '米游社/大别野/公域': ['mhyVila', 'mhyVila_link', 'public', 'True', 'websocket'],
     '米游社/大别野/私域': ['mhyVila', 'mhyVila_link', 'private', 'True', 'websocket'],
     '米游社/大别野/沙盒': ['mhyVila', 'mhyVila_link', 'sandbox', 'True', 'websocket'],
@@ -137,6 +139,7 @@ accountTypeDataList_platform = [
     'qq',
     'qqGuild',
     'kaiheila',
+    'xiaoheihe',
     'mhyVila',
     'telegram',
     'dodo',
@@ -161,6 +164,9 @@ accountTypeDataList_platform_sdk = {
     ],
     'kaiheila': [
         'kaiheila_link'
+    ],
+    'xiaoheihe': [
+        'xiaoheihe_link'
     ],
     'telegram': [
         'telegram_poll'
@@ -258,6 +264,11 @@ accountTypeDataList_platform_sdk_model = {
             'default',
             'card',
             'text'
+        ]
+    },
+    'xiaoheihe': {
+        'xiaoheihe_link': [
+            'default'
         ]
     },
     'mhyVila': {

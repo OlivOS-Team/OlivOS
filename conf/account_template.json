@@ -13,6 +13,7 @@
                 "port" : 58000,
                 "access_token" : ""
             },
+            "extends": {},
             "debug" : false
         },
         {
@@ -28,6 +29,7 @@
                 "port" : 443,
                 "access_token" : "7654321:TOKEN"
             },
+            "extends": {},
             "debug" : false
         }
     ]

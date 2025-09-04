@@ -29,6 +29,7 @@
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
             "OlivOS_kaiheila_link",
+            "OlivOS_xiaoheihe_link",
             "OlivOS_mhyVila_link",
             "OlivOS_dodo_link",
             "OlivOS_biliLive_link",
@@ -75,6 +76,7 @@
                 "OlivOS_telegram_poll",
                 "OlivOS_fanbook_poll",
                 "OlivOS_kaiheila_link",
+                "OlivOS_xiaoheihe_link",
                 "OlivOS_mhyVila_link",
                 "OlivOS_dodo_link",
                 "OlivOS_biliLive_link"
@@ -101,6 +103,7 @@
                 "telegram_poll",
                 "fanbook_poll",
                 "kaiheila_link",
+                "xiaoheihe_link",
                 "mhyVila_link",
                 "dodo_link",
                 "biliLive_link"
@@ -238,7 +241,7 @@
             "control_queue": "OlivOS_control_queue",
             "logger_proc": "OlivOS_logger",
             "treading_mode": "full",
-            "restart_gate": 50000,
+            "restart_gate": 10000,
             "enable_auto_restart": true,
             "debug": false
         },
@@ -362,6 +365,16 @@
             "enable": true,
             "name": "OlivOS_kaiheila_link",
             "type": "kaiheila_link",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": false
+        },
+        "OlivOS_xiaoheihe_link": {
+            "enable": true,
+            "name": "OlivOS_xiaoheihe_link",
+            "type": "xiaoheihe_link",
             "interval": 0.2,
             "dead_interval": 1,
             "tx_queue": "OlivOS_rx_queue",

@@ -67,6 +67,8 @@ from .adapter.fanbook import fanbookSDK
 from .adapter.fanbook import fanbookPollServerAPI
 from .adapter.kaiheila import kaiheilaSDK
 from .adapter.kaiheila import kaiheilaLinkServerAPI
+from .adapter.xiaoheihe import xiaoheiheSDK
+from .adapter.xiaoheihe import xiaoheiheLinkServerAPI
 from .adapter.mhyVila import mhyVilaSDK
 from .adapter.mhyVila import mhyVilaLinkServerAPI
 from .adapter.biliLive import biliLiveSDK
