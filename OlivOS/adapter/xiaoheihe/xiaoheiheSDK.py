@@ -27,15 +27,27 @@ from urllib import parse
 import OlivOS
 
 sdkAPIHost = {
-    'wss': 'wss://chat.xiaoheihe.cn/chatroom/ws/connect',
+    'wss': 'wss://chat.xiaoheihe.cn',
     'default': 'https://chat.xiaoheihe.cn',
-    'native': 'https://chat.xiaoheihe.cn'
+    'native': 'https://chat.xiaoheihe.cn',
+    'chat-upload': 'https://chat-upload.xiaoheihe.cn'
 }
 
 sdkAPIRoute = {
-    'wss': '?chat_os_type=bot&client_type=heybox_chat&chat_version=1.30.0&token=',
+    'wss': '/chatroom/ws/connect',
     'channel_msg': '/chatroom/v2/channel_msg',
-    'msg': '/chatroom/v3/msg'
+    'msg': '/chatroom/v3/msg',
+    'chat-upload': '/upload'
+}
+
+sdkAPIParams = {
+    'client_type': 'heybox_chat',
+    'x_client_type': 'web',
+    'os_type': 'web',
+    'x_os_type': 'bot',
+    'x_app': 'heybox_chat',
+    'chat_os_type': 'bot',
+    'chat_version': '1.30.0'
 }
 
 sdkAPIRouteTemp = {}
@@ -93,7 +105,9 @@ class event(object):
 
 def get_websocket_url(bot_info: OlivOS.API.bot_info_T):
     token = str(bot_info.post_info.access_token)
-    send_url = sdkAPIHost['wss'] + sdkAPIRoute['wss'] + token
+    tmp_sdkAPIParams = sdkAPIParams.copy()
+    tmp_sdkAPIParams['token'] = token
+    send_url = f"{sdkAPIHost['wss']}{sdkAPIRoute['wss']}?{parse.urlencode(tmp_sdkAPIParams)}"
     return send_url
 
 
@@ -182,18 +196,9 @@ class api_templet(object):
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj=tmp_payload_dict)
-            send_url_temp = self.host + self.route
-            send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-            params = {
-                'client_type': 'heybox_chat',
-                'x_client_type': 'web',
-                'os_type': 'web',
-                'x_os_type': 'bot',
-                'x_app': 'heybox_chat',
-                'chat_os_type': 'bot',
-                'chat_version': '1.30.0'
-            }
-            send_url = f'{send_url}?{parse.urlencode(params)}'
+            send_url = self.host + self.route
+            send_url = send_url.format(**tmp_sdkAPIRouteTemp)
+            send_url = f'{send_url}?{parse.urlencode(sdkAPIParams)}'
             headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
@@ -231,6 +236,47 @@ class API(object):
                 self.msg_type = None
                 self.msg = None
                 self.reply_id = ''
+
+    class setResourceUpload(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['chat-upload']
+            self.route = sdkAPIRoute['chat-upload']
+
+        class data_T(object):
+            def __init__(self):
+                self.file = None
+
+        def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
+            try:
+                tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
+                payload = MultipartEncoder(
+                    fields=tmp_payload_dict
+                )
+
+                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+                send_url = self.host + self.route
+                send_url = send_url.format(**tmp_sdkAPIRouteTemp)
+                send_url = f'{send_url}?{parse.urlencode(sdkAPIParams)}'
+                headers = {
+                    'Content-Type': payload.content_type,
+                    'Content-Length': str(len(self.data.file)),
+                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+                    'Token': self.bot_info.access_token
+                }
+
+                msg_res = None
+                if req_type == 'POST':
+                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+
+                self.res = msg_res.text
+                return msg_res.text
+            except Exception as e:
+                traceback.print_exc()
+                return None
 
 
 def get_Event_from_SDK(target_event):
@@ -328,33 +374,75 @@ class event_action(object):
             if type(message_this) == OlivOS.messageAPI.PARA.text:
                 res_data['modules'].append(
                     {
-                      "type": "section",
-                      "paragraph": [
-                        {
-                          "type": "plain-text",
-                          "text": message_this.data['text'].replace('\r\n', '\n').replace('\n', '<br>')
-                        }
-                      ]
+                        "type": "section",
+                        "paragraph": [
+                            {
+                                "type": "plain-text",
+                                "text": message_this.data['text'].replace('\r\n', '\n').replace('\n', '<br>')
+                            }
+                        ]
                     }
                 )
             elif type(message_this) == OlivOS.messageAPI.PARA.image:
-                pass
-                # 后续再实现图片的上传和插入
-                #image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
-                #res_data['modules'].append(
-                #    {
-                #        "type": "images",
-                #        "urls": [
-                #          {
-                #            "url": image_path
-                #          }
-                #        ]
-                #    }
-                #)
+                image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
+                res_data['modules'].append(
+                    {
+                        "type": "images",
+                        "urls": [
+                            {
+                              "url": image_path
+                            }
+                        ]
+                    }
+                )
         if len(res_data['modules']) > 0:
             this_msg.data.msg = json.dumps({"data": [res_data]}, ensure_ascii=False)
             this_msg.do_api()
 
+    # 现场上传的就地实现
+    def setResourceUploadFast(target_event, url: str, type_path: str = 'images'):
+        res = None
+        check_list = {
+            'images': ['.png', 'image/png'],
+            'videos': ['.mp4', 'video/mp4'],
+            'audios': ['.mp3', 'audio/mp3']
+        }
+        check_list.setdefault(type_path, ['', 'file/*'])
+        try:
+            pic_file = None
+            if url.startswith("base64://"):
+                data = url[9:]
+                pic_file = base64.decodebytes(data.encode("utf-8"))
+            else:
+                url_parsed = parse.urlparse(url)
+                if url_parsed.scheme in ["http", "https"]:
+                    send_url = url
+                    headers = {
+                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
+                    }
+                    msg_res = None
+                    msg_res = req.request("GET", send_url, headers=headers)
+                    pic_file = msg_res.content
+                else:
+                    file_path = url_parsed.path
+                    file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
+                    with open(file_path, "rb") as f:
+                        pic_file = f.read()
+
+            msg_upload_api = API.setResourceUpload(get_SDK_bot_info_from_Event(target_event))
+            msg_upload_api.data.file = pic_file
+            msg_upload_api.do_api('POST', check_list[type_path])
+            if msg_upload_api.res is not None:
+                msg_upload_api_obj = json.loads(msg_upload_api.res)
+                if 'status' in msg_upload_api_obj \
+                and 'ok' == msg_upload_api_obj['status'] \
+                and 'result' in msg_upload_api_obj \
+                and 'url' in msg_upload_api_obj['result']:
+                    res = msg_upload_api_obj['result']['url']
+        except Exception as e:
+            traceback.print_exc()
+            res = None
+        return res
 
 
 def init_api_json(raw_str):
