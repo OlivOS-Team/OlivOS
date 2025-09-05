@@ -426,7 +426,7 @@ class napcatTypeConfig(object):
                             "name": f"httpServer-{self.config_file_format['uin']}",
                             "enable": True,
                             "port": self.config_file_format['port'],
-                            "host": "0.0.0.0",
+                            "host": "127.0.0.1",
                             "enableCors": True,
                             "enableWebsocket": True,
                             "messagePostFormat": "array",

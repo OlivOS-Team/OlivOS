@@ -288,7 +288,7 @@ default_Conf = {
             "debug": False,
             "server": {
                 "auto": True,
-                "host": "0.0.0.0",
+                "host": "127.0.0.1",
                 "port": 55001
             }
         },
@@ -560,7 +560,7 @@ default_Conf = {
             "debug": False,
             "server": {
                 "auto": True,
-                "host": "0.0.0.0",
+                "host": "127.0.0.1",
                 "port": 55666,
                 "token": "114514"
             }

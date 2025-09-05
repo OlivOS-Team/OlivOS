@@ -268,7 +268,7 @@
             "debug": false,
             "server": {
                 "auto": true,
-                "host": "0.0.0.0",
+                "host": "127.0.0.1",
                 "port": 55001
             }
         },
@@ -540,7 +540,7 @@
             "debug": false,
             "server": {
                 "auto": true,
-                "host": "0.0.0.0",
+                "host": "127.0.0.1",
                 "port": 55666,
                 "token": "114514"
             }
