@@ -178,7 +178,10 @@ def format_cq_code_msg(msg):
                         res += msg_this['data']['text']
                 elif msg_this['type'] == 'at':
                     if 'qq' in msg_this['data']:
-                        res += f"[CQ:at,qq={msg_this['data']['qq']}]"
+                        cq_params = [f"qq={msg_this['data']['qq']}"]
+                        if 'name' in msg_this['data'] and msg_this['data']['name']:
+                            cq_params.append(f"name={msg_this['data']['name']}")
+                        res += f"[CQ:at,{','.join(cq_params)}]"
                 else:
                     res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]) + ']'
     return res

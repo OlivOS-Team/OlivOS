@@ -386,7 +386,8 @@ class Message_templet(object):
                         if code_key == 'CQ':
                             tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
                         tmp_para_this = PARA.at(
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
+                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], -1)),
+                            name=self.get_from_dict(tmp_code_data_dict, ['name'], None)
                         )
                     elif tmp_data_type_key == 'reply':
                         tmp_para_this = PARA.reply(
@@ -829,12 +830,13 @@ class PARA(object):
                 self['timeout'] = timeout
 
     class at(PARA_templet):
-        def __init__(self, id):
-            PARA_templet.__init__(self, 'at', self.data_T(id))
+        def __init__(self, id, name=None):
+            PARA_templet.__init__(self, 'at', self.data_T(id, name))
 
         class data_T(dict):
-            def __init__(self, id):
+            def __init__(self, id, name=None):
                 self['id'] = id
+                self['name'] = name if (name is not None and name != '') else None
 
         def get_string_by_key(self, code_key):
             code_tmp = '[' + code_key + ':' + self.type
@@ -843,6 +845,8 @@ class PARA(object):
                     if self.data[key_this] is not None:
                         if code_key == 'CQ' and key_this == 'id':
                             code_tmp += ',qq=' + str(self.data[key_this])
+                        elif code_key == 'CQ' and key_this == 'name':
+                            code_tmp += ',name=' + str(self.data[key_this])
                         else:
                             code_tmp += ',' + key_this + '=' + str(self.data[key_this])
             code_tmp += ']'
