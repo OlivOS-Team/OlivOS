@@ -1,7 +1,7 @@
 name: CI-Packing-all
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, chicken]
 jobs:
   build-win64-release:
     runs-on: windows-latest
