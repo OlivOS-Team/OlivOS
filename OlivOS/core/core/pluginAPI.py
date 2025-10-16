@@ -476,7 +476,9 @@ class shallow(OlivOS.API.Proc_templet):
                     ),
                     plugin_models_this['author'],
                     tmp_plugin_list_this,
-                    plugin_models_this['info']
+                    plugin_models_this['info'],
+                    plugin_models_this.get('folder_path', ''),
+                    plugin_models_this['priority']
                 ]
         self.sendControlEvent('send', {
             'target': {
@@ -511,30 +513,78 @@ class shallow(OlivOS.API.Proc_templet):
                 block=False
             )
 
+    def find_plugins_recursive(self, base_path, current_path='', depth=0, max_depth=10):
+        """
+        递归查找插件目录
+        base_path: 基础路径 
+        current_path: 当前相对路径
+        depth: 当前递归深度
+        max_depth: 最大递归深度
+        
+        return 插件路径列表
+        """
+        if depth > max_depth:
+            return []
+        
+        plugin_list = []
+        full_path = os.path.join(base_path, current_path) if current_path else base_path
+        
+        try:
+            items = os.listdir(full_path)
+        except Exception as e:
+            self.log(3, OlivOS.L10NAPI.getTrans(
+                'Failed to list directory [{0}]: {1}', [
+                    full_path,
+                    str(e)
+                ],
+                modelName
+            ))
+            return []
+        has_app_json = 'app.json' in items
+        if has_app_json:
+            # 当前目录就是插件,返回该插件的相对路径和完整路径
+            # 使用系统默认的路径分隔符(os.sep)确保一致性
+            relative_path = current_path.replace('/', os.sep) if current_path else '.'
+            plugin_list.append((relative_path, False, full_path))
+        else:
+            # 继续递归查找子目录
+            for item in items:
+                # 跳过隐藏文件/目录
+                if item.startswith('.'):
+                    continue
+                item_full_path = os.path.join(full_path, item)
+                item_relative_path = os.path.join(current_path, item) if current_path else item
+                if item.endswith('.opk') and os.path.isfile(item_full_path):
+                    plugin_list.append((item_relative_path, True, item_full_path))
+                elif os.path.isdir(item_full_path):
+                    sub_plugins = self.find_plugins_recursive(base_path, item_relative_path, depth + 1, max_depth)
+                    plugin_list.extend(sub_plugins)
+        return plugin_list
+
     def load_plugin_list(self):
         total_models_count = 0
         self.plugin_models_dict = {}
         skip_result = ''
         func_init_name = 'init'
-        plugin_dir_list = os.listdir(plugin_path)
+        # 递归查找插件
+        plugin_dir_list_with_info = self.find_plugins_recursive(plugin_path)
         opk_plugin_list = []
         # 解包opk格式插件
-        for plugin_dir_this_tmp in plugin_dir_list:
-            flag_is_opk = False
+        for plugin_dir_this_tmp, is_opk, full_path_info in plugin_dir_list_with_info:
+            flag_is_opk = is_opk
             try:
                 plugin_dir_this = plugin_dir_this_tmp
-                if len(plugin_dir_this_tmp) > 4:
+                if flag_is_opk and len(plugin_dir_this_tmp) > 4:
                     if plugin_dir_this_tmp[-4:] == '.opk':
-                        flag_is_opk = True
                         plugin_dir_this = plugin_dir_this_tmp[:-4]
-                        opkFile = zipfile.ZipFile(plugin_path + plugin_dir_this_tmp)
+                        opkFile = zipfile.ZipFile(os.path.join(plugin_path, plugin_dir_this_tmp))
                         opkFile_list = opkFile.namelist()
                         releaseDir(plugin_path_tmp)
                         doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                         opk_plugin_list.append(plugin_dir_this_tmp)
-                        releaseDir(plugin_path_tmp + plugin_dir_this)
+                        releaseDir(os.path.join(plugin_path_tmp, plugin_dir_this))
                         for opkFile_list_this in opkFile_list:
-                            opkFile.extract(opkFile_list_this, plugin_path_tmp + plugin_dir_this)
+                            opkFile.extract(opkFile_list_this, os.path.join(plugin_path_tmp, plugin_dir_this))
             except Exception as e:
                 doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                 # traceback.print_exc()
@@ -552,27 +602,26 @@ class shallow(OlivOS.API.Proc_templet):
         plugin_models_dict = {}
 
         # 统一载入插件
-        for plugin_dir_this_tmp in plugin_dir_list:
-            flag_is_opk = False
+        for plugin_dir_this_tmp, is_opk, full_path_info in plugin_dir_list_with_info:
+            flag_is_opk = is_opk
             plugin_models_app_conf = None
             skip_result = None
             skip_result_level = None
             try:
                 plugin_dir_this = plugin_dir_this_tmp
-                if len(plugin_dir_this_tmp) > 4:
+                if flag_is_opk and len(plugin_dir_this_tmp) > 4:
                     if plugin_dir_this_tmp[-4:] == '.opk':
-                        flag_is_opk = True
                         plugin_dir_this = plugin_dir_this_tmp[:-4]
                 if len(plugin_dir_this) > 0:
                     if plugin_dir_this[0] not in ['.']:
                         try:
                             if flag_is_opk:
-                                with open(plugin_path_tmp + plugin_dir_this + '/app.json', 'r',
-                                          encoding='utf-8') as plugin_models_app_conf_f:
+                                app_json_path = os.path.join(plugin_path_tmp, plugin_dir_this, 'app.json')
+                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
                                     plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
                             else:
-                                with open(plugin_path + plugin_dir_this + '/app.json', 'r',
-                                          encoding='utf-8') as plugin_models_app_conf_f:
+                                app_json_path = os.path.join(plugin_path, plugin_dir_this, 'app.json')
+                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
                                     plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
                         except:
                             traceback.print_exc()
@@ -582,16 +631,27 @@ class shallow(OlivOS.API.Proc_templet):
                             skip_result = plugin_dir_this + '/app.json' + ' not found'
                             skip_result_level = 4
                         else:
+                            # 获取插件的模块名
+                            plugin_module_name = os.path.basename(plugin_dir_this.rstrip(os.sep).rstrip('/'))
+                            # 获取插件所在的文件夹路径
+                            plugin_folder_path = os.path.dirname(plugin_dir_this) if os.sep in plugin_dir_this or '/' in plugin_dir_this else ''
+                            
+                            # 优先使用 app.json 中定义的 namespace,如果没有则使用插件模块名
+                            if 'namespace' in plugin_models_app_conf:
+                                plugin_namespace = plugin_models_app_conf['namespace']
+                            else:
+                                plugin_namespace = plugin_module_name
+                            
                             plugin_models_dict_this = {
                                 'appconf': plugin_models_app_conf,
                                 'priority': plugin_models_app_conf['priority'],
-                                'namespace': plugin_dir_this,
+                                'namespace': plugin_namespace,
+                                'module_name': plugin_module_name,
+                                'folder_path': plugin_folder_path,
                                 'name': plugin_models_app_conf['name'],
                                 'support': plugin_models_app_conf['support'],
                                 'menu_config': None
                             }
-                            if 'namespace' in plugin_models_app_conf:
-                                plugin_models_dict_this['namespace'] = plugin_models_app_conf['namespace']
                             if 'menu_config' in plugin_models_app_conf:
                                 plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
                             if 'message_mode' in plugin_models_app_conf:
@@ -651,20 +711,23 @@ class shallow(OlivOS.API.Proc_templet):
                             if flag_is_opk:
                                 plugin_namespace = plugin_models_dict_this['namespace']
                                 if plugin_namespace != plugin_dir_this:
-                                    removeDir(plugin_path_tmp + plugin_namespace)
+                                    removeDir(os.path.join(plugin_path_tmp, plugin_namespace))
                                     shutil.move(
-                                        plugin_path_tmp + plugin_dir_this,
-                                        plugin_path_tmp + plugin_namespace
+                                        os.path.join(plugin_path_tmp, plugin_dir_this),
+                                        os.path.join(plugin_path_tmp, plugin_namespace)
                                     )
-                                    removeDir(plugin_path_tmp + plugin_dir_this)
+                                    removeDir(os.path.join(plugin_path_tmp, plugin_dir_this))
                                     plugin_dir_this = plugin_namespace
 
                             # 完成配置数据库中对应插件命名空间的表格页初始化
                             self.database._init_namespace(plugin_models_dict_this['namespace'])
 
-                            plugin_models_dict[plugin_dir_this] = {
+                            # 使用 namespace 作为字典的 key
+                            plugin_namespace_key = plugin_models_dict_this['namespace']
+                            plugin_models_dict[plugin_namespace_key] = {
                                 'isOPK': flag_is_opk,
-                                'data': plugin_models_dict_this
+                                'data': plugin_models_dict_this,
+                                'plugin_dir': plugin_dir_this  # 保存原始目录路径用于后续加载
                             }
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
                     else:
@@ -695,12 +758,29 @@ class shallow(OlivOS.API.Proc_templet):
             try:
                 # 从这里开始导入实际模块
                 plugin_models_dict_this = plugin_models_dict[plugin_models_dict_this_key]['data']
-                plugin_dir_this = plugin_models_dict_this_key
-                plugin_models_tmp = importlib.import_module(plugin_models_dict_this_key)
+                plugin_namespace = plugin_models_dict_this_key  # 这是 namespace
+                plugin_dir_this = plugin_models_dict[plugin_models_dict_this_key].get('plugin_dir', plugin_namespace)  # 这是实际目录路径
+                flag_is_opk = plugin_models_dict[plugin_models_dict_this_key]['isOPK']
+                # 处理子目录中的插件
+                # 获取插件的模块名
+                plugin_module_name = plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
+                # 获取插件所在的父目录
+                plugin_folder_path = plugin_models_dict_this.get('folder_path', '')
+                if plugin_folder_path:
+                    # 插件在子目录中,需要将父目录添加到 sys.path
+                    if flag_is_opk:
+                        plugin_parent_full_path = os.path.join(plugin_path_tmp, plugin_folder_path)
+                    else:
+                        plugin_parent_full_path = os.path.join(plugin_path, plugin_folder_path)
+                    # 添加到 sys.path (如果还没有添加)
+                    if plugin_parent_full_path not in sys.path:
+                        sys.path.insert(0, plugin_parent_full_path)
+                
+                plugin_models_tmp = importlib.import_module(plugin_module_name)
                 plugin_models_dict_this['model'] = plugin_models_tmp
                 if hasattr(plugin_models_tmp, 'main'):
                     if hasattr(plugin_models_tmp.main, 'Event'):
-                        self.plugin_models_dict[plugin_dir_this] = plugin_models_dict_this
+                        self.plugin_models_dict[plugin_namespace] = plugin_models_dict_this
                         if hasattr(plugin_models_tmp.main.Event, func_init_name):
                             try:
                                 plugin_models_tmp.main.Event.init(plugin_event=None, Proc=self)
@@ -730,13 +810,13 @@ class shallow(OlivOS.API.Proc_templet):
                             modelName
                         ))
                         # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        self.run_plugin_data_release_by_name(plugin_models_dict_this_key)
+                        self.run_plugin_data_release_by_name(plugin_namespace)
                         continue
                     else:
-                        skip_result = plugin_dir_this + '.main.Event' + ' not found'
+                        skip_result = plugin_namespace + '.main.Event' + ' not found'
                         skip_result_level = 4
                 else:
-                    skip_result = plugin_dir_this + '.main' + ' not found'
+                    skip_result = plugin_namespace + '.main' + ' not found'
                     skip_result_level = 4
             except Exception as e:
                 # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
@@ -751,13 +831,14 @@ class shallow(OlivOS.API.Proc_templet):
                     skip_result_level = 3
                 self.log(skip_result_level, OlivOS.L10NAPI.getTrans(
                     'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}',
-                    [plugin_dir_this, self.Proc_name, skip_result]
+                    [plugin_namespace, self.Proc_name, skip_result]
                 ))
 
         # 清理opk格式插件缓存
         for plugin_models_dict_this in plugin_models_dict:
             if plugin_models_dict[plugin_models_dict_this]['isOPK']:
-                removeDir(plugin_path_tmp + plugin_models_dict_this)
+                plugin_dir = plugin_models_dict[plugin_models_dict_this].get('plugin_dir', plugin_models_dict_this)
+                removeDir(os.path.join(plugin_path_tmp, plugin_dir))
         # 插件调用列表按照优先级排序
         plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
                                              key=lambda i: (i['priority'], i['namespace']))

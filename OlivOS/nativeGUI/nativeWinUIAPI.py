@@ -3685,12 +3685,14 @@ class pluginManageUI(object):
         self.logger_proc = logger_proc
         self.UIData['flag_commit'] = False
         self.UIData['click_record'] = {}
+        self.UIData['show_path'] = False  # 默认不显示路径
+        self.UIData['item_namespace_map'] = {}
         self.UIConfig.update(dictColorContext)
 
     def start(self):
         self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('OlivOS 插件管理器')
-        self.UIObject['root'].geometry('518x400')
+        self.UIObject['root'].geometry('680x500')
         self.UIObject['root'].resizable(
             width=False,
             height=False
@@ -3705,31 +3707,51 @@ class pluginManageUI(object):
             command=self.UIObject['tree'].yview
         )
         self.UIObject['tree_yscroll'].place(
-            x=15 + 350 - 18,
+            x=15 + 500 - 18,
             y=15,
             width=18,
-            height=370 - 1
+            height=470 - 1
         )
         self.UIObject['tree'].configure(
             yscrollcommand=self.UIObject['tree_yscroll'].set
         )
 
         self.tree_UI_Label_init(
+            name='root_Label_PRIORITY_title',
+            title='root_Label_PRIORITY_title_StringVar',
+            x=525,
+            y=15,
+            width=140,
+            height=20
+        )
+        self.UIData['root_Label_PRIORITY_title_StringVar'].set('优先级')
+
+        self.tree_UI_Label_init(
+            name='root_Label_PRIORITY',
+            title='root_Label_PRIORITY_StringVar',
+            x=530,
+            y=35,
+            width=140,
+            height=20
+        )
+        self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
+
+        self.tree_UI_Label_init(
             name='root_Label_INFO_title',
             title='root_Label_INFO_title_StringVar',
-            x=375,
-            y=15,
-            width=120,
-            height=300
+            x=525,
+            y=65,
+            width=140,
+            height=20
         )
         self.UIData['root_Label_INFO_title_StringVar'].set('介绍')
 
         self.tree_UI_Label_init(
             name='root_Label_INFO',
             title='root_Label_INFO_StringVar',
-            x=380,
-            y=35,
-            width=120,
+            x=530,
+            y=85,
+            width=140,
             height=300
         )
         self.UIData['root_Label_INFO_StringVar'].set('未选定插件')
@@ -3738,9 +3760,19 @@ class pluginManageUI(object):
             name='root_Button_RESTART',
             text='重载插件',
             command=lambda: self.sendPluginRestart(),
-            x=380,
-            y=(400 - 34 - 15 - 40 * 1),
-            width=120,
+            x=530,
+            y=(500 - 34 - 15 - 40 * 2),
+            width=140,
+            height=34
+        )
+
+        self.tree_UI_Button_init(
+            name='root_Button_TOGGLE_MODE',
+            text='切换显示',
+            command=lambda: self.toggleDisplayMode(),
+            x=530,
+            y=(500 - 34 - 15 - 40 * 1),
+            width=140,
             height=34
         )
 
@@ -3748,9 +3780,9 @@ class pluginManageUI(object):
             name='root_Button_MENU',
             text='插件菜单',
             command=lambda: self.pluginMenu('root_Button_MENU'),
-            x=380,
-            y=(400 - 34 - 15 - 40 * 0),
-            width=120,
+            x=530,
+            y=(500 - 34 - 15 - 40 * 0),
+            width=140,
             height=34
         )
 
@@ -3774,10 +3806,11 @@ class pluginManageUI(object):
     def tree_init(self):
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
+        # 默认不显示路径列
         self.UIObject['tree']['columns'] = ('NAME', 'VERSION', 'AUTHOR')
-        self.UIObject['tree'].column('NAME', width=150 - 18)
-        self.UIObject['tree'].column('VERSION', width=100)
-        self.UIObject['tree'].column('AUTHOR', width=95)
+        self.UIObject['tree'].column('NAME', width=220)
+        self.UIObject['tree'].column('VERSION', width=130)
+        self.UIObject['tree'].column('AUTHOR', width=130)
         self.UIObject['tree'].heading('NAME', text='插件')
         self.UIObject['tree'].heading('VERSION', text='版本')
         self.UIObject['tree'].heading('AUTHOR', text='作者')
@@ -3785,27 +3818,103 @@ class pluginManageUI(object):
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
         self.UIObject['tree'].bind('<<TreeviewSelect>>', lambda x: self.treeSelect('tree', x))
         self.tree_load()
-        self.UIObject['tree'].place(x=15, y=15, width=350 - 18, height=370)
+        self.UIObject['tree'].place(x=15, y=15, width=500 - 18, height=470)
 
     def tree_load(self):
         tmp_tree_item_children = self.UIObject['tree'].get_children()
         for tmp_tree_item_this in tmp_tree_item_children:
             self.UIObject['tree'].delete(tmp_tree_item_this)
+        
+        # 清空映射表
+        self.UIData['item_namespace_map'] = {}
+        
         if self.root != None:
             if self.root.UIData['shallow_plugin_data_dict'] is not None:
                 tmp_plugin_menu_dict = self.root.UIData['shallow_plugin_data_dict']
+                
+                # 收集所有插件并按优先级排序
+                plugin_list = []
                 for plugin_namespace in tmp_plugin_menu_dict:
                     plugin_this = tmp_plugin_menu_dict[plugin_namespace]
-                    self.UIObject['tree'].insert(
-                        '',
-                        tkinter.END,
-                        text=plugin_namespace,
-                        values=(
-                            plugin_this[0],
-                            plugin_this[1],
-                            plugin_this[2]
+                    priority = plugin_this[6] if len(plugin_this) > 6 else 10000
+                    folder_path = plugin_this[5] if len(plugin_this) > 5 else ''
+                    # 规范化路径
+                    folder_path = folder_path.replace('\\', '/')
+                    
+                    # 构建完整路径
+                    if folder_path:
+                        full_path = '/' + folder_path + '/' + os.path.basename(plugin_namespace)
+                    else:
+                        full_path = '/' + os.path.basename(plugin_namespace)
+                    
+                    plugin_list.append({
+                        'namespace': plugin_namespace,
+                        'name': plugin_this[0],
+                        'version': plugin_this[1],
+                        'author': plugin_this[2],
+                        'priority': priority,
+                        'full_path': full_path
+                    })
+                
+                # 按优先级排序
+                sorted_plugins = sorted(plugin_list, key=lambda x: x['priority'])
+                
+                # 插入到树中
+                for plugin_data in sorted_plugins:
+                    if self.UIData['show_path']:
+                        # 显示路径模式:PATH, NAME, VERSION, AUTHOR
+                        item_id = self.UIObject['tree'].insert(
+                            '',
+                            tkinter.END,
+                            text=plugin_data['namespace'],
+                            values=(
+                                plugin_data['full_path'],
+                                plugin_data['name'],
+                                plugin_data['version'],
+                                plugin_data['author']
+                            )
                         )
-                    )
+                    else:
+                        # 不显示路径模式:NAME, VERSION, AUTHOR
+                        item_id = self.UIObject['tree'].insert(
+                            '',
+                            tkinter.END,
+                            text=plugin_data['namespace'],
+                            values=(
+                                plugin_data['name'],
+                                plugin_data['version'],
+                                plugin_data['author']
+                            )
+                        )
+                    self.UIData['item_namespace_map'][item_id] = plugin_data['namespace']
+    
+    def toggleDisplayMode(self):
+        """切换显示/隐藏路径列"""
+        if self.UIData['show_path']:
+            # 当前显示路径,切换为隐藏 - 移除PATH列
+            self.UIData['show_path'] = False
+            self.UIObject['tree']['columns'] = ('NAME', 'VERSION', 'AUTHOR')
+            self.UIObject['tree'].heading('NAME', text='插件')
+            self.UIObject['tree'].heading('VERSION', text='版本')
+            self.UIObject['tree'].heading('AUTHOR', text='作者')
+            self.UIObject['tree'].column('NAME', width=220)
+            self.UIObject['tree'].column('VERSION', width=130)
+            self.UIObject['tree'].column('AUTHOR', width=130)
+        else:
+            # 当前隐藏路径,切换为显示 - 添加PATH列
+            self.UIData['show_path'] = True
+            self.UIObject['tree']['columns'] = ('PATH', 'NAME', 'VERSION', 'AUTHOR')
+            self.UIObject['tree'].heading('PATH', text='路径')
+            self.UIObject['tree'].heading('NAME', text='插件')
+            self.UIObject['tree'].heading('VERSION', text='版本')
+            self.UIObject['tree'].heading('AUTHOR', text='作者')
+            self.UIObject['tree'].column('PATH', width=150)
+            self.UIObject['tree'].column('NAME', width=120)
+            self.UIObject['tree'].column('VERSION', width=120)
+            self.UIObject['tree'].column('AUTHOR', width=90)
+        
+        # 重新加载插件列表以应用新的列配置
+        self.tree_load()
 
     def tree_UI_Button_init(self, name, text, command, x, y, width, height):
         self.UIObject[name] = tkinter.Button(
@@ -3862,13 +3971,30 @@ class pluginManageUI(object):
 
     def treeSelect(self, name, event):
         if name == 'tree':
+            selected_item = self.UIObject['tree'].focus()
+            if not selected_item:
+                return
+
+            # 从映射表获取插件的 namespace
+            plugin_namespace_now = self.UIData['item_namespace_map'].get(selected_item, None)
+            if not plugin_namespace_now:
+                self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
+                self.UIData['root_Label_INFO_StringVar'].set('未找到插件信息')
+                return
+            
             tmp_info_str = '这个插件的作者很懒，没有写介绍。'
-            plugin_namespace_now = get_tree_force(self.UIObject['tree'])['text']
+            tmp_priority_str = 'N/A'
             if plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
                 plugin_menu_now = self.root.UIData['shallow_plugin_data_dict'][plugin_namespace_now]
+                # 获取优先级
+                if len(plugin_menu_now) > 6:
+                    tmp_priority_str = str(plugin_menu_now[6])
+                # 获取介绍
                 if type(plugin_menu_now[4]) == str:
                     if plugin_menu_now[4] != 'N/A':
                         tmp_info_str = plugin_menu_now[4]
+            
+            self.UIData['root_Label_PRIORITY_StringVar'].set(tmp_priority_str)
             self.UIData['root_Label_INFO_StringVar'].set(tmp_info_str)
 
     def clickRecord(self, name, event):
@@ -3876,8 +4002,20 @@ class pluginManageUI(object):
 
     def pluginMenu(self, name):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
-        plugin_namespace_now = get_tree_force(self.UIObject['tree'])['text']
-        if plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
+        
+        selected_item = self.UIObject['tree'].focus()
+        if not selected_item:
+            self.UIObject['tree_rightkey_menu'].add_command(label='未选定插件', command=None)
+            self.UIObject['tree_rightkey_menu'].post(
+                self.UIData['click_record'][name].x_root,
+                self.UIData['click_record'][name].y_root
+            )
+            return
+        
+        # 从映射表获取插件的 namespace
+        plugin_namespace_now = self.UIData['item_namespace_map'].get(selected_item, None)
+        
+        if plugin_namespace_now and plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
             plugin_menu_now = self.root.UIData['shallow_plugin_data_dict'][plugin_namespace_now]
             if type(plugin_menu_now[3]) == list:
                 for plugin_menu_this in plugin_menu_now[3]:
@@ -3889,6 +4027,9 @@ class pluginManageUI(object):
                                                                     )
             else:
                 self.UIObject['tree_rightkey_menu'].add_command(label='无选项', command=None)
+        else:
+            self.UIObject['tree_rightkey_menu'].add_command(label='未找到插件', command=None)
+        
         self.UIObject['tree_rightkey_menu'].post(
             self.UIData['click_record'][name].x_root,
             self.UIData['click_record'][name].y_root
