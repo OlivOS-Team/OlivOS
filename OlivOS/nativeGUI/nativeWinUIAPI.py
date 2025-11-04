@@ -108,6 +108,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIData['shallow_opqbot_menu_list'] = None
         self.UIData['shallow_napcat_menu_list'] = None
         self.UIData['shallow_virtual_terminal_menu_list'] = None
+        self.UIData['shallow_account_menu_list'] = None
         self.UIData['shallow_plugin_data_dict'] = None
         self.updateShallowMenuList()
 
@@ -136,6 +137,7 @@ class dock(OlivOS.API.Proc_templet):
                         self.UIData['shallow_walleq_menu_list'] = None
                         self.UIData['shallow_cwcb_menu_list'] = None
                         self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.UIData['shallow_account_menu_list'] = None
                         self.updateShallowMenuList()
 
     def process_msg(self):
@@ -515,12 +517,102 @@ class dock(OlivOS.API.Proc_templet):
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
 
+    def getPlatformDisplayName(self, bot_info):
+        """
+        获取协议端显示名称
+        """
+        try:
+            if bot_info and hasattr(bot_info, 'platform') and bot_info.platform:
+                platform_platform = str(bot_info.platform.get('platform', ''))
+                platform_sdk = str(bot_info.platform.get('sdk', ''))
+                platform_model = str(bot_info.platform.get('model', ''))
+                server_auto = str(bot_info.post_info.auto) if hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'auto') else 'False'
+                server_type = str(bot_info.post_info.type) if hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'type') else 'post'
+                
+                list_data_check = [
+                    platform_platform,
+                    platform_sdk,
+                    platform_model,
+                    server_auto,
+                    server_type
+                ]
+                # 使用 accountTypeMappingList 进行匹配
+                for type_this in OlivOS.accountMetadataAPI.accountTypeList:
+                    flag_hit = True
+                    if type_this in OlivOS.accountMetadataAPI.accountTypeMappingList:
+                        for list_data_check_i in range(len(list_data_check)):
+                            if list_data_check[list_data_check_i] != str(OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]):
+                                flag_hit = False
+                                break
+                        if flag_hit:
+                            return type_this
+                # 如果找不到完全匹配，尝试只匹配前三个参数（platform, sdk, model）
+                for type_this in OlivOS.accountMetadataAPI.accountTypeList:
+                    if type_this in OlivOS.accountMetadataAPI.accountTypeMappingList:
+                        mapping = OlivOS.accountMetadataAPI.accountTypeMappingList[type_this]
+                        if (len(mapping) >= 3 and 
+                            str(mapping[0]) == platform_platform and 
+                            str(mapping[1]) == platform_sdk and 
+                            str(mapping[2]) == platform_model):
+                            return type_this
+        except:
+            pass
+        return '自定义'
+    
+    def getAccountDisplayInfo(self, botHash, bot_info):
+        """
+        获取账号显示信息（名称和协议端）
+        """
+        account_name = "未知账号"
+        try:
+            fake_event = OlivOS.API.Event(
+                OlivOS.contentAPI.fake_sdk_event(
+                    bot_info=bot_info,
+                    fakename='nativeWinUI'
+                ),
+                None
+            )
+            res_data = fake_event.get_login_info(bot_info)
+            if res_data and res_data.get('active') and 'data' in res_data:
+                account_name = res_data['data'].get('name', str(bot_info.id))
+            else:
+                account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+        except:
+            try:
+                account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+            except:
+                pass
+        platform_name = self.getPlatformDisplayName(bot_info)
+        return account_name, platform_name
+    
     def updateShallowMenuList(self):
         tmp_new = []
+        account_items = []
+        account_count = 0
+        if self.bot_info and type(self.bot_info) is dict:
+            account_list = []
+            for botHash, bot_info in self.bot_info.items():
+                account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info)
+                account_list.append((botHash, account_name, platform_name))
+            account_list.sort(key=lambda x: x[1])
+            account_count = len(account_list)
+            for botHash, account_name, platform_name in account_list:
+                account_items.append(['account_info', account_name, botHash])
+                account_items.append(['account_info', f"└ {platform_name}", botHash])
+        
         self.UIData['shallow_menu_list'] = [
             ['打开终端', self.startOlivOSTerminalUISend],
-            #['账号管理', self.startAccountEditSendFunc()],
-            #['账号管理', None],
+        ]
+        # 账号菜单项
+        account_menu_title = f"[{account_count}]个账号"
+        if account_items:
+            self.UIData['shallow_account_menu_list'] = account_items
+        else:
+            self.UIData['shallow_account_menu_list'] = []
+        self.UIData['shallow_menu_list'].append(['account_menu', account_menu_title, self.UIData['shallow_account_menu_list'], account_count])
+        self.UIData['shallow_menu_list'].extend([
+            # ['账号管理', self.startAccountEditSendFunc()],
+            # ['账号管理', None],
             ['NapCat管理', self.UIData['shallow_napcat_menu_list']],
             ['OPQBot管理', self.UIData['shallow_opqbot_menu_list']],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
@@ -533,7 +625,8 @@ class dock(OlivOS.API.Proc_templet):
             ['社区论坛', self.sendOpenForum],
             ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
-        ]
+        ])
+        
         for data_this in self.UIData['shallow_menu_list']:
             if data_this[0] in ['NapCat管理', 'OPQBot管理', 'gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
                 if data_this[1] is not None:
@@ -3576,7 +3669,28 @@ class shallow(object):
                 list_new = []
                 for item_this in data:
                     if type(item_this) == list:
-                        if len(item_this) == 2:
+                        # 处理账号信息项（禁用）
+                        if len(item_this) == 3 and item_this[0] == 'account_info':
+                            list_new.append(
+                                pystray.MenuItem(
+                                    item_this[1],
+                                    None,
+                                    enabled=False
+                                )
+                            )
+                        # 处理账号菜单项（根据账号数量决定是否禁用）
+                        elif len(item_this) == 4 and item_this[0] == 'account_menu':
+                            account_count = item_this[3]
+                            tmp_sub_menu = self.getMenu(item_this[2])
+                            menu_enabled = (tmp_sub_menu not in [None, False]) and account_count > 0
+                            list_new.append(
+                                pystray.MenuItem(
+                                    item_this[1],
+                                    tmp_sub_menu,
+                                    enabled=menu_enabled
+                                )
+                            )
+                        elif len(item_this) == 2:
                             tmp_sub_menu = self.getMenu(item_this[1])
                             list_new.append(
                                 pystray.MenuItem(
