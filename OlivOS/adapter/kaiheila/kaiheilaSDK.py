@@ -40,12 +40,18 @@ sdkAPIRoute = {
     'user': '/user',
     'gateway': '/gateway',
     'asset': '/asset',
-    'game': '/game'
+    'game': '/game',
+    'guild': '/guild',
+    'guild-mute': '/guild-mute',
+    'guild-boost': '/guild-boost'
 }
 
 sdkAPIRouteTemp = {}
 
 sdkSubSelfInfo = {}
+
+# 缓存每个guild的管理员role_id: {guild_id: admin_role_id}
+sdkGuildAdminRoleId = {}
 
 
 class bot_info_T(object):
@@ -94,7 +100,6 @@ class event(object):
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
-
 
 class payload_template(object):
     def __init__(self, data=None, is_rx=False):
@@ -393,6 +398,182 @@ class API(object):
             def __init__(self):
                 self.data_type = 1
 
+    # 服务器相关接口
+    class getGuildList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/list?page={page}&page_size={page_size}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.page = 1
+                self.page_size = 100
+
+    class getGuildView(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/view?guild_id={guild_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = None
+
+    class getGuildUserList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/user-list?guild_id={guild_id}&channel_id={channel_id}&page={page}&page_size={page_size}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.channel_id = ''
+                self.page = 1
+                self.page_size = 100
+
+    class setGuildNickname(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/nickname'
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.nickname = None
+                self.user_id = None
+
+    class setGuildLeave(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/leave'
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = None
+
+    class setGuildKickout(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild'] + '/kickout'
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.target_id = None
+
+    class getGuildMuteList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild-mute'] + '/list?guild_id={guild_id}&return_type={return_type}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.return_type = 'detail'
+
+    class setGuildMuteCreate(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild-mute'] + '/create'
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.user_id = None
+                self.type = 1
+
+    class setGuildMuteDelete(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild-mute'] + '/delete'
+
+        class data_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.user_id = None
+                self.type = 1
+
+    class getGuildBoostHistory(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guild-boost'] + '/history?guild_id={guild_id}&start_time={start_time}&end_time={end_time}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.start_time = ''
+                self.end_time = ''
+
+    # 频道相关接口
+    class getChannelList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channel'] + '/list?guild_id={guild_id}&page={page}&page_size={page_size}&type={type}&parent_id={parent_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = None
+                self.page = 1
+                self.page_size = 100
+                self.type = ''
+                self.parent_id = ''
+
+    class getChannelView(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channel'] + '/view?target_id={target_id}&need_children={need_children}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.target_id = None
+                self.need_children = 'false'
 
 def get_kmarkdown_message_raw(data: dict):
     res = data['raw_content']
@@ -460,6 +641,54 @@ def get_message_obj(target_event):
             message_obj.data = []
     return message_obj
 
+def get_guild_admin_role_id(bot_info, guild_id):
+    """
+    获取并缓存guild的管理员role_id
+    通过调用/guild/view API，在roles数组中查找name为"管理员"的角色
+    """
+    global sdkGuildAdminRoleId
+    guild_id_str = str(guild_id)
+    # 如果缓存中已有，直接返回
+    if guild_id_str in sdkGuildAdminRoleId:
+        return sdkGuildAdminRoleId[guild_id_str]
+    # 调用API获取guild信息
+    try:
+        this_msg = API.getGuildView(bot_info)
+        this_msg.metadata.guild_id = guild_id_str
+        this_msg.do_api('GET')
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None and type(raw_obj) == dict:
+                if 'data' in raw_obj and 'roles' in raw_obj['data']:
+                    roles = raw_obj['data']['roles']
+                    # 查找name为"管理员"的角色
+                    for role in roles:
+                        if type(role) == dict and 'name' in role and role['name'] == '管理员':
+                            admin_role_id = role.get('role_id')
+                            if admin_role_id is not None:
+                                sdkGuildAdminRoleId[guild_id_str] = admin_role_id
+                                return admin_role_id
+    except Exception as e:
+        traceback.print_exc()
+    
+    # 如果没找到，缓存None避免重复请求
+    sdkGuildAdminRoleId[guild_id_str] = None
+    return None
+
+def determine_user_role(user_data, admin_role_id):
+    """
+    根据用户数据判断用户的role
+    """
+    # 如果is_master为true，返回owner
+    if user_data.get('is_master') == True:
+        return 'owner'
+    # 如果roles数组中包含管理员role_id，返回admin
+    if admin_role_id is not None:
+        user_roles = user_data.get('roles', [])
+        if type(user_roles) == list and admin_role_id in user_roles:
+            return 'admin'
+    return 'member'
+
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
@@ -517,8 +746,47 @@ def get_Event_from_SDK(target_event):
                             'username']
                         target_event.data.sender['sex'] = 'unknown'
                         target_event.data.sender['age'] = 0
-                        target_event.data.sender['role'] = 'member'
-                        target_event.data.host_id = str(target_event.sdk_event.payload.data.d['extra']['guild_id'])
+                        # 获取guild_id和user_id用于判断role
+                        guild_id = str(target_event.sdk_event.payload.data.d['extra']['guild_id'])
+                        user_id = str(target_event.sdk_event.payload.data.d['extra']['author']['id'])
+                        target_event.data.host_id = guild_id
+                        # 获取管理员role_id
+                        tmp_bot_info = bot_info_T(
+                            target_event.sdk_event.base_info['self_id'],
+                            target_event.sdk_event.base_info['token']
+                        )
+                        admin_role_id = get_guild_admin_role_id(tmp_bot_info, guild_id)
+                        # 尝试从事件数据中获取用户信息，如果没有则调用API
+                        user_data = {}
+                        if 'extra' in target_event.sdk_event.payload.data.d:
+                            extra = target_event.sdk_event.payload.data.d['extra']
+                            if 'author' in extra:
+                                author = extra['author']
+                                # 检查是否有is_master和roles字段
+                                if 'is_master' in author:
+                                    user_data['is_master'] = author['is_master']
+                                if 'roles' in author:
+                                    user_data['roles'] = author['roles']
+                        # 如果事件数据中没有完整信息，调用API获取
+                        if 'is_master' not in user_data or 'roles' not in user_data:
+                            try:
+                                this_msg = API.getUserView(tmp_bot_info)
+                                this_msg.metadata.user_id = user_id
+                                this_msg.metadata.guild_id = guild_id
+                                this_msg.do_api('GET')
+                                if this_msg.res is not None:
+                                    raw_obj = init_api_json(this_msg.res)
+                                    if raw_obj is not None and type(raw_obj) == dict:
+                                        if 'data' in raw_obj:
+                                            data = raw_obj['data']
+                                            if 'is_master' in data:
+                                                user_data['is_master'] = data['is_master']
+                                            if 'roles' in data:
+                                                user_data['roles'] = data['roles']
+                            except:
+                                pass
+                        # 判断role
+                        target_event.data.sender['role'] = determine_user_role(user_data, admin_role_id)
                         target_event.data.extend['flag_from_direct'] = False
                         if plugin_event_bot_hash in sdkSubSelfInfo:
                             target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -662,7 +930,41 @@ def get_Event_from_SDK(target_event):
                             target_event.data.sender['name'] = user_name
                             target_event.data.sender['sex'] = 'unknown'
                             target_event.data.sender['age'] = 0
-                            target_event.data.sender['role'] = 'member'
+                            # 获取管理员role_id并判断用户role
+                            tmp_bot_info = bot_info_T(
+                                target_event.sdk_event.base_info['self_id'],
+                                target_event.sdk_event.base_info['token']
+                            )
+                            admin_role_id = get_guild_admin_role_id(tmp_bot_info, host_id)
+                            # 尝试从事件数据中获取用户信息，如果没有则调用API
+                            user_data = {}
+                            body = target_event.sdk_event.payload.data.d['extra']['body']
+                            if 'user_info' in body:
+                                user_info = body['user_info']
+                                if 'is_master' in user_info:
+                                    user_data['is_master'] = user_info['is_master']
+                                if 'roles' in user_info:
+                                    user_data['roles'] = user_info['roles']
+                            # 如果事件数据中没有完整信息，调用API获取
+                            if 'is_master' not in user_data or 'roles' not in user_data:
+                                try:
+                                    this_msg = API.getUserView(tmp_bot_info)
+                                    this_msg.metadata.user_id = user_id
+                                    this_msg.metadata.guild_id = host_id
+                                    this_msg.do_api('GET')
+                                    if this_msg.res is not None:
+                                        raw_obj = init_api_json(this_msg.res)
+                                        if raw_obj is not None and type(raw_obj) == dict:
+                                            if 'data' in raw_obj:
+                                                data = raw_obj['data']
+                                                if 'is_master' in data:
+                                                    user_data['is_master'] = data['is_master']
+                                                if 'roles' in data:
+                                                    user_data['roles'] = data['roles']
+                                except:
+                                    pass
+                            # 判断role
+                            target_event.data.sender['role'] = determine_user_role(user_data, admin_role_id)
                             target_event.data.host_id = host_id
                             target_event.data.extend['flag_from_direct'] = False
                             if plugin_event_bot_hash in sdkSubSelfInfo:
@@ -846,7 +1148,19 @@ class event_action(object):
                                                                                           ['data', 'joined_at'], int)
                     res_data['data']['times']['last_sent_time'] = 0
                     res_data['data']['times']['shut_up_timestamp'] = 0
-                    res_data['data']['role'] = 'member'
+                    # 获取管理员role_id并判断用户role
+                    bot_info = get_SDK_bot_info_from_Event(target_event)
+                    admin_role_id = get_guild_admin_role_id(bot_info, host_id)
+                    # 从API返回数据中提取用户信息
+                    user_data = {}
+                    if 'data' in raw_obj:
+                        data = raw_obj['data']
+                        if 'is_master' in data:
+                            user_data['is_master'] = data['is_master']
+                        if 'roles' in data:
+                            user_data['roles'] = data['roles']
+                    # 判断role
+                    res_data['data']['role'] = determine_user_role(user_data, admin_role_id)
                     res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickname'], str)
                     res_data['data']['title'] = ''
         except:
@@ -974,6 +1288,261 @@ class event_action(object):
                     res_data['data']['music_name'] = music_name
                     res_data['data']['singer'] = singer
                     res_data['data']['software'] = software
+        except:
+            res_data['active'] = False
+        return res_data
+
+    # 服务器相关接口实现
+    def get_host_list(target_event, page=1, page_size=100):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        raw_obj = None
+        this_msg = API.getGuildList(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.page = page
+        this_msg.metadata.page_size = page_size
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) == dict:
+                    if 'data' in raw_obj and 'items' in raw_obj['data']:
+                        res_data['active'] = True
+                        for raw_obj_this in raw_obj['data']['items']:
+                            tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
+                            tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['id'], str)
+                            tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['name'], str)
+                            tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['topic'], str)
+                            res_data['data'].append(tmp_res_data_this)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_host_info(target_event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        raw_obj = None
+        this_msg = API.getGuildView(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.guild_id = str(group_id)
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'name'], str)
+                    res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'topic'], str)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_group_member_list(target_event, group_id, page=1, page_size=100):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        raw_obj = None
+        this_msg = API.getGuildUserList(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.guild_id = str(group_id)
+        this_msg.metadata.page = page
+        this_msg.metadata.page_size = page_size
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) == dict:
+                    if 'data' in raw_obj and 'items' in raw_obj['data']:
+                        res_data['active'] = True
+                        # 获取管理员role_id
+                        bot_info = get_SDK_bot_info_from_Event(target_event)
+                        admin_role_id = get_guild_admin_role_id(bot_info, group_id)
+                        for raw_obj_this in raw_obj['data']['items']:
+                            tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+                            tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['id'], str)
+                            tmp_res_data_this['user_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['id'], str)
+                            tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['username'], str)
+                            tmp_res_data_this['card'] = init_api_do_mapping_for_dict(raw_obj_this, ['nickname'], str)
+                            tmp_res_data_this['group_id'] = str(group_id)
+                            # 判断role
+                            user_data = {}
+                            if 'is_master' in raw_obj_this:
+                                user_data['is_master'] = raw_obj_this['is_master']
+                            if 'roles' in raw_obj_this:
+                                user_data['roles'] = raw_obj_this['roles']
+                            tmp_res_data_this['role'] = determine_user_role(user_data, admin_role_id)
+                            res_data['data'].append(tmp_res_data_this)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def set_group_card(target_event, group_id, user_id, card):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setGuildNickname(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.nickname = str(card) if card else ""
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def set_group_leave(target_event, group_id):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setGuildLeave(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = str(group_id)
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def set_group_kick(target_event, group_id, user_id):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setGuildKickout(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = str(group_id)
+        this_msg.data.target_id = str(user_id)
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_guild_mute_list(target_event, group_id):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.getGuildMuteList(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.guild_id = str(group_id)
+        this_msg.metadata.return_type = 'detail'
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+                    res_data['data'] = raw_obj.get('data', {})
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def set_guild_mute_create(target_event, group_id, user_id, mute_type=1):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setGuildMuteCreate(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.type = mute_type
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def set_guild_mute_delete(target_event, group_id, user_id, mute_type=1):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.setGuildMuteDelete(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.guild_id = str(group_id)
+        this_msg.data.user_id = str(user_id)
+        this_msg.data.type = mute_type
+        try:
+            this_msg.do_api('POST')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_guild_boost_history(target_event, group_id, start_time=None, end_time=None):
+        raw_obj = None
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        this_msg = API.getGuildBoostHistory(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.guild_id = str(group_id)
+        this_msg.metadata.start_time = str(start_time) if start_time else ''
+        this_msg.metadata.end_time = str(end_time) if end_time else ''
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) is dict:
+                    res_data['active'] = True
+                    res_data['data'] = raw_obj.get('data', {})
+        except:
+            res_data['active'] = False
+        return res_data
+
+    # 频道相关接口实现
+    def get_group_list(target_event, host_id, page=1, page_size=100, channel_type=None, parent_id=None):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        raw_obj = None
+        this_msg = API.getChannelList(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.guild_id = str(host_id)
+        this_msg.metadata.page = page
+        this_msg.metadata.page_size = page_size
+        if channel_type is not None:
+            this_msg.metadata.type = str(channel_type)
+        if parent_id is not None:
+            this_msg.metadata.parent_id = str(parent_id)
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) == dict:
+                    if 'data' in raw_obj and 'items' in raw_obj['data']:
+                        res_data['active'] = True
+                        for raw_obj_this in raw_obj['data']['items']:
+                            tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
+                            tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['id'], str)
+                            tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['name'], str)
+                            tmp_res_data_this['memo'] = ''
+                            res_data['data'].append(tmp_res_data_this)
+        except:
+            res_data['active'] = False
+        return res_data
+
+    def get_group_info(target_event, group_id, need_children=False):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        raw_obj = None
+        this_msg = API.getChannelView(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.target_id = str(group_id)
+        this_msg.metadata.need_children = 'true' if need_children else 'false'
+        try:
+            this_msg.do_api('GET')
+            if this_msg.res is not None:
+                raw_obj = init_api_json(this_msg.res)
+            if raw_obj is not None:
+                if type(raw_obj) == dict:
+                    res_data['active'] = True
+                    res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
+                    res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'name'], str)
+                    res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'topic'], str)
         except:
             res_data['active'] = False
         return res_data
