@@ -1046,6 +1046,10 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # 服务器相关操作需要使用 host_id
+            OlivOS.kaiheilaSDK.event_action.set_group_kick(self, host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1158,6 +1162,10 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # 服务器相关操作需要使用 host_id
+            OlivOS.kaiheilaSDK.event_action.set_group_card(self, host_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1199,6 +1207,10 @@ class Event(object):
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.OPQBotSDK.event_action.set_group_leave(self, group_id, self.plugin_info['control_queue'])
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # 服务器相关操作需要使用 host_id（guild_id）
+            OlivOS.kaiheilaSDK.event_action.set_group_leave(self, host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
@@ -1373,6 +1385,10 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # get_group_info 获取的是频道详情，使用 group_id（channel_id）
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_info(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
         return res_data
@@ -1396,6 +1412,15 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 res_data = OlivOS.OPQBotSDK.event_action.get_group_list(self, self.plugin_info['control_queue'])
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # get_group_list 获取的是频道列表，需要 host_id（guild_id）作为参数
+            # 从事件数据中获取 host_id
+            tmp_host_id = None
+            if hasattr(self.data, 'host_id') and self.data.host_id is not None:
+                tmp_host_id = self.data.host_id
+            if tmp_host_id is not None:
+                res_data = OlivOS.kaiheilaSDK.event_action.get_group_list(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1425,6 +1450,8 @@ class Event(object):
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
         elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # 获取服务器成员信息需要使用 host_id（guild_id）
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, host_id, user_id)
         return res_data
 
@@ -1447,6 +1474,10 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+        elif self.platform['sdk'] == 'kaiheila_link':
+            # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
+            # 获取服务器成员列表需要使用 host_id（guild_id）
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_list(self, host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1458,6 +1489,36 @@ class Event(object):
             pass
         else:
             res_data = self.__get_group_member_list(group_id, host_id, flag_log=True)
+        return res_data
+
+    @callbackLogger('get_host_list')
+    def __get_host_list(self, flag_log=True):
+        res_data = None
+        if self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_host_list(self)
+        return res_data
+
+    def get_host_list(self, flag_log: bool = True, remote: bool = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_host_list(flag_log=True)
+        return res_data
+
+    @callbackLogger('get_host_info', ['name', 'id'])
+    def __get_host_info(self, host_id, flag_log=True):
+        res_data = None
+        if self.platform['sdk'] == 'kaiheila_link':
+            res_data = OlivOS.kaiheilaSDK.event_action.get_host_info(self, host_id)
+        return res_data
+
+    def get_host_info(self, host_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = self.__get_host_info(host_id, flag_log=True)
         return res_data
 
     @callbackLogger('can_send_image')
