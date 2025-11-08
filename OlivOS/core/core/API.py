@@ -223,13 +223,48 @@ class Event(object):
             'group_message',
             'group_message_sent'
         ]:
-            if self.plugin_info['message_mode_tx'] == 'olivos_para' \
-            or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
-                self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
-                self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
+            compatible_svn = self.plugin_info.get('compatible_svn', OlivOS.infoAPI.OlivOS_compatible_svn_default)
+            # 如果插件版本小于OlivOS_SVN_Compatible，需要从at部分移除name
+            # 这里选择创建一个临时副本，避免共用
+            if compatible_svn < OlivOS.infoAPI.OlivOS_SVN_Compatible:
+                if self.data.message_sdk is not None and hasattr(self.data.message_sdk, 'data'):
+                    temp_message_sdk = OlivOS.messageAPI.Message_templet(
+                        self.data.message_sdk.mode_rx,
+                        self.data.message_sdk.data_raw
+                    )
+                    # 从at部分移除name
+                    for para_this in temp_message_sdk.data:
+                        if type(para_this) == OlivOS.messageAPI.PARA.at:
+                            if 'name' in para_this.data:
+                                new_data = para_this.data.copy()
+                                del new_data['name']
+                                para_this.data = new_data
+                    # 使用临时副本生成消息
+                    if self.plugin_info['message_mode_tx'] == 'olivos_para' \
+                    or temp_message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                        self.data.message = temp_message_sdk.get(self.plugin_info['message_mode_tx'])
+                        self.data.raw_message = temp_message_sdk.get(self.plugin_info['message_mode_tx'])
+                    else:
+                        self.data.message = temp_message_sdk.data_raw
+                        self.data.raw_message = temp_message_sdk.data_raw
+                else:
+                    # 如果message_sdk不存在（通常不会发生），使用原始逻辑
+                    if self.plugin_info['message_mode_tx'] == 'olivos_para' \
+                    or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                        self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
+                        self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
+                    else:
+                        self.data.message = self.data.message_sdk.data_raw
+                        self.data.raw_message = self.data.raw_message_sdk.data_raw
             else:
-                self.data.message = self.data.message_sdk.data_raw
-                self.data.raw_message = self.data.raw_message_sdk.data_raw
+                # 插件版本大于等于OlivOS_SVN_Compatible，保持原始逻辑
+                if self.plugin_info['message_mode_tx'] == 'olivos_para' \
+                or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                    self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
+                    self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
+                else:
+                    self.data.message = self.data.message_sdk.data_raw
+                    self.data.raw_message = self.data.raw_message_sdk.data_raw
 
     def do_init_log(self):
         if self.active:

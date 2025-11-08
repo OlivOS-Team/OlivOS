@@ -267,6 +267,10 @@ class shallow(OlivOS.API.Proc_templet):
                     plugin_event.plugin_info['name'] = self.plugin_models_dict[plugin_models_index_this]['name']
                     plugin_event.plugin_info['namespace'] = self.plugin_models_dict[plugin_models_index_this][
                         'namespace']
+                    if 'compatible_svn' in self.plugin_models_dict[plugin_models_index_this]:
+                        plugin_event.plugin_info['compatible_svn'] = self.plugin_models_dict[plugin_models_index_this]['compatible_svn']
+                    else:
+                        plugin_event.plugin_info['compatible_svn'] = OlivOS.infoAPI.OlivOS_compatible_svn_default
                     if 'message_mode' in self.plugin_models_dict[plugin_models_index_this]:
                         plugin_event.plugin_info['message_mode_tx'] = self.plugin_models_dict[plugin_models_index_this][
                             'message_mode']

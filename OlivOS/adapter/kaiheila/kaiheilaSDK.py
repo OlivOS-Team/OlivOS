@@ -50,7 +50,8 @@ sdkAPIRouteTemp = {}
 
 sdkSubSelfInfo = {}
 
-# 缓存每个guild的管理员role_id: {guild_id: admin_role_id}
+# 缓存每个guild的管理员role_id列表: {guild_id: [admin_role_id1, admin_role_id2, ...]}
+# 包括"管理员"、"文字频道管理员"、"语音频道管理员"（这三种为默认管理员）
 sdkGuildAdminRoleId = {}
 
 
@@ -643,15 +644,15 @@ def get_message_obj(target_event):
 
 def get_guild_admin_role_id(bot_info, guild_id):
     """
-    获取并缓存guild的管理员role_id
-    通过调用/guild/view API，在roles数组中查找name为"管理员"的角色
+    获取并缓存guild的管理员role_id列表
+    通过调用getGuildView，在roles数组中查找管理员：
     """
     global sdkGuildAdminRoleId
     guild_id_str = str(guild_id)
     # 如果缓存中已有，直接返回
     if guild_id_str in sdkGuildAdminRoleId:
         return sdkGuildAdminRoleId[guild_id_str]
-    # 调用API获取guild信息
+    admin_role_ids = []
     try:
         this_msg = API.getGuildView(bot_info)
         this_msg.metadata.guild_id = guild_id_str
@@ -661,32 +662,34 @@ def get_guild_admin_role_id(bot_info, guild_id):
             if raw_obj is not None and type(raw_obj) == dict:
                 if 'data' in raw_obj and 'roles' in raw_obj['data']:
                     roles = raw_obj['data']['roles']
-                    # 查找name为"管理员"的角色
+                    # 查找所有管理员角色
+                    admin_role_names = ['管理员', '文字频道管理员', '语音频道管理员']
                     for role in roles:
-                        if type(role) == dict and 'name' in role and role['name'] == '管理员':
-                            admin_role_id = role.get('role_id')
-                            if admin_role_id is not None:
-                                sdkGuildAdminRoleId[guild_id_str] = admin_role_id
-                                return admin_role_id
+                        if type(role) == dict and 'name' in role:
+                            role_name = role['name']
+                            if role_name in admin_role_names:
+                                admin_role_id = role.get('role_id')
+                                if admin_role_id is not None:
+                                    admin_role_ids.append(admin_role_id)
     except Exception as e:
         traceback.print_exc()
-    
-    # 如果没找到，缓存None避免重复请求
-    sdkGuildAdminRoleId[guild_id_str] = None
-    return None
+    sdkGuildAdminRoleId[guild_id_str] = admin_role_ids if len(admin_role_ids) > 0 else None
+    return sdkGuildAdminRoleId[guild_id_str]
 
-def determine_user_role(user_data, admin_role_id):
+def determine_user_role(user_data, admin_role_ids):
     """
     根据用户数据判断用户的role
     """
     # 如果is_master为true，返回owner
     if user_data.get('is_master') == True:
         return 'owner'
-    # 如果roles数组中包含管理员role_id，返回admin
-    if admin_role_id is not None:
+    # 如果roles数组中包含任何一个管理员role_id
+    if admin_role_ids is not None:
         user_roles = user_data.get('roles', [])
-        if type(user_roles) == list and admin_role_id in user_roles:
-            return 'admin'
+        if type(user_roles) == list and type(admin_role_ids) == list:
+            for admin_role_id in admin_role_ids:
+                if admin_role_id in user_roles:
+                    return 'admin'
     return 'member'
 
 def get_Event_from_SDK(target_event):
@@ -755,7 +758,7 @@ def get_Event_from_SDK(target_event):
                             target_event.sdk_event.base_info['self_id'],
                             target_event.sdk_event.base_info['token']
                         )
-                        admin_role_id = get_guild_admin_role_id(tmp_bot_info, guild_id)
+                        admin_role_ids = get_guild_admin_role_id(tmp_bot_info, guild_id)
                         # 尝试从事件数据中获取用户信息，如果没有则调用API
                         user_data = {}
                         if 'extra' in target_event.sdk_event.payload.data.d:
@@ -786,7 +789,7 @@ def get_Event_from_SDK(target_event):
                             except:
                                 pass
                         # 判断role
-                        target_event.data.sender['role'] = determine_user_role(user_data, admin_role_id)
+                        target_event.data.sender['role'] = determine_user_role(user_data, admin_role_ids)
                         target_event.data.extend['flag_from_direct'] = False
                         if plugin_event_bot_hash in sdkSubSelfInfo:
                             target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -935,7 +938,7 @@ def get_Event_from_SDK(target_event):
                                 target_event.sdk_event.base_info['self_id'],
                                 target_event.sdk_event.base_info['token']
                             )
-                            admin_role_id = get_guild_admin_role_id(tmp_bot_info, host_id)
+                            admin_role_ids = get_guild_admin_role_id(tmp_bot_info, host_id)
                             # 尝试从事件数据中获取用户信息，如果没有则调用API
                             user_data = {}
                             body = target_event.sdk_event.payload.data.d['extra']['body']
@@ -964,7 +967,7 @@ def get_Event_from_SDK(target_event):
                                 except:
                                     pass
                             # 判断role
-                            target_event.data.sender['role'] = determine_user_role(user_data, admin_role_id)
+                            target_event.data.sender['role'] = determine_user_role(user_data, admin_role_ids)
                             target_event.data.host_id = host_id
                             target_event.data.extend['flag_from_direct'] = False
                             if plugin_event_bot_hash in sdkSubSelfInfo:
@@ -1148,9 +1151,9 @@ class event_action(object):
                                                                                           ['data', 'joined_at'], int)
                     res_data['data']['times']['last_sent_time'] = 0
                     res_data['data']['times']['shut_up_timestamp'] = 0
-                    # 获取管理员role_id并判断用户role
+                    # 获取管理员role_id列表并判断用户role
                     bot_info = get_SDK_bot_info_from_Event(target_event)
-                    admin_role_id = get_guild_admin_role_id(bot_info, host_id)
+                    admin_role_ids = get_guild_admin_role_id(bot_info, host_id)
                     # 从API返回数据中提取用户信息
                     user_data = {}
                     if 'data' in raw_obj:
@@ -1160,7 +1163,7 @@ class event_action(object):
                         if 'roles' in data:
                             user_data['roles'] = data['roles']
                     # 判断role
-                    res_data['data']['role'] = determine_user_role(user_data, admin_role_id)
+                    res_data['data']['role'] = determine_user_role(user_data, admin_role_ids)
                     res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickname'], str)
                     res_data['data']['title'] = ''
         except:
@@ -1351,9 +1354,9 @@ class event_action(object):
                 if type(raw_obj) == dict:
                     if 'data' in raw_obj and 'items' in raw_obj['data']:
                         res_data['active'] = True
-                        # 获取管理员role_id
+                        # 获取管理员role_id列表
                         bot_info = get_SDK_bot_info_from_Event(target_event)
-                        admin_role_id = get_guild_admin_role_id(bot_info, group_id)
+                        admin_role_ids = get_guild_admin_role_id(bot_info, group_id)
                         for raw_obj_this in raw_obj['data']['items']:
                             tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
                             tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['id'], str)
@@ -1367,7 +1370,7 @@ class event_action(object):
                                 user_data['is_master'] = raw_obj_this['is_master']
                             if 'roles' in raw_obj_this:
                                 user_data['roles'] = raw_obj_this['roles']
-                            tmp_res_data_this['role'] = determine_user_role(user_data, admin_role_id)
+                            tmp_res_data_this['role'] = determine_user_role(user_data, admin_role_ids)
                             res_data['data'].append(tmp_res_data_this)
         except:
             res_data['active'] = False
