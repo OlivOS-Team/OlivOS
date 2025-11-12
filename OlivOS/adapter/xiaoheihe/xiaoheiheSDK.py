@@ -559,7 +559,7 @@ def get_Event_from_SDK(target_event):
         )
 
     # 我是搞不明白了，为什么文档里面说的是50，实际上收到的消息type是5？？？？？？？？？？？？？？？？
-    if '5' == target_event.sdk_event.payload.data.type:
+    if '5' == target_event.sdk_event.payload.data.type or '50' == target_event.sdk_event.payload.data.type:
         try:
             if 'room_id' in target_event.sdk_event.payload.data.data \
             and 'channel_id' in target_event.sdk_event.payload.data.data \
