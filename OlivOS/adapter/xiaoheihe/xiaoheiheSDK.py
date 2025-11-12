@@ -558,12 +558,7 @@ def get_Event_from_SDK(target_event):
             target_event.sdk_event.base_info['token']
         )
 
-    # 打印收到的事件数据
-    print(f"[xiaoheihe] 收到事件完整内容:")
-    print(f"  base_info: {target_event.sdk_event.base_info}")
-    print(f"  platform: {target_event.sdk_event.platform}")
-    print(f"  payload.data.__dict__: {target_event.sdk_event.payload.data.__dict__}")
-        
+    # 我是搞不明白了，为什么文档里面说的是50，实际上收到的消息type是5？？？？？？？？？？？？？？？？
     if '5' == target_event.sdk_event.payload.data.type:
         try:
             if 'room_id' in target_event.sdk_event.payload.data.data \
