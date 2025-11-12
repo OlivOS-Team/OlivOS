@@ -150,6 +150,7 @@ def get_Event_from_SDK(target_event):
                     str(0),
                     str(0),
                     str(user_hash),
+                    None,
                     'approve'
                 )
         elif target_event.sdk_event.payload.cmd == 'onlineRemove':
@@ -160,6 +161,7 @@ def get_Event_from_SDK(target_event):
                     str(0),
                     str(0),
                     str(user_hash),
+                    None,
                     'leave'
                 )
 
