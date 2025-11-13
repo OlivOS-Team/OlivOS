@@ -231,6 +231,10 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.kaiheila()
+        elif get_type == 'xiaoheihe_string':
+            res = ''
+            for data_this in self.data:
+                res += data_this.xiaoheihe()
         else:
             res = str(self)
         return res
@@ -254,6 +258,8 @@ class Message_templet(object):
             self.init_from_kaiheila_code_string()
         elif self.mode_rx == 'discord_string':
             self.init_from_discord_code_string()
+        elif self.mode_rx == 'xiaoheihe_string':
+            self.init_from_xiaoheihe_string()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -587,6 +593,13 @@ class Message_templet(object):
         self.data_raw = tmp_data_raw
         self.init_from_code_string('OP')
 
+    def init_from_xiaoheihe_string(self):
+        tmp_data_raw = str(self.data_raw)
+        # 将小黑盒的 @{id:xxxxx} 格式转换为 [OP:at,id=xxxxx]
+        tmp_data_raw = re.sub(r'@\{id:(\d+)\}', r'[OP:at,id=\1]', tmp_data_raw)
+        self.data_raw = tmp_data_raw
+        self.init_from_code_string('OP')
+
 
 class PARA_templet(object):
     def __init__(self, type=None, data=None):
@@ -713,6 +726,21 @@ class PARA_templet(object):
                 return ''
         code_tmp += '>'
         return code_tmp
+
+    def xiaoheihe(self):
+        if type(self) == PARA.at:
+            if self.data is not None and 'id' in self.data and self.data['id'] is not None:
+                return f"@{{id:{self.data['id']}}}"
+            return ''
+        elif type(self) == PARA.text:
+            if self.data is not None:
+                if type(self.data['text']) is str:
+                    return self.data['text']
+                else:
+                    return str(self.data['text'])
+            else:
+                return ''
+        return ''
 
     def get_string_by_key(self, code_key):
         code_tmp = '[' + code_key + ':' + self.type

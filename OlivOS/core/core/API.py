@@ -323,15 +323,29 @@ class Event(object):
                     ['action', self.data.action]
                 ])
             elif self.plugin_info['func_type'] == 'group_member_decrease':
+                tmp_host_id = '-'
+                if hasattr(self.data, 'host_id') and self.data.host_id is not None:
+                    tmp_host_id = str(self.data.host_id)
+                tmp_group_id = '-'
+                if self.data.group_id is not None:
+                    tmp_group_id = str(self.data.group_id)
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
-                    ['group_id', self.data.group_id],
+                    ['host_id', tmp_host_id],
+                    ['group_id', tmp_group_id],
                     ['user_id', self.data.user_id],
                     ['operator_id', self.data.operator_id],
                     ['action', self.data.action]
                 ])
             elif self.plugin_info['func_type'] == 'group_member_increase':
+                tmp_host_id = '-'
+                if hasattr(self.data, 'host_id') and self.data.host_id is not None:
+                    tmp_host_id = str(self.data.host_id)
+                tmp_group_id = '-'
+                if self.data.group_id is not None:
+                    tmp_group_id = str(self.data.group_id)
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
-                    ['group_id', self.data.group_id],
+                    ['host_id', tmp_host_id],
+                    ['group_id', tmp_group_id],
                     ['user_id', self.data.user_id],
                     ['operator_id', self.data.operator_id],
                     ['action', self.data.action]
@@ -525,18 +539,20 @@ class Event(object):
             self.action = 'unset'
 
     class group_member_decrease(object):
-        def __init__(self, group_id, operator_id, user_id, action='leave', flag_lazy=True):
+        def __init__(self, group_id, operator_id, user_id, host_id=None, action='leave', flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
             self.user_id = user_id
             self.action = action
+            self.host_id = host_id
 
     class group_member_increase(object):
-        def __init__(self, group_id, operator_id, user_id, action='approve', flag_lazy=True):
+        def __init__(self, group_id, operator_id, user_id, host_id=None, action='approve', flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
             self.user_id = user_id
             self.action = action
+            self.host_id = host_id
 
     class group_ban(object):
         def __init__(self, group_id, operator_id, user_id, duration, action='unban', flag_lazy=True):
@@ -1084,7 +1100,19 @@ class Event(object):
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id
-            OlivOS.kaiheilaSDK.event_action.set_group_kick(self, host_id, user_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.kaiheilaSDK.event_action.set_group_kick(self, tmp_host_id, user_id)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
+            # 踢人操作使用 host_id(room_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.xiaoheiheSDK.event_action.set_group_kick(self, tmp_host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1104,6 +1132,14 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
+            # 禁言操作使用 host_id(room_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.xiaoheiheSDK.event_action.set_group_ban(self, tmp_host_id, user_id, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1200,7 +1236,19 @@ class Event(object):
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id
-            OlivOS.kaiheilaSDK.event_action.set_group_card(self, host_id, user_id, card)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.kaiheilaSDK.event_action.set_group_card(self, tmp_host_id, user_id, card)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
+            # 修改房间昵称使用 host_id(room_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.xiaoheiheSDK.event_action.set_group_card(self, tmp_host_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1245,7 +1293,19 @@ class Event(object):
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id（guild_id）
-            OlivOS.kaiheilaSDK.event_action.set_group_leave(self, host_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.kaiheilaSDK.event_action.set_group_leave(self, tmp_host_id)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
+            # 退出房间使用 host_id(room_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            OlivOS.xiaoheiheSDK.event_action.set_group_leave(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
 
@@ -1456,6 +1516,8 @@ class Event(object):
                 tmp_host_id = self.data.host_id
             if tmp_host_id is not None:
                 res_data = OlivOS.kaiheilaSDK.event_action.get_group_list(self, tmp_host_id)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            res_data = OlivOS.xiaoheiheSDK.event_action.get_group_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
@@ -1487,7 +1549,11 @@ class Event(object):
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 获取服务器成员信息需要使用 host_id（guild_id）
-            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, host_id, user_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, tmp_host_id, user_id)
         return res_data
 
     def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
@@ -1512,7 +1578,19 @@ class Event(object):
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 获取服务器成员列表需要使用 host_id（guild_id）
-            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_list(self, host_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_list(self, tmp_host_id)
+        elif self.platform['sdk'] == 'xiaoheihe_link':
+            # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
+            # 获取房间成员列表使用 host_id(room_id)
+            # 如果未提供 host_id，尝试从事件数据中获取
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            res_data = OlivOS.xiaoheiheSDK.event_action.get_group_member_list(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data

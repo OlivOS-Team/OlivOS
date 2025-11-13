@@ -843,7 +843,51 @@ def get_Event_from_SDK(target_event):
                 and target_event.sdk_event.payload.data.d['type'] == 255 \
                 and 'extra' in target_event.sdk_event.payload.data.d \
                 and type(target_event.sdk_event.payload.data.d['extra']) is dict:
-                    if 'body' in target_event.sdk_event.payload.data.d['extra'] \
+                    # 处理服务器成员加入/退出事件(包括自己和其他成员)
+                    if 'type' in target_event.sdk_event.payload.data.d['extra'] \
+                    and target_event.sdk_event.payload.data.d['extra']['type'] in ['joined_guild', 'exited_guild', 'self_joined_guild', 'self_exited_guild'] \
+                    and 'body' in target_event.sdk_event.payload.data.d['extra'] \
+                    and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict:
+                        try:
+                            extra = target_event.sdk_event.payload.data.d['extra']
+                            body = extra['body']
+                            # 判断是自己还是其他成员
+                            if extra['type'] in ['self_joined_guild', 'self_exited_guild']:
+                                user_id = str(target_event.base_info['self_id'])
+                                host_id = str(body.get('guild_id', ''))
+                            else:
+                                user_id = str(body.get('user_id', ''))
+                                host_id = str(target_event.sdk_event.payload.data.d.get('target_id', ''))
+                            if extra['type'] in ['joined_guild', 'self_joined_guild']:
+                                # 新成员加入服务器(包括自己)
+                                target_event.active = True
+                                target_event.plugin_info['func_type'] = 'group_member_increase'
+                                target_event.data = target_event.group_member_increase(
+                                    None,
+                                    '-1',
+                                    user_id,
+                                    host_id
+                                )
+                                if extra['type'] == 'self_joined_guild':
+                                    target_event.data.action = 'invite'
+                                else:
+                                    target_event.data.action = 'join'
+                            elif extra['type'] in ['exited_guild', 'self_exited_guild']:
+                                # 服务器成员退出(包括自己)
+                                target_event.active = True
+                                target_event.plugin_info['func_type'] = 'group_member_decrease'
+                                target_event.data = target_event.group_member_decrease(
+                                    None,
+                                    '-1',
+                                    user_id,
+                                    host_id
+                                )
+                                target_event.data.action = 'leave'
+                        except Exception as e:
+                            traceback.print_exc()
+                            target_event.active = False
+                    # 处理按钮点击事件
+                    elif 'body' in target_event.sdk_event.payload.data.d['extra'] \
                     and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict \
                     and 'type' in target_event.sdk_event.payload.data.d['extra'] \
                     and target_event.sdk_event.payload.data.d['extra']['type'] == 'message_btn_click':
