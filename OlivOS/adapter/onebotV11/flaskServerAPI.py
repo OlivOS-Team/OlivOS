@@ -41,7 +41,10 @@ gCheckList = [
     'napcat_hide',
     'napcat_show',
     'napcat_show_new',
-    'napcat_show_old'
+    'napcat_show_old',
+    'napcat_default',
+    'llonebot_default',
+    'lagrange_default'
 ]
 
 class server(OlivOS.API.Proc_templet):

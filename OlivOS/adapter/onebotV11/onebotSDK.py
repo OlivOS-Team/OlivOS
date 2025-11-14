@@ -29,6 +29,23 @@ paraMsgMap = [
     'para_default'
 ]
 
+napcatModelMap = [
+    'napcat',
+    'napcat_hide',
+    'napcat_show',
+    'napcat_show_new',
+    'napcat_show_old',
+    'napcat_default',
+]
+
+llonebotModelMap = [
+    'llonebot_default'
+]
+
+lagrangeModelMap = [
+    'lagrange_default'
+]
+
 gFlagCheckList = []
 
 class bot_info_T(object):
@@ -139,6 +156,36 @@ class api_templet(object):
             self.res = None
         return self.res
 
+    def do_api_get(self):
+        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.node_ext == '':
+            return None
+        try:
+            tmp_host = self.bot_info.host
+            if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
+                pass
+            else:
+                tmp_host = 'http://' + tmp_host
+            token_str = ''
+            token_dict = {}
+            if len(self.bot_info.access_token) > 0:
+                token_str = f'?access_token={self.bot_info.access_token}'
+                token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
+            send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
+            if self.bot_info.debug_mode:
+                if self.bot_info.debug_logger is not None:
+                    self.bot_info.debug_logger.log(0, self.node_ext + ': GET request')
+            headers = {}
+            headers.update(token_dict)
+            msg_res = req.request("GET", send_url, headers=headers)
+            if self.bot_info.debug_mode:
+                if self.bot_info.debug_logger is not None:
+                    self.bot_info.debug_logger.log(0, self.node_ext + ' - GET succeed: ' + msg_res.text)
+            self.res = msg_res
+            return msg_res
+        except:
+            traceback.print_exc()
+            self.res = None
+            return None
 
 class event(object):
     def __init__(self, raw):
@@ -589,10 +636,54 @@ class event_action(object):
                 res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)
         return res_data
 
+    def get_forward_msg(target_event, message_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_forward_msg()
+        raw_obj = None
+        this_msg = api.get_forward_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.id = str(message_id)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['messages'] = init_api_do_mapping_for_dict(raw_obj, ['messages'], list)
+        return res_data
+
+    def send_group_forward_msg(target_event, group_id, messages):
+        this_msg = api.send_group_forward_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.messages = messages
+        this_msg.do_api()
+
+    def send_private_forward_msg(target_event, user_id, messages):
+        this_msg = api.send_private_forward_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = int(user_id)
+        this_msg.data.messages = messages
+        this_msg.do_api()
+
+    def set_essence_msg(target_event, message_id):
+        this_msg = api.set_essence_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.message_id = int(message_id)
+        this_msg.do_api()
+
+    def delete_essence_msg(target_event, message_id):
+        this_msg = api.delete_essence_msg(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.message_id = int(message_id)
+        this_msg.do_api()
+
     def send_like(target_event, user_id, times=1):
         this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.times = times
+        this_msg.do_api()
+
+    def send_group_sign(target_event, group_id):
+        model = target_event.bot_info.platform['model']
+        if model in lagrangeModelMap:
+            return
+        this_msg = api.send_group_sign(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
         this_msg.do_api()
 
     def set_group_kick(target_event, group_id, user_id, rehect_add_request=False):
@@ -656,11 +747,14 @@ class event_action(object):
         this_msg.do_api()
 
     def set_group_special_title(target_event, group_id, user_id, special_title, duration):
+        model = target_event.bot_info.platform['model']
         this_msg = api.set_group_special_title(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.special_title = special_title
-        this_msg.data.duration = duration
+        # llonebot 和 napcat 不需要 duration 参数
+        if model not in llonebotModelMap and model not in napcatModelMap:
+            this_msg.data.duration = duration
         this_msg.do_api()
 
     def set_friend_add_request(target_event, flag, approve, remark):
@@ -932,6 +1026,404 @@ class event_action(object):
                 res_data['data']['title'] = ''
         return res_data
 
+    def get_group_notice(target_event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_notice()
+        raw_obj = None
+        this_msg = api.get_group_notice(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                model = target_event.bot_info.platform['model']
+                for raw_obj_this in raw_obj:
+                    item = {}
+                    item['sender_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['sender_id'], int)
+                    item['publish_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['publish_time'], int)
+                    item['message'] = init_api_do_mapping_for_dict(raw_obj_this, ['message'], dict)
+                    item['notice_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['notice_id'], str))
+                    item['extra'] = {}
+                    if model in napcatModelMap or model in lagrangeModelMap:
+                        item['extra']['notice_id_type'] = 'string'
+                    else:
+                        item['extra']['notice_id_type'] = 'int'
+                    res_data['data'].append(item)
+        return res_data
+
+    def send_group_notice(target_event, group_id, content, image=None, **kwargs):
+        model = target_event.bot_info.platform['model']
+        this_msg = api.send_group_notice(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.content = str(content)
+        if image is not None:
+            this_msg.data.image = str(image)
+        # NapCat 额外参数
+        if model in napcatModelMap:
+            if 'pinned' in kwargs and kwargs['pinned'] is not None:
+                this_msg.data.pinned = kwargs['pinned']
+            if 'type' in kwargs and kwargs['type'] is not None:
+                this_msg.data.type = kwargs['type']
+            if 'confirm_required' in kwargs and kwargs['confirm_required'] is not None:
+                this_msg.data.confirm_required = kwargs['confirm_required']
+            if 'is_show_edit_card' in kwargs and kwargs['is_show_edit_card'] is not None:
+                this_msg.data.is_show_edit_card = kwargs['is_show_edit_card']
+            if 'tip_window_type' in kwargs and kwargs['tip_window_type'] is not None:
+                this_msg.data.tip_window_type = kwargs['tip_window_type']
+        this_msg.do_api()
+
+    def del_group_notice(target_event, group_id, notice_id):
+        """删除群公告（仅 NapCat 和 Lagrange）"""
+        model = target_event.bot_info.platform['model']
+        if model not in napcatModelMap and model not in lagrangeModelMap:
+            return
+        this_msg = api.del_group_notice(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.notice_id = str(notice_id)
+        this_msg.do_api()
+
+    def upload_group_file(target_event, group_id, file, name='', folder_id=None):
+        this_msg = api.upload_group_file(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.file = file
+        if name:
+            this_msg.data.name = name
+        if folder_id is not None:
+            this_msg.data.folder_id = folder_id
+        this_msg.do_api()
+
+    def delete_group_file(target_event, group_id, file_id, name=None):
+        model = target_event.bot_info.platform['model']
+        this_msg = api.delete_group_file(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        # llonebot 和 napcat 没有 parent_id
+        if model in llonebotModelMap or model in napcatModelMap:
+            this_msg.data.file_id = str(file_id)
+        else:
+            this_msg.data.file_id = str(file_id)
+            this_msg.data.parent_id = '/'
+        this_msg.do_api()
+
+    def create_group_file_folder(target_event, group_id, name, parent_id='/'):
+        this_msg = api.create_group_file_folder(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.name = name
+        this_msg.data.parent_id = parent_id
+        this_msg.do_api()
+
+    def delete_group_folder(target_event, group_id, folder_id):
+        this_msg = api.delete_group_folder(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.folder_id = str(folder_id)
+        this_msg.do_api()
+
+    def get_group_file_system_info(target_event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_system_info()
+        raw_obj = None
+        this_msg = api.get_group_file_system_info(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['file_count'] = init_api_do_mapping_for_dict(raw_obj, ['file_count'], int)
+                res_data['data']['limit_count'] = init_api_do_mapping_for_dict(raw_obj, ['limit_count'], int)
+                res_data['data']['used_space'] = init_api_do_mapping_for_dict(raw_obj, ['used_space'], int)
+                res_data['data']['total_space'] = init_api_do_mapping_for_dict(raw_obj, ['total_space'], int)
+        return res_data
+
+    def get_group_root_files(target_event, group_id, file_count=None):
+        model = target_event.bot_info.platform['model']
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_root_files()
+        raw_obj = None
+        this_msg = api.get_group_root_files(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        # napcat 支持 file_count 参数
+        if model in napcatModelMap and file_count is not None:
+            this_msg.data.file_count = int(file_count)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
+                res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
+        return res_data
+
+    def get_group_files_by_folder(target_event, group_id, folder_id, file_count=None):
+        model = target_event.bot_info.platform['model']
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_files_by_folder()
+        raw_obj = None
+        this_msg = api.get_group_files_by_folder(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.folder_id = str(folder_id)
+        # napcat 支持 file_count 参数
+        if model in napcatModelMap and file_count is not None:
+            this_msg.data.file_count = int(file_count)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
+                res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
+        return res_data
+
+    def get_group_file_url(target_event, group_id, file_id, busid):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_url()
+        raw_obj = None
+        this_msg = api.get_group_file_url(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.file_id = str(file_id)
+        this_msg.data.busid = int(busid)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                res_data['data']['url'] = init_api_do_mapping_for_dict(raw_obj, ['url'], str)
+        return res_data
+
+    def upload_private_file(target_event, user_id, file, name):
+        this_msg = api.upload_private_file(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.user_id = int(user_id)
+        this_msg.data.file = file
+        this_msg.data.name = name
+        this_msg.do_api()
+
+    # 这里是三协议新引入的接口，以 LLOneBot 为主，NapCat 和 Lagrange 兼容实现
+    def rename_group_file_folder(target_event, group_id, folder_id, new_folder_name):
+        """重命名群文件夹（仅 LLOneBot 和 Lagrange）"""
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in lagrangeModelMap:
+            return
+        this_msg = api.rename_group_file_folder(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.folder_id = str(folder_id)
+        this_msg.data.new_folder_name = str(new_folder_name)
+        this_msg.do_api()
+
+    def rename_group_file(target_event, group_id, file_id, current_parent_directory, new_name):
+        """重命名群文件（仅 NapCat）"""
+        model = target_event.bot_info.platform['model']
+        if model not in napcatModelMap:
+            return
+        this_msg = api.rename_group_file(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.file_id = str(file_id)
+        this_msg.data.current_parent_directory = str(current_parent_directory)
+        this_msg.data.new_name = str(new_name)
+        this_msg.do_api()
+
+    def set_group_file_forever(target_event, group_id, file_id):
+        """群文件转永久（仅 LLOneBot 和 NapCat）"""
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in napcatModelMap:
+            return
+        if model in llonebotModelMap:
+            this_msg = api.set_group_file_forever(get_SDK_bot_info_from_Event(target_event))
+        elif model in napcatModelMap:
+            this_msg = api.trans_group_file(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.data.file_id = str(file_id)
+        this_msg.do_api()
+    
+    def get_essence_msg_list(target_event, group_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
+        raw_obj = None
+        this_msg = api.get_essence_msg_list(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.group_id = int(group_id)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                model = target_event.bot_info.platform['model']
+                for raw_obj_this in raw_obj:
+                    item = {}
+                    # LLOneBot 字段作为主要标准
+                    item['sender_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['sender_id'], int)
+                    item['sender_nick'] = init_api_do_mapping_for_dict(raw_obj_this, ['sender_nick'], str)
+                    item['sender_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['sender_time'], int)
+                    item['operator_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['operator_id'], int)
+                    item['operator_nick'] = init_api_do_mapping_for_dict(raw_obj_this, ['operator_nick'], str)
+                    item['operator_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['operator_time'], int)
+                    item['message_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['message_id'], int)
+                    item['message'] = init_api_do_mapping_for_dict(raw_obj_this, ['message'], str)
+                    item['wording'] = init_api_do_mapping_for_dict(raw_obj_this, ['wording'], str)
+                    item['extra'] = {}
+                    if model in napcatModelMap:
+                        # NapCat 独有字段
+                        item['extra']['msg_seq'] = init_api_do_mapping_for_dict(raw_obj_this, ['msg_seq'], int)
+                        item['extra']['msg_random'] = init_api_do_mapping_for_dict(raw_obj_this, ['msg_random'], int)
+                        item['extra']['content'] = init_api_do_mapping_for_dict(raw_obj_this, ['content'], list)
+                    elif model in lagrangeModelMap:
+                        # Lagrange 独有字段
+                        item['extra']['content'] = init_api_do_mapping_for_dict(raw_obj_this, ['content'], list)
+                    res_data['data'].append(item)
+        return res_data
+
+    def get_group_ignore_add_request(target_event, group_id=None):
+        """获取已过滤的加群通知（仅 NapCat）"""
+        model = target_event.bot_info.platform['model']
+        if model not in napcatModelMap:
+            return
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_ignore_add_request()
+        raw_obj = None
+        this_msg = api.get_group_ignore_add_request(get_SDK_bot_info_from_Event(target_event))
+        if group_id is not None:
+            this_msg.data.group_id = int(group_id)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    item = {}
+                    item['request_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['request_id'], int)
+                    item['invitor_uin'] = init_api_do_mapping_for_dict(raw_obj_this, ['invitor_uin'], int)
+                    item['invitor_nick'] = init_api_do_mapping_for_dict(raw_obj_this, ['invitor_nick'], str)
+                    item['group_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int)
+                    item['group_name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
+                    item['checked'] = init_api_do_mapping_for_dict(raw_obj_this, ['checked'], bool)
+                    item['actor'] = init_api_do_mapping_for_dict(raw_obj_this, ['actor'], int)
+                    item['requester_nick'] = init_api_do_mapping_for_dict(raw_obj_this, ['requester_nick'], str)
+                    item['message'] = init_api_do_mapping_for_dict(raw_obj_this, ['message'], str)
+        return res_data
+
+    def get_doubt_friends_add_request(target_event, count=50):
+        """获取被过滤的好友请求（仅 LLOneBot 和 NapCat）"""
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in napcatModelMap:
+            return
+        res_data = OlivOS.contentAPI.api_result_data_template.get_doubt_friends_add_request()
+        raw_obj = None
+        this_msg = api.get_doubt_friends_add_request(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.count = int(count)
+        this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == list:
+                res_data['active'] = True
+                for raw_obj_this in raw_obj:
+                    item = {}
+                    # 以 LLOneBot 字段为主
+                    item['flag'] = init_api_do_mapping_for_dict(raw_obj_this, ['flag'], str)
+                    item['uin'] = init_api_do_mapping_for_dict(raw_obj_this, ['uin'], str)
+                    item['nick'] = init_api_do_mapping_for_dict(raw_obj_this, ['nick'], str)
+                    item['source'] = init_api_do_mapping_for_dict(raw_obj_this, ['source'], str)
+                    item['reason'] = init_api_do_mapping_for_dict(raw_obj_this, ['reason'], str)
+                    item['msg'] = init_api_do_mapping_for_dict(raw_obj_this, ['msg'], str)
+                    item['group_code'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_code'], str)
+                    item['time'] = init_api_do_mapping_for_dict(raw_obj_this, ['time'], str)
+                    item['type'] = init_api_do_mapping_for_dict(raw_obj_this, ['type'], str)
+                    item['extra'] = {}
+                    # 平台特有字段放在 extra 中（目前两个平台字段相同）
+                    res_data['data'].append(item)
+        return res_data
+
+    def get_group_system_msg(target_event, count=50):
+        """获取群系统消息（仅 LLOneBot 和 NapCat，LLOneBot 的已过滤在这里看）"""
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in napcatModelMap:
+            return
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_system_msg()
+        raw_obj = None
+        this_msg = api.get_group_system_msg(get_SDK_bot_info_from_Event(target_event))
+        # LLOneBot 使用 GET，NapCat 使用 POST
+        if model in llonebotModelMap:
+            this_msg.do_api_get()
+        elif model in napcatModelMap:
+            this_msg.data.count = int(count)
+            this_msg.do_api()
+        if this_msg.res is not None:
+            raw_obj = init_api_json(this_msg.res.text)
+        if raw_obj is not None:
+            if type(raw_obj) == dict:
+                res_data['active'] = True
+                # 处理邀请加群申请
+                if 'invited_requests' in raw_obj or 'InvitedRequest' in raw_obj:
+                    invited_key = 'invited_requests' if 'invited_requests' in raw_obj else 'InvitedRequest'
+                    invited_list = init_api_do_mapping_for_dict(raw_obj, [invited_key], list)
+                    if invited_list:
+                        res_data['data']['invited_requests'] = invited_list
+                # 处理加群申请
+                if 'join_requests' in raw_obj:
+                    join_list = init_api_do_mapping_for_dict(raw_obj, ['join_requests'], list)
+                    if join_list:
+                        res_data['data']['join_requests'] = join_list
+        return res_data
+
+    def set_doubt_friends_add_request(target_event, flag, approve=True):
+        """处理被过滤的好友请求（仅 LLOneBot 和 NapCat）"""
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in napcatModelMap:
+            return
+        this_msg = api.set_doubt_friends_add_request(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.flag = str(flag)
+        if model in napcatModelMap:
+            this_msg.data.approve = approve
+        this_msg.do_api()
+
+    def group_poke(target_event, group_id, user_id):
+        model = target_event.bot_info.platform['model']
+        if model in napcatModelMap or model in lagrangeModelMap or model in llonebotModelMap:
+            this_msg = api.group_poke(get_SDK_bot_info_from_Event(target_event))
+            this_msg.data.group_id = int(group_id)
+            this_msg.data.user_id = int(user_id)
+            this_msg.do_api()
+
+    def friend_poke(target_event, user_id):
+        model = target_event.bot_info.platform['model']
+        if model in napcatModelMap or model in lagrangeModelMap or model in llonebotModelMap:
+            this_msg = api.friend_poke(get_SDK_bot_info_from_Event(target_event))
+            this_msg.data.user_id = int(user_id)
+            this_msg.do_api()
+            
+    def set_msg_emoji_like(target_event, message_id, emoji_id, is_set=True, group_id=None):
+        model = target_event.bot_info.platform['model']
+        
+        if model in lagrangeModelMap:
+            # Lagrange 用 set_group_reaction
+            this_msg = api.set_group_reaction(get_SDK_bot_info_from_Event(target_event))
+            if group_id is None:
+                raise ValueError("Lagrange model requires group_id parameter")
+            this_msg.data.group_id = int(group_id)
+            this_msg.data.message_id = int(message_id)
+            this_msg.data.code = str(emoji_id)
+            this_msg.data.is_add = is_set
+            this_msg.do_api()
+            
+        elif model in napcatModelMap:
+            # NapCat 用 set_msg_emoji_like
+            this_msg = api.set_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
+            this_msg.data.message_id = int(message_id)
+            this_msg.data.emoji_id = int(emoji_id)
+            this_msg.data.set = is_set
+            this_msg.do_api()
+            
+        elif model in llonebotModelMap:
+            # LLOneBot 用 set_msg_emoji_like，根据 is_set 使用不同的 API
+            if is_set:
+                this_msg = api.set_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
+                this_msg.data.message_id = int(message_id)
+                this_msg.data.emoji_id = int(emoji_id)
+                this_msg.do_api()
+            else:
+                this_msg = api.unset_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
+                this_msg.data.message_id = int(message_id)
+                this_msg.data.emoji_id = int(emoji_id)
+                this_msg.do_api()
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -1023,6 +1515,19 @@ class api(object):
                 self.group_id = -1
                 self.messages = ''
 
+    class send_private_forward_msg(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'send_private_forward_msg'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.user_id = -1
+                self.messages = ''
+
     class send_msg(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1075,6 +1580,30 @@ class api(object):
             def __init__(self):
                 self.id = -1
 
+    class set_essence_msg(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'set_essence_msg'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.message_id = -1
+
+    class delete_essence_msg(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'delete_essence_msg'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.message_id = -1
+
     class send_like(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1087,6 +1616,43 @@ class api(object):
             def __init__(self):
                 self.user_id = -1
                 self.times = 1
+
+    class send_group_sign(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'send_group_sign'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+
+    class group_poke(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'group_poke'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.user_id = -1
+
+    class friend_poke(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'friend_poke'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.user_id = -1
 
     class set_group_kick(api_templet):
         def __init__(self, bot_info=None):
@@ -1224,7 +1790,7 @@ class api(object):
                 self.group_id = -1
                 self.user_id = -1
                 self.special_title = None
-                self.duration = -1
+                self.duration = None
 
     class set_friend_add_request(api_templet):
         def __init__(self, bot_info=None):
@@ -1516,3 +2082,340 @@ class api(object):
             def __init__(self):
                 self.guild_id = -1
                 self.user_id = -1
+
+    # 文件相关接口
+
+    class upload_group_file(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'upload_group_file'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file = ''
+                self.name = ''
+                self.folder_id = None
+
+    class delete_group_file(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'delete_group_file'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_id = ''
+                self.name = None
+                self.parent_id = None
+
+    class create_group_file_folder(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'create_group_file_folder'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.name = ''
+                self.parent_id = '/'
+
+    class delete_group_folder(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'delete_group_folder'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.folder_id = ''
+
+    class get_group_file_system_info(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_file_system_info'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+
+    class get_group_root_files(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_root_files'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_count = None
+
+    class get_group_files_by_folder(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_files_by_folder'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.folder_id = ''
+                self.file_count = None
+
+    class get_group_file_url(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_file_url'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_id = ''
+                self.busid = -1
+
+    class upload_private_file(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'upload_private_file'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.user_id = -1
+                self.file = ''
+                self.name = ''
+
+    class rename_group_file_folder(api_templet):
+        """LLOneBot 和 Lagrange 支持"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'rename_group_file_folder'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.folder_id = ''
+                self.new_folder_name = ''
+
+    class rename_group_file(api_templet):
+        """NapCat 支持"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'rename_group_file'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_id = ''
+                self.current_parent_directory = ''
+                self.new_name = ''
+
+    class set_group_file_forever(api_templet):
+        """LLOneBot 支持 (群文件转永久)"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'set_group_file_forever'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_id = ''
+
+    class trans_group_file(api_templet):
+        """NapCat 支持 (转存为永久文件)"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'trans_group_file'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.file_id = ''
+
+    class get_essence_msg_list(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_essence_msg_list'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+
+    class get_group_ignore_add_request(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_ignore_add_request'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = None
+
+    class get_doubt_friends_add_request(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_doubt_friends_add_request'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.count = 50
+
+    class get_group_system_msg(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'get_group_system_msg'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.count = None
+
+    class set_doubt_friends_add_request(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'set_doubt_friends_add_request'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.flag = ''
+                self.approve = None
+
+    class get_group_notice(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = '_get_group_notice'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+
+    class send_group_notice(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = '_send_group_notice'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.content = ''
+                self.image = ''
+                # NapCat 额外参数
+                self.pinned = None
+                self.type = None
+                self.confirm_required = None
+                self.is_show_edit_card = None
+                self.tip_window_type = None
+
+    class del_group_notice(api_templet):
+        """仅 Lagrange 和 NapCat 支持"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = '_del_group_notice'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.notice_id = ''
+                
+    class set_group_reaction(api_templet):
+        """Lagrange 贴表情"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'set_group_reaction'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.group_id = -1
+                self.message_id = -1
+                self.code = ''
+                self.is_add = True
+
+    class set_msg_emoji_like(api_templet):
+        """NapCat/LLOneBot 贴表情"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'set_msg_emoji_like'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.message_id = -1
+                self.emoji_id = -1
+                self.set = None
+
+    class unset_msg_emoji_like(api_templet):
+        """LLOneBot 取消贴表情"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.node_ext = 'unset_msg_emoji_like'
+            self.res = None
+
+        class data_T(object):
+            def __init__(self):
+                self.message_id = -1
+                self.emoji_id = -1

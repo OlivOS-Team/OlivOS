@@ -52,6 +52,16 @@ class api_result_data_template(object):
                 }
             )
 
+    class get_forward_msg(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'messages': []
+                }
+            )
+
     class get_login_info(dict):
         def __init__(self):
             self['active'] = False
@@ -198,6 +208,80 @@ class api_result_data_template(object):
                     'os': None
                 }
             )
+
+
+    class get_group_file_system_info(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'file_count': 0,
+                    'limit_count': 0,
+                    'used_space': 0,
+                    'total_space': 0
+                }
+            )
+
+    class get_group_root_files(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'files': [],
+                    'folders': []
+                }
+            )
+
+    class get_group_files_by_folder(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'files': [],
+                    'folders': []
+                }
+            )
+
+    class get_group_file_url(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {}
+            self['data'].update(
+                {
+                    'url': None
+                }
+            )
+
+    class get_essence_msg_list(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
+    class get_group_ignore_add_request(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
+    class get_doubt_friends_add_request(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
+    class get_group_notice(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = []
+
+    class get_group_system_msg(dict):
+        def __init__(self):
+            self['active'] = False
+            self['data'] = {
+                'invited_requests': [],
+                'join_requests': []
+            }
 
 
 def get_Event_from_fake_SDK(target_event):
