@@ -39,6 +39,9 @@ accountTypeList = [
     'Hack.Chat/私有',
     'onebotV12/正向WS',
     'onebotV11/Http',
+    'onebotV11/Http/NapCat',
+    'onebotV11/Http/LLOneBot',
+    'onebotV11/Http/Lagrange',
     'onebotV11/Http/Shamrock',
     'RED协议',
     '微信/ComWeChat',
@@ -74,6 +77,9 @@ accountTypeList = [
 
 accountTypeMappingList = {
     'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post'],
+    'onebotV11/Http/NapCat': ['qq', 'onebot', 'napcat_default', 'False', 'post'],
+    'onebotV11/Http/LLOneBot': ['qq', 'onebot', 'llonebot_default', 'False', 'post'],
+    'onebotV11/Http/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'post'],
     'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post'],
     'onebotV11/Http/消息段': ['qq', 'onebot', 'array_default', 'False', 'post'],
     'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket'],
@@ -239,7 +245,10 @@ accountTypeDataList_platform_sdk_model = {
             #'napcat_hide',
             'napcat_show',
             'napcat_show_new',
-            'napcat_show_old'
+            'napcat_show_old',
+            'napcat_default',
+            'llonebot_default',
+            'lagrange_default'
         ]
     },
     'qqGuild': {
