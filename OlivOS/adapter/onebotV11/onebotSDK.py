@@ -1074,9 +1074,9 @@ class event_action(object):
         this_msg.do_api()
 
     def del_group_notice(target_event, group_id, notice_id):
-        """删除群公告（仅 NapCat 和 Lagrange）"""
+        """删除群公告（支持 NapCat、Lagrange 和 LLOneBot）"""
         model = target_event.bot_info.platform['model']
-        if model not in napcatModelMap and model not in lagrangeModelMap:
+        if model not in napcatModelMap and model not in lagrangeModelMap and model not in llonebotModelMap:
             return
         this_msg = api.del_group_notice(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
@@ -1237,6 +1237,9 @@ class event_action(object):
     def get_essence_msg_list(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
         raw_obj = None
+        model = target_event.bot_info.platform['model']
+        if model not in llonebotModelMap and model not in napcatModelMap and model not in lagrangeModelMap:
+            return
         this_msg = api.get_essence_msg_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.do_api()
@@ -1245,7 +1248,6 @@ class event_action(object):
         if raw_obj is not None:
             if type(raw_obj) == list:
                 res_data['active'] = True
-                model = target_event.bot_info.platform['model']
                 for raw_obj_this in raw_obj:
                     item = {}
                     # LLOneBot 字段作为主要标准
@@ -2362,12 +2364,12 @@ class api(object):
                 self.tip_window_type = None
 
     class del_group_notice(api_templet):
-        """仅 Lagrange 和 NapCat 支持"""
+        """删除群公告（支持 Lagrange、NapCat 和 LLOneBot）"""
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = self.data_T()
-            self.node_ext = '_del_group_notice'
+            self.node_ext = '_delete_group_notice'
             self.res = None
 
         class data_T(object):
