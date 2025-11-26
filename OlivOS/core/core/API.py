@@ -23,6 +23,7 @@ import time
 import traceback
 import inspect
 import ctypes
+import html
 
 from functools import wraps
 
@@ -265,6 +266,21 @@ class Event(object):
                 else:
                     self.data.message = self.data.message_sdk.data_raw
                     self.data.raw_message = self.data.raw_message_sdk.data_raw
+        # 转换html实例
+        self._normalize_message_entities()
+
+    def _html_unescape_if_str(self, value):
+        if isinstance(value, str):
+            return html.unescape(value)
+        return value
+
+    def _normalize_message_entities(self):
+        if self.data is None:
+            return
+        if hasattr(self.data, 'message'):
+            self.data.message = self._html_unescape_if_str(self.data.message)
+        if hasattr(self.data, 'raw_message'):
+            self.data.raw_message = self._html_unescape_if_str(self.data.raw_message)
 
     def do_init_log(self):
         if self.active:
