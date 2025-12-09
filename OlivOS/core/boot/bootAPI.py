@@ -44,10 +44,15 @@ def releaseDir(dir_path):
 
 
 class Entity(object):
-    def __init__(self, basic_conf=None):
-        self.Config = {'basic_conf_path': './conf/basic.json'}
+    def __init__(self, basic_conf=None, patch_conf=None):
+        self.Config = {
+            'basic_conf_path': './conf/basic.json',
+            'patch_conf_path': './conf/config.json'
+        }
         if basic_conf is not None:
             self.Config['basic_conf_path'] = basic_conf
+        if patch_conf is not None:
+            self.Config['patch_conf_path'] = patch_conf
 
     def start(self):
         global gLoggerProc
@@ -56,7 +61,9 @@ class Entity(object):
         atexit.register(killMain)
         sys.setrecursionlimit(100000)
         basic_conf_path = self.Config['basic_conf_path']
+        patch_conf_path = self.Config['patch_conf_path']
         basic_conf = None
+        patch_conf = None
         basic_conf_models = None
         Proc_dict = {}
         Proc_Proc_dict = {}
@@ -80,12 +87,25 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
             with open(basic_conf_path, 'r', encoding='utf-8') as basic_conf_f:
                 basic_conf = json.loads(basic_conf_f.read())
         except:
-            preLoadPrint('init config from [%s] ... failed' % basic_conf_path)
+            preLoadPrint('init config from [%s] ... not hit' % basic_conf_path)
             releaseDir('./conf')
             basic_conf = OlivOS.bootDataAPI.default_Conf
             preLoadPrint('init config from default ... done')
         else:
             preLoadPrint('init config from [%s] ... done' % basic_conf_path)
+
+        preLoadPrint('patch config from [%s] ... ' % patch_conf_path)
+        try:
+            with open(patch_conf_path, 'r', encoding='utf-8') as patch_conf_f:
+                patch_conf = json.loads(patch_conf_f.read())
+        except:
+            preLoadPrint('patch config from [%s] ... not hit' % patch_conf_path)
+            releaseDir('./conf')
+            preLoadPrint('patch config from default ... done')
+        else:
+            basic_conf = get_patch_config(basic_conf, patch_conf)
+            preLoadPrint('patch config from [%s] ... done' % patch_conf_path)
+
         preLoadPrint('init models from config ... ')
         if basic_conf is not None:
             basic_conf_models = basic_conf['models']
@@ -1041,6 +1061,49 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 killMain()
             bootMonitor(varDict=locals())
 
+
+def get_patch_config(basic_conf: dict, patch_conf: dict):
+    res = basic_conf
+    list_patch = [
+        ['system', 'name'],
+        ['system', 'init'],
+        ['system', 'event'],
+        ['system', 'type_event'],
+        ['system', 'control_queue'],
+        ['system', 'interval'],
+        ['system', 'proc_mode'],
+        ['queue']
+    ]
+    for i in list_patch:
+        patch_config_by_path(basic_conf, patch_conf, i)
+    if 'models' in basic_conf:
+        for i in basic_conf['models']:
+            patch_config_by_path(basic_conf, patch_conf, ['models', i])
+    return res
+
+def patch_config_by_path(basic_conf: dict, patch_conf: dict, path: list):
+    basic_conf_this = basic_conf
+    patch_conf_this = patch_conf
+    if len(path) > 0:
+        for idx in range(len(path)):
+            if idx == len(path) - 1:
+                break
+            basic_conf_this = basic_conf_this[path[idx]]
+            patch_conf_this = patch_conf_this[path[idx]]
+        conf_key = path[-1]
+        if conf_key in basic_conf_this \
+        and conf_key in patch_conf_this:
+            flag_same_type = False
+            if type(basic_conf_this[conf_key]) is type(patch_conf_this[conf_key]):
+                flag_same_type = True
+            elif type(basic_conf_this[conf_key]) in (int, float) \
+            and type(patch_conf_this[conf_key]) in (int, float):
+                flag_same_type = True
+            if flag_same_type:
+                if type(basic_conf_this[conf_key]) is dict:
+                    basic_conf_this[conf_key].update(patch_conf_this[conf_key])
+                else:
+                    basic_conf_this[conf_key] = patch_conf_this[conf_key]
 
 def update_get_func(
         Proc_dict,
