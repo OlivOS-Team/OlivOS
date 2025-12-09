@@ -17,9 +17,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 
-OlivOS_Version = '0.11.75'
-OlivOS_SVN = 195
-OlivOS_Version_Slogan = '沉重的封神剑'
+OlivOS_Version = '0.11.76'
+OlivOS_SVN = 196
+OlivOS_Version_Slogan = '不死的头发元素'
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
 # OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn

@@ -101,6 +101,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_plugin_edit_enable'] = False
         self.UIObject['root_plugin_edit_count'] = 0
         self.UIObject['flag_have_update'] = False
+        self.UIObject['flag_first_account_list_update'] = True
         self.UIData['shallow_plugin_menu_list'] = None
         self.UIData['shallow_gocqhttp_menu_list'] = None
         self.UIData['shallow_walleq_menu_list'] = None
@@ -110,6 +111,8 @@ class dock(OlivOS.API.Proc_templet):
         self.UIData['shallow_virtual_terminal_menu_list'] = None
         self.UIData['shallow_account_menu_list'] = None
         self.UIData['shallow_plugin_data_dict'] = None
+        self.UIData['shallow_account_list'] = []
+        self.UIData['shallow_account_list_new'] = []
         self.updateShallowMenuList()
 
     def run(self):
@@ -144,6 +147,14 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['main_tk'].after(50, self.process_msg)
         self.mainrun()
 
+    def update_account_msg(self):
+        if self.UIObject['flag_first_account_list_update']:
+            self.UIObject['main_tk'].after(60000, self.update_account_msg)
+            self.UIObject['flag_first_account_list_update'] = False
+        else:
+            self.UIObject['main_tk'].after(300000, self.update_account_msg)
+            self.updateShallowMenuAccountList()
+
     def mainrun(self):
         if True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
@@ -162,6 +173,10 @@ class dock(OlivOS.API.Proc_templet):
                                         if 'update_data' == rx_packet_data.key['data']['action']:
                                             self.UIData.update(rx_packet_data.key['data']['data'])
                                             self.updateShallowMenuList()
+                                        elif 'update_account_list' == rx_packet_data.key['data']['action']:
+                                            self.updateShallowMenuAccountList()
+                                            if self.UIObject['root_shallow'] is not None:
+                                                self.updateShallow()
                                         elif 'start_shallow' == rx_packet_data.key['data']['action']:
                                             if self.UIObject['root_shallow'] is None:
                                                 self.startShallow()
@@ -559,57 +574,101 @@ class dock(OlivOS.API.Proc_templet):
             pass
         return '自定义'
     
-    def getAccountDisplayInfo(self, botHash, bot_info):
+    def getAccountDisplayInfo(self, botHash, bot_info, flagInit = False):
         """
         获取账号显示信息（名称和协议端）
         """
         account_name = "未知账号"
         try:
-            fake_event = OlivOS.API.Event(
-                OlivOS.contentAPI.fake_sdk_event(
-                    bot_info=bot_info,
-                    fakename='nativeWinUI'
-                ),
-                None
-            )
-            res_data = fake_event.get_login_info(bot_info)
-            if res_data and res_data.get('active') and 'data' in res_data:
-                account_name = res_data['data'].get('name', str(bot_info.id))
-            else:
-                account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+            account_name = str(bot_info.id)
         except:
+            pass
+        if not flagInit:
             try:
-                account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+                fake_event = OlivOS.API.Event(
+                    OlivOS.contentAPI.fake_sdk_event(
+                        bot_info=bot_info,
+                        fakename='nativeWinUI'
+                    ),
+                    None
+                )
+                res_data = fake_event.get_login_info(bot_info)
+                if res_data and res_data.get('active') and 'data' in res_data:
+                    account_name = res_data['data'].get('name', str(bot_info.id))
+                    account_name = f'{account_name}({str(bot_info.id)})'
+                else:
+                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
             except:
-                pass
+                try:
+                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+                except:
+                    pass
         platform_name = self.getPlatformDisplayName(bot_info)
         return account_name, platform_name
-    
+
+    def updateAccountList(self, flagInit = False):
+        self.UIData['shallow_account_list_new'] = []
+        if self.bot_info and type(self.bot_info) is dict:
+            for botHash, bot_info in self.bot_info.items():
+                account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info, flagInit = flagInit)
+                self.UIData['shallow_account_list_new'].append((botHash, account_name, platform_name))
+            self.UIData['shallow_account_list_new'].sort(key=lambda x: x[1])
+
+    def mergeAccountList(self):
+        self.UIData['shallow_account_list'] = self.UIData['shallow_account_list_new']
+        return True
+
+    def updateShallowMenuAccountList(self):
+        self.updateAccountList()
+        if self.mergeAccountList():
+            self.updateShallowMenuList()
+
+    def updateShallowMenuAccountListSendFunc(self):
+        def resFunc():
+            self.updateShallowMenuAccountListSend()
+        return resFunc
+
+    def updateShallowMenuAccountListSend(self):
+        self.sendRxEvent('send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'update_account_list'
+                }
+            }
+        )
+
     def updateShallowMenuList(self):
         tmp_new = []
         account_items = []
-        account_count = 0
-        if self.bot_info and type(self.bot_info) is dict:
-            account_list = []
-            for botHash, bot_info in self.bot_info.items():
-                account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info)
-                account_list.append((botHash, account_name, platform_name))
-            account_list.sort(key=lambda x: x[1])
-            account_count = len(account_list)
-            for botHash, account_name, platform_name in account_list:
-                account_items.append(['account_info', account_name, botHash])
-                account_items.append(['account_info', f"└ {platform_name}", botHash])
+        account_list = self.UIData['shallow_account_list']
+        account_count = len(account_list)
+        if 0 == account_count:
+            self.updateAccountList(flagInit = True)
+            self.mergeAccountList()
+        for botHash, account_name, platform_name in account_list:
+            account_items.append(['account_info', f"{account_name} - {platform_name}", botHash])
         
-        self.UIData['shallow_menu_list'] = [
-            ['打开终端', self.startOlivOSTerminalUISend],
-        ]
+        self.UIData['shallow_menu_list'] = []
+        self.UIData['shallow_menu_list'].extend([
+            ['打开终端', self.startOlivOSTerminalUISend]
+        ])
         # 账号菜单项
         account_menu_title = f"[{account_count}]个账号"
+        account_list_final = []
         if account_items:
-            self.UIData['shallow_account_menu_list'] = account_items
-        else:
-            self.UIData['shallow_account_menu_list'] = []
-        self.UIData['shallow_menu_list'].append(['account_menu', account_menu_title, self.UIData['shallow_account_menu_list'], account_count])
+            account_list_final = account_items
+        account_refresh = [
+            ['SEPARATOR'],
+            ['刷新', self.updateShallowMenuAccountListSendFunc()]
+        ]
+        self.UIData['shallow_menu_list'].extend([
+            ['account_menu', account_menu_title, account_list_final + account_refresh, account_count]
+        ])
+        self.UIData['shallow_menu_list'].extend([
+            ['SEPARATOR']
+        ])
         self.UIData['shallow_menu_list'].extend([
             # ['账号管理', self.startAccountEditSendFunc()],
             # ['账号管理', None],
@@ -3675,7 +3734,7 @@ class shallow(object):
                                 pystray.MenuItem(
                                     item_this[1],
                                     None,
-                                    enabled=False
+                                    enabled=True
                                 )
                             )
                         # 处理账号菜单项（根据账号数量决定是否禁用）
@@ -3690,6 +3749,8 @@ class shallow(object):
                                     enabled=menu_enabled
                                 )
                             )
+                        elif len(item_this) == 1 and item_this[0] == 'SEPARATOR':
+                            list_new.append(pystray.Menu.SEPARATOR)
                         elif len(item_this) == 2:
                             tmp_sub_menu = self.getMenu(item_this[1])
                             list_new.append(
