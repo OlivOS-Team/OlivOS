@@ -43,6 +43,18 @@ gCheckList = [
     'napcat_show_old'
 ]
 
+gCheck9912List = [
+    'napcat_show_new_9_9_12'
+]
+
+gCheck9919List = [
+    'napcat_show_new_9_9_19'
+]
+
+gCheck9922List = [
+    'napcat_show_new_9_9_22',
+    'napcat_show_new'
+]
 
 def startNapCatLibExeModel(
     plugin_bot_info_dict,
@@ -55,35 +67,59 @@ def startNapCatLibExeModel(
 ):
     if platform.system() == 'Windows':
         flagActive = False
+        flag9911Active = False
+        flag9912Active = False
+        flag9919Active = False
+        flag9922Active = False
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
                 flagActive = True
+            if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9912List:
+                flag9912Active = True
+            elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9919List:
+                flag9919Active = True
+            elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9922List:
+                flag9922Active = True
+            else:
+                flag9911Active = True
         if flagActive:
             releaseDir('./lib')
-            OlivOS.updateAPI.checkResouceFile(
-                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api=resourceUrlPath,
-                resouce_name='NapCat-QQ-Win-9.9.11-24568',
-                filePath='./lib/NapCat.zip',
-                filePathUpdate='./lib/NapCat.zip.tmp',
-                filePathFORCESKIP='./lib/FORCESKIP'
-            )
-            OlivOS.updateAPI.checkResouceFile(
-                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api=resourceUrlPath,
-                resouce_name='NapCat-QQ-Win-9.9.12-26000',
-                filePath='./lib/NapCatNew.zip',
-                filePathUpdate='./lib/NapCatNew.zip.tmp',
-                filePathFORCESKIP='./lib/FORCESKIP'
-            )
-            OlivOS.updateAPI.checkResouceFile(
-                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                resouce_api=resourceUrlPath,
-                resouce_name='NapCat-QQ-Win-9.9.19-34740',
-                filePath='./lib/NapCat-QQ-Win-9.9.19-34740.zip',
-                filePathUpdate='./lib/NapCat-QQ-Win-9.9.19-34740.zip.tmp',
-                filePathFORCESKIP='./lib/FORCESKIP'
-            )
+            if flag9911Active:
+                OlivOS.updateAPI.checkResouceFile(
+                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                    resouce_api=resourceUrlPath,
+                    resouce_name='NapCat-QQ-Win-9.9.11-24568',
+                    filePath='./lib/NapCat.zip',
+                    filePathUpdate='./lib/NapCat.zip.tmp',
+                    filePathFORCESKIP='./lib/FORCESKIP'
+                )
+            if flag9912Active:
+                OlivOS.updateAPI.checkResouceFile(
+                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                    resouce_api=resourceUrlPath,
+                    resouce_name='NapCat-QQ-Win-9.9.12-26000',
+                    filePath='./lib/NapCatNew.zip',
+                    filePathUpdate='./lib/NapCatNew.zip.tmp',
+                    filePathFORCESKIP='./lib/FORCESKIP'
+                )
+            if flag9919Active:
+                OlivOS.updateAPI.checkResouceFile(
+                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                    resouce_api=resourceUrlPath,
+                    resouce_name='NapCat-QQ-Win-9.9.19-34740',
+                    filePath='./lib/NapCat-QQ-Win-9.9.19-34740.zip',
+                    filePathUpdate='./lib/NapCat-QQ-Win-9.9.19-34740.zip.tmp',
+                    filePathFORCESKIP='./lib/FORCESKIP'
+                )
+            if flag9922Active:
+                OlivOS.updateAPI.checkResouceFile(
+                    logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                    resouce_api=resourceUrlPath,
+                    resouce_name='NapCat-QQ-Win-9.9.22-40990',
+                    filePath='./lib/NapCat-QQ-Win-9.9.22-40990.zip',
+                    filePathUpdate='./lib/NapCat-QQ-Win-9.9.22-40990.zip.tmp',
+                    filePathFORCESKIP='./lib/FORCESKIP'
+                )
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
@@ -144,15 +180,13 @@ class server(OlivOS.API.Proc_templet):
             releaseDir('./conf/napcat')
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
-            if self.Proc_data['bot_info_dict'].platform['model'] in [
-                'napcat_show_new_9_9_19',
-                'napcat_show_new'
-            ]:
+            if self.Proc_data['bot_info_dict'].platform['model'] in gCheck9922List:
+                unzip('./lib/NapCat-QQ-Win-9.9.22-40990.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+            elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9919List:
                 unzip('./lib/NapCat-QQ-Win-9.9.19-34740.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
                 napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
-            elif self.Proc_data['bot_info_dict'].platform['model'] in [
-                'napcat_show_new_9_9_12'
-            ]:
+            elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9912List:
                 unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
                 napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             else:
@@ -162,6 +196,7 @@ class server(OlivOS.API.Proc_templet):
                 'napcat',
                 'napcat_show_new_9_9_12',
                 'napcat_show_new_9_9_19',
+                'napcat_show_new_9_9_22',
                 'napcat_show_new',
                 'napcat_show'
             ]:
@@ -176,6 +211,7 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_data['check_qrcode_flag'] = True
                 self.Proc_data['check_stdin'] = True
                 if self.Proc_data['bot_info_dict'].platform['model'] in [
+                    'napcat_show_new_9_9_22',
                     'napcat_show_new_9_9_19',
                     'napcat_show_new'
                 ]:
