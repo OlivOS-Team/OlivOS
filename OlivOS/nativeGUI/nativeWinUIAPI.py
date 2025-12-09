@@ -44,6 +44,9 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
+gTerminalDataMax = 128
+gTerminalDataStep = 8
+
 class dock(OlivOS.API.Proc_templet):
     def __init__(
             self,
@@ -67,6 +70,7 @@ class dock(OlivOS.API.Proc_templet):
             control_queue=control_queue,
             logger_proc=logger_proc
         )
+        global gTerminalDataMax
         self.Proc_config['ready_for_restart'] = False
         self.bot_info = bot_info_dict
         self.UIObject = {}
@@ -75,25 +79,25 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_shallow'] = None
         self.UIObject['root_OlivOS_terminal'] = None
         self.UIObject['root_OlivOS_terminal_data'] = []
-        self.UIObject['root_OlivOS_terminal_data_max'] = 500
+        self.UIObject['root_OlivOS_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_gocqhttp_terminal'] = {}
         self.UIObject['root_gocqhttp_terminal_data'] = {}
-        self.UIObject['root_gocqhttp_terminal_data_max'] = 500
+        self.UIObject['root_gocqhttp_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_walleq_terminal'] = {}
         self.UIObject['root_walleq_terminal_data'] = {}
-        self.UIObject['root_walleq_terminal_data_max'] = 500
+        self.UIObject['root_walleq_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_cwcb_terminal'] = {}
         self.UIObject['root_cwcb_terminal_data'] = {}
-        self.UIObject['root_cwcb_terminal_data_max'] = 500
+        self.UIObject['root_cwcb_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_opqbot_terminal'] = {}
         self.UIObject['root_opqbot_terminal_data'] = {}
-        self.UIObject['root_opqbot_terminal_data_max'] = 500
+        self.UIObject['root_opqbot_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_napcat_terminal'] = {}
         self.UIObject['root_napcat_terminal_data'] = {}
-        self.UIObject['root_napcat_terminal_data_max'] = 500
+        self.UIObject['root_napcat_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_virtual_terminal_terminal'] = {}
         self.UIObject['root_virtual_terminal_terminal_data'] = {}
-        self.UIObject['root_virtual_terminal_terminal_data_max'] = 150
+        self.UIObject['root_virtual_terminal_terminal_data_max'] = gTerminalDataMax
         self.UIObject['root_qrcode_window'] = {}
         self.UIObject['root_qrcode_window_thread'] = {}
         self.UIObject['root_qrcode_window_enable'] = False
@@ -201,14 +205,11 @@ class dock(OlivOS.API.Proc_templet):
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
                                         elif 'logger' == rx_packet_data.key['data']['action']:
-                                            self.UIObject['root_OlivOS_terminal_data'].append(
-                                                rx_packet_data.key['data']['data'])
-                                            if len(self.UIObject['root_OlivOS_terminal_data']) > self.UIObject[
-                                                'root_OlivOS_terminal_data_max']:
+                                            self.UIObject['root_OlivOS_terminal_data'].append(rx_packet_data.key['data']['data'])
+                                            if len(self.UIObject['root_OlivOS_terminal_data']) > self.UIObject['root_OlivOS_terminal_data_max']:
                                                 self.UIObject['root_OlivOS_terminal_data'].pop(0)
                                             if self.UIObject['root_OlivOS_terminal'] is not None:
-                                                self.UIObject['root_OlivOS_terminal'].tree_add_line(
-                                                    rx_packet_data.key['data']['data'])
+                                                self.UIObject['root_OlivOS_terminal'].tree_add_line(rx_packet_data.key['data']['data'])
                                         elif 'napcat' == rx_packet_data.key['data']['action']:
                                             if 'event' in rx_packet_data.key['data']:
                                                 if 'init' == rx_packet_data.key['data']['event']:
@@ -232,22 +233,19 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startNapCatTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_napcat_terminal_data']:
                                                             self.UIObject['root_napcat_terminal_data'][hash] = []
-                                                        self.UIObject['root_napcat_terminal_data'][hash].append(
-                                                            rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_napcat_terminal_data'][hash]) > \
-                                                                self.UIObject['root_napcat_terminal_data_max']:
+                                                        self.UIObject['root_napcat_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_napcat_terminal_data'][hash]) > self.UIObject['root_napcat_terminal_data_max']:
                                                             self.UIObject['root_napcat_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_napcat_terminal']:
-                                                            self.UIObject['root_napcat_terminal'][hash].tree_add_line(
-                                                                rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_napcat_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'path' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'path' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
@@ -290,22 +288,19 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startGoCqhttpTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_gocqhttp_terminal_data']:
                                                             self.UIObject['root_gocqhttp_terminal_data'][hash] = []
-                                                        self.UIObject['root_gocqhttp_terminal_data'][hash].append(
-                                                            rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_gocqhttp_terminal_data'][hash]) > \
-                                                                self.UIObject['root_gocqhttp_terminal_data_max']:
+                                                        self.UIObject['root_gocqhttp_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_gocqhttp_terminal_data'][hash]) > self.UIObject['root_gocqhttp_terminal_data_max']:
                                                             self.UIObject['root_gocqhttp_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_gocqhttp_terminal']:
-                                                            self.UIObject['root_gocqhttp_terminal'][hash].tree_add_line(
-                                                                rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_gocqhttp_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'path' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'path' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
@@ -356,22 +351,19 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startWalleQTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_walleq_terminal_data']:
                                                             self.UIObject['root_walleq_terminal_data'][hash] = []
-                                                        self.UIObject['root_walleq_terminal_data'][hash].append(
-                                                            rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_walleq_terminal_data'][hash]) > \
-                                                                self.UIObject['root_walleq_terminal_data_max']:
+                                                        self.UIObject['root_walleq_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_walleq_terminal_data'][hash]) > self.UIObject['root_walleq_terminal_data_max']:
                                                             self.UIObject['root_walleq_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_walleq_terminal']:
-                                                            self.UIObject['root_walleq_terminal'][hash].tree_add_line(
-                                                                rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_walleq_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'path' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'path' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
@@ -414,19 +406,16 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startCWCBTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_cwcb_terminal_data']:
                                                             self.UIObject['root_cwcb_terminal_data'][hash] = []
-                                                        self.UIObject['root_cwcb_terminal_data'][hash].append(
-                                                            rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_cwcb_terminal_data'][hash]) > \
-                                                                self.UIObject['root_cwcb_terminal_data_max']:
+                                                        self.UIObject['root_cwcb_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_cwcb_terminal_data'][hash]) > self.UIObject['root_cwcb_terminal_data_max']:
                                                             self.UIObject['root_cwcb_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_cwcb_terminal']:
-                                                            self.UIObject['root_cwcb_terminal'][hash].tree_add_line(
-                                                                rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_cwcb_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
                                                 elif 'cwcb_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startCWCBTerminalUI(rx_packet_data.key['data']['hash'])
@@ -453,19 +442,16 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startOPQBotTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data']:
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_opqbot_terminal_data']:
                                                             self.UIObject['root_opqbot_terminal_data'][hash] = []
-                                                        self.UIObject['root_opqbot_terminal_data'][hash].append(
-                                                            rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_opqbot_terminal_data'][hash]) > \
-                                                                self.UIObject['root_opqbot_terminal_data_max']:
+                                                        self.UIObject['root_opqbot_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
+                                                        if len(self.UIObject['root_opqbot_terminal_data'][hash]) > self.UIObject['root_opqbot_terminal_data_max']:
                                                             self.UIObject['root_opqbot_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_opqbot_terminal']:
-                                                            self.UIObject['root_opqbot_terminal'][hash].tree_add_line(
-                                                                rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_opqbot_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data'] \
                                                     and 'path' in rx_packet_data.key['data']:
@@ -502,9 +488,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startVirtualTerminalUI(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] and 'data' in \
-                                                            rx_packet_data.key['data'] and 'name' in rx_packet_data.key[
-                                                        'data']:
+                                                    if 'hash' in rx_packet_data.key['data'] \
+                                                    and 'data' in rx_packet_data.key['data'] \
+                                                    and 'name' in rx_packet_data.key['data']:
                                                         user_conf = {
                                                             "user_name": "未知",
                                                             "user_id": "-1",
@@ -515,20 +501,13 @@ class dock(OlivOS.API.Proc_templet):
                                                         if "user_conf" in rx_packet_data.key['data'] and rx_packet_data.key['data']["user_conf"] is not None:
                                                             user_conf.update(rx_packet_data.key['data']["user_conf"])
                                                         hash = rx_packet_data.key['data']['hash']
-                                                        if hash not in self.UIObject[
-                                                            'root_virtual_terminal_terminal_data']:
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][
-                                                                hash] = []
-                                                        self.UIObject['root_virtual_terminal_terminal_data'][
-                                                            hash].append(rx_packet_data.key['data'])
-                                                        if len(self.UIObject['root_virtual_terminal_terminal_data'][
-                                                                   hash]) > self.UIObject[
-                                                            'root_virtual_terminal_terminal_data_max']:
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][
-                                                                hash].pop(0)
+                                                        if hash not in self.UIObject['root_virtual_terminal_terminal_data']:
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash] = []
+                                                        self.UIObject['root_virtual_terminal_terminal_data'][hash].append(rx_packet_data.key['data'])
+                                                        if len(self.UIObject['root_virtual_terminal_terminal_data'][hash]) > self.UIObject['root_virtual_terminal_terminal_data_max']:
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_virtual_terminal_terminal']:
-                                                            self.UIObject['root_virtual_terminal_terminal'][
-                                                                hash].tree_add_line(rx_packet_data.key['data'], user_conf)
+                                                            self.UIObject['root_virtual_terminal_terminal'][hash].tree_add_line(rx_packet_data.key['data'], user_conf)
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
 
@@ -1510,6 +1489,7 @@ class gocqhttpTerminalUI(object):
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
+        res_data = res_data.replace('\\', '\\\\')
         res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
@@ -1521,6 +1501,7 @@ class gocqhttpTerminalUI(object):
                         res_data
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -1830,6 +1811,7 @@ class walleqTerminalUI(object):
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
+        res_data = res_data.replace('\\', '\\\\')
         res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
@@ -1841,6 +1823,7 @@ class walleqTerminalUI(object):
                         res_data
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -2123,6 +2106,7 @@ class CWCBTerminalUI(object):
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
+        res_data = res_data.replace('\\', '\\\\')
         res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
@@ -2134,6 +2118,7 @@ class CWCBTerminalUI(object):
                         res_data
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -2402,6 +2387,7 @@ class opqbotTerminalUI(object):
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
+        res_data = res_data.replace('\\', '\\\\')
         res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
@@ -2413,6 +2399,7 @@ class opqbotTerminalUI(object):
                         res_data
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -2680,6 +2667,7 @@ class napcatTerminalUI(object):
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
+        res_data = res_data.replace('\\', '\\\\')
         res_data = res_data.replace(' ', '\ ')
         if len(res_data.replace('\ ', '')) > 0:
             try:
@@ -2691,6 +2679,7 @@ class napcatTerminalUI(object):
                         res_data
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -3051,6 +3040,7 @@ class OlivOSTerminalUI(object):
                         ),
                         tag=log_level
                     )
+                    keep_tree_thin(self.UIObject['tree'])
                     if self.UIData['flag_tree_is_bottom']:
                         self.UIObject['tree'].see(iid)
                         #self.UIObject['tree'].update()
@@ -3666,6 +3656,7 @@ class VirtualTerminalUI(object):
                         res_data_list_this
                     )
                 )
+                keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
                     #self.UIObject['tree'].update()
@@ -4211,9 +4202,15 @@ class pluginManageUI(object):
         )
 
 
-def get_tree_force(tree_obj):
+def get_tree_force(tree_obj: ttk.Treeview):
     return tree_obj.item(tree_obj.focus())
 
+# 此函数用于确保传入的tree组件的条目数不超过指定数目
+def keep_tree_thin(tree_obj: ttk.Treeview, max_num: int = gTerminalDataMax, step_num: int = gTerminalDataStep):
+    items = tree_obj.get_children()
+    if len(items) > max_num:
+        for i in range(min(max_num, step_num)):
+            tree_obj.delete(items[i])
 
 def releaseBase64Data(dir_path, file_name, base64_data):
     if not os.path.exists(dir_path):
