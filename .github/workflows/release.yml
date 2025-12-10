@@ -94,7 +94,6 @@ jobs:
 
   release-draft:
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag' && contains(github.event.base_ref, 'refs/heads/main')
     needs:
       - build-win64-release
       - build-win32-old-release
