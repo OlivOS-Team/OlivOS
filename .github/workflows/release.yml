@@ -118,11 +118,17 @@ jobs:
           path: OlivOS-Linux/
       - name: Packing Release
         run: |
-          zip -r ./OlivOS-Win.zip ./OlivOS-Win/
+          cd ./OlivOS-Win
+          zip -r ../OlivOS-Win.zip ./
+          cd ../
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
-          zip -r ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old/
+          cd ./OlivOS-Win-32-old
+          zip -r ./OlivOS-Win-32-old.zip ./
+          cd ../
           cp ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old-${{ github.ref_name }}.zip
-          zip -r ./OlivOS-Linux.zip ./OlivOS-Linux/
+          cd ./OlivOS-Linux
+          zip -r ./OlivOS-Linux.zip ./
+          cd ../
           cp ./OlivOS-Linux.zip ./OlivOS-Linux-${{ github.ref_name }}.zip
           ls -R
       - name: Create Draft Release
