@@ -260,14 +260,18 @@ jobs:
           name: OlivOS-Linux
           path: OlivOS-Linux/
       - name: ls -R
-        run: ls -R
+        run: |
+          zip -r ./OlivOS-Win.zip ./OlivOS-Win/
+          zip -r ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old/
+          zip -r ./OlivOS-Linux.zip ./OlivOS-Linux/
+          ls -R
       - name: Create Draft Release
         uses: ncipollo/release-action@v1
         with:
           tag: test
           draft: true
           artifacts: |
-            OlivOS-Win/
-            OlivOS-Linux/
-            OlivOS-Win-32-old/
+            ./OlivOS-Win.zip
+            ./OlivOS-Win-32-old.zip
+            ./OlivOS-Linux.zip
           token: ${{ secrets.GITHUB_TOKEN }}
