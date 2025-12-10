@@ -248,14 +248,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: OlivOS-Win
+          path: OlivOS-Win/
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
           name: OlivOS-Win-32-old
+          path: OlivOS-Win-32-old/
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
           name: OlivOS-Linux
+          path: OlivOS-Linux/
       - name: ls -R
-        run: ls -R # 可选步骤，用于调试，确认文件已就位
-          
+        run: ls -R
+      - name: Create Draft Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: test
+          draft: true
+          artifacts: |
+            OlivOS-Win/
+            OlivOS-Linux/
+            OlivOS-Win-32-old/
+          token: ${{ secrets.GITHUB_TOKEN }}
