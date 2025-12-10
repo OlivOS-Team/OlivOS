@@ -116,7 +116,7 @@ jobs:
         with:
           name: OlivOS-Linux
           path: OlivOS-Linux/
-      - name: ls -R
+      - name: Packing Release
         run: |
           zip -r ./OlivOS-Win.zip ./OlivOS-Win/
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
@@ -132,6 +132,9 @@ jobs:
           draft: true
           artifacts: |
             ./OlivOS-Win.zip
+            ./OlivOS-Win-${{ github.ref_name }}.zip
             ./OlivOS-Win-32-old.zip
+            ./OlivOS-Win-32-old-${{ github.ref_name }}.zip
             ./OlivOS-Linux.zip
+            ./OlivOS-Linux-${{ github.ref_name }}.zip
           token: ${{ secrets.GITHUB_TOKEN }}
