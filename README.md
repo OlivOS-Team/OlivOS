@@ -57,6 +57,7 @@
 [![Bilibili](https://img.shields.io/badge/-Bilibili-FB7299?style=flat-square&logo=Bilibili&logoColor=white)](http://www.bilibili.com/)
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?style=flat-square&logo=Telegram&logoColor=white)](https://telegram.org/)
 [![KOOK](https://img.shields.io/badge/-%E5%BC%80%E9%BB%91%E5%95%A6KOOK-83E700?style=flat-square&logo=Discord&logoColor=white)](https://www.kookapp.cn/)
+[![黑盒语音](https://img.shields.io/badge/-%E9%BB%91%E7%9B%92%E8%AF%AD%E9%9F%B3-111111?style=flat-square&logo=Discord&logoColor=white)](https://chat.xiaoheihe.cn/)
 [![大别野](https://img.shields.io/badge/-%E7%B1%B3%E6%B8%B8%E7%A4%BE%E5%A4%A7%E5%88%AB%E9%87%8E-59DBFC?style=flat-square&logoColor=white)](https://open.miyoushe.com/)
 [![Dodo](https://img.shields.io/badge/-Dodo-00B8AA?style=flat-square&logo=%2Fe%2F&logoColor=white)](https://dodo.link/)
 [![Fanbook](https://img.shields.io/badge/-Fanbook-1A52F3?style=flat-square&logo=sharp&logoColor=white)](https://fanbook.mobi/)
@@ -78,7 +79,11 @@
 ## 开始使用
 ### 发布版本
 #### Windows
-我们推荐`Windows`用户直接使用经过二进制编译的发布版本，你可以在这里获取最新版本：[releases](https://github.com/OlivOS-Team/OlivOS/releases)
+我们推荐`Windows`用户直接使用经过二进制编译的发布版本，你可以在这里获取：
+
+最新版本: [![GitHub release](https://img.shields.io/github/release/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases) [![GitHub Release Date](https://img.shields.io/github/release-date/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases)
+
+全部版本: [![GitHub release](https://img.shields.io/github/release-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases) [![GitHub Release Date](https://img.shields.io/github/release-date-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases)
 
 ### 源码版本
 请确保你已经安装了Python3以及git，当前我们主要使用`3.7.5`以及`3.11.0`两个版本的Python。  
