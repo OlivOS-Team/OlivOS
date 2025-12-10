@@ -81,7 +81,7 @@
 #### Windows
 我们推荐`Windows`用户直接使用经过二进制编译的发布版本，你可以在这里获取：
 
-最新版本: [![GitHub release](https://img.shields.io/github/release/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases) [![GitHub Release Date](https://img.shields.io/github/release-date/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases)
+最新版本: [![GitHub release](https://img.shields.io/github/release/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases/latest) [![GitHub Release Date](https://img.shields.io/github/release-date/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases/latest)
 
 全部版本: [![GitHub release](https://img.shields.io/github/release-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases) [![GitHub Release Date](https://img.shields.io/github/release-date-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases)
 
