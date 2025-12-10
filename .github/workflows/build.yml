@@ -1,4 +1,4 @@
-name: CI-Packing-all
+name: CI-Build
 on:
   push:
     branches: [ main, dev ]
@@ -234,44 +234,3 @@ jobs:
       with:
         name: OlivOS-MacOS
         path: ./OlivOS-PKG
-
-  release-draft:
-    runs-on: ubuntu-latest
-    needs:
-      - build-win64-release
-      - build-win32-old-release
-      - build-linux-release
-    permissions:
-      contents: write
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: OlivOS-Win
-          path: OlivOS-Win/
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: OlivOS-Win-32-old
-          path: OlivOS-Win-32-old/
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: OlivOS-Linux
-          path: OlivOS-Linux/
-      - name: ls -R
-        run: |
-          zip -r ./OlivOS-Win.zip ./OlivOS-Win/
-          zip -r ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old/
-          zip -r ./OlivOS-Linux.zip ./OlivOS-Linux/
-          ls -R
-      - name: Create Draft Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: test
-          draft: true
-          artifacts: |
-            ./OlivOS-Win.zip
-            ./OlivOS-Win-32-old.zip
-            ./OlivOS-Linux.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
