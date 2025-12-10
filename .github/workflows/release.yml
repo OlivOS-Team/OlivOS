@@ -123,11 +123,11 @@ jobs:
           cd ../
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
           cd ./OlivOS-Win-32-old
-          zip -r ./OlivOS-Win-32-old.zip ./
+          zip -r ../OlivOS-Win-32-old.zip ./
           cd ../
           cp ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old-${{ github.ref_name }}.zip
           cd ./OlivOS-Linux
-          zip -r ./OlivOS-Linux.zip ./
+          zip -r ../OlivOS-Linux.zip ./
           cd ../
           cp ./OlivOS-Linux.zip ./OlivOS-Linux-${{ github.ref_name }}.zip
           ls -R
