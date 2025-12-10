@@ -79,11 +79,6 @@ jobs:
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
-          name: OlivOS-Win-32-old
-          path: OlivOS-Win-32-old/
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
           name: OlivOS-Linux
           path: OlivOS-Linux/
       - name: Packing Release
@@ -92,10 +87,6 @@ jobs:
           zip -r ../OlivOS-Win.zip ./
           cd ../
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
-          cd ./OlivOS-Win-32-old
-          zip -r ../OlivOS-Win-32-old.zip ./
-          cd ../
-          cp ./OlivOS-Win-32-old.zip ./OlivOS-Win-32-old-${{ github.ref_name }}.zip
           cd ./OlivOS-Linux
           zip -r ../OlivOS-Linux.zip ./
           cd ../
