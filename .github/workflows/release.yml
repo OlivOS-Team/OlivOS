@@ -65,6 +65,7 @@ jobs:
 
   release-draft:
     runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
     needs:
       - build-win64-release
       - build-linux-release
