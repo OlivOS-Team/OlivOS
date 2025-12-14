@@ -271,11 +271,13 @@ jobs:
       - name: Create Draft Release
         uses: ncipollo/release-action@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           draft: true
+          allowUpdates: true
+          removeArtifacts: true
           artifacts: |
             ./OlivOS-Win.zip
             ./OlivOS-Win-${{ github.ref_name }}.zip
             ./OlivOS-Linux.zip
             ./OlivOS-Linux-${{ github.ref_name }}.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
