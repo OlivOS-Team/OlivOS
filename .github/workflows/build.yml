@@ -2,6 +2,9 @@ name: CI-Build
 on:
   push:
     branches: [ main, dev ]
+    tags:
+      - '*.*.*'
+      - '*.*.*-*.*'
 jobs:
   build-win64-old-release:
     runs-on: windows-latest
@@ -234,3 +237,45 @@ jobs:
       with:
         name: OlivOS-MacOS
         path: ./OlivOS-PKG
+
+  release-draft:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    needs:
+      - build-win64-release
+      - build-linux-release
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-Win
+          path: OlivOS-Win/
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-Linux
+          path: OlivOS-Linux/
+      - name: Packing Release
+        run: |
+          cd ./OlivOS-Win
+          zip -r ../OlivOS-Win.zip ./
+          cd ../
+          cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
+          cd ./OlivOS-Linux
+          zip -r ../OlivOS-Linux.zip ./
+          cd ../
+          cp ./OlivOS-Linux.zip ./OlivOS-Linux-${{ github.ref_name }}.zip
+          ls -R
+      - name: Create Draft Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          draft: true
+          artifacts: |
+            ./OlivOS-Win.zip
+            ./OlivOS-Win-${{ github.ref_name }}.zip
+            ./OlivOS-Linux.zip
+            ./OlivOS-Linux-${{ github.ref_name }}.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
