@@ -1,0 +1,12 @@
+{
+    "version": "0.11.80",
+    "configurations": [
+        {
+            "name": "调试: 全量",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./main.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
