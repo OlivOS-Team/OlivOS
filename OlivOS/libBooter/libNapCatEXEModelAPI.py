@@ -170,28 +170,29 @@ class server(OlivOS.API.Proc_templet):
             self.send_init_event()
         while self.flag_run:
             releaseDir('./lib')
-            if not os.path.exists('./lib/NapCat.zip'):
+            releaseDir('./conf')
+            releaseDir('./conf/napcat')
+            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
+            try:
+                if self.Proc_data['bot_info_dict'].platform['model'] in gCheck9922List:
+                    unzip('./lib/NapCat-QQ-Win-9.9.22-40990.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+                elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9919List:
+                    unzip('./lib/NapCat-QQ-Win-9.9.19-34740.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+                elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9912List:
+                    unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
+                else:
+                    unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
+            except:
                 self.log(3, OlivOS.L10NAPI.getTrans(
                     'OlivOS libNapCatEXEModel server [{0}] can`t found target lib',
                     [self.Proc_name], modelName
                 ))
                 break
-            releaseDir('./conf')
-            releaseDir('./conf/napcat')
-            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
-            if self.Proc_data['bot_info_dict'].platform['model'] in gCheck9922List:
-                unzip('./lib/NapCat-QQ-Win-9.9.22-40990.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
-            elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9919List:
-                unzip('./lib/NapCat-QQ-Win-9.9.19-34740.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
-            elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9912List:
-                unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
-            else:
-                unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             if self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat',
                 'napcat_show_new_9_9_12',
