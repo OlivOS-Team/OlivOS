@@ -74,14 +74,14 @@ def startNapCatLibExeModel(
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
                 flagActive = True
-            if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9912List:
-                flag9912Active = True
-            elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9919List:
-                flag9919Active = True
-            elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9922List:
-                flag9922Active = True
-            else:
-                flag9911Active = True
+                if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9912List:
+                    flag9912Active = True
+                elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9919List:
+                    flag9919Active = True
+                elif plugin_bot_info_dict[bot_info_key].platform['model'] in gCheck9922List:
+                    flag9922Active = True
+                else:
+                    flag9911Active = True
         if flagActive:
             releaseDir('./lib')
             if flag9911Active:
