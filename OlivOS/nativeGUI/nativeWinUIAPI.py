@@ -18,8 +18,6 @@ import OlivOS
 
 import base64
 import os
-import time
-import threading
 import pystray
 import tkinter
 import re
@@ -148,7 +146,7 @@ class dock(OlivOS.API.Proc_templet):
                         self.updateShallowMenuList()
 
     def process_msg(self):
-        self.UIObject['main_tk'].after(50, self.process_msg)
+        self.UIObject['main_tk'].after(20, self.process_msg)
         self.mainrun()
 
     def update_account_msg(self):
@@ -162,7 +160,7 @@ class dock(OlivOS.API.Proc_templet):
     def mainrun(self):
         if True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
-                time.sleep(self.Proc_info.scan_interval)
+                pass
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
