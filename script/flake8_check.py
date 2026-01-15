@@ -42,6 +42,7 @@ def main():
             print(f"检查完成。详细结果已输出至: {log_file.absolute()}")
         else:
             print(f"检查异常，返回码: {result.returncode}")
+        sys.exit(result.returncode)
 
     except FileNotFoundError:
         print("错误: 未找到flake8。请确保已在当前Python环境中安装。")
