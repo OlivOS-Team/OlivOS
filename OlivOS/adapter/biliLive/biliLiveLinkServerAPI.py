@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -48,7 +48,7 @@ class server(OlivOS.API.Proc_templet):
         while True:
             try:
                 asyncio.run(start(int(self.Proc_data['bot_info_dict'].post_info.access_token), self))
-            except:
+            except Exception:
                 self.log(2, 'OlivOS biliLive Link server [' + self.Proc_name + '] link lost')
             time.sleep(5)
 
@@ -77,7 +77,7 @@ async def start(room: int, Proc: server):
                         qr.add_data(url)
                         try:
                             qr.print_ascii(invert=True)
-                        except:
+                        except Exception:
                             pass
                         releaseDir('./conf/')
                         releaseDir('./conf/biliLive')
@@ -88,7 +88,6 @@ async def start(room: int, Proc: server):
                             os.path.abspath(conf_dir_path + '/qrcode.png'),
                             Proc.Proc_info.control_queue
                         )
-                        # os.startfile(os.path.abspath('./conf/biliLive/' + Proc.Proc_data['bot_info_dict'].hash + '/qrcode.png')) # Linux方案: subprocess.call(["xdg-open",file_path])
                         while True:
                             await asyncio.sleep(5)
                             if time.time() > outdated:
@@ -108,7 +107,7 @@ async def start(room: int, Proc: server):
                                 if code in [-1, -2]:
                                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login failed')
                                     break
-                except Exception as e:
+                except Exception:
                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login error')
                     traceback.print_exc()
             Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login succeed')
@@ -128,14 +127,14 @@ async def start(room: int, Proc: server):
             else:
                 try:
                     rx_packet_data = Proc.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if rx_packet_data is not None:
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'send' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data']:
                                 # Proc.Proc_data['extend_data']['ws_obj'].send(rx_packet_data.key['data']['data'])
-                                if type(rx_packet_data.key['data']['data']) == dict:
+                                if type(rx_packet_data.key['data']['data']) is dict:
                                     tmp_data = rx_packet_data.key['data']['data']
                                     tmp_data['roomid'] = room
                                     token = OlivOS.biliLiveSDK.get_cookies(cookie, 'bili_jct')
@@ -161,7 +160,7 @@ async def start(room: int, Proc: server):
                                                                                      csrf_token=token,
                                                                                      **tmp_data
                                                                                      )
-                                            except Exception as e:
+                                            except Exception:
                                                 flag_continue = True
                                             if flag_msg_loop:
                                                 await asyncio.sleep(1)

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -104,7 +104,7 @@ class SDKHandler(OlivOS.thirdPartyModule.blivedm.BaseHandler):
             sdk_event = event(message, client.Proc.Proc_data['bot_info_dict'])
             tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
             client.Proc.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -116,12 +116,6 @@ def get_Event_from_SDK(target_event: event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
-    plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id=target_event.base_info['self_id'],
-        platform_sdk=target_event.platform['sdk'],
-        platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
-    )
     type_sdk_event = type(target_event.sdk_event.payload)
     if type_sdk_event == OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage:
         sdk_payload: OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage = target_event.sdk_event.payload
@@ -243,8 +237,8 @@ class payload_template(object):
 
     def load(self, data, is_rx: bool):
         if data is not None:
-            if type(data) == dict:
-                if 'cmd' in data and type(data['cmd']) == str:
+            if type(data) is dict:
+                if 'cmd' in data and type(data['cmd']) is str:
                     self.cmd = data['cmd']
                 else:
                     self.active = False
