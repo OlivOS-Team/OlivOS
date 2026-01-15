@@ -23,7 +23,7 @@ jobs:
         python -m pip install flake8
     - name: Run Flake8 Check
       run: |
-        python ./script/flake8_check.py
+        python ./script/flake8_check.py --exit-zero
     - name: Upload Flake8 Output
       uses: actions/upload-artifact@v4
       with:

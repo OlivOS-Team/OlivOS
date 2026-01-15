@@ -3,12 +3,19 @@ import subprocess
 import sys
 from pathlib import Path
 from datetime import datetime
+import argparse
+
+# 构建命令 - 与平台无关
+cmd = [sys.executable, "-m", "flake8", "./"]
 
 
 def main():
+    parser = argparse.ArgumentParser(description='运行Flake8检查')
+    parser.add_argument('--exit-zero', action='store_true', help='无退出模式')
+    args = parser.parse_args()
     log_file = Path("flake8_output.log")
-    # 构建命令 - 与平台无关
-    cmd = [sys.executable, "-m", "flake8", "./", "--exit-zero"]
+    if args.exit_zero:
+        cmd.append("--exit-zero")
 
     try:
         print(f"[{datetime.now().isoformat()}] 开始Flake8检查...")
@@ -22,11 +29,6 @@ def main():
 
         # 准备要写入的内容
         with open(log_file, 'w', encoding='utf-8') as f:
-            f.write(f"\n{'='*60}\n")
-            f.write(f"检查时间: {datetime.now().isoformat()}\n")
-            f.write(f"命令: {' '.join(cmd)}\n")
-            f.write(f"{'='*60}\n\n")
-
             if result.stdout:
                 f.write(result.stdout)
                 print(result.stdout, end='')

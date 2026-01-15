@@ -13,6 +13,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/script/flake8_check.py",
+            "args": ["--exit-zero"],
             "console": "integratedTerminal",
             "justMyCode": false
         }
