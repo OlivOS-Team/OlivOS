@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,13 +10,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import logging
 import json
-import multiprocessing
 import threading
 import time
 import websocket
@@ -38,6 +36,7 @@ gCheckList = [
     'walleq_show_old',
     'ComWeChatBotClient'
 ]
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(
@@ -76,7 +75,9 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS onebotV12 link server [{0}] is running', [self.Proc_name], modelName))
+        self.log(2, OlivOS.L10NAPI.getTrans(
+            'OlivOS onebotV12 link server [{0}] is running', [self.Proc_name], modelName
+        ))
         threading.Thread(
             target=self.message_router,
             args=()
@@ -87,7 +88,7 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['bot_info_dict'].post_info.host,
                     self.Proc_data['bot_info_dict'].post_info.port
                 )
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -112,7 +113,7 @@ class server(OlivOS.API.Proc_templet):
                     if sdk_event.active:
                         tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                         self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):
@@ -165,7 +166,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if rx_packet_data is not None:
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:

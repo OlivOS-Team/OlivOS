@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,16 +10,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import logging
 import json
-import multiprocessing
-import threading
 import time
-import websocket
 import uuid
 import copy
 
@@ -30,6 +26,7 @@ gResReg = {}
 gTmpReg = {}
 
 gUsrReg = {}
+
 
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
@@ -42,7 +39,7 @@ class bot_info_T(object):
         self.debug_logger = None
 
 
-def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info:OlivOS.API.bot_info_T):
+def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info: OlivOS.API.bot_info_T):
     res = bot_info_T(
         id=plugin_bot_info.id,
         host=plugin_bot_info.post_info.host,
@@ -54,13 +51,13 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info:OlivOS.API.bot_info_T)
     return res
 
 
-def get_SDK_bot_info_from_Event(target_event:OlivOS.API.Event):
+def get_SDK_bot_info_from_Event(target_event: OlivOS.API.Event):
     res = get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
     return res
 
 
 class event(object):
-    def __init__(self, raw:dict, bot_info:bot_info_T):
+    def __init__(self, raw: dict, bot_info: bot_info_T):
         self.json = self.event_load(raw)
         self.platform = {
             'sdk': 'onebot',
@@ -83,7 +80,7 @@ class event(object):
         return res
 
 
-def get_Event_from_SDK(target_event:OlivOS.API.Event):
+def get_Event_from_SDK(target_event: OlivOS.API.Event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -92,26 +89,24 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'obv12_para'
 
-    control_queue = target_event.plugin_info['control_queue']
-    bot_hash = OlivOS.API.getBotHash(
-        bot_id=target_event.base_info['self_id'],
-        platform_sdk=target_event.sdk_event.platform['sdk'],
-        platform_platform=target_event.sdk_event.platform['platform'],
-        platform_model=target_event.sdk_event.platform['model']
-    )
-
-    if 'retcode' in target_event.sdk_event.json \
-    and 'echo' in target_event.sdk_event.json \
-    and type(target_event.sdk_event.json['echo']) is str:
+    if (
+        'retcode' in target_event.sdk_event.json
+        and 'echo' in target_event.sdk_event.json
+        and type(target_event.sdk_event.json['echo']) is str
+    ):
         target_event.active = False
         waitForResSet(
             target_event.sdk_event.json['echo'],
             target_event.sdk_event.json
         )
-    elif 'type' in target_event.sdk_event.json \
-    and 'message' == target_event.sdk_event.json['type']:
-        if 'detail_type' in target_event.sdk_event.json \
-        and 'private' == target_event.sdk_event.json['detail_type']:
+    elif (
+        'type' in target_event.sdk_event.json
+        and 'message' == target_event.sdk_event.json['type']
+    ):
+        if (
+            'detail_type' in target_event.sdk_event.json
+            and 'private' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
@@ -140,8 +135,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 target_event.data.sender['name'] = target_event.sdk_event.json['user_name']
                 target_event.data.sender['nickname'] = target_event.sdk_event.json['user_name']
             pass
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
             target_event.data = target_event.group_message(
@@ -170,8 +167,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
             if 'user_name' in target_event.sdk_event.json:
                 target_event.data.sender['name'] = target_event.sdk_event.json['user_name']
                 target_event.data.sender['nickname'] = target_event.sdk_event.json['user_name']
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'channel' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'channel' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
             target_event.data = target_event.group_message(
@@ -201,29 +200,39 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
             if 'user_name' in target_event.sdk_event.json:
                 target_event.data.sender['name'] = target_event.sdk_event.json['user_name']
                 target_event.data.sender['nickname'] = target_event.sdk_event.json['user_name']
-    elif 'type' in target_event.sdk_event.json \
-    and 'notice' == target_event.sdk_event.json['type']:
-        if 'detail_type' in target_event.sdk_event.json \
-        and 'friend_increase' == target_event.sdk_event.json['detail_type']:
+    elif (
+        'type' in target_event.sdk_event.json
+        and 'notice' == target_event.sdk_event.json['type']
+    ):
+        if (
+            'detail_type' in target_event.sdk_event.json
+            and 'friend_increase' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add'
             target_event.data = target_event.friend_add(
                 str(target_event.sdk_event.json['user_id'])
             )
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'friend_decrease' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'friend_decrease' == target_event.sdk_event.json['detail_type']
+        ):
             # 暂无该事件
             pass
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'private_message_delete' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'private_message_delete' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_recall'
             target_event.data = target_event.private_message_recall(
                 str(target_event.sdk_event.json['user_id']),
                 str(target_event.sdk_event.json['message_id'])
             )
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_member_increase' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_member_increase' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_member_increase'
             target_event.data = target_event.group_member_increase(
@@ -237,8 +246,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 target_event.data.action = 'approve'
             elif target_event.sdk_event.json['sub_type'] == 'invite':
                 target_event.data.action = 'invite'
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_member_decrease' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_member_decrease' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_member_decrease'
             target_event.data = target_event.group_member_decrease(
@@ -254,8 +265,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                     target_event.data.action = 'kick_me'
             elif target_event.sdk_event.json['sub_type'] == 'kick_me':
                 target_event.data.action = 'kick_me'
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_message_delete' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_message_delete' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message_recall'
             target_event.data = target_event.group_message_recall(
@@ -264,8 +277,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 str(target_event.sdk_event.json['user_id']),
                 str(target_event.sdk_event.json['message_id'])
             )
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_admin_set' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_admin_set' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_admin'
             target_event.data = target_event.group_admin(
@@ -273,8 +288,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 str(target_event.sdk_event.json['user_id'])
             )
             target_event.data.action = 'set'
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_admin_unset' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_admin_unset' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_admin'
             target_event.data = target_event.group_admin(
@@ -282,8 +299,10 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 str(target_event.sdk_event.json['user_id'])
             )
             target_event.data.action = 'unset'
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'group_member_ban' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'group_member_ban' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_ban'
             target_event.data = target_event.group_ban(
@@ -296,10 +315,14 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
                 target_event.data.action = 'ban'
             else:
                 target_event.data.action = 'unban'
-    elif 'type' in target_event.sdk_event.json \
-    and 'request' == target_event.sdk_event.json['type']:
-        if 'detail_type' in target_event.sdk_event.json \
-        and 'new_friend' == target_event.sdk_event.json['detail_type']:
+    elif (
+        'type' in target_event.sdk_event.json
+        and 'request' == target_event.sdk_event.json['type']
+    ):
+        if (
+            'detail_type' in target_event.sdk_event.json
+            and 'new_friend' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add_request'
             target_event.data = target_event.friend_add_request(
@@ -308,53 +331,63 @@ def get_Event_from_SDK(target_event:OlivOS.API.Event):
             )
             target_event.data.flag = str(target_event.sdk_event.json['request_id'])
             setReg(target_event.data.flag, target_event.data.user_id)
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'join_group' == target_event.sdk_event.json['detail_type']:
-                target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_add_request'
-                target_event.data = target_event.group_add_request(
-                    str(target_event.sdk_event.json['group_id']),
-                    str(target_event.sdk_event.json['user_id']),
-                    target_event.sdk_event.json['message']
-                )
-                target_event.data.flag = str(target_event.sdk_event.json['request_id'])
-                setReg(target_event.data.flag, target_event.data.group_id)
-                setReg(target_event.data.flag + '-user', target_event.data.user_id)
-        elif 'detail_type' in target_event.sdk_event.json \
-        and ('group_invited' == target_event.sdk_event.json['detail_type'] \
-        or 'group_invite' == target_event.sdk_event.json['detail_type']): # 这里是为了兼容 https://github.com/onebot-walle/walle-q/issues/37
-                target_event.active = True
-                target_event.plugin_info['func_type'] = 'group_invite_request'
-                target_event.data = target_event.group_invite_request(
-                    str(target_event.sdk_event.json['group_id']),
-                    str(target_event.sdk_event.json['invitor_id']),
-                    ''
-                )
-                target_event.data.flag = str(target_event.sdk_event.json['request_id'])
-                setReg(target_event.data.flag, target_event.data.group_id)
-                setReg(target_event.data.flag + '-user', target_event.data.user_id)
-    elif 'type' in target_event.sdk_event.json \
-    and 'meta' == target_event.sdk_event.json['type']:
-        if 'detail_type' in target_event.sdk_event.json \
-        and 'heartbeat' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'join_group' == target_event.sdk_event.json['detail_type']
+        ):
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_add_request'
+            target_event.data = target_event.group_add_request(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['user_id']),
+                target_event.sdk_event.json['message']
+            )
+            target_event.data.flag = str(target_event.sdk_event.json['request_id'])
+            setReg(target_event.data.flag, target_event.data.group_id)
+            setReg(target_event.data.flag + '-user', target_event.data.user_id)
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and (
+                'group_invited' == target_event.sdk_event.json['detail_type']
+                or 'group_invite' == target_event.sdk_event.json['detail_type']
+            )
+        ):  # 这里是为了兼容 https://github.com/onebot-walle/walle-q/issues/37
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_invite_request'
+            target_event.data = target_event.group_invite_request(
+                str(target_event.sdk_event.json['group_id']),
+                str(target_event.sdk_event.json['invitor_id']),
+                ''
+            )
+            target_event.data.flag = str(target_event.sdk_event.json['request_id'])
+            setReg(target_event.data.flag, target_event.data.group_id)
+            setReg(target_event.data.flag + '-user', target_event.data.user_id)
+    elif (
+        'type' in target_event.sdk_event.json
+        and 'meta' == target_event.sdk_event.json['type']
+    ):
+        if (
+            'detail_type' in target_event.sdk_event.json
+            and 'heartbeat' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'heartbeat'
             target_event.data = target_event.heartbeat(
                 int(target_event.sdk_event.json['interval']) * 1000
             )
-        elif 'detail_type' in target_event.sdk_event.json \
-        and 'connect' == target_event.sdk_event.json['detail_type']:
+        elif (
+            'detail_type' in target_event.sdk_event.json
+            and 'connect' == target_event.sdk_event.json['detail_type']
+        ):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'lifecycle'
             target_event.data = target_event.lifecycle()
             target_event.data.action = 'connect'
 
 
-'''
-对于WEBSOCKET接口的PAYLOAD实现
-'''
+# 对于WEBSOCKET接口的PAYLOAD实现
 class payload_template(object):
-    def __init__(self, eventType:str, data:'str|None'=None, is_rx:bool=False):
+    def __init__(self, eventType: str, data: 'str|None' = None, is_rx: bool = False):
         self.active = True
         self.data = self.data_T()
         self.load(eventType, data, is_rx)
@@ -382,7 +415,7 @@ class payload_template(object):
 
     def load(self, eventType, data, is_rx):
         if data is not None:
-            if type(data) == dict:
+            if type(data) is dict:
                 self.data.type = eventType
                 self.data.data = data
             else:
@@ -391,21 +424,20 @@ class payload_template(object):
             self.active = False
         return self
 
+
 class PAYLOAD(object):
     class rxPacket(payload_template):
-        def __init__(self, data:dict):
+        def __init__(self, data: dict):
             payload_template.__init__(self, 'rxPacket', data, True)
 
     class txPacket(payload_template):
-        def __init__(self, data:dict):
+        def __init__(self, data: dict):
             payload_template.__init__(self, 'txPacket', data, False)
 
 
-'''
-对于WEBSOCKET接口的发送数据PAYLOAD实现
-'''
+# 对于WEBSOCKET接口的发送数据PAYLOAD实现
 class api_templet(object):
-    def __init__(self, action:'str|None'=None, params=None, echo:'str|None'=None):
+    def __init__(self, action: 'str|None' = None, params=None, echo: 'str|None' = None):
         self.action = action
         self.params = params
         self.echo = echo
@@ -415,9 +447,9 @@ class api_templet(object):
     def do_api(self, bot_hash, control_queue):
         data = self.do_dump()
         send_ws_event(
-            hash = bot_hash,
-            data = data,
-            control_queue = control_queue
+            hash=bot_hash,
+            data=data,
+            control_queue=control_queue
         )
 
     def do_dump(self):
@@ -426,7 +458,7 @@ class api_templet(object):
             'params': {},
             'echo': self.echo
         }
-        if self.params != None:
+        if self.params is not None:
             for key_this in self.params.__dict__:
                 if self.params.__dict__[key_this] is not None:
                     res_obj['params'][key_this] = self.params.__dict__[key_this]
@@ -444,6 +476,7 @@ def sendControlEventSend(action, data, control_queue):
             block=False
         )
 
+
 def send_ws_event(hash, data, control_queue):
     sendControlEventSend(
         'send',
@@ -459,6 +492,7 @@ def send_ws_event(hash, data, control_queue):
         },
         control_queue
     )
+
 
 class api(object):
     class send_message(api_templet):
@@ -694,11 +728,10 @@ class api(object):
             self.action = 'get_group_inviteds'
 
 
-
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_private_msg(target_event:OlivOS.API.Event, user_id, message):
-        if target_event.bot_info != None:
+    def send_private_msg(target_event: OlivOS.API.Event, user_id, message):
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.send_message()
@@ -707,8 +740,8 @@ class event_action(object):
             this_msg.params.message = message
             this_msg.do_api(bot_hash, control_queue)
 
-    def send_group_msg(target_event:OlivOS.API.Event, group_id, message):
-        if target_event.bot_info != None:
+    def send_group_msg(target_event: OlivOS.API.Event, group_id, message):
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.send_message()
@@ -717,8 +750,8 @@ class event_action(object):
             this_msg.params.message = message
             this_msg.do_api(bot_hash, control_queue)
 
-    def send_host_msg(target_event:OlivOS.API.Event, host_id, group_id, message):
-        if target_event.bot_info != None:
+    def send_host_msg(target_event: OlivOS.API.Event, host_id, group_id, message):
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.send_message()
@@ -729,7 +762,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def delete_msg(target_event, message_id):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.delete_message()
@@ -737,7 +770,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def set_group_kick(target_event, group_id, user_id):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.kick_group_member()
@@ -746,7 +779,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def set_group_leave(target_event, group_id):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.leave_group()
@@ -754,7 +787,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def set_group_name(target_event, group_id, group_name):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.set_group_name()
@@ -763,7 +796,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def set_group_ban(target_event, group_id, user_id, duration=1800):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             if 0 == duration:
@@ -779,7 +812,7 @@ class event_action(object):
                 this_msg.do_api(bot_hash, control_queue)
 
     def set_group_admin(target_event, group_id, user_id, enable):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             if True is enable:
@@ -793,10 +826,10 @@ class event_action(object):
                 this_msg.params.user_id = str(user_id)
                 this_msg.do_api(bot_hash, control_queue)
 
-    def get_login_info(target_event:OlivOS.API.Event):
+    def get_login_info(target_event: OlivOS.API.Event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_self_info()
@@ -811,10 +844,10 @@ class event_action(object):
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
         return res_data
 
-    def get_stranger_info(target_event:OlivOS.API.Event, user_id):
+    def get_stranger_info(target_event: OlivOS.API.Event, user_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_user_info()
@@ -830,10 +863,10 @@ class event_action(object):
                 res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
         return res_data
 
-    def get_friend_list(target_event:OlivOS.API.Event):
+    def get_friend_list(target_event: OlivOS.API.Event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_friend_list()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_friend_list()
@@ -842,7 +875,7 @@ class event_action(object):
             res_raw = waitForRes(this_msg.echo)
             raw_obj = init_api_json(res_raw)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -851,10 +884,10 @@ class event_action(object):
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def get_group_info(target_event:OlivOS.API.Event, group_id):
+    def get_group_info(target_event: OlivOS.API.Event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_group_info()
@@ -873,10 +906,10 @@ class event_action(object):
                 res_data['data']['max_member_count'] = 0
         return res_data
 
-    def get_group_list(target_event:OlivOS.API.Event):
+    def get_group_list(target_event: OlivOS.API.Event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_group_list()
@@ -885,7 +918,7 @@ class event_action(object):
             res_raw = waitForRes(this_msg.echo)
             raw_obj = init_api_json(res_raw)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -897,10 +930,10 @@ class event_action(object):
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def get_group_member_info(target_event:OlivOS.API.Event, group_id, user_id):
+    def get_group_member_info(target_event: OlivOS.API.Event, group_id, user_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_group_member_info()
@@ -925,10 +958,10 @@ class event_action(object):
                 res_data['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['user_displayname'], str)
         return res_data
 
-    def get_group_member_list(target_event:OlivOS.API.Event, group_id):
+    def get_group_member_list(target_event: OlivOS.API.Event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
         raw_obj = None
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.get_group_member_list()
@@ -938,7 +971,7 @@ class event_action(object):
             res_raw = waitForRes(this_msg.echo)
             raw_obj = init_api_json(res_raw)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -951,13 +984,14 @@ class event_action(object):
                     tmp_res_data_this['data']['times']['shut_up_timestamp'] = 0
                     tmp_res_data_this['data']['role'] = 'member'
                     tmp_res_data_this['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user_remark'], str)
-                    tmp_res_data_this['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['user_displayname'], str)
+                    tmp_res_data_this['data']['title'] = init_api_do_mapping_for_dict(
+                        raw_obj, ['user_displayname'], str
+                    )
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
-    def set_friend_add_request(target_event, flag, approve:bool, remark):
-        global gTmpReg
-        if target_event.bot_info != None:
+    def set_friend_add_request(target_event, flag, approve: bool, remark):
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             this_msg = api.set_new_friend()
@@ -967,7 +1001,7 @@ class event_action(object):
             this_msg.do_api(bot_hash, control_queue)
 
     def set_group_add_request(target_event, flag, sub_type, approve, reason):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             if 'add' == sub_type:
@@ -986,17 +1020,21 @@ class event_action(object):
                 this_msg.do_api(bot_hash, control_queue)
 
 
-def init_api_json(raw:dict):
+def init_api_json(raw: dict):
     res_data = None
     flag_is_active = False
     tmp_obj = raw
-    if type(tmp_obj) is dict \
-    and 'retcode' in tmp_obj \
-    and type(tmp_obj['retcode']) is int \
-    and tmp_obj['retcode'] == 0:
+    if (
+        type(tmp_obj) is dict
+        and 'retcode' in tmp_obj
+        and type(tmp_obj['retcode']) is int
+        and tmp_obj['retcode'] == 0
+    ):
         flag_is_active = True
-    if flag_is_active \
-    and 'data' in tmp_obj:
+    if (
+        flag_is_active
+        and 'data' in tmp_obj
+    ):
         if type(tmp_obj['data']) is dict:
             res_data = copy.deepcopy(tmp_obj['data'])
         elif type(tmp_obj['data']) is list:
@@ -1005,15 +1043,15 @@ def init_api_json(raw:dict):
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
@@ -1023,51 +1061,55 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
 
-def getReg(flag:str):
-    global gTmpReg
+
+def getReg(flag: str):
     res = None
     if flag in gTmpReg:
         res = gTmpReg[flag]
     return res
 
-def setReg(flag:str, value):
-    global gTmpReg
+
+def setReg(flag: str, value):
     gTmpReg[flag] = value
 
-def setUserReg(botHash:str, regType:str, flag:str, value:str):
-    global gUsrReg
+
+def setUserReg(botHash: str, regType: str, flag: str, value: str):
     gUsrReg.setdefault(botHash, {})
     gUsrReg[botHash].setdefault(regType, {})
     gUsrReg[botHash][regType][flag] = value
 
-def getUserReg(botHash:str, regType:str, flag:str):
-    global gUsrReg
+
+def getUserReg(botHash: str, regType: str, flag: str):
     res = None
-    if botHash in gUsrReg \
-    and regType in gUsrReg[botHash] \
-    and flag in gUsrReg[botHash][regType]:
+    if (
+        botHash in gUsrReg
+        and regType in gUsrReg[botHash]
+        and flag in gUsrReg[botHash][regType]
+    ):
         res = gUsrReg[botHash][regType][flag]
     return res
 
-def waitForResSet(echo:str, data):
-    global gResReg
+
+def waitForResSet(echo: str, data):
     if echo in gResReg:
         gResReg[echo] = data
 
-def waitForResReady(echo:str):
-    global gResReg
+
+def waitForResReady(echo: str):
     gResReg[echo] = None
 
-def waitForRes(echo:str):
-    global gResReg
+
+def waitForRes(echo: str):
     res = None
     interval = 0.1
     limit = 30
     index_limit = int(limit / interval)
     for i in range(index_limit):
         time.sleep(interval)
-        if echo in gResReg \
-        and gResReg[echo] is not None:
+        if (
+            echo in gResReg
+            and gResReg[echo] is not None
+        ):
             res = gResReg[echo]
             gResReg.pop(echo)
             break
