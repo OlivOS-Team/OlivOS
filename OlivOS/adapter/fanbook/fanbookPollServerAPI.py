@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
-import threading
 import time
 import json
 import traceback
@@ -77,7 +75,7 @@ class server(OlivOS.API.Proc_templet):
                         try:
                             res_obj = json.loads(sdk_api_res)
                             if res_obj['ok'] is True:
-                                if type(res_obj['result']) == list:
+                                if type(res_obj['result']) is list:
                                     for tmp_messages_this in res_obj['result']:
                                         sdk_event = OlivOS.fanbookSDK.event(tmp_messages_this, bot_info_this_obj)
                                         tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
@@ -116,7 +114,7 @@ def accountFix(bot_info_dict, logger_proc):
                 this_msg_res = this_msg.do_api()
                 this_msg_res_obj = json.loads(this_msg_res)
                 if this_msg_res_obj['ok'] is True:
-                    if type(this_msg_res_obj['result']['id']) == int:
+                    if type(this_msg_res_obj['result']['id']) is int:
                         logger_proc.log(2, '[fanbook] account [' + str(
                             bot_info_dict[bot_hash].id) + '] will be updated as [' + str(
                             this_msg_res_obj['result']['id']) + ']')
@@ -132,11 +130,11 @@ def accountFix(bot_info_dict, logger_proc):
                     this_msg_2.data.owner_id = this_msg_res_obj['result']['owner_id']
                     this_msg_2.data.bot_id = this_msg_res_obj['result']['id']
                     this_msg_2.data.enable = True
-                    this_msg_res_2 = this_msg_2.do_api()
+                    this_msg_2.do_api()
                     logger_proc.log(2, '[fanbook] account [' + str(
                         this_msg_res_obj['result']['id']) + '] set to private mode')
                 continue
-            except:
+            except Exception:
                 logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
                 continue
         else:

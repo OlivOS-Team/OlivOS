@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,14 +10,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 import requests as req
 import json
 import time
-import uuid
 
 import OlivOS
 
@@ -112,7 +111,7 @@ class event(object):
     def event_dump(self, raw):
         try:
             res = json.dumps(raw)
-        except:
+        except Exception:
             res = None
         return res
 
@@ -216,7 +215,7 @@ def get_Event_from_SDK(target_event):
     ]):
         message_obj = None
         message_para_list = []
-        if type(target_event.sdk_event.json['channel_post']['photo']) == list:
+        if type(target_event.sdk_event.json['channel_post']['photo']) is list:
             for photo_this in target_event.sdk_event.json['channel_post']['photo']:
                 if 'file_id' in photo_this:
                     message_para_list.append(OlivOS.messageAPI.PARA.image(photo_this['file_id']))
@@ -257,7 +256,7 @@ class event_action(object):
         this_msg_image.data.chat_id = int(chat_id)
         this_msg.data.text = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
                 if flag_now_type != 'image':
                     if this_msg.data.text != '':
                         this_msg.do_api()
@@ -265,10 +264,10 @@ class event_action(object):
                 this_msg_image.data.photo['Url'] = message_this.data['file']
                 this_msg_image.do_api()
                 flag_now_type = 'image'
-            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+            elif type(message_this) is OlivOS.messageAPI.PARA.text:
                 this_msg.data.text += message_this.fanbook()
                 flag_now_type = 'string'
-            elif type(message_this) == OlivOS.messageAPI.PARA.at:
+            elif type(message_this) is OlivOS.messageAPI.PARA.at:
                 this_msg.data.text += message_this.fanbook()
                 flag_now_type = 'string'
         if flag_now_type != 'image':
@@ -284,14 +283,13 @@ class event_action(object):
             tmp_res_obj = json.loads(tmp_res)
             if tmp_res_obj['ok']:
                 private_chat_id = tmp_res_obj['result']['id']
-        except:
+        except Exception:
             return
         if private_chat_id is not None:
             event_action.send_msg(target_event, private_chat_id, message)
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
-        private_chat_id = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
         try:
             tmp_res = this_msg.do_api()
@@ -300,22 +298,21 @@ class event_action(object):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'username'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(tmp_res_obj, ['result', 'id'], int))
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
