@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
-import threading
 import time
 import json
 
@@ -59,8 +57,6 @@ class platform_bot_info_T(object):
 
 
 def get_SDK_platform_bot_info_from_data(target_data):
-    global websocket_host
-    global websocket_port
     if 'Uid' in target_data:
         res = platform_bot_info_T(target_data['Uid'])
     else:
@@ -110,7 +106,7 @@ class event(object):
     def event_dump(self, raw):
         try:
             res = json.dumps(raw)
-        except:
+        except Exception:
             res = None
         return res
 

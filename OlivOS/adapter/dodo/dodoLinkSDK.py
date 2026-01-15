@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,17 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import sys
 import json
 import requests as req
 from requests_toolbelt import MultipartEncoder
 import time
 import traceback
-import rsa
 import base64
 import uuid
 from urllib import parse
@@ -133,7 +131,7 @@ class payload_template(object):
 
     def load(self, data, is_rx):
         if data is not None:
-            if type(data) == dict:
+            if type(data) is dict:
                 if 'type' in data:
                     self.data.type = data['type']
                 if 'data' in data:
@@ -205,7 +203,7 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception:
             return None
 
 
@@ -317,13 +315,11 @@ class API(object):
 
                 self.res = msg_res.text
                 return msg_res.text
-            except:
+            except Exception:
                 return None
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
-    global sdkUserInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -357,7 +353,7 @@ def get_Event_from_SDK(target_event):
                 api_res_json = json.loads(api_msg_obj.res)
                 if api_res_json['status'] == 0:
                     sdkSubSelfInfo[plugin_event_bot_hash] = str(api_res_json['data'].get('dodoSourceId', None))
-        except:
+        except Exception:
             pass
     try:
         if target_event.sdk_event.payload.data.type == 0:
@@ -517,19 +513,21 @@ def get_Event_from_SDK(target_event):
                                 target_event.data.sender['sex'] = 'male'
                     if plugin_event_bot_hash in sdkSubSelfInfo:
                         target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         target_event.active = False
 
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_msg(target_event:OlivOS.API.Event, chat_id, message):
+    def send_msg(target_event: OlivOS.API.Event, chat_id, message):
         this_msg = None
         this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = str(chat_id)
-        if target_event is not None \
-        and target_event.bot_info.platform['model'] == 'v1':
+        if (
+            target_event is not None
+            and target_event.bot_info.platform['model'] == 'v1'
+        ):
             this_msg.host = sdkAPIHost['v1']
         for message_this in message.data:
             if type(message_this) is OlivOS.messageAPI.PARA.text:
@@ -542,15 +540,17 @@ class event_action(object):
                 if this_msg.data.messageBody is not None:
                     this_msg.do_api('POST')
 
-    def send_personal_msg(target_event:OlivOS.API.Event, chat_id, message):
+    def send_personal_msg(target_event: OlivOS.API.Event, chat_id, message):
         this_msg = None
         this_msg = API.sendPersonalMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.dodoSourceId = str(chat_id)
         this_msg.data.dodoId = None
         if type(target_event.data) is OlivOS.API.Event.group_message:
             this_msg.data.islandSourceId = str(target_event.data.host_id)
-        if target_event is not None \
-        and target_event.bot_info.platform['model'] == 'v1':
+        if (
+            target_event is not None
+            and target_event.bot_info.platform['model'] == 'v1'
+        ):
             this_msg.host = sdkAPIHost['v1']
             this_msg.data.islandSourceId = None
             this_msg.data.dodoId = str(chat_id)
@@ -569,21 +569,23 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
-        if target_event is not None \
-        and target_event.bot_info.platform['model'] == 'v1':
+        if (
+            target_event is not None
+            and target_event.bot_info.platform['model'] == 'v1'
+        ):
             this_msg.host = sdkAPIHost['v1']
         try:
             this_msg.do_api('POST')
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickName'], str)
                     res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'dodoSourceId'], str)
                     if res_data['data']['id'] is None:
                         res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'dodoId'], str)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -613,8 +615,10 @@ class event_action(object):
                         pic_file = f.read()
 
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
-            if target_event is not None \
-            and target_event.bot_info.platform['model'] == 'v1':
+            if (
+                target_event is not None
+                and target_event.bot_info.platform['model'] == 'v1'
+            ):
                 msg_upload_api.host = sdkAPIHost['v1']
             msg_upload_api.data.file = pic_file
             msg_upload_api.do_api()
@@ -622,7 +626,7 @@ class event_action(object):
                 msg_upload_api_obj = json.loads(msg_upload_api.res)
                 if msg_upload_api_obj['status'] == 0:
                     res = msg_upload_api_obj['data']
-        except:
+        except Exception:
             res = None
         return res
 
@@ -633,28 +637,27 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         if tmp_obj['status'] == 0:
             flag_is_active = True
     if flag_is_active:
-        if type(tmp_obj) == dict:
+        if type(tmp_obj) is dict:
             res_data = tmp_obj.copy()
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:

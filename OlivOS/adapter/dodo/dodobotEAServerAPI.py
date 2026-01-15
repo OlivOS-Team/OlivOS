@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
-import threading
 import time
 import json
 import websockets
@@ -56,7 +54,7 @@ class server(OlivOS.API.Proc_templet):
                 if 'Code' in msg_res_obj:
                     if msg_res_obj['Code'] == 200:
                         if 'Data' in msg_res_obj:
-                            if type(msg_res_obj['Data']) == list:
+                            if type(msg_res_obj['Data']) is list:
                                 self.Proc_data['platform_bot_info_dict'] = {}
                                 for msg_res_obj_Data_this in msg_res_obj['Data']:
                                     tmp_platform_bot_info = OlivOS.dodobotEASDK.get_SDK_platform_bot_info_from_data(
@@ -65,7 +63,7 @@ class server(OlivOS.API.Proc_templet):
                                     if tmp_platform_bot_info is not None:
                                         self.Proc_data['platform_bot_info_dict'][
                                             tmp_platform_bot_info.id] = tmp_platform_bot_info
-            except:
+            except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
                 asyncio.get_event_loop().run_until_complete(self.run_websockets_rx_connect())
@@ -85,14 +83,17 @@ class server(OlivOS.API.Proc_templet):
                         tmp_recv_pkg_str = await websocket.recv()
                         try:
                             tmp_recv_pkg = json.loads(tmp_recv_pkg_str)
-                        except:
+                        except Exception:
                             tmp_recv_pkg = None
-                        if tmp_recv_pkg is not None and type(tmp_recv_pkg) == dict:
+                        if (
+                            tmp_recv_pkg is not None
+                            and type(tmp_recv_pkg) is dict
+                        ):
                             if 'Data' in tmp_recv_pkg:
-                                if type(tmp_recv_pkg['Data']) == str:
+                                if type(tmp_recv_pkg['Data']) is str:
                                     try:
                                         tmp_recv_pkg_data = json.loads(tmp_recv_pkg['Data'])
-                                    except:
+                                    except Exception:
                                         tmp_recv_pkg_data = None
                         if tmp_recv_pkg_data is not None:
                             for bot_info_this in self.Proc_data['bot_info_dict']:
@@ -105,6 +106,6 @@ class server(OlivOS.API.Proc_templet):
                                     sdk_event = OlivOS.dodobotEASDK.event(tmp_recv_pkg_data, sdk_bot_info_this)
                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-            except:
+            except Exception:
                 time.sleep(self.Proc_info.scan_interval)
                 tmp_recv_pkg_data = None

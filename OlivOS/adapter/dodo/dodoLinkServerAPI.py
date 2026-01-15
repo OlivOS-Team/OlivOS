@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,18 +10,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
-import threading
 import time
 import json
 import websocket
 import uuid
-import requests as req
-import traceback
 
 import OlivOS
 
@@ -67,7 +63,7 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['extend_data']['websocket_url'] = api_obj_json['data']['endpoint']
                 else:
                     self.Proc_data['extend_data']['websocket_url'] = None
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -83,7 +79,7 @@ class server(OlivOS.API.Proc_templet):
                     sdk_event = OlivOS.dodoLinkSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):

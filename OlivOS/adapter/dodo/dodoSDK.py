@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -95,7 +95,7 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception:
             return None
 
 
@@ -117,7 +117,7 @@ class event(object):
     def event_dump(self, raw):
         try:
             res = json.dumps(raw)
-        except:
+        except Exception:
             res = None
         return res
 
@@ -151,7 +151,7 @@ def get_Event_from_SDK(target_event):
                             OlivOS.messageAPI.PARA.image(resourceJson_obj['resourceUrl'])
                         ]
                     )
-                except:
+                except Exception:
                     return
         if message_obj is not None:
             target_event.active = True
@@ -186,7 +186,7 @@ class event_action(object):
         this_msg.data.channelId = chat_id
         this_msg.data.content = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
                 if flag_now_type != 'image':
                     if this_msg.data.content != '':
                         this_msg.do_api()
@@ -222,14 +222,14 @@ class event_action(object):
         this_msg.data.toUid = chat_id
         this_msg.data.content = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.text:
+            if type(message_this) is OlivOS.messageAPI.PARA.text:
                 this_msg.data.content = message_this.OP()
                 this_msg.data.resourceJson = '{}'
                 this_msg.data.type = 1
                 this_msg.data.tk = uuid.uuid4()
                 if this_msg.data.content != '':
                     this_msg.do_api()
-            elif type(message_this) == OlivOS.messageAPI.PARA.image:
+            elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 this_msg.data.content = ''
                 this_msg.data.resourceJson = json.dumps({
                     'resourceType': 1,
