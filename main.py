@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -24,6 +24,6 @@ if __name__ == '__main__':
     if not os.path.exists('./conf'):
         os.makedirs('./conf')
     OlivOS.bootAPI.Entity(
-        basic_conf = './conf/basic.json',
-        patch_conf = './conf/config.json'
+        basic_conf='./conf/basic.json',
+        patch_conf='./conf/config.json'
     ).start()
