@@ -1,0 +1,53 @@
+# -*- encoding: utf-8 -*-
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime
+
+
+def main():
+    log_file = Path("flake8_output.log")
+    # 构建命令 - 与平台无关
+    cmd = [sys.executable, "-m", "flake8", "./", "--exit-zero"]
+
+    try:
+        print(f"[{datetime.now().isoformat()}] 开始Flake8检查...")
+        # 执行，捕获所有输出
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
+        )
+
+        # 准备要写入的内容
+        with open(log_file, 'w', encoding='utf-8') as f:
+            f.write(f"\n{'='*60}\n")
+            f.write(f"检查时间: {datetime.now().isoformat()}\n")
+            f.write(f"命令: {' '.join(cmd)}\n")
+            f.write(f"{'='*60}\n\n")
+
+            if result.stdout:
+                f.write(result.stdout)
+                print(result.stdout, end='')
+
+            if result.stderr:
+                f.write("\n[标准错误输出]\n")
+                f.write(result.stderr)
+                # 通常flake8的错误也打印到stdout，这里stderr多为运行时错误
+
+        if result.returncode == 0:
+            print(f"检查完成。详细结果已输出至: {log_file.absolute()}")
+        else:
+            print(f"检查异常，返回码: {result.returncode}")
+
+    except FileNotFoundError:
+        print("错误: 未找到flake8。请确保已在当前Python环境中安装。")
+        sys.exit(1)
+    except Exception as e:
+        print(f"执行过程中发生未知错误: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

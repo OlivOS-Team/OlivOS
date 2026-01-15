@@ -7,6 +7,14 @@
             "request": "launch",
             "program": "./main.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "格式检查: 全量",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/script/flake8_check.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
