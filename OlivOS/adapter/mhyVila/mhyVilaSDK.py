@@ -91,12 +91,10 @@ class event(object):
 
 
 def set_name(id: str, name: str):
-    global sdkNameDict
     sdkNameDict[str(id)] = str(name)
 
 
 def get_name(id: str):
-    global sdkNameDict
     return sdkNameDict.get(str(id), str(id))
 
 
@@ -173,7 +171,6 @@ def release_message(msg: str):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -233,7 +230,6 @@ def get_Event_from_SDK(target_event):
 
 # 对于WEBSOCKET接口的PAYLOAD实现
 def getIDCount(botId: str) -> int:
-    global sdkIDCount
     if type(sdkIDCount.get(str(botId), None)) is not int:
         sdkIDCount[str(botId)] = 0
     res: int = sdkIDCount[str(botId)] + 1
@@ -331,7 +327,6 @@ class payload_template(object):
         return self.raw
 
     def load(self):
-        global recvProtoDict
         if (
             self.raw is not None
             and len(self.raw) >= 32
