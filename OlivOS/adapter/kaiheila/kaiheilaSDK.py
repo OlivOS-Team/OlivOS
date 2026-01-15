@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,11 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import sys
 import json
 import requests as req
 import time
@@ -98,10 +97,7 @@ class event(object):
             self.base_info['post_type'] = None
 
 
-'''
-对于WEBSOCKET接口的PAYLOAD实现
-'''
-
+# 对于WEBSOCKET接口的PAYLOAD实现
 class payload_template(object):
     def __init__(self, data=None, is_rx=False):
         self.active = True
@@ -124,7 +120,7 @@ class payload_template(object):
 
     def load(self, data, is_rx):
         if data is not None:
-            if type(data) == dict:
+            if type(data) is dict:
                 if 's' in data:
                     self.data.s = data['s']
                 if 'd' in data:
@@ -191,7 +187,7 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception:
             return None
 
 
@@ -313,11 +309,11 @@ class API(object):
 
                 self.res = msg_res.text
                 return msg_res.text
-            except Exception as e:
+            except Exception:
                 traceback.print_exc()
                 return None
 
-    #在玩游戏相关接口
+    # 在玩游戏相关接口
     class getPlayGameList(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -434,7 +430,9 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guild'] + '/user-list?guild_id={guild_id}&channel_id={channel_id}&page={page}&page_size={page_size}'
+            self.route = sdkAPIRoute['guild'] + (
+                '/user-list?guild_id={guild_id}&channel_id={channel_id}&page={page}&page_size={page_size}'
+            )
 
         class metadata_T(object):
             def __init__(self):
@@ -536,7 +534,9 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guild-boost'] + '/history?guild_id={guild_id}&start_time={start_time}&end_time={end_time}'
+            self.route = sdkAPIRoute['guild-boost'] + (
+                '/history?guild_id={guild_id}&start_time={start_time}&end_time={end_time}'
+            )
 
         class metadata_T(object):
             def __init__(self):
@@ -552,7 +552,9 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channel'] + '/list?guild_id={guild_id}&page={page}&page_size={page_size}&type={type}&parent_id={parent_id}'
+            self.route = sdkAPIRoute['channel'] + (
+                '/list?guild_id={guild_id}&page={page}&page_size={page_size}&type={type}&parent_id={parent_id}'
+            )
 
         class metadata_T(object):
             def __init__(self):
@@ -576,15 +578,19 @@ class API(object):
                 self.target_id = None
                 self.need_children = 'false'
 
+
 def get_kmarkdown_message_raw(data: dict):
     res = data['raw_content']
     return res
 
+
 def get_message_obj(target_event):
     flag_hit = False
     if 'type' in target_event.sdk_event.payload.data.d:
-        if 1 == target_event.sdk_event.payload.data.d['type'] \
-        and 'content' in target_event.sdk_event.payload.data.d:
+        if (
+            1 == target_event.sdk_event.payload.data.d['type']
+            and 'content' in target_event.sdk_event.payload.data.d
+        ):
             flag_hit = True
             message_obj = OlivOS.messageAPI.Message_templet(
                 'kaiheila_string',
@@ -592,8 +598,10 @@ def get_message_obj(target_event):
             )
             message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
             message_obj.data_raw = message_obj.data.copy()
-        elif 9 == target_event.sdk_event.payload.data.d['type'] \
-        and 'content' in target_event.sdk_event.payload.data.d:
+        elif (
+            9 == target_event.sdk_event.payload.data.d['type']
+            and 'content' in target_event.sdk_event.payload.data.d
+        ):
             flag_hit = True
             message_obj = OlivOS.messageAPI.Message_templet(
                 'kaiheila_string',
@@ -601,8 +609,10 @@ def get_message_obj(target_event):
             )
             message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
             message_obj.data_raw = message_obj.data.copy()
-        elif 2 == target_event.sdk_event.payload.data.d['type'] \
-        and 'content' in target_event.sdk_event.payload.data.d:
+        elif (
+            2 == target_event.sdk_event.payload.data.d['type']
+            and 'content' in target_event.sdk_event.payload.data.d
+        ):
             flag_hit = True
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -610,8 +620,10 @@ def get_message_obj(target_event):
                     OlivOS.messageAPI.PARA.image(file=target_event.sdk_event.payload.data.d['content'])
                 ]
             )
-        elif 3 == target_event.sdk_event.payload.data.d['type'] \
-        and 'content' in target_event.sdk_event.payload.data.d:
+        elif (
+            3 == target_event.sdk_event.payload.data.d['type']
+            and 'content' in target_event.sdk_event.payload.data.d
+        ):
             flag_hit = True
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -619,8 +631,10 @@ def get_message_obj(target_event):
                     OlivOS.messageAPI.PARA.video(file=target_event.sdk_event.payload.data.d['content'])
                 ]
             )
-        elif 8 == target_event.sdk_event.payload.data.d['type'] \
-        and 'content' in target_event.sdk_event.payload.data.d:
+        elif (
+            8 == target_event.sdk_event.payload.data.d['type']
+            and 'content' in target_event.sdk_event.payload.data.d
+        ):
             flag_hit = True
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -637,17 +651,17 @@ def get_message_obj(target_event):
     else:
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
     return message_obj
+
 
 def get_guild_admin_role_id(bot_info, guild_id):
     """
     获取并缓存guild的管理员role_id列表
     通过调用getGuildView，在roles数组中查找管理员：
     """
-    global sdkGuildAdminRoleId
     guild_id_str = str(guild_id)
     # 如果缓存中已有，直接返回
     if guild_id_str in sdkGuildAdminRoleId:
@@ -659,41 +673,42 @@ def get_guild_admin_role_id(bot_info, guild_id):
         this_msg.do_api('GET')
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res)
-            if raw_obj is not None and type(raw_obj) == dict:
+            if raw_obj is not None and type(raw_obj) is dict:
                 if 'data' in raw_obj and 'roles' in raw_obj['data']:
                     roles = raw_obj['data']['roles']
                     # 查找所有管理员角色
                     admin_role_names = ['管理员', '文字频道管理员', '语音频道管理员']
                     for role in roles:
-                        if type(role) == dict and 'name' in role:
+                        if type(role) is dict and 'name' in role:
                             role_name = role['name']
                             if role_name in admin_role_names:
                                 admin_role_id = role.get('role_id')
                                 if admin_role_id is not None:
                                     admin_role_ids.append(admin_role_id)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
     sdkGuildAdminRoleId[guild_id_str] = admin_role_ids if len(admin_role_ids) > 0 else None
     return sdkGuildAdminRoleId[guild_id_str]
+
 
 def determine_user_role(user_data, admin_role_ids):
     """
     根据用户数据判断用户的role
     """
     # 如果is_master为true，返回owner
-    if user_data.get('is_master') == True:
+    if user_data.get('is_master') is True:
         return 'owner'
     # 如果roles数组中包含任何一个管理员role_id
     if admin_role_ids is not None:
         user_roles = user_data.get('roles', [])
-        if type(user_roles) == list and type(admin_role_ids) == list:
+        if type(user_roles) is list and type(admin_role_ids) is list:
             for admin_role_id in admin_role_ids:
                 if admin_role_id in user_roles:
                     return 'admin'
     return 'member'
 
+
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -717,15 +732,17 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('GET')
             api_res_json = json.loads(api_msg_obj.res)
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['data']['id']
-        except:
+        except Exception:
             pass
     if 'channel_type' in target_event.sdk_event.payload.data.d:
         if target_event.sdk_event.payload.data.d['channel_type'] == 'GROUP':
             message_obj = get_message_obj(target_event)
             if message_obj.active:
                 try:
-                    if 'extra' in target_event.sdk_event.payload.data.d \
-                    and 'type' in target_event.sdk_event.payload.data.d:
+                    if (
+                        'extra' in target_event.sdk_event.payload.data.d
+                        and 'type' in target_event.sdk_event.payload.data.d
+                    ):
                         target_event.active = True
                         target_event.plugin_info['func_type'] = 'group_message'
                         target_event.data = target_event.group_message(
@@ -779,14 +796,14 @@ def get_Event_from_SDK(target_event):
                                 this_msg.do_api('GET')
                                 if this_msg.res is not None:
                                     raw_obj = init_api_json(this_msg.res)
-                                    if raw_obj is not None and type(raw_obj) == dict:
+                                    if raw_obj is not None and type(raw_obj) is dict:
                                         if 'data' in raw_obj:
                                             data = raw_obj['data']
                                             if 'is_master' in data:
                                                 user_data['is_master'] = data['is_master']
                                             if 'roles' in data:
                                                 user_data['roles'] = data['roles']
-                            except:
+                            except Exception:
                                 pass
                         # 判断role
                         target_event.data.sender['role'] = determine_user_role(user_data, admin_role_ids)
@@ -797,15 +814,17 @@ def get_Event_from_SDK(target_event):
                             target_event.active = False
                     else:
                         target_event.active = False
-                except Exception as e:
+                except Exception:
                     traceback.print_exc()
                     target_event.active = False
         elif target_event.sdk_event.payload.data.d['channel_type'] == 'PERSON':
             message_obj = get_message_obj(target_event)
             if message_obj.active:
                 try:
-                    if 'extra' in target_event.sdk_event.payload.data.d \
-                    and 'type' in target_event.sdk_event.payload.data.d:
+                    if (
+                        'extra' in target_event.sdk_event.payload.data.d
+                        and 'type' in target_event.sdk_event.payload.data.d
+                    ):
                         target_event.active = True
                         target_event.plugin_info['func_type'] = 'private_message'
                         target_event.data = target_event.private_message(
@@ -835,19 +854,28 @@ def get_Event_from_SDK(target_event):
                             target_event.active = False
                     else:
                         target_event.active = False
-                except Exception as e:
+                except Exception:
                     traceback.print_exc()
                     target_event.active = False
             else:
-                if 'type' in target_event.sdk_event.payload.data.d \
-                and target_event.sdk_event.payload.data.d['type'] == 255 \
-                and 'extra' in target_event.sdk_event.payload.data.d \
-                and type(target_event.sdk_event.payload.data.d['extra']) is dict:
+                if (
+                    'type' in target_event.sdk_event.payload.data.d
+                    and target_event.sdk_event.payload.data.d['type'] == 255
+                    and 'extra' in target_event.sdk_event.payload.data.d
+                    and type(target_event.sdk_event.payload.data.d['extra']) is dict
+                ):
                     # 处理服务器成员加入/退出事件(包括自己和其他成员)
-                    if 'type' in target_event.sdk_event.payload.data.d['extra'] \
-                    and target_event.sdk_event.payload.data.d['extra']['type'] in ['joined_guild', 'exited_guild', 'self_joined_guild', 'self_exited_guild'] \
-                    and 'body' in target_event.sdk_event.payload.data.d['extra'] \
-                    and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict:
+                    if (
+                        'type' in target_event.sdk_event.payload.data.d['extra']
+                        and target_event.sdk_event.payload.data.d['extra']['type'] in [
+                            'joined_guild',
+                            'exited_guild',
+                            'self_joined_guild',
+                            'self_exited_guild'
+                        ]
+                        and 'body' in target_event.sdk_event.payload.data.d['extra']
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict
+                    ):
                         try:
                             extra = target_event.sdk_event.payload.data.d['extra']
                             body = extra['body']
@@ -883,28 +911,33 @@ def get_Event_from_SDK(target_event):
                                     host_id
                                 )
                                 target_event.data.action = 'leave'
-                        except Exception as e:
+                        except Exception:
                             traceback.print_exc()
                             target_event.active = False
                     # 处理按钮点击事件
-                    elif 'body' in target_event.sdk_event.payload.data.d['extra'] \
-                    and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict \
-                    and 'type' in target_event.sdk_event.payload.data.d['extra'] \
-                    and target_event.sdk_event.payload.data.d['extra']['type'] == 'message_btn_click':
-                        if 'channel_type' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'PERSON' \
-                        and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str \
-                        and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str \
-                        and 'value' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str \
-                        and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict \
-                        and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str \
-                        and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']) is str:
+                    elif (
+                        'body' in target_event.sdk_event.payload.data.d['extra']
+                        and type(target_event.sdk_event.payload.data.d['extra']['body']) is dict
+                        and 'type' in target_event.sdk_event.payload.data.d['extra']
+                        and target_event.sdk_event.payload.data.d['extra']['type'] == 'message_btn_click'
+                    ):
+                        if (
+                            'channel_type' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'PERSON'
+                            and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str
+                            and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str
+                            and 'value' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str
+                            and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict
+                            and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str
+                            and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username'])
+                                is str
+                        ):
                             target_event.active = True
                             target_event.plugin_info['func_type'] = 'private_message'
                             msg = target_event.sdk_event.payload.data.d['extra']['body']['value']
@@ -933,22 +966,25 @@ def get_Event_from_SDK(target_event):
                             target_event.data.extend['flag_from_direct'] = True
                             if plugin_event_bot_hash in sdkSubSelfInfo:
                                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-                        elif 'channel_type' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'GROUP' \
-                        and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str \
-                        and 'guild_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['guild_id']) is str \
-                        and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str \
-                        and 'value' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str \
-                        and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict \
-                        and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str \
-                        and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info'] \
-                        and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username']) is str:
+                        elif (
+                            'channel_type' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and target_event.sdk_event.payload.data.d['extra']['body']['channel_type'] == 'GROUP'
+                            and 'target_id' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['target_id']) is str
+                            and 'guild_id' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['guild_id']) is str
+                            and 'user_id' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_id']) is str
+                            and 'value' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['value']) is str
+                            and 'user_info' in target_event.sdk_event.payload.data.d['extra']['body']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']) is dict
+                            and 'id' in target_event.sdk_event.payload.data.d['extra']['body']['user_info']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['id']) is str
+                            and 'username' in target_event.sdk_event.payload.data.d['extra']['body']['user_info']
+                            and type(target_event.sdk_event.payload.data.d['extra']['body']['user_info']['username'])
+                                is str
+                        ):
                             target_event.active = True
                             target_event.plugin_info['func_type'] = 'group_message'
                             msg = target_event.sdk_event.payload.data.d['extra']['body']['value']
@@ -1001,14 +1037,14 @@ def get_Event_from_SDK(target_event):
                                     this_msg.do_api('GET')
                                     if this_msg.res is not None:
                                         raw_obj = init_api_json(this_msg.res)
-                                        if raw_obj is not None and type(raw_obj) == dict:
+                                        if raw_obj is not None and type(raw_obj) is dict:
                                             if 'data' in raw_obj:
                                                 data = raw_obj['data']
                                                 if 'is_master' in data:
                                                     user_data['is_master'] = data['is_master']
                                                 if 'roles' in data:
                                                     user_data['roles'] = data['roles']
-                                except:
+                                except Exception:
                                     pass
                             # 判断role
                             target_event.data.sender['role'] = determine_user_role(user_data, admin_role_ids)
@@ -1016,6 +1052,7 @@ def get_Event_from_SDK(target_event):
                             target_event.data.extend['flag_from_direct'] = False
                             if plugin_event_bot_hash in sdkSubSelfInfo:
                                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
@@ -1050,24 +1087,26 @@ class event_action(object):
         msg_type_last = 'text'
         for message_this in message.data:
             if message_type == 'text':
-                if type(message_this) == OlivOS.messageAPI.PARA.text:
+                if type(message_this) is OlivOS.messageAPI.PARA.text:
                     if msg_type_last != 'text':
                         res_data = ''
                     res_data += message_this.data['text']
                     msg_type_last = 'text'
-                elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                elif type(message_this) is OlivOS.messageAPI.PARA.image:
                     if msg_type_last == 'text':
                         if len(res_data) > 0:
                             this_msg.data.type = 9
                             this_msg.data.content = res_data
                             this_msg.do_api()
-                        image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
+                        image_path = event_action.setResourceUploadFast(
+                            target_event, message_this.data['file'], 'images'
+                        )
                         this_msg.data.type = 2
                         this_msg.data.content = image_path
                         this_msg.do_api()
                     msg_type_last = 'media'
             elif message_type == 'card':
-                if type(message_this) == OlivOS.messageAPI.PARA.text:
+                if type(message_this) is OlivOS.messageAPI.PARA.text:
                     res_data['modules'].append(
                         {
                             "type": "section",
@@ -1077,7 +1116,7 @@ class event_action(object):
                             }
                         }
                     )
-                elif type(message_this) == OlivOS.messageAPI.PARA.image:
+                elif type(message_this) is OlivOS.messageAPI.PARA.image:
                     image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
                     res_data['modules'].append(
                         {
@@ -1090,7 +1129,7 @@ class event_action(object):
                             ]
                         }
                     )
-                elif type(message_this) == OlivOS.messageAPI.PARA.video:
+                elif type(message_this) is OlivOS.messageAPI.PARA.video:
                     video_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'videos')
                     res_data['modules'].append(
                         {
@@ -1099,7 +1138,7 @@ class event_action(object):
                             "src": video_path
                         }
                     )
-                elif type(message_this) == OlivOS.messageAPI.PARA.record:
+                elif type(message_this) is OlivOS.messageAPI.PARA.record:
                     audio_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'audios')
                     res_data['modules'].append(
                         {
@@ -1119,7 +1158,7 @@ class event_action(object):
                 this_msg.data.content = json.dumps([res_data], ensure_ascii=False)
                 this_msg.do_api()
 
-    def create_message(target_event, chat_id, content_type:int, content:str, flag_direct=False):
+    def create_message(target_event, chat_id, content_type: int, content: str, flag_direct=False):
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         res_data['active'] = True
         this_msg = None
@@ -1135,7 +1174,7 @@ class event_action(object):
         res_data['data']['chat_type'] = 'private' if flag_direct else 'group'
         res_data['data']['chat_id'] = str(chat_id)
         res_data['data']['content_type'] = str(content_type)
-        res_data['data']['content'] = str(json.dumps(content, ensure_ascii = False))
+        res_data['data']['content'] = str(json.dumps(content, ensure_ascii=False))
         return res_data
 
     def get_login_info(target_event):
@@ -1147,11 +1186,11 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
                     res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1165,11 +1204,11 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
                     res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1185,7 +1224,7 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'username'], str)
                     res_data['data']['id'] = str(user_id)
@@ -1210,7 +1249,7 @@ class event_action(object):
                     res_data['data']['role'] = determine_user_role(user_data, admin_role_ids)
                     res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'nickname'], str)
                     res_data['data']['title'] = ''
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1249,17 +1288,19 @@ class event_action(object):
             msg_upload_api.do_api('POST', check_list[type_path])
             if msg_upload_api.res is not None:
                 msg_upload_api_obj = json.loads(msg_upload_api.res)
-                if 'code' in msg_upload_api_obj \
-                and 0 == msg_upload_api_obj['code'] \
-                and 'data' in msg_upload_api_obj \
-                and 'url' in msg_upload_api_obj['data']:
+                if (
+                    'code' in msg_upload_api_obj
+                    and 0 == msg_upload_api_obj['code']
+                    and 'data' in msg_upload_api_obj
+                    and 'url' in msg_upload_api_obj['data']
+                ):
                     res = msg_upload_api_obj['data']['url']
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             res = None
         return res
 
-    def set_playgame_delete_activity(target_event, data_type:int):
+    def set_playgame_delete_activity(target_event, data_type: int):
         raw_obj = None
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         this_msg = API.setPlayGameDeleteActivity(get_SDK_bot_info_from_Event(target_event))
@@ -1271,7 +1312,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
             return res_data
         return res_data
@@ -1305,7 +1346,7 @@ class event_action(object):
                     res_data['active'] = True
                     res_data['data'] = {}
                     res_data['data']['id'] = game_id
-        except:
+        except Exception:
             res_data['active'] = False
             return res_data
         return res_data
@@ -1335,7 +1376,7 @@ class event_action(object):
                     res_data['data']['music_name'] = music_name
                     res_data['data']['singer'] = singer
                     res_data['data']['software'] = software
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1351,7 +1392,7 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     if 'data' in raw_obj and 'items' in raw_obj['data']:
                         res_data['active'] = True
                         for raw_obj_this in raw_obj['data']['items']:
@@ -1360,7 +1401,7 @@ class event_action(object):
                             tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['name'], str)
                             tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['topic'], str)
                             res_data['data'].append(tmp_res_data_this)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1374,12 +1415,12 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'name'], str)
                     res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'topic'], str)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1395,7 +1436,7 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     if 'data' in raw_obj and 'items' in raw_obj['data']:
                         res_data['active'] = True
                         # 获取管理员role_id列表
@@ -1416,7 +1457,7 @@ class event_action(object):
                                 user_data['roles'] = raw_obj_this['roles']
                             tmp_res_data_this['role'] = determine_user_role(user_data, admin_role_ids)
                             res_data['data'].append(tmp_res_data_this)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1434,7 +1475,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1450,7 +1491,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1467,7 +1508,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1485,7 +1526,7 @@ class event_action(object):
                 if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data'] = raw_obj.get('data', {})
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1503,7 +1544,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1521,7 +1562,7 @@ class event_action(object):
             if raw_obj is not None:
                 if type(raw_obj) is dict:
                     res_data['active'] = True
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1540,7 +1581,7 @@ class event_action(object):
                 if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data'] = raw_obj.get('data', {})
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1561,7 +1602,7 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     if 'data' in raw_obj and 'items' in raw_obj['data']:
                         res_data['active'] = True
                         for raw_obj_this in raw_obj['data']['items']:
@@ -1570,7 +1611,7 @@ class event_action(object):
                             tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['name'], str)
                             tmp_res_data_this['memo'] = ''
                             res_data['data'].append(tmp_res_data_this)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -1585,14 +1626,15 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'id'], str)
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'name'], str)
                     res_data['data']['memo'] = init_api_do_mapping_for_dict(raw_obj, ['data', 'topic'], str)
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
+
 
 class inde_interface(OlivOS.API.inde_interface_T):
     @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_delete_activity_all')
@@ -1615,7 +1657,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
         res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_game(target_event, game_id)
         return res_data
 
-    def set_playgame_activity_game(self, game_id:int, flag_log: bool = True, remote: bool = False):
+    def set_playgame_activity_game(self, game_id: int, flag_log: bool = True, remote: bool = False):
         res_data = None
         if remote:
             pass
@@ -1624,23 +1666,30 @@ class inde_interface(OlivOS.API.inde_interface_T):
         return res_data
 
     @OlivOS.API.Event.callbackLogger('kaiheila:create_message', ['chat_type', 'chat_id', 'content_type', 'content'])
-    def __create_message(target_event, chat_type:str, chat_id:str, content_type:int, content:str, flag_log:bool=True):
+    def __create_message(
+        target_event,
+        chat_type: str,
+        chat_id: str,
+        content_type: int,
+        content: str,
+        flag_log: bool = True
+    ):
         res_data = None
         res_data = OlivOS.kaiheilaSDK.event_action.create_message(
             target_event,
             chat_id,
             content_type,
             content,
-            flag_direct = (False if chat_type == 'group' else True)
+            flag_direct=(False if chat_type == 'group' else True)
         )
         return res_data
 
     def create_message(
         self,
-        chat_type:str,
-        chat_id:str,
-        content_type:int,
-        content:str,
+        chat_type: str,
+        chat_id: str,
+        content_type: int,
+        content: str,
         flag_log: bool = True,
         remote: bool = False
     ):
@@ -1648,20 +1697,25 @@ class inde_interface(OlivOS.API.inde_interface_T):
         if remote:
             pass
         else:
-            res_data = inde_interface.__create_message(self.event, chat_type, chat_id, content_type, content, flag_log=True)
+            res_data = inde_interface.__create_message(
+                self.event, chat_type, chat_id, content_type, content,
+                flag_log=True
+            )
         return res_data
 
     @OlivOS.API.Event.callbackLogger('kaiheila:set_playgame_activity_music', ['music_name', 'singer', 'software'])
     def __set_playgame_activity_music(target_event, music_name, singer, software, flag_log=True):
         res_data = None
-        res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_music(target_event, music_name, singer, software)
+        res_data = OlivOS.kaiheilaSDK.event_action.set_playgame_activity_music(
+            target_event, music_name, singer, software
+        )
         return res_data
 
     def set_playgame_activity_music(
         self,
-        music_name:str,
-        singer:str,
-        software:str = 'cloudmusic',
+        music_name: str,
+        singer: str,
+        software: str = 'cloudmusic',
         flag_log: bool = True,
         remote: bool = False
     ):
@@ -1669,8 +1723,12 @@ class inde_interface(OlivOS.API.inde_interface_T):
         if remote:
             pass
         else:
-            res_data = inde_interface.__set_playgame_activity_music(self.event, music_name, singer, software, flag_log=True)
+            res_data = inde_interface.__set_playgame_activity_music(
+                self.event, music_name, singer, software,
+                flag_log=True
+            )
         return res_data
+
 
 def init_api_json(raw_str):
     res_data = None
@@ -1678,28 +1736,27 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         if tmp_obj['code'] == 0:
             flag_is_active = True
     if flag_is_active:
-        if type(tmp_obj) == dict:
+        if type(tmp_obj) is dict:
             res_data = tmp_obj.copy()
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:

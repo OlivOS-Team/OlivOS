@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,17 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
 import threading
 import time
 import json
 import websocket
 import uuid
-import requests as req
 import traceback
 
 import OlivOS
@@ -65,7 +63,7 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['extend_data']['websocket_url'] = api_obj_json['data']['url']
                 else:
                     self.Proc_data['extend_data']['websocket_url'] = None
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -88,7 +86,7 @@ class server(OlivOS.API.Proc_templet):
                     target=self.run_pulse,
                     args=()
                 ).start()
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):
@@ -110,14 +108,17 @@ class server(OlivOS.API.Proc_templet):
             tmp_data = OlivOS.kaiheilaSDK.PAYLOAD.sendPing(
                 self.Proc_data['extend_data']['last_s']
             ).dump()
-            if tmp_ws_item != self.Proc_data['extend_data']['ws_item'] or self.Proc_data['extend_data']['ws_item'] is None:
+            if (
+                tmp_ws_item != self.Proc_data['extend_data']['ws_item']
+                or self.Proc_data['extend_data']['ws_item'] is None
+            ):
                 self.log(0, 'OlivOS kaiheila link server [' + self.Proc_name + '] websocket pulse giveup')
                 return
             if self.Proc_data['extend_data']['ws_obj'] is not None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
                     self.log(0, 'OlivOS kaiheila link server [' + self.Proc_name + '] websocket pulse send')
-                except:
+                except Exception:
                     break
             else:
                 break
@@ -154,7 +155,7 @@ def accountFix(bot_info_dict, logger_proc):
                 this_msg_res = this_msg.do_api()
                 this_msg_res_obj = json.loads(this_msg_res)
                 if this_msg_res_obj['code'] == 0:
-                    if type(this_msg_res_obj['data']['id']) == str:
+                    if type(this_msg_res_obj['data']['id']) is str:
                         if this_msg_res_obj['data']['id'].isdigit():
                             logger_proc.log(2, '[kaiheila] account [' + str(
                                 bot_info_dict[bot_hash].id) + '] will be updated as [' + str(
@@ -168,7 +169,7 @@ def accountFix(bot_info_dict, logger_proc):
                 else:
                     logger_proc.log(2, '[kaiheila] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
                 res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
-            except:
+            except Exception:
                 logger_proc.log(3, '[kaiheila] account [' + str(
                     bot_info_dict[bot_hash].id) + '] not hit:\n' + traceback.format_exc())
                 continue
