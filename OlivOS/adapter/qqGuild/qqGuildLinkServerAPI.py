@@ -24,8 +24,17 @@ import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
