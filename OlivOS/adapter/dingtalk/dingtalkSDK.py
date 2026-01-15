@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   RainyZhou雨舟, OlivOS-Team
 @Contact   :   thunderain_zhou@163.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,7 +20,6 @@ import traceback
 import time
 import uuid
 import base64
-import os
 import dataclasses
 import typing
 # import mimetypes
@@ -28,9 +27,7 @@ import filetype
 from enum import IntEnum
 
 import requests as req
-from requests_toolbelt import MultipartEncoder
 from urllib import parse
-from urllib3 import encode_multipart_formdata
 
 import OlivOS
 
@@ -61,6 +58,7 @@ def _init_kw_dataclass_safe(**kwargs):
         return dataclasses.dataclass(**kwargs)
     else:
         return dataclasses.dataclass(kw_only=True, **kwargs)
+
 
 class RESPONSE_STATUS_CODE(IntEnum):
     UNKNOWN = 0
@@ -98,19 +96,19 @@ class bot_info_T(object):
             return self._access_token
         return None
 
+
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     """
         基于本地缓存查看
     """
-    global sdkSubSelfInfo
     bot_hash_this = plugin_bot_info.getHash()
     if bot_hash_this in sdkSubSelfInfo:
         return sdkSubSelfInfo[bot_hash_this]
 
     res = bot_info_T(
-        id = plugin_bot_info.id,
-        AppKey = plugin_bot_info.extends["app_key"],
-        AppSecret = plugin_bot_info.extends["app_secret"]
+        id=plugin_bot_info.id,
+        AppKey=plugin_bot_info.extends["app_key"],
+        AppSecret=plugin_bot_info.extends["app_secret"]
     )
     res.debug_mode = plugin_bot_info.debug_mode
     if plugin_bot_info.platform['model'] == 'public':
@@ -168,7 +166,6 @@ class payload_template(object):
             self.messageId = None
             self.type = None
             self.topic = None
-
 
     def load(self, data, is_rx):
         if data is not None:
@@ -234,6 +231,7 @@ class PAYLOAD(object):
                 self.data.data = packet.data.data
             else:
                 self.active = False
+
         def dump(self):
             return super().dump()
 
@@ -249,11 +247,11 @@ class PAYLOAD(object):
                 self.data.data = packet.data.data
             else:
                 self.active = False
-    
+
         def dump(self):
             data = {"response": None}
             return super().dump(data=data)
-        
+
     class replyEvent(payload_template):
         def __init__(self, packet: "PAYLOAD.rxPacket"):
             payload_template.__init__(self)
@@ -266,27 +264,25 @@ class PAYLOAD(object):
                 self.data.data = packet.data.data
             else:
                 self.active = False
-    
+
         def dump(self, flag_status=True, err_msg=""):
             data = {}
             if flag_status:
-                data["status"] = "SUCCESS" 
+                data["status"] = "SUCCESS"
                 data["message"] = "success"
             else:
                 data['status'] = "LATER"
                 data['message'] = str(err_msg)
             return super().dump(data=data)
-        
-
-
-'''
-对于POST接口的实现
-'''
 
 
 class api_templet(object):
+    '''
+    对于POST接口的实现
+    '''
     NO_DATA = object()      # 当需要传入 `None` 时，使用这个（直接传 None 代表使用默认配置）
-    def __init__(self, bot_info: 'bot_info_T|None'=None):
+
+    def __init__(self, bot_info: 'bot_info_T|None' = None):
         self.bot_info = bot_info
         self.data = None
         self.metadata = None
@@ -297,12 +293,12 @@ class api_templet(object):
 
     # @dataclasses.dataclass
     class data_T:
-        def  __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):
             raise NotImplementedError()
 
     # @dataclasses.dataclass
     class metadata_T:
-        def  __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):
             raise NotImplementedError()
 
     def do_api(self, req_type='POST', proxy=None):
@@ -349,10 +345,22 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload,
-                                      proxies=OlivOS.webTool.get_system_proxy(), **request_args)
+                msg_res = req.request(
+                    "POST",
+                    send_url,
+                    headers=headers,
+                    data=payload,
+                    proxies=OlivOS.webTool.get_system_proxy(),
+                    **request_args
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy(), **request_args)
+                msg_res = req.request(
+                    "GET",
+                    send_url,
+                    headers=headers,
+                    proxies=OlivOS.webTool.get_system_proxy(),
+                    **request_args
+                )
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
@@ -364,7 +372,7 @@ class api_templet(object):
             except json.JSONDecodeError:
                 self.res = t
             return self.res
-        except:
+        except Exception:
             traceback.print_exc()
             return None
 
@@ -381,30 +389,30 @@ class API:
             self.metadata = None
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['gateway']
-        
+
         def do_api(self, req_type='POST', proxy=None):
             body = {
-                    "clientId" : None, 
-                    "clientSecret" : None,
-                    "subscriptions" : [
+                    "clientId": None,
+                    "clientSecret": None,
+                    "subscriptions": [
                         {
-                        "type" : "EVENT",
-                        "topic" : "*"
+                            "type": "EVENT",
+                            "topic": "*"
                         },
                         {
-                        "type" : "CALLBACK",
-                        "topic" : "/v1.0/im/bot/messages/get"
+                            "type": "CALLBACK",
+                            "topic": "/v1.0/im/bot/messages/get"
                         },
                         {
-                        "type" : "SYSTEM",
-                        "topic" : "ping"
+                            "type": "SYSTEM",
+                            "topic": "ping"
                         },
                         {
-                        "type" : "SYSTEM",
-                        "topic" : "disconnect"
+                            "type": "SYSTEM",
+                            "topic": "disconnect"
                         },
                     ],
-                    "ua" : OlivOS.infoAPI.OlivOS_Header_UA,
+                    "ua": OlivOS.infoAPI.OlivOS_Header_UA,
                     # localIp : "0.0.0.0"                   # ip 为非必填项
                 }
             body['clientId'] = self.bot_info.app_key
@@ -463,13 +471,12 @@ class API:
             mediaName: typing.Optional[str] = None
             contentType: typing.Optional[str] = None
 
-
         def do_api(self, req_type='POST', proxy=None):
             if self.data is None:
                 return None
             if self.data.contentType is None:
                 file_mime = filetype.guess_mime(self.data.media)
-                if file_meta is not None:
+                if file_mime is not None:
                     self.data.contentType = file_mime
                 else:
                     self.data.contentType = 'application/octet-stream'
@@ -502,7 +509,7 @@ class API:
                 headers=self.NO_DATA,
                 flag_body_json=False,
                 request_args=requset_args
-            )         
+            )
 
     class getFileDownloadUrl(api_templet):
         def __init__(self, bot_info: bot_info_T):
@@ -562,7 +569,7 @@ class API:
             )
 
     class sendGroupMessage(api_templet):
-        def __init__(self, bot_info: bot_info_T):            
+        def __init__(self, bot_info: bot_info_T):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -587,8 +594,8 @@ class API:
             if self.data is None:
                 return None
             tmp_payload_dict = {
-                "msgKey" : self.data.msgKey,
-                "msgParam" : self.data.str_msgParam
+                "msgKey": self.data.msgKey,
+                "msgParam": self.data.str_msgParam
             }
 
             tmp_payload_dict["openConversationId"] = self.data.openConversationId
@@ -598,14 +605,14 @@ class API:
                 tmp_payload_dict["coolAppCode"] = self.data.coolAppCode
             else:
                 tmp_payload_dict["robotCode"] = self.bot_info.id
-            
+
             return self._do_api(
                 req_type="POST",
                 body=tmp_payload_dict
             )
 
     class sendPrivateMessage(api_templet):
-        def __init__(self, bot_info: bot_info_T):            
+        def __init__(self, bot_info: bot_info_T):
             api_templet.__init__(self)
             self.bot_info = bot_info
             self.data = None
@@ -629,20 +636,21 @@ class API:
             if self.data is None:
                 return None
             tmp_payload_dict = {
-                "msgKey" : self.data.msgKey,
-                "msgParam" : self.data.str_msgParam,
-                "userIds" : self.data.userIds,
+                "msgKey": self.data.msgKey,
+                "msgParam": self.data.str_msgParam,
+                "userIds": self.data.userIds,
             }
 
             if self.data.robotCode is not None:
                 tmp_payload_dict["robotCode"] = self.data.robotCode
             else:
                 tmp_payload_dict["robotCode"] = self.bot_info.id
-            
+
             return self._do_api(
                 req_type="POST",
                 body=tmp_payload_dict
             )
+
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
     if var_path is None:
@@ -685,7 +693,6 @@ def checkByListAnd(check_list):
 
 def get_Event_from_SDK(target_event):
     # OlivOS.bootAPI.logG(0, "get_Event_from_SDK")
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -700,17 +707,17 @@ def get_Event_from_SDK(target_event):
     #     platform_model=target_event.platform['model']
     # )
     # if plugin_event_bot_hash not in sdkSubSelfInfo:
-        # tmp_bot_info = bot_info_T(
-        #     target_event.sdk_event.base_info['self_id'],
-        #     target_event.sdk_event.base_info['token']
-        # )
-        # api_msg_obj = API.getMe(tmp_bot_info)
-        # try:
-        #     api_msg_obj.do_api('GET')
-        #     api_res_json = json.loads(api_msg_obj.res)
-        #     sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
-        # except:
-        #     pass
+    #     tmp_bot_info = bot_info_T(
+    #         target_event.sdk_event.base_info['self_id'],
+    #         target_event.sdk_event.base_info['token']
+    #     )
+    #     api_msg_obj = API.getMe(tmp_bot_info)
+    #     try:
+    #         api_msg_obj.do_api('GET')
+    #         api_res_json = json.loads(api_msg_obj.res)
+    #         sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
+    #     except:
+    #         pass
     if target_event.sdk_event.payload.data.type in [
         'CALLBACK',
     ]:
@@ -718,7 +725,7 @@ def get_Event_from_SDK(target_event):
         message_obj = None
         message_para_list = []
 
-        if type(data_raw) == dict:
+        if type(data_raw) is dict:
             self_id_encrypted = data_raw['chatbotUserId']
             tmp_at_list = []
             if 'atUsers' in data_raw:
@@ -765,14 +772,14 @@ def get_Event_from_SDK(target_event):
             elif data_raw["msgtype"] == "file":
                 # TODO: 文件接收事件，尚未实现
                 pass
-    
+
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_para',
             message_para_list
-        )        
+        )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             traceback.print_exc()
             message_obj.active = False
             message_obj.data = []
@@ -826,7 +833,7 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['name'] = data_raw['senderNick']
                 target_event.data.sender['sex'] = 'unknown'
                 target_event.data.sender['age'] = 0
-                
+
                 if "isAdmin" in data_raw:
                     if data_raw["isAdmin"]:
                         target_event.data.sender['role'] = 'admin'
@@ -834,14 +841,13 @@ def get_Event_from_SDK(target_event):
 
                 target_event.data.host_id = None
 
-    elif target_event.sdk_event.payload.data.type in [
-            "EVENT"
-        ]:
+    elif target_event.sdk_event.payload.data.type in ["EVENT"]:
         # TODO: 事件订阅处理
         target_event.active = False
     else:
         # 其他未知事件
         target_event.active = False
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
@@ -856,11 +862,11 @@ class event_action(object):
                     )
                     api_obj.set_data(
                         API.sendGroupMessage.data_T(
-                            msgKey = "sampleText",
-                            msgParam = {
+                            msgKey="sampleText",
+                            msgParam={
                                 "content": res_this
                             },
-                            openConversationId = target_id
+                            openConversationId=target_id
                         )
                     )
                     api_obj.do_api()
@@ -870,11 +876,11 @@ class event_action(object):
                     )
                     api_obj.set_data(
                         API.sendPrivateMessage.data_T(
-                            msgKey = "sampleText",
-                            msgParam = {
+                            msgKey="sampleText",
+                            msgParam={
                                 "content": res_this
                             },
-                            userIds = [target_id]
+                            userIds=[target_id]
                         )
                     )
                     api_obj.do_api()
@@ -887,11 +893,11 @@ class event_action(object):
                         )
                         api_obj.set_data(
                             API.sendGroupMessage.data_T(
-                                msgKey = "sampleImageMsg",
-                                msgParam = {
+                                msgKey="sampleImageMsg",
+                                msgParam={
                                     "photoURL": code,
                                 },
-                                openConversationId = target_id
+                                openConversationId=target_id
                             )
                         )
                         api_obj.do_api()
@@ -901,11 +907,11 @@ class event_action(object):
                         )
                         api_obj.set_data(
                             API.sendPrivateMessage.data_T(
-                                msgKey = "sampleImageMsg",
-                                msgParam = {
+                                msgKey="sampleImageMsg",
+                                msgParam={
                                     "photoURL": code,
                                 },
-                                userIds = [target_id]
+                                userIds=[target_id]
                             )
                         )
                         api_obj.do_api()
@@ -930,9 +936,7 @@ class event_action(object):
             #         api_obj.do_api()
 
 
-"""
-    以下为  DingTalk SDK 的内部实现函数，不建议直接调用
-"""
+# 以下为  DingTalk SDK 的内部实现函数，不建议直接调用
 def _get_file_url(target_event, downloadCode):
     """
         基于 downloadCode 获取文件下载地址
@@ -950,10 +954,11 @@ def _get_file_url(target_event, downloadCode):
         if msg_api.res is not None:
             msg_api_obj = msg_api.res
             res = msg_api_obj['downloadUrl']
-    except:
+    except Exception:
         traceback.print_exc()
         res = None
     return res
+
 
 def _download_file(target_event, downloadCode, file_ext=".png", file_type="images"):
     """
@@ -976,10 +981,11 @@ def _download_file(target_event, downloadCode, file_ext=".png", file_type="image
             with open(file_path, "wb") as f:
                 f.write(req_obj.content)
             return file_path
-    except:
+    except Exception:
         traceback.print_exc()
         pass
     return None
+
 
 def _set_image_upload_fast(target_event, url: str):
     """
@@ -1035,10 +1041,11 @@ def _set_image_upload_fast(target_event, url: str):
             msg_upload_api_obj = msg_upload_api.res
             if msg_upload_api_obj['errcode'] == 0:
                 res = msg_upload_api_obj['media_id']
-    except:
+    except Exception:
         traceback.print_exc()
         res = None
     return res
+
 
 def _get_user_mobile(target_event, user_id: str):
     """
@@ -1061,8 +1068,6 @@ def _get_user_mobile(target_event, user_id: str):
             if msg_api_obj['errcode'] == 0:
                 if "result" in msg_api_obj and "mobile" in msg_api_obj["result"]:
                     res = msg_api_obj['result']['mobile']
-    except:
+    except Exception:
         res = None
     return res
-
-

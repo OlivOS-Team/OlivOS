@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,29 +10,22 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   RainyZhou雨舟, OlivOS-Team
 @Contact   :   thunderain_zhou@163.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-
-import multiprocessing
-import threading
 import time
 import json
 import traceback
-from weakref import proxy
 import websocket
-import ssl
-import asyncio
 import uuid
-import requests as req
 
 import OlivOS
-
 
 gCheckList = [
     'default',
 ]
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
@@ -79,12 +72,14 @@ class server(OlivOS.API.Proc_templet):
                         self.Proc_data['extend_data']['websocket_ticket'] = api_obj_json['ticket']
                     else:
                         self.Proc_data['extend_data']['websocket_ticket'] = None
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
                 self.Proc_data['extend_data']['websocket_ticket'] = None
 
-            if self.Proc_data['extend_data']['websocket_url'] is not None and \
-                self.Proc_data['extend_data']['websocket_ticket'] is not None:
+            if (
+                self.Proc_data['extend_data']['websocket_url'] is not None
+                and self.Proc_data['extend_data']['websocket_ticket'] is not None
+            ):
                 self.run_websocket_rx_connect_start()
             time.sleep(self.Proc_info.scan_interval)
 
@@ -110,7 +105,10 @@ class server(OlivOS.API.Proc_templet):
                     resp_data = OlivOS.dingtalkSDK.PAYLOAD.sendPong(tmp_data_rx_obj)
                     self.send(ws, resp_data)
                 if tmp_data_rx_obj.data.topic == "disconnect":
-                    self.log(0, 'OlivOS dingtalk link server [' + self.Proc_name + '] websocket link will be closed by remote!')
+                    self.log(
+                        0,
+                        'OlivOS dingtalk link server [' + self.Proc_name + '] websocket link will be closed by remote!'
+                    )
             elif tmp_data_rx_obj.data.type == "CALLBACK":
                 resp_data = OlivOS.dingtalkSDK.PAYLOAD.replyCallback(tmp_data_rx_obj)
                 self.send(ws, resp_data)
@@ -118,7 +116,7 @@ class server(OlivOS.API.Proc_templet):
                 resp_data = OlivOS.dingtalkSDK.PAYLOAD.replyEvent(tmp_data_rx_obj)
                 self.send(ws, resp_data)
 
-        except Exception as err:
+        except Exception:
             pass
             traceback.print_exc()
 
@@ -137,7 +135,10 @@ class server(OlivOS.API.Proc_templet):
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
-        url_this = f"{self.Proc_data['extend_data']['websocket_url']}?ticket={self.Proc_data['extend_data']['websocket_ticket']}"
+        url_this = (
+            f"{self.Proc_data['extend_data']['websocket_url']}"
+            f"?ticket={self.Proc_data['extend_data']['websocket_ticket']}"
+        )
         ws = websocket.WebSocketApp(
             url_this,
             on_open=self.on_open,
