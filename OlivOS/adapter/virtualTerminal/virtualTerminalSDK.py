@@ -61,7 +61,6 @@ class event(object):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
