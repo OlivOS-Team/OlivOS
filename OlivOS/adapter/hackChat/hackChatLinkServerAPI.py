@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -25,6 +25,7 @@ import OlivOS
 modelName = 'hackChatLinkServerAPI'
 
 gDefaultWsPath = 'wss://hack.chat/chat-ws'
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
@@ -49,11 +50,15 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        global gDefaultWsPath
         wsPath = gDefaultWsPath
         if 'ws_path' in self.Proc_data['bot_info_dict'].extends:
             wsPath = self.Proc_data['bot_info_dict'].extends['ws_path']
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS hackChat link server [{0}] is running on [{1}]', [self.Proc_name, wsPath], modelName))
+        self.log(
+            2, OlivOS.L10NAPI.getTrans(
+                'OlivOS hackChat link server [{0}] is running on [{1}]',
+                [self.Proc_name, wsPath], modelName
+            )
+        )
         threading.Thread(
             target=self.message_router,
             args=()
@@ -61,7 +66,7 @@ class server(OlivOS.API.Proc_templet):
         while True:
             try:
                 self.Proc_data['extend_data']['websocket_url'] = wsPath
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -75,7 +80,7 @@ class server(OlivOS.API.Proc_templet):
                 sdk_event = OlivOS.hackChatSDK.event(rx_obj, self.Proc_data['bot_info_dict'])
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):
@@ -134,7 +139,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if rx_packet_data is not None:
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:

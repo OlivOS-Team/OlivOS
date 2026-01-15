@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,19 +10,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import threading
 import time
 import json
-import websocket
-import uuid
 
 import OlivOS
 
 gBotIdDict = {}
+
 
 class bot_info_T(object):
     def __init__(self, id=-1, nickname=None, password='', chatroom=None):
@@ -68,7 +66,6 @@ class event(object):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -95,25 +92,33 @@ def get_Event_from_SDK(target_event):
             user_hash = target_event.sdk_event.payload.data['userid']
         if target_event.sdk_event.payload.cmd == 'onlineSet':
             target_event.active = False
-            if 'users' in target_event.sdk_event.payload.data \
-            and type(target_event.sdk_event.payload.data['users']) is list:
+            if (
+                'users' in target_event.sdk_event.payload.data
+                and type(target_event.sdk_event.payload.data['users']) is list
+            ):
                 for user_this in target_event.sdk_event.payload.data['users']:
-                    if type(user_this) is dict \
-                    and 'isme' in user_this \
-                    and 'userid' in user_this \
-                    and user_this['isme'] == True:
+                    if (
+                        type(user_this) is dict
+                        and 'isme' in user_this
+                        and 'userid' in user_this
+                        and user_this['isme'] is True
+                    ):
                         gBotIdDict[plugin_event_bot_hash] = str(user_this['userid'])
         elif target_event.sdk_event.payload.cmd == 'chat':
-            if 'nick' in target_event.sdk_event.payload.data \
-            and 'text' in target_event.sdk_event.payload.data:
+            if (
+                'nick' in target_event.sdk_event.payload.data
+                and 'text' in target_event.sdk_event.payload.data
+            ):
                 target_event.active = True
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     target_event.sdk_event.payload.data['text']
                 )
                 tmp_user_id = str(user_hash)
-                if plugin_event_bot_hash in gBotIdDict \
-                and tmp_user_id == gBotIdDict[plugin_event_bot_hash]:
+                if (
+                    plugin_event_bot_hash in gBotIdDict
+                    and tmp_user_id == gBotIdDict[plugin_event_bot_hash]
+                ):
                     target_event.plugin_info['func_type'] = 'group_message_sent'
                     target_event.data = target_event.group_message_sent(
                         str(0),
@@ -184,8 +189,8 @@ class payload_template(object):
 
     def load(self, data, is_rx: bool):
         if data is not None:
-            if type(data) == dict:
-                if 'cmd' in data and type(data['cmd']) == str:
+            if type(data) is dict:
+                if 'cmd' in data and type(data['cmd']) is str:
                     self.cmd = data['cmd']
                 else:
                     self.active = False
@@ -201,7 +206,7 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class join(payload_template):
-        def __init__(self, nickname: str, chatroom: str, password:str=None):
+        def __init__(self, nickname: str, chatroom: str, password: str = None):
             payload_template.__init__(self)
             self.cmd = 'join'
             self.data = {
@@ -209,8 +214,10 @@ class PAYLOAD(object):
                 "channel": chatroom,
                 "nick": nickname
             }
-            if type(password) is str \
-            and len(password) > 0:
+            if (
+                type(password) is str
+                and len(password) > 0
+            ):
                 self.data['password'] = password
 
     class chat(payload_template):
