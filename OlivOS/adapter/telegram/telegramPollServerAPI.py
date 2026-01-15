@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
-import threading
 import time
 import json
 
@@ -61,17 +59,17 @@ class server(OlivOS.API.Proc_templet):
                 sdk_api_tmp.data.offset = self.Proc_data['bot_info_update_id'][bot_info_this]
                 try:
                     sdk_api_tmp.do_api()
-                except:
+                except Exception:
                     flag_not_attach = True
                 if not flag_not_attach:
                     try:
                         res_obj = json.loads(sdk_api_tmp.res.text)
-                        if type(res_obj['result']) == list and res_obj['result'] != []:
+                        if type(res_obj['result']) is list and res_obj['result'] != []:
                             self.Proc_data['bot_info_update_id'][bot_info_this] = res_obj['result'][-1]['update_id'] + 1
                             if not flag_first_update:
                                 for result_this in res_obj['result']:
                                     sdk_event = OlivOS.telegramSDK.event(result_this, 'poll', bot_info_this_obj)
                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-                    except:
+                    except Exception:
                         pass

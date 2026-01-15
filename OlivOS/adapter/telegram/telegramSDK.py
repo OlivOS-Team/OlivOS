@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质, MetaLeo元理
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -65,7 +65,13 @@ class send_telegram_post_json_T(object):
         self.node_ext = ''
 
     def send_telegram_post_json(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
+        if (
+            type(self.bot_info) is not bot_info_T
+            or self.bot_info.host == ''
+            or self.bot_info.port == -1
+            or self.obj is None
+            or self.node_ext == ''
+        ):
             return None
         else:
             json_str_tmp = json.dumps(obj=self.obj.__dict__)
@@ -124,7 +130,7 @@ class event(object):
     def event_dump(self, raw):
         try:
             res = json.dumps(raw)
-        except:
+        except Exception:
             res = None
         return res
 
@@ -233,7 +239,7 @@ def get_message_obj_from_SDK(target_event):
             ]):
                 message_list.append(
                     OlivOS.messageAPI.PARA.text(
-                        text = str(target_event.sdk_event.json['message']['caption'])
+                        text=str(target_event.sdk_event.json['message']['caption'])
                     )
                 )
             message_obj = OlivOS.messageAPI.Message_templet(
@@ -259,7 +265,6 @@ def get_message_obj_from_SDK(target_event):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -284,9 +289,9 @@ def get_Event_from_SDK(target_event):
         try:
             tmp_api.do_api()
             tmp_api_json = json.loads(tmp_api.res.text)
-            if tmp_api_json['ok'] == True:
+            if tmp_api_json['ok'] is True:
                 sdkSubSelfInfo[plugin_event_bot_hash] = tmp_api_json['result']['username']
-        except:
+        except Exception:
             pass
     if checkByListAnd([
         not target_event.active,
@@ -296,7 +301,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('message_id', target_event.sdk_event.json, ['message']),
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -332,7 +337,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -370,7 +375,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
-        #checkInDictSafe('text', target_event.sdk_event.json, ['message']),
+        # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
         checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
     ]):
         message_obj = None
@@ -455,9 +460,9 @@ class event_action(object):
         this_msg.data.text = ''
         flag_now_type = 'string'
         if message is not None:
-            if type(message.data) == list:
+            if type(message.data) is list:
                 for message_this in message.data:
-                    if type(message_this) == OlivOS.messageAPI.PARA.image:
+                    if type(message_this) is OlivOS.messageAPI.PARA.image:
                         if flag_now_type != 'image':
                             if this_msg.data.text != '':
                                 this_msg.do_api()
@@ -465,7 +470,7 @@ class event_action(object):
                         this_msg_image.data.photo = message_this.data['file']
                         this_msg_image.do_api()
                         flag_now_type = 'image'
-                    elif type(message_this) == OlivOS.messageAPI.PARA.text:
+                    elif type(message_this) is OlivOS.messageAPI.PARA.text:
                         this_msg.data.text += message_this.OP()
                         flag_now_type = 'string'
         if flag_now_type != 'image':
@@ -486,21 +491,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
-                res_data['active'] = True
-                res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
-                res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
-        return res_data
-
-    def get_login_info(target_event):
-        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
-        raw_obj = None
-        this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
-        if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
-        if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['first_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], int))
@@ -526,7 +517,7 @@ class event_action(object):
         if this_msg_2.res is not None:
             raw_obj_2 = init_api_json(this_msg_2.res.text)
         if raw_obj is not None and raw_obj_2 is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
                 res_data['data']['id'] = str(chat_id)
@@ -551,7 +542,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user', 'first_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user', 'id'], int))
@@ -577,18 +568,18 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         if 'ok' in tmp_obj:
-            if type(tmp_obj['ok']) == bool:
+            if type(tmp_obj['ok']) is bool:
                 if tmp_obj['ok']:
                     flag_is_active = True
     if flag_is_active:
         if 'result' in tmp_obj:
-            if type(tmp_obj['result']) == dict:
+            if type(tmp_obj['result']) is dict:
                 res_data = tmp_obj['result'].copy()
-            elif type(tmp_obj['result']) == list:
+            elif type(tmp_obj['result']) is list:
                 res_data = tmp_obj['result'].copy()
             else:
                 res_data = tmp_obj['result']
@@ -596,18 +587,17 @@ def init_api_json(raw_str):
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
