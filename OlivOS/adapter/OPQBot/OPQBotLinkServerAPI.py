@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -30,6 +30,7 @@ gCheckList = [
 ]
 
 modelName = 'OPQBotLinkServerAPI'
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
@@ -54,8 +55,16 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        wsPath = f"ws://{self.Proc_data['bot_info_dict'].post_info.host}:{self.Proc_data['bot_info_dict'].post_info.port}/ws"
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS OPQBot link server [{0}] is running on [{1}]', [self.Proc_name, wsPath], modelName))
+        wsPath = (
+            f"ws://{self.Proc_data['bot_info_dict'].post_info.host}"
+            f":{self.Proc_data['bot_info_dict'].post_info.port}/ws"
+        )
+        self.log(2, OlivOS.L10NAPI.getTrans(
+                'OlivOS OPQBot link server [{0}] is running on [{1}]',
+                [self.Proc_name, wsPath],
+                modelName
+            )
+        )
         threading.Thread(
             target=self.message_router,
             args=()
@@ -63,7 +72,7 @@ class server(OlivOS.API.Proc_templet):
         while True:
             try:
                 self.Proc_data['extend_data']['websocket_url'] = wsPath
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -71,14 +80,14 @@ class server(OlivOS.API.Proc_templet):
 
     def on_message(self, ws, message):
         try:
-            #print(message)
+            # print(message)
             rx_data = json.loads(message)
             rx_obj = OlivOS.OPQBotSDK.PAYLOAD.rxPacket(data=rx_data)
             if rx_obj.active:
                 sdk_event = OlivOS.OPQBotSDK.event(rx_obj, self.Proc_data['bot_info_dict'])
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):
@@ -130,11 +139,11 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if rx_packet_data is not None:
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'send' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data']:
-                                #print(rx_packet_data.key['data']['data'])
+                                # print(rx_packet_data.key['data']['data'])
                                 self.Proc_data['extend_data']['ws_obj'].send(rx_packet_data.key['data']['data'])

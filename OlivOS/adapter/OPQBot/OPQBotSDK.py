@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -19,8 +19,6 @@ import json
 import uuid
 import hashlib
 import copy
-import base64
-import requests as req
 from urllib import parse
 import traceback
 
@@ -35,6 +33,7 @@ gUinfoReg = {}
 gMsgSeqToGroupCodeReg = {}
 
 gFriendReqTsReg = {}
+
 
 class bot_info_T(object):
     def __init__(self, id=-1):
@@ -68,15 +67,16 @@ class event(object):
             self.base_info['self_id'] = self.payload.CurrentQQ
             self.base_info['post_type'] = None
 
-def get_message(Content:str, AtUinLists:list):
+
+def get_message(Content: str, AtUinLists: list):
     res_msg = Content
     if type(AtUinLists) is list:
         for AtUin in AtUinLists:
             res_msg = res_msg.replace(f'@{AtUin["Nick"]}', f'[OP:at,id={AtUin["Uin"]}]')
     return res_msg
 
+
 def get_Event_from_SDK(target_event):
-    global gFriendReqTsReg
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -84,47 +84,49 @@ def get_Event_from_SDK(target_event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
-    plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id=target_event.base_info['self_id'],
-        platform_sdk=target_event.platform['sdk'],
-        platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
-    )
     if target_event.sdk_event.payload.active:
         if target_event.sdk_event.payload.EventName == 'CgiBaseResponse':
-            if type(target_event.sdk_event.payload.ReqId) is int \
-            and type(target_event.sdk_event.payload.ResponseData) is dict \
-            and type(target_event.sdk_event.payload.Ret) is int:
+            if (
+                type(target_event.sdk_event.payload.ReqId) is int
+                and type(target_event.sdk_event.payload.ResponseData) is dict
+                and type(target_event.sdk_event.payload.Ret) is int
+            ):
                 target_event.active = False
                 waitForResSet(
                     str(target_event.sdk_event.payload.ReqId),
                     target_event.sdk_event.payload.data
                 )
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_NEW_MSG':
-            if type(target_event.sdk_event.payload.EventData) is dict \
-            and 'MsgHead' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
-            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
-            and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int \
-            and 'SenderUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']) is int \
-            and 'SenderNick' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['SenderNick']) is str \
-            and 'MsgBody' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgBody']) is dict \
-            and 'Content' in target_event.sdk_event.payload.EventData['MsgBody'] \
-            and type(target_event.sdk_event.payload.EventData['MsgBody']['Content']) is str:
+            if (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'MsgHead' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict
+                and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int
+                and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int
+                and 'SenderUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']) is int
+                and 'SenderNick' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['SenderNick']) is str
+                and 'MsgBody' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgBody']) is dict
+                and 'Content' in target_event.sdk_event.payload.EventData['MsgBody']
+                and type(target_event.sdk_event.payload.EventData['MsgBody']['Content']) is str
+            ):
                 target_event.active = True
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     get_message(
-                        Content = target_event.sdk_event.payload.EventData['MsgBody']['Content'],
-                        AtUinLists = target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
+                        Content=target_event.sdk_event.payload.EventData['MsgBody']['Content'],
+                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
                     )
                 )
-                if str(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']) == str(target_event.base_info['self_id']):
+                if str(
+                    target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']
+                ) == str(
+                    target_event.base_info['self_id']
+                ):
                     target_event.plugin_info['func_type'] = 'group_message_sent'
                     target_event.data = target_event.group_message_sent(
                         str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
@@ -145,7 +147,9 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message = message_obj
                 target_event.data.raw_message_sdk = message_obj
                 target_event.data.font = None
-                target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin'])
+                target_event.data.sender['user_id'] = str(
+                    target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']
+                )
                 target_event.data.sender['nickname'] = target_event.sdk_event.payload.EventData['MsgHead']['SenderNick']
                 target_event.data.sender['id'] = target_event.data.sender['user_id']
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
@@ -155,19 +159,21 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender.pop('role')
                 target_event.data.host_id = None
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_NEW_MSG':
-            if type(target_event.sdk_event.payload.EventData) is dict \
-            and 'MsgHead' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
-            and 'MsgType' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and target_event.sdk_event.payload.EventData['MsgHead']['MsgType'] == 528 \
-            and 'C2cCmd' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and target_event.sdk_event.payload.EventData['MsgHead']['C2cCmd'] == 35 \
-            and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int \
-            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
-            and 'FromUid' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUid']) is str:
+            if (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'MsgHead' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict
+                and 'MsgType' in target_event.sdk_event.payload.EventData['MsgHead']
+                and target_event.sdk_event.payload.EventData['MsgHead']['MsgType'] == 528
+                and 'C2cCmd' in target_event.sdk_event.payload.EventData['MsgHead']
+                and target_event.sdk_event.payload.EventData['MsgHead']['C2cCmd'] == 35
+                and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int
+                and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int
+                and 'FromUid' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUid']) is str
+            ):
                 tmp_ToUin = str(target_event.sdk_event.payload.EventData['MsgHead']['ToUin'])
                 tmp_FromUin = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin'])
                 if tmp_ToUin != tmp_FromUin:
@@ -180,23 +186,25 @@ def get_Event_from_SDK(target_event):
                             ''
                         )
                         target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUid'])
-            elif type(target_event.sdk_event.payload.EventData) is dict \
-            and 'MsgHead' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
-            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
-            and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int \
-            and 'MsgBody' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgBody']) is dict \
-            and 'Content' in target_event.sdk_event.payload.EventData['MsgBody'] \
-            and type(target_event.sdk_event.payload.EventData['MsgBody']['Content']) is str:
+            elif (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'MsgHead' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict
+                and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int
+                and 'ToUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['ToUin']) is int
+                and 'MsgBody' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgBody']) is dict
+                and 'Content' in target_event.sdk_event.payload.EventData['MsgBody']
+                and type(target_event.sdk_event.payload.EventData['MsgBody']['Content']) is str
+            ):
                 target_event.active = True
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     get_message(
-                        Content = target_event.sdk_event.payload.EventData['MsgBody']['Content'],
-                        AtUinLists = target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
+                        Content=target_event.sdk_event.payload.EventData['MsgBody']['Content'],
+                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
                     )
                 )
                 target_event.plugin_info['func_type'] = 'private_message'
@@ -210,7 +218,9 @@ def get_Event_from_SDK(target_event):
                 target_event.data.raw_message = message_obj
                 target_event.data.raw_message_sdk = message_obj
                 target_event.data.font = None
-                target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin'])
+                target_event.data.sender['user_id'] = str(
+                    target_event.sdk_event.payload.EventData['MsgHead']['FromUin']
+                )
                 target_event.data.sender['nickname'] = '用户'
                 target_event.data.sender['id'] = target_event.data.sender['user_id']
                 target_event.data.sender['name'] = target_event.data.sender['nickname']
@@ -218,17 +228,19 @@ def get_Event_from_SDK(target_event):
                 target_event.data.sender['age'] = 0
                 target_event.data.host_id = None
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_INVITE':
-            if type(target_event.sdk_event.payload.EventData) is dict \
-            and 'MsgHead' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict \
-            and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead'] \
-            and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int \
-            and 'Event' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['Event']) is dict \
-            and 'Invitee' in target_event.sdk_event.payload.EventData['Event'] \
-            and type(target_event.sdk_event.payload.EventData['Event']['Invitee']) in [str, int] \
-            and 'Invitor' in target_event.sdk_event.payload.EventData['Event'] \
-            and type(target_event.sdk_event.payload.EventData['Event']['Invitor']) in [str, int]:
+            if (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'MsgHead' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgHead']) is dict
+                and 'FromUin' in target_event.sdk_event.payload.EventData['MsgHead']
+                and type(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']) is int
+                and 'Event' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['Event']) is dict
+                and 'Invitee' in target_event.sdk_event.payload.EventData['Event']
+                and type(target_event.sdk_event.payload.EventData['Event']['Invitee']) in [str, int]
+                and 'Invitor' in target_event.sdk_event.payload.EventData['Event']
+                and type(target_event.sdk_event.payload.EventData['Event']['Invitor']) in [str, int]
+            ):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_member_increase'
                 target_event.data = target_event.group_member_increase(
@@ -238,21 +250,23 @@ def get_Event_from_SDK(target_event):
                 )
                 target_event.data.action = 'approve'
         elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_SYSTEM_MSG_NOTIFY':
-            if type(target_event.sdk_event.payload.EventData) is dict \
-            and 'ReqUid' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['ReqUid']) is str \
-            and 'Status' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['Status']) is int \
-            and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str:
+            if (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'ReqUid' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['ReqUid']) is str
+                and 'Status' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['Status']) is int
+                and 'MsgAdditional' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str
+            ):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'friend_add_request'
                 uin = None
                 if False and OlivOS.pluginAPI.gProc is not None:
                     uin = event_action.getUinfo(
-                        target_event = target_event,
-                        Uid = target_event.sdk_event.payload.EventData['ReqUid'],
-                        control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                        target_event=target_event,
+                        Uid=target_event.sdk_event.payload.EventData['ReqUid'],
+                        control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue
                     )
                 if uin is None:
                     uin = -1
@@ -262,29 +276,33 @@ def get_Event_from_SDK(target_event):
                 )
                 target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_SYSTEM_MSG_NOTIFY':
-            if type(target_event.sdk_event.payload.EventData) is dict \
-            and 'MsgType' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgType']) is int \
-            and 'GroupCode' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['GroupCode']) is int \
-            and 'MsgSeq' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgSeq']) is int \
-            and 'Status' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['Status']) is int \
-            and 'MsgAdditional' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str \
-            and 'ActorUid' in target_event.sdk_event.payload.EventData \
-            and type(target_event.sdk_event.payload.EventData['ActorUid']) in [str, int]:
-                if target_event.sdk_event.payload.EventData['MsgType'] == 2 \
-                and target_event.sdk_event.payload.EventData['Status'] == 1:
+            if (
+                type(target_event.sdk_event.payload.EventData) is dict
+                and 'MsgType' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgType']) is int
+                and 'GroupCode' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['GroupCode']) is int
+                and 'MsgSeq' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgSeq']) is int
+                and 'Status' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['Status']) is int
+                and 'MsgAdditional' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['MsgAdditional']) is str
+                and 'ActorUid' in target_event.sdk_event.payload.EventData
+                and type(target_event.sdk_event.payload.EventData['ActorUid']) in [str, int]
+            ):
+                if (
+                    target_event.sdk_event.payload.EventData['MsgType'] == 2
+                    and target_event.sdk_event.payload.EventData['Status'] == 1
+                ):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_invite_request'
                     uin = None
                     if False and OlivOS.pluginAPI.gProc is not None:
                         uin = event_action.getUinfo(
-                            target_event = target_event,
-                            Uid = target_event.sdk_event.payload.EventData['ActorUid'],
-                            control_queue = OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                            target_event=target_event,
+                            Uid=target_event.sdk_event.payload.EventData['ActorUid'],
+                            control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue
                         )
                     if uin is None:
                         uin = -1
@@ -294,7 +312,9 @@ def get_Event_from_SDK(target_event):
                         target_event.sdk_event.payload.EventData['MsgAdditional']
                     )
                     target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgSeq'])
-                    gMsgSeqToGroupCodeReg[target_event.data.flag] = target_event.sdk_event.payload.EventData['GroupCode']
+                    gMsgSeqToGroupCodeReg[
+                        target_event.data.flag
+                    ] = target_event.sdk_event.payload.EventData['GroupCode']
 
 
 '''
@@ -322,7 +342,7 @@ class payload_template(object):
 
     def dump_CurrentPacket(self):
         res = json.dumps(
-            obj = {
+            obj={
                 'CurrentPacket': {
                     'EventData': self.EventData,
                     'EventName': self.EventName
@@ -334,31 +354,35 @@ class payload_template(object):
 
     def load(self, data, is_rx: bool):
         self.active = False
-        if is_rx \
-        and type(data) is dict \
-        and 'CurrentQQ' in data \
-        and type(data['CurrentQQ']) in [int, str] \
-        and 'CurrentPacket' in data \
-        and type(data['CurrentPacket']) is dict \
-        and 'EventName' in data['CurrentPacket'] \
-        and type(data['CurrentPacket']['EventName']) is str \
-        and 'EventData' in data['CurrentPacket'] \
-        and type(data['CurrentPacket']['EventData']) is dict:
+        if (
+            is_rx
+            and type(data) is dict
+            and 'CurrentQQ' in data
+            and type(data['CurrentQQ']) in [int, str]
+            and 'CurrentPacket' in data
+            and type(data['CurrentPacket']) is dict
+            and 'EventName' in data['CurrentPacket']
+            and type(data['CurrentPacket']['EventName']) is str
+            and 'EventData' in data['CurrentPacket']
+            and type(data['CurrentPacket']['EventData']) is dict
+        ):
             self.active = True
             self.data = data
             self.EventName = data['CurrentPacket']['EventName']
             self.EventData = data['CurrentPacket']['EventData']
             self.CurrentQQ = data['CurrentQQ']
-        elif is_rx \
-        and type(data) is dict \
-        and 'CgiBaseResponse' in data \
-        and type(data['CgiBaseResponse']) is dict \
-        and 'Ret' in data['CgiBaseResponse'] \
-        and type(data['CgiBaseResponse']['Ret']) is int \
-        and 'ReqId' in data \
-        and type(data['ReqId']) is int \
-        and 'ResponseData' in data \
-        and type(data['ResponseData']) is dict:
+        elif (
+            is_rx
+            and type(data) is dict
+            and 'CgiBaseResponse' in data
+            and type(data['CgiBaseResponse']) is dict
+            and 'Ret' in data['CgiBaseResponse']
+            and type(data['CgiBaseResponse']['Ret']) is int
+            and 'ReqId' in data
+            and type(data['ReqId']) is int
+            and 'ResponseData' in data
+            and type(data['ResponseData']) is dict
+        ):
             self.active = True
             self.data = data
             self.ReqId = data['ReqId']
@@ -374,13 +398,15 @@ def getHash(key):
     hash_tmp.update(str(key).encode(encoding='UTF-8'))
     return hash_tmp.hexdigest()
 
+
 def getIdBackport(id):
     res = id
     try:
         res = int(id)
-    except:
+    except Exception:
         res = id
     return res
+
 
 class PAYLOAD(object):
     class rxPacket(payload_template):
@@ -388,7 +414,7 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class MessageSvc_PbSendMsg(payload_template):
-        def __init__(self, ToUin:'int|str', ToType:int, Content:str, CurrentQQ:'int|str'):
+        def __init__(self, ToUin: 'int|str', ToType: int, Content: str, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "MessageSvc.PbSendMsg"
             self.CurrentQQ = str(CurrentQQ)
@@ -404,7 +430,7 @@ class PAYLOAD(object):
             }
 
     class MessageSvc_PbSendMsg_all(payload_template):
-        def __init__(self, ToUin:'int|str', ToType:int, dataPatch:dict, CurrentQQ:'int|str'):
+        def __init__(self, ToUin: 'int|str', ToType: int, dataPatch: dict, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "MessageSvc.PbSendMsg"
             self.CurrentQQ = str(CurrentQQ)
@@ -420,7 +446,7 @@ class PAYLOAD(object):
             self.data['CgiRequest'].update(dataPatch)
 
     class exitGroup(payload_template):
-        def __init__(self, Uin:'int|str', CurrentQQ:'int|str'):
+        def __init__(self, Uin: 'int|str', CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "SsoGroup.Op"
             self.CurrentQQ = str(CurrentQQ)
@@ -435,7 +461,7 @@ class PAYLOAD(object):
             }
 
     class GetGroupLists(payload_template):
-        def __init__(self, CurrentQQ:'int|str'):
+        def __init__(self, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "GetGroupLists"
             self.CurrentQQ = str(CurrentQQ)
@@ -449,11 +475,11 @@ class PAYLOAD(object):
     class PicUp_DataUp(payload_template):
         def __init__(
             self,
-            CommandId:int,
-            CurrentQQ:'int|str',
-            FilePath:'str|None' = None,
-            FileUrl:'str|None' = None,
-            Base64Buf:'str|None' = None,
+            CommandId: int,
+            CurrentQQ: 'int|str',
+            FilePath: 'str|None' = None,
+            FileUrl: 'str|None' = None,
+            Base64Buf: 'str|None' = None,
         ):
             payload_template.__init__(self)
             self.CgiCmd = "PicUp.DataUp"
@@ -473,7 +499,7 @@ class PAYLOAD(object):
                 self.data['CgiRequest']['Base64Buf'] = Base64Buf
 
     class QueryUinByUid(payload_template):
-        def __init__(self, UidQuery:'list[str]', CurrentQQ:'int|str'):
+        def __init__(self, UidQuery: 'list[str]', CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "QueryUinByUid"
             self.CurrentQQ = str(CurrentQQ)
@@ -487,7 +513,7 @@ class PAYLOAD(object):
             }
 
     class SystemMsgAction_Friend(payload_template):
-        def __init__(self, ReqUid:int, OpCode:int, CurrentQQ:'int|str'):
+        def __init__(self, ReqUid: int, OpCode: int, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "SystemMsgAction.Friend"
             self.CurrentQQ = str(CurrentQQ)
@@ -502,7 +528,7 @@ class PAYLOAD(object):
             }
 
     class SystemMsgAction_Group(payload_template):
-        def __init__(self, MsgSeq:int, MsgType:int, GroupCode:int, OpCode:int, CurrentQQ:'int|str'):
+        def __init__(self, MsgSeq: int, MsgType: int, GroupCode: int, OpCode: int, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
             self.CgiCmd = "SystemMsgAction.Group"
             self.CurrentQQ = str(CurrentQQ)
@@ -522,22 +548,20 @@ class PAYLOAD(object):
 # 支持OlivOS API调用的方法实现
 class event_action(object):
     def getUinfo(target_event, Uid, control_queue):
-        global gUinfoReg
         res = Uid
         if Uid in gUinfoReg:
             res = gUinfoReg[Uid]
         else:
             res_list = event_action.getUinfoCache(
-                target_event = target_event,
-                UidQuery = [Uid],
-                control_queue = control_queue
+                target_event=target_event,
+                UidQuery=[Uid],
+                control_queue=control_queue
             )
             if len(res_list) == 1:
                 res = res_list[0]
         return res
 
     def getUinfoCache(target_event, UidQuery, control_queue):
-        global gUinfoReg
         res_tmp = {}
         res = []
         plugin_event_bot_hash = OlivOS.API.getBotHash(
@@ -547,8 +571,8 @@ class event_action(object):
             platform_model=target_event.platform['model']
         )
         this_msg = PAYLOAD.QueryUinByUid(
-            UidQuery = UidQuery,
-            CurrentQQ = target_event.base_info['self_id']
+            UidQuery=UidQuery,
+            CurrentQQ=target_event.base_info['self_id']
         )
         waitForResReady(str(this_msg.ReqId))
         send_ws_event(
@@ -578,10 +602,10 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.MessageSvc_PbSendMsg(
-                    ToUin = target_id,
-                    ToType = 2 if 'group' == target_type else 1,
-                    Content = message,
-                    CurrentQQ = target_event.base_info['self_id']
+                    ToUin=target_id,
+                    ToType=2 if 'group' == target_type else 1,
+                    Content=message,
+                    CurrentQQ=target_event.base_info['self_id']
                 ).dump(),
                 control_queue
             )
@@ -597,22 +621,15 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.MessageSvc_PbSendMsg_all(
-                    ToUin = target_id,
-                    ToType = 2 if 'group' == target_type else 1,
-                    dataPatch = dataPatch,
-                    CurrentQQ = target_event.base_info['self_id']
+                    ToUin=target_id,
+                    ToType=2 if 'group' == target_type else 1,
+                    dataPatch=dataPatch,
+                    CurrentQQ=target_event.base_info['self_id']
                 ).dump(),
                 control_queue
             )
 
-
     def send_msg(target_event, target_type, target_id, message, control_queue):
-        plugin_event_bot_hash = OlivOS.API.getBotHash(
-            bot_id=target_event.base_info['self_id'],
-            platform_sdk=target_event.platform['sdk'],
-            platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
-        )
         message_new = ''
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_string',
@@ -632,33 +649,37 @@ class event_action(object):
                     flag_now_type = 'string'
                 elif type(data_this) is OlivOS.messageAPI.PARA.image:
                     res = event_action.setResourceUploadFast(
-                        target_event = target_event,
-                        control_queue = control_queue,
-                        url = data_this.data['file'],
-                        type_path = 'images',
-                        type_chat = 2 if 'group' == target_type else 1
+                        target_event=target_event,
+                        control_queue=control_queue,
+                        url=data_this.data['file'],
+                        type_path='images',
+                        type_chat=2 if 'group' == target_type else 1
                     )
                     flag_now_type = 'image'
-                if size_data == count_data\
-                or (flag_now_type_last != flag_now_type \
-                and flag_now_type_last == 'string' \
-                and len(message_new) > 0):
+                if (
+                    size_data == count_data
+                    or (
+                        flag_now_type_last != flag_now_type
+                        and flag_now_type_last == 'string'
+                        and len(message_new) > 0
+                    )
+                ):
                     event_action.send_solo_msg(
-                        target_event = target_event,
-                        target_type = target_type,
-                        target_id = target_id,
-                        message = message_new,
-                        control_queue = control_queue
+                        target_event=target_event,
+                        target_type=target_type,
+                        target_id=target_id,
+                        message=message_new,
+                        control_queue=control_queue
                     )
                     message_new = ''
                     time.sleep(1)
                     if flag_now_type == 'image':
                         if res is not None:
                             event_action.send_solo_all_msg(
-                                target_event = target_event,
-                                target_type = target_type,
-                                target_id = target_id,
-                                dataPatch = {
+                                target_event=target_event,
+                                target_type=target_type,
+                                target_id=target_id,
+                                dataPatch={
                                     'Images': [
                                         {
                                             "FileId": res[2],
@@ -669,7 +690,7 @@ class event_action(object):
                                         }
                                     ]
                                 },
-                                control_queue = control_queue
+                                control_queue=control_queue
                             )
                             time.sleep(1)
 
@@ -684,28 +705,27 @@ class event_action(object):
         res = [None, None, None]
         data_obj = None
         try:
-            pic_file = None
             if url.startswith("base64://"):
                 data_obj = PAYLOAD.PicUp_DataUp(
-                    CommandId = type_chat,
-                    Base64Buf = url,
-                    CurrentQQ = target_event.base_info['self_id']
+                    CommandId=type_chat,
+                    Base64Buf=url,
+                    CurrentQQ=target_event.base_info['self_id']
                 )
             else:
                 url_parsed = parse.urlparse(url)
                 if url_parsed.scheme in ["http", "https"]:
                     data_obj = PAYLOAD.PicUp_DataUp(
-                        CommandId = type_chat,
-                        FileUrl = url,
-                        CurrentQQ = target_event.base_info['self_id']
+                        CommandId=type_chat,
+                        FileUrl=url,
+                        CurrentQQ=target_event.base_info['self_id']
                     )
                 else:
                     file_path = url_parsed.path
                     file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
                     data_obj = PAYLOAD.PicUp_DataUp(
-                        CommandId = type_chat,
-                        FilePath = file_path,
-                        CurrentQQ = target_event.base_info['self_id']
+                        CommandId=type_chat,
+                        FilePath=file_path,
+                        CurrentQQ=target_event.base_info['self_id']
                     )
 
             if data_obj is not None:
@@ -718,21 +738,23 @@ class event_action(object):
                 res_raw = waitForRes(str(data_obj.ReqId))
                 raw_obj = init_api_json(res_raw)
                 if raw_obj is not None:
-                    if type(raw_obj) is dict \
-                    and 'FileMd5' in raw_obj \
-                    and type(raw_obj['FileMd5']) is str \
-                    and 'FileSize' in raw_obj \
-                    and type(raw_obj['FileSize']) is int \
-                    and 'FileId' in raw_obj \
-                    and type(raw_obj['FileId']) is int:
+                    if (
+                        type(raw_obj) is dict
+                        and 'FileMd5' in raw_obj
+                        and type(raw_obj['FileMd5']) is str
+                        and 'FileSize' in raw_obj
+                        and type(raw_obj['FileSize']) is int
+                        and 'FileId' in raw_obj
+                        and type(raw_obj['FileId']) is int
+                    ):
                         res = [raw_obj['FileMd5'], raw_obj['FileSize'], raw_obj['FileId']]
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             res = [None, None, None]
         return res
 
     def set_group_leave(target_event, group_id, control_queue):
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             plugin_event_bot_hash = OlivOS.API.getBotHash(
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
@@ -742,14 +764,14 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.exitGroup(
-                    Uin = group_id,
-                    CurrentQQ = target_event.base_info['self_id']
+                    Uin=group_id,
+                    CurrentQQ=target_event.base_info['self_id']
                 ).dump(),
                 control_queue
             )
 
-    def set_friend_add_request(target_event, flag:str, approve:bool, control_queue):
-        if target_event.bot_info != None:
+    def set_friend_add_request(target_event, flag: str, approve: bool, control_queue):
+        if target_event.bot_info is not None:
             plugin_event_bot_hash = OlivOS.API.getBotHash(
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
@@ -760,15 +782,15 @@ class event_action(object):
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.SystemMsgAction_Friend(
-                    ReqUid = flag,
-                    OpCode = OpCode_int,
-                    CurrentQQ = target_event.base_info['self_id']
+                    ReqUid=flag,
+                    OpCode=OpCode_int,
+                    CurrentQQ=target_event.base_info['self_id']
                 ).dump(),
                 control_queue
             )
 
-    def set_group_add_request(target_event, flag:str, sub_type:str, approve:bool, control_queue):
-        if target_event.bot_info != None:
+    def set_group_add_request(target_event, flag: str, sub_type: str, approve: bool, control_queue):
+        if target_event.bot_info is not None:
             plugin_event_bot_hash = OlivOS.API.getBotHash(
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
@@ -791,19 +813,18 @@ class event_action(object):
                 send_ws_event(
                     plugin_event_bot_hash,
                     PAYLOAD.SystemMsgAction_Group(
-                        MsgSeq = int(flag),
-                        MsgType = sub_type_int,
-                        GroupCode = GroupCode_this,
-                        OpCode = OpCode_int,
-                        CurrentQQ = target_event.base_info['self_id']
+                        MsgSeq=int(flag),
+                        MsgType=sub_type_int,
+                        GroupCode=GroupCode_this,
+                        OpCode=OpCode_int,
+                        CurrentQQ=target_event.base_info['self_id']
                     ).dump(),
                     control_queue
                 )
 
-
-    def get_group_list(target_event:OlivOS.API.Event, control_queue):
+    def get_group_list(target_event: OlivOS.API.Event, control_queue):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
-        if target_event.bot_info != None:
+        if target_event.bot_info is not None:
             plugin_event_bot_hash = OlivOS.API.getBotHash(
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
@@ -811,7 +832,7 @@ class event_action(object):
                 platform_model=target_event.platform['model']
             )
             this_msg = PAYLOAD.GetGroupLists(
-                CurrentQQ = target_event.base_info['self_id']
+                CurrentQQ=target_event.base_info['self_id']
             )
             waitForResReady(str(this_msg.ReqId))
             send_ws_event(
@@ -822,17 +843,23 @@ class event_action(object):
             res_raw = waitForRes(str(this_msg.ReqId))
             raw_obj = init_api_json(res_raw)
             if raw_obj is not None:
-                if type(raw_obj) is dict \
-                and 'GroupLists' in raw_obj \
-                and type(raw_obj['GroupLists']) is list:
+                if (
+                    type(raw_obj) is dict
+                    and 'GroupLists' in raw_obj
+                    and type(raw_obj['GroupLists']) is list
+                ):
                     res_data['active'] = True
                     for raw_obj_this in raw_obj['GroupLists']:
                         tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
                         tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupName'], str)
                         tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupCode'], int)
                         tmp_res_data_this['memo'] = ''
-                        tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['MemberCnt'], int)
-                        tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['GroupCnt'], int)
+                        tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(
+                            raw_obj_this, ['MemberCnt'], int
+                        )
+                        tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(
+                            raw_obj_this, ['GroupCnt'], int
+                        )
                         res_data['data'].append(tmp_res_data_this)
         return res_data
 
@@ -862,31 +889,35 @@ def send_ws_event(hash, data, control_queue):
         control_queue
     )
 
-def init_api_json(raw:dict):
+
+def init_api_json(raw: dict):
     res_data = None
-    if type(raw) is dict \
-    and 'CgiBaseResponse' in raw \
-    and type(raw['CgiBaseResponse']) is dict \
-    and 'Ret' in raw['CgiBaseResponse'] \
-    and type(raw['CgiBaseResponse']['Ret']) is int \
-    and raw['CgiBaseResponse']['Ret'] == 0 \
-    and 'ReqId' in raw \
-    and type(raw['ReqId']) is int \
-    and 'ResponseData' in raw \
-    and type(raw['ResponseData']) in [dict, list]:
+    if (
+        type(raw) is dict
+        and 'CgiBaseResponse' in raw
+        and type(raw['CgiBaseResponse']) is dict
+        and 'Ret' in raw['CgiBaseResponse']
+        and type(raw['CgiBaseResponse']['Ret']) is int
+        and raw['CgiBaseResponse']['Ret'] == 0
+        and 'ReqId' in raw
+        and type(raw['ReqId']) is int
+        and 'ResponseData' in raw
+        and type(raw['ResponseData']) in [dict, list]
+    ):
         res_data = copy.deepcopy(raw['ResponseData'])
     return res_data
 
+
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
+
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
@@ -896,25 +927,27 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
 
-def waitForResSet(echo:str, data):
-    global gResReg
+
+def waitForResSet(echo: str, data):
     if echo in gResReg:
         gResReg[echo] = data
 
-def waitForResReady(echo:str):
-    global gResReg
+
+def waitForResReady(echo: str):
     gResReg[echo] = None
 
-def waitForRes(echo:str):
-    global gResReg
+
+def waitForRes(echo: str):
     res = None
     interval = 0.1
     limit = 30
     index_limit = int(limit / interval)
     for i in range(index_limit):
         time.sleep(interval)
-        if echo in gResReg \
-        and gResReg[echo] is not None:
+        if (
+            echo in gResReg
+            and gResReg[echo] is not None
+        ):
             res = gResReg[echo]
             gResReg.pop(echo)
             break
