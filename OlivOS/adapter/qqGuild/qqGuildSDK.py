@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 from enum import IntEnum
-import sys
 import json
 import requests as req
 import time
@@ -126,9 +125,9 @@ class payload_template(object):
 
     def load(self, data, is_rx):
         if data is not None:
-            if type(data) == dict:
+            if type(data) is dict:
                 if 'op' in data:
-                    if type(data['op']) == int:
+                    if type(data['op']) is int:
                         self.data.op = data['op']
                     else:
                         self.active = False
@@ -137,12 +136,12 @@ class payload_template(object):
                 if 'd' in data:
                     self.data.d = data['d']
                 if 's' in data:
-                    if type(data['s']) == int:
+                    if type(data['s']) is int:
                         self.data.s = data['s']
                     else:
                         self.active = False
                 if 't' in data:
-                    if type(data['t']) == str:
+                    if type(data['t']) is str:
                         self.data.t = data['t']
                     else:
                         self.active = False
@@ -176,7 +175,7 @@ class PAYLOAD(object):
                         'os': OlivOS.infoAPI.OlivOS_Header_UA
                     }
                 }
-            except:
+            except Exception:
                 self.active = False
 
     class sendHeartbeat(payload_template):
@@ -241,7 +240,7 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception:
             return None
 
 
@@ -371,14 +370,13 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('GET')
             api_res_json = json.loads(api_msg_obj.res)
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
-        except:
+        except Exception:
             pass
     if target_event.sdk_event.payload.data.t in [
         'MESSAGE_CREATE',
         'AT_MESSAGE_CREATE'
     ]:
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -398,7 +396,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -409,7 +407,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -453,7 +451,6 @@ def get_Event_from_SDK(target_event):
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -473,7 +470,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -484,7 +481,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -527,14 +524,12 @@ class event_action(object):
         if this_msg is None:
             return
         this_msg.data.msg_id = reply_msg_id
-        flag_now_type = 'string'
         res = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
                 pass
-            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+            elif type(message_this) is OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
-                flag_now_type = 'string'
         if res != '':
             res_list = []
             for res_this in res.split('\n'):
@@ -557,11 +552,11 @@ class event_action(object):
             if this_msg.res is not None:
                 raw_obj = init_api_json(this_msg.res)
             if raw_obj is not None:
-                if type(raw_obj) == dict:
+                if type(raw_obj) is dict:
                     res_data['active'] = True
                     res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
                     res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
-        except:
+        except Exception:
             res_data['active'] = False
         return res_data
 
@@ -572,29 +567,28 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         flag_is_active = True
     if flag_is_active:
-        if type(tmp_obj) == dict:
+        if type(tmp_obj) is dict:
             res_data = tmp_obj.copy()
-        elif type(tmp_obj) == list:
+        elif type(tmp_obj) is list:
             res_data = tmp_obj.copy()
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:

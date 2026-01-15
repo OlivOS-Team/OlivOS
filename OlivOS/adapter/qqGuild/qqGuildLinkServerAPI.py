@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,19 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
 import threading
 import time
 import json
 import websocket
-import ssl
-import asyncio
 import uuid
-import requests as req
 
 import OlivOS
 
@@ -63,7 +59,7 @@ class server(OlivOS.API.Proc_templet):
                 api_obj.do_api('GET')
                 api_obj_json = json.loads(api_obj.res)
                 self.Proc_data['extend_data']['websocket_url'] = api_obj_json['url']
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
@@ -101,7 +97,7 @@ class server(OlivOS.API.Proc_templet):
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
             elif tmp_data_rx_obj.data.op == 11:
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse ACK')
-        except:
+        except Exception:
             pass
 
     def on_error(self, ws, error):
@@ -123,14 +119,17 @@ class server(OlivOS.API.Proc_templet):
             tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendHeartbeat(
                 self.Proc_data['extend_data']['last_s']
             ).dump()
-            if tmp_ws_item != self.Proc_data['extend_data']['ws_item'] or self.Proc_data['extend_data']['ws_item'] is None:
+            if (
+                tmp_ws_item != self.Proc_data['extend_data']['ws_item']
+                or self.Proc_data['extend_data']['ws_item'] is None
+            ):
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse giveup')
                 return
             if self.Proc_data['extend_data']['ws_obj'] is not None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
                     self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse send')
-                except:
+                except Exception:
                     break
             else:
                 break
