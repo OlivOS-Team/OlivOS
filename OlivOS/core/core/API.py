@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 import sys
-import json
 import multiprocessing
 import threading
 import hashlib
@@ -99,7 +98,7 @@ def getMenuEvent(target_event):
     target_event.platform['model'] = 'all'
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if target_event.sdk_event.action == 'send':
-        if type(target_event.sdk_event.key) == dict:
+        if type(target_event.sdk_event.key) is dict:
             if 'data' in target_event.sdk_event.key:
                 if 'action' in target_event.sdk_event.key['data']:
                     if 'plugin_menu' == target_event.sdk_event.key['data']['action']:
@@ -113,7 +112,7 @@ def getMenuEvent(target_event):
 
 
 class inde_interface_T(object):
-    def __init__(self, event, platform:str):
+    def __init__(self, event, platform: str):
         self.platform = platform
         self.event = event
 
