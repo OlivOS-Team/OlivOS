@@ -1,4 +1,4 @@
-name: CI-pypiPublish
+name: pypiPublish
 on:
   push:
     branches: [ pypipublish ]
