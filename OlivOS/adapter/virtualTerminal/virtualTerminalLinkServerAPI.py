@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,16 +20,10 @@ from flask import Flask
 from flask import current_app
 from flask import request
 
-import multiprocessing
 import threading
 import time
 import json
-import traceback
-import websocket
-import ssl
-import asyncio
 import uuid
-import requests as req
 
 import OlivOS
 
@@ -68,12 +62,14 @@ class server(OlivOS.API.Proc_templet):
                 else:
                     try:
                         rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                    except:
+                    except Exception:
                         rx_packet_data = None
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'reply' == rx_packet_data.key['data']['action']:
                             if 'data' in rx_packet_data.key['data'] and 'event_id' in rx_packet_data.key['data']:
-                                self.Proc_data['reply_event_pool'][str(rx_packet_data.key['data']['event_id'])] = rx_packet_data.key['data']['data']
+                                self.Proc_data['reply_event_pool'][str(rx_packet_data.key['data']['event_id'])] = (
+                                    rx_packet_data.key['data']['data']
+                                )
         elif self.Proc_data['bot_info_dict'].platform['model'] == 'default':
             self.send_init_event()
             while True:
@@ -82,7 +78,7 @@ class server(OlivOS.API.Proc_templet):
                 else:
                     try:
                         rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                    except:
+                    except Exception:
                         rx_packet_data = None
                     if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                         if 'input' == rx_packet_data.key['data']['action']:
@@ -94,13 +90,15 @@ class server(OlivOS.API.Proc_templet):
                                     user_conf = rx_packet_data.key['data']['user_conf']
                                     if "user_name" in user_conf:
                                         user_name = user_conf['user_name']
-                                sdk_event = OlivOS.virtualTerminalSDK.event(rx_packet_data,
-                                                                            self.Proc_data['bot_info_dict'])
+                                sdk_event = OlivOS.virtualTerminalSDK.event(
+                                    rx_packet_data,
+                                    self.Proc_data['bot_info_dict']
+                                )
                                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                                 self.send_log_event(
                                     rx_packet_data.key['data']['data'],
-                                    name=user_name, 
+                                    name=user_name,
                                     user_conf=user_conf
                                 )
 
@@ -130,7 +128,7 @@ class server(OlivOS.API.Proc_templet):
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                     flag_active = True
-                except:
+                except Exception:
                     flag_active = False
                 if self.Proc_data['bot_info_dict'].platform['model'] == 'ff14':
                     flag_active = False

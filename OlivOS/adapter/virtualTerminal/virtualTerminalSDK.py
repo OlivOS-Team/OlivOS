@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,14 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-from enum import IntEnum
-import sys
-import json
-import traceback
 import requests as req
 import time
 import hashlib
@@ -73,12 +69,6 @@ def get_Event_from_SDK(target_event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
-    plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id=target_event.base_info['self_id'],
-        platform_sdk=target_event.platform['sdk'],
-        platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
-    )
     message_obj = None
     user_conf = None
     if target_event.platform['model'] in ['default']:
@@ -99,7 +89,7 @@ def get_Event_from_SDK(target_event):
             }
             if user_conf is not None:
                 tmp_user_conf.update(user_conf)
-            if tmp_user_conf["flag_group"] == True:
+            if tmp_user_conf["flag_group"] is True:
                 target_event.plugin_info['func_type'] = 'group_message'
                 target_event.data = target_event.group_message(
                     tmp_user_conf["target_id"],             # 此时的 target_id 为群号
@@ -125,14 +115,19 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['name'] = tmp_user_conf["user_name"]
             target_event.data.sender['sex'] = 'unknown'
             target_event.data.sender['age'] = 0
-            if tmp_user_conf["flag_group"] \
-            and 'unknown' != tmp_user_conf["group_role"]:
+            if (
+                tmp_user_conf["flag_group"]
+                and 'unknown' != tmp_user_conf["group_role"]
+            ):
                 target_event.data.sender['role'] = tmp_user_conf["group_role"]
             target_event.data.host_id = None
     elif target_event.platform['model'] in ['postapi', 'ff14']:
         # 此段内容不修改
         if 'type' in target_event.sdk_event.payload and target_event.sdk_event.payload['type'] == 'message':
-            if 'message_type' in target_event.sdk_event.payload and target_event.sdk_event.payload['message_type'] == 'group_message':
+            if (
+                'message_type' in target_event.sdk_event.payload
+                and target_event.sdk_event.payload['message_type'] == 'group_message'
+            ):
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'olivos_string',
                     target_event.sdk_event.payload['message']
@@ -154,7 +149,10 @@ def get_Event_from_SDK(target_event):
                         target_event.data.font = None
                         target_event.data.sender['name'] = '仑质'
                         target_event.data.sender['id'] = str(target_event.sdk_event.payload['user_id'])
-                        if 'sender' in target_event.sdk_event.payload and 'nickname' in target_event.sdk_event.payload['sender']:
+                        if (
+                            'sender' in target_event.sdk_event.payload
+                            and 'nickname' in target_event.sdk_event.payload['sender']
+                        ):
                             target_event.data.sender['name'] = target_event.sdk_event.payload['sender']['nickname']
                         target_event.data.sender['nickname'] = target_event.data.sender['name']
                         target_event.data.sender['user_id'] = target_event.data.sender['id']
@@ -168,7 +166,7 @@ def get_Event_from_SDK(target_event):
                             tmp_hash_user_id = str(int(int(hash_tmp.hexdigest(), 16) % 1000000000) + 1)
                             target_event.data.user_id = tmp_hash_user_id
                             target_event.data.sender['id'] = tmp_hash_user_id
-                    except:
+                    except Exception:
                         message_obj.active = False
 
 
@@ -218,45 +216,46 @@ def sendControlEventSend(action, data, control_queue):
 
 
 def send_log_event(hash, data, name, control_queue, user_conf=None):
-    sendControlEventSend('send', {
-        'target': {
-            'type': 'nativeWinUI'
+    sendControlEventSend(
+        'send', {
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'virtual_terminal',
+                'event': 'log',
+                'hash': hash,
+                'data': data,
+                'name': name,
+                'user_conf': user_conf
+            }
         },
-        'data': {
-            'action': 'virtual_terminal',
-            'event': 'log',
-            'hash': hash,
-            'data': data,
-            'name': name,
-            'user_conf': user_conf
-        }
-    },
-                         control_queue
-                         )
+        control_queue
+    )
 
 
 def send_postapi_event(hash, data, event_id, control_queue):
-    sendControlEventSend('send', {
-        'target': {
-            'type': 'terminal_link',
-            'hash': hash
+    sendControlEventSend(
+        'send', {
+            'target': {
+                'type': 'terminal_link',
+                'hash': hash
+            },
+            'data': {
+                'action': 'reply',
+                'event_id': str(event_id),
+                'data': data
+            }
         },
-        'data': {
-            'action': 'reply',
-            'event_id': str(event_id),
-            'data': data
-        }
-    },
-                         control_queue
-                         )
+        control_queue
+    )
 
 
 def send_ff14_post(plugin_event, message: str):
-    if True:
-        send_url = 'http://127.0.0.1:%s/Command' % str(plugin_event.bot_info.post_info.access_token)
-        headers = {
-            'Content-Type': 'text/plain'
-        }
-        data = message.encode('UTF-8')
-        msg_res = req.request("POST", send_url, headers=headers, data=data)
-        return msg_res
+    send_url = 'http://127.0.0.1:%s/Command' % str(plugin_event.bot_info.post_info.access_token)
+    headers = {
+        'Content-Type': 'text/plain'
+    }
+    data = message.encode('UTF-8')
+    msg_res = req.request("POST", send_url, headers=headers, data=data)
+    return msg_res
