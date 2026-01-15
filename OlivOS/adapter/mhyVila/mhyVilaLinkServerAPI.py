@@ -1,26 +1,24 @@
 # -*- encoding: utf-8 -*-
-'''
-@ _______________________    ________________ 
-@ __  __ \__  /____  _/_ |  / /_  __ \_  ___/ 
-@ _  / / /_  /  __  / __ | / /_  / / /____ \  
-@ / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /  
-@ \____/ /_____/___/  _____/  \____/ /____/   
-@                                             
+r'''
+@ _______________________    ________________
+@ __  __ \__  /____  _/_ |  / /_  __ \_  ___/
+@ _  / / /_  /  __  / __ | / /_  / / /____ \
+@ / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+@ \____/ /_____/___/  _____/  \____/ /____/
+@
 @File      :   OlivOS/mhyVilaLinkServerAPI.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL3
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
 import threading
 import time
 import json
 import websocket
 import uuid
-import requests as req
 import traceback
 
 import OlivOS
@@ -80,19 +78,19 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['extend_data']['websocket_url'] = api_obj_json['data']['websocket_url']
                 else:
                     self.Proc_data['extend_data']['websocket_url'] = None
-            except:
+            except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
             time.sleep(10)
 
-    def on_data(self, ws:websocket.WebSocketApp, data, opcode, FIN):
-        #print([data, opcode, FIN])
+    def on_data(self, ws: websocket.WebSocketApp, data, opcode, FIN):
+        # print([data, opcode, FIN])
         pass
 
-    def on_message(self, ws:websocket.WebSocketApp, message):
+    def on_message(self, ws: websocket.WebSocketApp, message):
         try:
-            #print(message)
+            # print(message)
             messageObj = OlivOS.mhyVilaSDK.PAYLOAD.rxPacket(message)
             if messageObj.dataHeader.BizType in [
                 OlivOS.mhyVilaSDK.protoEnum.Model_ROBOTEVENT.value
@@ -104,16 +102,16 @@ class server(OlivOS.API.Proc_templet):
                 )
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
 
-    def on_error(self, ws:websocket.WebSocketApp, error):
+    def on_error(self, ws: websocket.WebSocketApp, error):
         self.log(0, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket link error')
 
-    def on_close(self, ws:websocket.WebSocketApp, close_status_code, close_msg):
+    def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
         self.log(0, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket link close')
 
-    def on_open(self, ws:websocket.WebSocketApp):
+    def on_open(self, ws: websocket.WebSocketApp):
         self.send_PLogin(ws)
         threading.Thread(
             target=self.run_pulse,
@@ -127,21 +125,24 @@ class server(OlivOS.API.Proc_templet):
             tmp_pulse_interval = self.Proc_data['extend_data']['pulse_interval']
             time.sleep(tmp_pulse_interval)
             tmp_data = OlivOS.mhyVilaSDK.PAYLOAD.PHeartBeat().dump()
-            if tmp_ws_item != self.Proc_data['extend_data']['ws_item'] or self.Proc_data['extend_data']['ws_item'] is None:
+            if (
+                tmp_ws_item != self.Proc_data['extend_data']['ws_item']
+                or self.Proc_data['extend_data']['ws_item'] is None
+            ):
                 self.log(0, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket pulse giveup')
                 return
             if self.Proc_data['extend_data']['ws_obj'] is not None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data, opcode=websocket.ABNF.OPCODE_BINARY)
                     self.log(0, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket pulse send')
-                except:
+                except Exception:
                     break
             else:
                 break
         self.log(0, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket pulse lost')
         return
 
-    def send_PLogin(self, ws:websocket.WebSocketApp):
+    def send_PLogin(self, ws: websocket.WebSocketApp):
         tmp_data = OlivOS.mhyVilaSDK.PAYLOAD.PLogin()
         tmp_data.data.uid = self.Proc_data['extend_data']['ws_PLogin']['uid']
         tmp_data.data.token = self.Proc_data['extend_data']['ws_PLogin']['token']
@@ -149,7 +150,7 @@ class server(OlivOS.API.Proc_templet):
         tmp_data.data.app_id = self.Proc_data['extend_data']['ws_PLogin']['app_id']
         tmp_data.data.device_id = self.Proc_data['extend_data']['ws_PLogin']['device_id']
         tmp_data.dump()
-        #print(tmp_data)
+        # print(tmp_data)
         ws.send(tmp_data.raw, opcode=websocket.ABNF.OPCODE_BINARY)
 
     def run_websocket_rx_connect_start(self):

@@ -1,29 +1,23 @@
 # -*- encoding: utf-8 -*-
-'''
-@ _______________________    ________________ 
-@ __  __ \__  /____  _/_ |  / /_  __ \_  ___/ 
-@ _  / / /_  /  __  / __ | / /_  / / /____ \  
-@ / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /  
-@ \____/ /_____/___/  _____/  \____/ /____/   
-@                                             
+r'''
+@ _______________________    ________________
+@ __  __ \__  /____  _/_ |  / /_  __ \_  ___/
+@ _  / / /_  /  __  / __ | / /_  / / /____ \
+@ / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+@ \____/ /_____/___/  _____/  \____/ /____/
+@
 @File      :   OlivOS/mhyVilaSDK.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL3
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import sys
 import json
 import requests as req
 import time
-from datetime import datetime, timezone, timedelta
-from requests_toolbelt import MultipartEncoder
-import uuid
-import traceback
-import base64
-from urllib import parse
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import struct
@@ -49,13 +43,14 @@ sdkSubSelfInfo = {}
 
 sdkNameDict = {}
 
+
 class bot_info_T(object):
     def __init__(
         self,
-        id = -1,
-        password = '',
-        access_token = '',
-        port = 0
+        id=-1,
+        password='',
+        access_token='',
+        port=0
     ):
         self.bot_id = id
         self.secret = password
@@ -64,21 +59,24 @@ class bot_info_T(object):
         self.debug_mode = False
         self.debug_logger = None
 
+
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
-        id = plugin_bot_info.id,
-        password = plugin_bot_info.password,
-        access_token = plugin_bot_info.post_info.access_token,
-        port = plugin_bot_info.post_info.port
+        id=plugin_bot_info.id,
+        password=plugin_bot_info.password,
+        access_token=plugin_bot_info.post_info.access_token,
+        port=plugin_bot_info.post_info.port
     )
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
+
 def get_SDK_bot_info_from_Event(target_event):
     return get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
 
+
 class event(object):
-    def __init__(self, BizType:int, dataTable:dict, botInfo):
+    def __init__(self, BizType: int, dataTable: dict, botInfo):
         self.payload = dataTable
         self.BizType = BizType
         self.platform = botInfo.platform
@@ -91,15 +89,18 @@ class event(object):
             self.base_info['self_id'] = botInfo.id
             self.base_info['post_type'] = None
 
-def set_name(id:str, name:str):
+
+def set_name(id: str, name: str):
     global sdkNameDict
     sdkNameDict[str(id)] = str(name)
 
-def get_name(id:str):
+
+def get_name(id: str):
     global sdkNameDict
     return sdkNameDict.get(str(id), str(id))
 
-def get_message(contentData:dict):
+
+def get_message(contentData: dict):
     msg = contentData.get('content', {}).get('text', '')
     res_msg = ''
     count = 0
@@ -110,10 +111,12 @@ def get_message(contentData:dict):
                 i_offset = atTable_this.get('offset', None)
                 i_length = atTable_this.get('length', None)
                 s_type = atTable_this.get('entity', {}).get('type', None)
-                if type(i_offset) is int \
-                and type(i_length) is int \
-                and type(s_type) is str \
-                and i_offset + i_length <= len(msg):
+                if (
+                    type(i_offset) is int
+                    and type(i_length) is int
+                    and type(s_type) is str
+                    and i_offset + i_length <= len(msg)
+                ):
                     if s_type == 'mentioned_robot':
                         s_bot_id = atTable_this.get('entity', {}).get('bot_id', None)
                         if type(s_bot_id) is str:
@@ -133,7 +136,7 @@ def get_message(contentData:dict):
     return res_msg
 
 
-def release_message(msg:str):
+def release_message(msg: str):
     res = {
         'content': {
             'text': '',
@@ -168,9 +171,9 @@ def release_message(msg:str):
             res['content']['text'] += message_obj_this.data['text']
     return res
 
+
 def get_Event_from_SDK(target_event):
     global sdkSubSelfInfo
-    #print(json.dumps(target_event.sdk_event.__dict__, ensure_ascii=False, indent=4))
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -178,34 +181,32 @@ def get_Event_from_SDK(target_event):
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'olivos_string'
-    plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id=target_event.base_info['self_id'],
-        platform_sdk=target_event.platform['sdk'],
-        platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
-    )
-    #print(type(target_event.sdk_event.payload))
-    if target_event.sdk_event.BizType == protoEnum.Model_ROBOTEVENT.value \
-    and type(target_event.sdk_event.payload) is dict \
-    and target_event.sdk_event.payload.get('type', None) == 'SendMessage' \
-    and type(target_event.sdk_event.payload.get('extendData', None)) is dict:
+    if (
+        target_event.sdk_event.BizType == protoEnum.Model_ROBOTEVENT.value
+        and type(target_event.sdk_event.payload) is dict
+        and target_event.sdk_event.payload.get('type', None) == 'SendMessage'
+        and type(target_event.sdk_event.payload.get('extendData', None)) is dict
+    ):
         messageData = target_event.sdk_event.payload.get('extendData', {}).get('sendMessage', None)
         if type(messageData) is dict:
             contentData_str = messageData.get('content', None)
-            if type(contentData_str) is str \
-            and messageData.get('objectName', None) == 'Text':
+            if (
+                type(contentData_str) is str
+                and messageData.get('objectName', None) == 'Text'
+            ):
                 villaId = messageData.get('villaId', None)
                 roomId = messageData.get('roomId', None)
                 msgUid = messageData.get('msgUid', None)
                 nickname = messageData.get('nickname', None)
                 fromUserId = messageData.get('fromUserId', None)
                 contentData = json.loads(contentData_str)
-                #print(json.dumps(contentData, ensure_ascii=False, indent=4))
-                if type(villaId) is str \
-                and type(roomId) is str \
-                and type(msgUid) is str \
-                and type(nickname) is str \
-                and type(fromUserId) is str:
+                if (
+                    type(villaId) is str
+                    and type(roomId) is str
+                    and type(msgUid) is str
+                    and type(nickname) is str
+                    and type(fromUserId) is str
+                ):
                     msg = get_message(contentData)
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_message'
@@ -229,23 +230,23 @@ def get_Event_from_SDK(target_event):
                     target_event.data.sender['nickname'] = target_event.data.sender['name']
                     target_event.data.sender['user_id'] = target_event.data.sender['id']
 
-'''
-对于WEBSOCKET接口的PAYLOAD实现
-'''
 
-def getIDCount(botId:str) -> int:
+# 对于WEBSOCKET接口的PAYLOAD实现
+def getIDCount(botId: str) -> int:
     global sdkIDCount
     if type(sdkIDCount.get(str(botId), None)) is not int:
         sdkIDCount[str(botId)] = 0
-    res:int = sdkIDCount[str(botId)] + 1
+    res: int = sdkIDCount[str(botId)] + 1
     sdkIDCount[str(botId)] = res
     return res
+
 
 class protoEnum(enum.Enum):
     Command_P_HEARTBEAT = mhyVilaProto.command.Command.P_HEARTBEAT
     Command_P_LOGIN = mhyVilaProto.command.Command.P_LOGIN
     Command_P_LOGOUT = mhyVilaProto.command.Command.P_LOGOUT
     Model_ROBOTEVENT = 30001
+
 
 recvProtoDict = {
     protoEnum.Command_P_HEARTBEAT.value: mhyVilaProto.command.PHeartBeatReply,
@@ -260,8 +261,9 @@ sendProtoDict = {
     protoEnum.Command_P_LOGOUT.value: mhyVilaProto.command.PLogout,
 }
 
+
 class payload_template(object):
-    def __init__(self, raw:'bytearray|None'=None):
+    def __init__(self, raw: 'bytearray|None' = None):
         self.active = True
         self.raw = raw
         self.is_rx = False
@@ -269,7 +271,7 @@ class payload_template(object):
             self.is_rx = True
         self.magicHeader = self.magicHeader_T()
         self.dataHeader = self.dataHeader_T()
-        self.dataDataBody:bytearray = b''
+        self.dataDataBody: bytearray = b''
         self.data = None
         self.dataTable = {}
         self.dataProto = None
@@ -278,18 +280,18 @@ class payload_template(object):
 
     class magicHeader_T(object):
         def __init__(self):
-            self.Magic:int = 0xBABEFACE
-            self.DataLen:int = 0
+            self.Magic: int = 0xBABEFACE
+            self.DataLen: int = 0
 
     class dataHeader_T(object):
         def __init__(self):
-            self.HeaderLen:int = 24   # uint32    变长头总长度，变长头部分所有字段（包括HeaderLen本身）的总长度。 注：也就是说这玩意每个版本是固定的
-            self.ID:int = 1           # uint64    协议包序列ID，同一条连接上的发出的协议包应该单调递增，相同序列ID且Flag字段相同的包应该被认为是同一个包
-            self.Flag:int = 1         # uint32    配合bizType使用，用于标识同一个bizType协议的方向。
-                                      #             用 1 代表主动发到服务端的request包
-                                      #             用 2 代表针对某个request包回应的response包
-            self.BizType:int = 0      # uint32    消息体的业务类型，用于标识Body字段中的消息所属业务类型
-            self.AppId:int = 104      # int32     应用标识。固定为 104
+            self.HeaderLen: int = 24    # uint32    变长头总长度，变长头部分所有字段（包括HeaderLen本身）的总长度。 注：也就是说这玩意每个版本是固定的
+            self.ID: int = 1            # uint64    协议包序列ID，同一条连接上的发出的协议包应该单调递增，相同序列ID且Flag字段相同的包应该被认为是同一个包
+            self.Flag: int = 1          # uint32    配合bizType使用，用于标识同一个bizType协议的方向。
+            #                                       用 1 代表主动发到服务端的request包
+            #                                       用 2 代表针对某个request包回应的response包
+            self.BizType: int = 0       # uint32    消息体的业务类型，用于标识Body字段中的消息所属业务类型
+            self.AppId: int = 104       # int32     应用标识。固定为 104
 
     def __dump_dataDataBody(self):
         if self.data is not None:
@@ -330,18 +332,24 @@ class payload_template(object):
 
     def load(self):
         global recvProtoDict
-        if self.raw is not None \
-        and len(self.raw) >= 32:
-            self.magicHeader.Magic, \
-            self.magicHeader.DataLen = struct.unpack(
+        if (
+            self.raw is not None
+            and len(self.raw) >= 32
+        ):
+            (
+                self.magicHeader.Magic,
+                self.magicHeader.DataLen
+            ) = struct.unpack(
                 '<II',
                 self.raw[:8]
             )
-            self.dataHeader.HeaderLen, \
-            self.dataHeader.ID, \
-            self.dataHeader.Flag, \
-            self.dataHeader.BizType, \
-            self.dataHeader.AppId = struct.unpack(
+            (
+                self.dataHeader.HeaderLen,
+                self.dataHeader.ID,
+                self.dataHeader.Flag,
+                self.dataHeader.BizType,
+                self.dataHeader.AppId
+            ) = struct.unpack(
                 '<IQIIi',
                 self.raw[8:32]
             )
@@ -360,7 +368,15 @@ class payload_template(object):
         return str(self.dataTable)
 
     def __str__(self):
-        return f'<mhyVilaSDK PAYLOAD [{str(self.dataProto.__name__ if self.dataProto is not None else None)}] BizType={self.dataHeader.BizType} ID={self.dataHeader.ID} dataTable={self.get_data_str()} HEX={self.get_hex_str()}>'
+        return (
+            '<mhyVilaSDK PAYLOAD'
+            f" [{str(self.dataProto.__name__ if self.dataProto is not None else None)}]"
+            f" BizType={self.dataHeader.BizType}"
+            f" ID={self.dataHeader.ID}"
+            f" dataTable={self.get_data_str()}"
+            f" HEX={self.get_hex_str()}>"
+        )
+
 
 class PAYLOAD(object):
     class rxPacket(payload_template):
@@ -378,13 +394,13 @@ class PAYLOAD(object):
 
         class data_T(object):
             def __init__(self):
-                self.uid:int = 0
-                self.token:str = ''
-                self.platform:int = 0
-                self.app_id:int = 0
-                self.device_id:str = ''
-                self.region:str = ''
-                self.meta:dict = {}
+                self.uid: int = 0
+                self.token: str = ''
+                self.platform: int = 0
+                self.app_id: int = 0
+                self.device_id: str = ''
+                self.region: str = ''
+                self.meta: dict = {}
 
     # 心跳命令
     class PHeartBeat(payload_template):
@@ -397,23 +413,21 @@ class PAYLOAD(object):
 
         class data_T(object):
             def __init__(self):
-                self.client_timestamp:str = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+                self.client_timestamp: str = str(int(datetime.now(timezone.utc).timestamp() * 1000))
 
 
-'''
-对于POST接口的实现
-'''
-
-def get_bot_secret(bot_info:bot_info_T):
+# 对于POST接口的实现
+def get_bot_secret(bot_info: bot_info_T):
     return str(hmac.new(
         str(bot_info.pub_key).encode('utf-8'),
         str(bot_info.secret).encode('utf-8'),
         hashlib.sha256
     ).hexdigest())
 
+
 class api_templet(object):
     def __init__(self):
-        self.bot_info:'bot_info_T|None' = None
+        self.bot_info: 'bot_info_T|None' = None
         self.data = None
         self.metadata = None
         self.headdata = self.headdata_T()
@@ -455,10 +469,11 @@ class api_templet(object):
                 msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
-            #print(self.res)
+            # print(self.res)
             return msg_res.text
-        except:
+        except Exception:
             return None
+
 
 class API(object):
     class getWebsocketInfo(api_templet):
@@ -483,11 +498,11 @@ class API(object):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
-    def send_group_msg(target_event, chat_id, message, host_id = None):
+    def send_group_msg(target_event, chat_id, message, host_id=None):
         if host_id is None:
             try:
                 host_id = target_event.data.host_id
-            except:
+            except Exception:
                 pass
         sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
         api_obj = API.sendMessage(sdk_bot_info)
@@ -498,13 +513,13 @@ class event_action(object):
         api_obj.do_api('POST')
         return None
 
-    def create_panel_message(target_event, chat_id, object_name, content:dict, host_id = None):
+    def create_panel_message(target_event, chat_id, object_name, content: dict, host_id=None):
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         res_data['active'] = True
         if host_id is None:
             try:
                 host_id = target_event.data.host_id
-            except:
+            except Exception:
                 pass
         sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
         api_obj = API.sendMessage(sdk_bot_info)
@@ -517,31 +532,39 @@ class event_action(object):
         res_data['data']['chat_type'] = 'private' if False else 'group'
         res_data['data']['chat_id'] = str(chat_id)
         res_data['data']['object_name'] = str(object_name)
-        res_data['data']['content'] = str(json.dumps(content, ensure_ascii = False))
+        res_data['data']['content'] = str(json.dumps(content, ensure_ascii=False))
         return res_data
 
 
 class inde_interface(OlivOS.API.inde_interface_T):
     @OlivOS.API.Event.callbackLogger('mhyVila:create_message', ['chat_type', 'chat_id', 'object_name', 'content'])
-    def __create_message(target_event, chat_type:str, chat_id:str, object_name:str, content:dict, host_id=None, flag_log:bool=True):
+    def __create_message(
+        target_event,
+        chat_type: str,
+        chat_id: str,
+        object_name: str,
+        content: dict,
+        host_id=None,
+        flag_log: bool = True
+    ):
         res_data = None
         if chat_type == 'group':
             res_data = OlivOS.mhyVilaSDK.event_action.create_panel_message(
-                target_event = target_event,
-                chat_id = chat_id,
-                object_name = object_name,
-                content = content,
-                host_id = host_id
+                target_event=target_event,
+                chat_id=chat_id,
+                object_name=object_name,
+                content=content,
+                host_id=host_id
             )
         return res_data
 
     def create_message(
         self,
-        chat_type:str,
-        chat_id:str,
-        object_name:str,
-        content:dict,
-        host_id:'str|None' = None,
+        chat_type: str,
+        chat_id: str,
+        object_name: str,
+        content: dict,
+        host_id: 'str|None' = None,
         flag_log: bool = True,
         remote: bool = False
     ):
@@ -551,12 +574,11 @@ class inde_interface(OlivOS.API.inde_interface_T):
         else:
             res_data = inde_interface.__create_message(
                 self.event,
-                chat_type = chat_type,
-                chat_id = chat_id,
-                object_name = object_name,
-                content = content,
-                host_id = host_id,
-                flag_log = True
+                chat_type=chat_type,
+                chat_id=chat_id,
+                object_name=object_name,
+                content=content,
+                host_id=host_id,
+                flag_log=True
             )
         return res_data
-
