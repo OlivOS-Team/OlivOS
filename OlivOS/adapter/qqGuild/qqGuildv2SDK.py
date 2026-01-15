@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,16 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 from enum import IntEnum
-import sys
 import json
 import requests as req
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import traceback
 import re
 from requests_toolbelt import MultipartEncoder
@@ -30,6 +29,7 @@ from urllib import parse
 import OlivOS
 
 modelName = 'qqGuildv2SDK'
+
 
 class intents_T(IntEnum):
     GUILDS = (1 << 0)  # 频道变更
@@ -86,10 +86,10 @@ class bot_info_T(object):
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     res = bot_info_T(
-        id = plugin_bot_info.id,
-        access_token = plugin_bot_info.post_info.access_token,
-        model = plugin_bot_info.platform.get('model', 'private'),
-        intents = plugin_bot_info.post_info.port
+        id=plugin_bot_info.id,
+        access_token=plugin_bot_info.post_info.access_token,
+        model=plugin_bot_info.platform.get('model', 'private'),
+        intents=plugin_bot_info.post_info.port
     )
     res.debug_mode = plugin_bot_info.debug_mode
     return res
@@ -143,9 +143,9 @@ class payload_template(object):
 
     def load(self, data, is_rx):
         if data is not None:
-            if type(data) == dict:
+            if type(data) is dict:
                 if 'op' in data:
-                    if type(data['op']) == int:
+                    if type(data['op']) is int:
                         self.data.op = data['op']
                     else:
                         self.active = False
@@ -154,12 +154,12 @@ class payload_template(object):
                 if 'd' in data:
                     self.data.d = data['d']
                 if 's' in data:
-                    if type(data['s']) == int:
+                    if type(data['s']) is int:
                         self.data.s = data['s']
                     else:
                         self.active = False
                 if 't' in data:
-                    if type(data['t']) == str:
+                    if type(data['t']) is str:
                         self.data.t = data['t']
                     else:
                         self.active = False
@@ -176,11 +176,11 @@ class PAYLOAD(object):
             payload_template.__init__(self, data, True)
 
     class sendIdentify(payload_template):
-        def __init__(self, bot_info:bot_info_T, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
+        def __init__(self, bot_info: bot_info_T, intents=(int(intents_T.GUILDS) | int(intents_T.DIRECT_MESSAGE))):
             tmp_intents = intents
             if bot_info.model in ['private']:
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
-                #tmp_intents |= int(intents_T.QQ_MESSAGES)
+                # tmp_intents |= int(intents_T.QQ_MESSAGES)
             elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
@@ -199,7 +199,7 @@ class PAYLOAD(object):
                         'os': OlivOS.infoAPI.OlivOS_Header_UA
                     }
                 }
-            except:
+            except Exception:
                 self.active = False
 
     class sendHeartbeat(payload_template):
@@ -233,7 +233,6 @@ class api_templet(object):
         self.res = None
 
     def __switch_host(self):
-        global sdkAPIHost
         if self.bot_info.model in ['sandbox', 'sandbox_intents']:
             if self.host == sdkAPIHost['default']:
                 self.host = sdkAPIHost['sandbox']
@@ -266,7 +265,7 @@ class api_templet(object):
 
             self.res = msg_res.text
             return msg_res.text
-        except:
+        except Exception:
             return None
 
     def do_api(self, req_type='POST'):
@@ -282,7 +281,7 @@ class api_templet(object):
                         tmp_payload_dict[data_this] = self.data.__dict__[data_this]
 
             payload = json.dumps(obj=tmp_payload_dict)
-            #print(payload)
+            # print(payload)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
             headers = {
@@ -299,14 +298,14 @@ class api_templet(object):
                 msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
-            #print(self.res)
+            # print(self.res)
             return msg_res.text
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             return None
 
-def getTokenNow(bot_info:bot_info_T):
-    global sdkTokenInfo
+
+def getTokenNow(bot_info: bot_info_T):
     access_token = None
     plugin_event_bot_hash = OlivOS.API.getBotHash(
         bot_id=bot_info.id,
@@ -316,8 +315,10 @@ def getTokenNow(bot_info:bot_info_T):
     )
     tmpInfo = sdkTokenInfo.get(plugin_event_bot_hash, [None, -1])
     tmpTime = int(datetime.now(timezone.utc).timestamp())
-    if tmpInfo[0] is not None \
-    and tmpInfo[1] > tmpTime :
+    if (
+        tmpInfo[0] is not None
+        and tmpInfo[1] > tmpTime
+    ):
         access_token = sdkTokenInfo[plugin_event_bot_hash][0]
     else:
         msg_this = API.getAppAccessToken(bot_info)
@@ -346,9 +347,10 @@ def getTokenNow(bot_info:bot_info_T):
                             modelName
                         )
                     )
-            except Exception as e:
+            except Exception:
                 traceback.print_exc()
     return access_token
+
 
 class API(object):
     class getAppAccessToken(api_templet):
@@ -403,8 +405,8 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
-                #self.msg_type = 0
-                #self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                # self.msg_type = 0
+                # self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -421,13 +423,13 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None  # str
-                self.embed = None  # str
-                self.ark = None  # str
-                self.image = None  # str
-                self.msg_id = None  # str
-                #self.msg_type = 0
-                #self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.content = None     # str
+                self.embed = None       # str
+                self.ark = None         # str
+                self.image = None       # str
+                self.msg_id = None      # str
+                # self.msg_type = 0
+                # self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     class sendQQMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -444,13 +446,13 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None  # str
-                self.media = None  # str
-                self.msg_type = 0
-                self.embed = None  # str
-                self.ark = None  # str
-                self.image = None  # str
-                self.msg_id = None  # str
+                self.content = None     # str
+                self.media = None       # str
+                self.msg_type = 0       # int
+                self.embed = None       # str
+                self.ark = None         # str
+                self.image = None       # str
+                self.msg_id = None      # str
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
                 self.msg_seq = None
 
@@ -478,7 +480,7 @@ class API(object):
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
                 self.msg_seq = None
 
-    #资源文件上传
+    # 资源文件上传
     class setResourcePictureUpload(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -524,7 +526,7 @@ class API(object):
 
                 self.res = msg_res.text
                 return msg_res.text
-            except Exception as e:
+            except Exception:
                 traceback.print_exc()
                 return None
 
@@ -569,7 +571,6 @@ def checkByListAnd(check_list):
 
 
 def get_Event_from_SDK(target_event):
-    global sdkSubSelfInfo, sdkSelfInfo
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -593,25 +594,28 @@ def get_Event_from_SDK(target_event):
             api_msg_obj.do_api('GET')
             api_res_json = json.loads(api_msg_obj.res)
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
-        if plugin_event_bot_hash in sdkSelfInfo \
-        and type(sdkSelfInfo[plugin_event_bot_hash]) is dict \
-        and 'id' in sdkSelfInfo[plugin_event_bot_hash] \
-        and 'username' in sdkSelfInfo[plugin_event_bot_hash]:
+        if (
+            plugin_event_bot_hash in sdkSelfInfo
+            and type(sdkSelfInfo[plugin_event_bot_hash]) is dict
+            and 'id' in sdkSelfInfo[plugin_event_bot_hash]
+            and 'username' in sdkSelfInfo[plugin_event_bot_hash]
+        ):
             sdkSubSelfInfo[plugin_event_bot_hash] = str(sdkSelfInfo[plugin_event_bot_hash]['id'])
     if target_event.sdk_event.payload.data.t == 'READY':
         target_event.active = False
-        if type(target_event.sdk_event.payload.data.d) is dict \
-        and 'user' in target_event.sdk_event.payload.data.d \
-        and type(target_event.sdk_event.payload.data.d['user']) is dict:
+        if (
+            type(target_event.sdk_event.payload.data.d) is dict
+            and 'user' in target_event.sdk_event.payload.data.d
+            and type(target_event.sdk_event.payload.data.d['user']) is dict
+        ):
             sdkSelfInfo[plugin_event_bot_hash] = target_event.sdk_event.payload.data.d['user']
     elif target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
     ]:
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -631,7 +635,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -642,7 +646,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -687,7 +691,6 @@ def get_Event_from_SDK(target_event):
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -707,7 +710,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -718,7 +721,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -750,9 +753,8 @@ def get_Event_from_SDK(target_event):
         'AT_MESSAGE_CREATE'
     ]:
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
-            if(target_event.sdk_event.payload.data.t == 'AT_MESSAGE_CREATE'):
+            if target_event.sdk_event.payload.data.t == 'AT_MESSAGE_CREATE':
                 # 针对某些无法调用 /users/@me 接口的机器人的临时解决方案
                 target_event.sdk_event.payload.data.d['content'] = re.sub(
                     r'^<@!\d+>', r'',
@@ -776,7 +778,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -787,7 +789,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -831,7 +833,6 @@ def get_Event_from_SDK(target_event):
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         message_obj = None
-        message_para_list = []
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
@@ -851,7 +852,7 @@ def get_Event_from_SDK(target_event):
                 []
             )
         if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) == list:
+            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
@@ -862,7 +863,7 @@ def get_Event_from_SDK(target_event):
                             )
         try:
             message_obj.init_data()
-        except:
+        except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
@@ -900,17 +901,17 @@ class event_action(object):
         if flag_direct:
             this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.openid = str(chat_id)
-            if(type(target_event.sdk_event) is event):
+            if type(target_event.sdk_event) is event:
                 msg_id = target_event.sdk_event.payload.data.d.get('id', None)
         else:
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.group_openid = str(chat_id)
-            if(type(target_event.sdk_event) is event):
+            if type(target_event.sdk_event) is event:
                 msg_id = target_event.sdk_event.payload.data.d.get('id', None)
         if this_msg is None:
             return
         this_msg.data.msg_id = msg_id
-        #this_msg.data.msg_id = reply_msg_id
+        # this_msg.data.msg_id = reply_msg_id
         flag_now_type = 'string'
         flag_now_type_last = flag_now_type
         res = ''
@@ -919,20 +920,26 @@ class event_action(object):
         for message_this in message.data:
             count_data += 1
             flag_now_type_last = flag_now_type
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
-                #this_msg.data.media = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
-                #this_msg.data.msg_type = 7
-                #this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
-                #this_msg.do_api()
-                #flag_now_type = 'image'
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
+                # this_msg.data.media = event_action.setResourceUploadFast(
+                #     target_event, message_this.data['file'], 'images'
+                # )
+                # this_msg.data.msg_type = 7
+                # this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
+                # this_msg.do_api()
+                # flag_now_type = 'image'
                 pass
-            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+            elif type(message_this) is OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
                 flag_now_type = 'string'
-            if size_data == count_data\
-            or (flag_now_type_last != flag_now_type \
-            and flag_now_type_last == 'string' \
-            and len(res) > 0):
+            if (
+                size_data == count_data
+                or (
+                    flag_now_type_last != flag_now_type
+                    and flag_now_type_last == 'string'
+                    and len(res) > 0
+                )
+            ):
                 this_msg.data.content = res
                 this_msg.data.msg_type = 0
                 this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
@@ -950,27 +957,26 @@ class event_action(object):
         if this_msg is None:
             return
         this_msg.data.msg_id = reply_msg_id
-        flag_now_type = 'string'
         res = ''
         for message_this in message.data:
-            if type(message_this) == OlivOS.messageAPI.PARA.image:
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
                 pass
-            elif type(message_this) == OlivOS.messageAPI.PARA.text:
+            elif type(message_this) is OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
-                flag_now_type = 'string'
         if res != '':
             this_msg.data.content = res
-            #this_msg.data.msg_type = 0
+            # this_msg.data.msg_type = 0
             this_msg.do_api()
 
     def get_login_info(target_event):
-        global sdkSelfInfo
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
-        if target_event.bot_info.hash in sdkSelfInfo \
-        and type(sdkSelfInfo[target_event.bot_info.hash]) is dict \
-        and 'id' in sdkSelfInfo[target_event.bot_info.hash] \
-        and 'username' in sdkSelfInfo[target_event.bot_info.hash]:
+        if (
+            target_event.bot_info.hash in sdkSelfInfo
+            and type(sdkSelfInfo[target_event.bot_info.hash]) is dict
+            and 'id' in sdkSelfInfo[target_event.bot_info.hash]
+            and 'username' in sdkSelfInfo[target_event.bot_info.hash]
+        ):
             res_data['active'] = True
             res_data['data']['name'] = str(sdkSelfInfo[target_event.bot_info.hash]['username'])
             res_data['data']['id'] = str(sdkSelfInfo[target_event.bot_info.hash]['id'])
@@ -981,12 +987,14 @@ class event_action(object):
                 if this_msg.res is not None:
                     raw_obj = init_api_json(this_msg.res)
                 if raw_obj is not None:
-                    if type(raw_obj) is dict \
-                    and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int):
+                    if (
+                        type(raw_obj) is dict
+                        and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int)
+                    ):
                         res_data['active'] = True
                         res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
                         res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
-            except:
+            except Exception:
                 res_data['active'] = False
         return res_data
 
@@ -1024,22 +1032,23 @@ class event_action(object):
             msg_upload_api.data.file = pic_file
             msg_upload_api.data.type = type_chat
             msg_upload_api.do_api('POST', check_list[type_path])
-            #print(msg_upload_api.res)
+            # print(msg_upload_api.res)
             if msg_upload_api.res is not None:
                 msg_upload_api_obj = json.loads(msg_upload_api.res)
-                if 'code' in msg_upload_api_obj \
-                and 0 == msg_upload_api_obj['code'] \
-                and 'data' in msg_upload_api_obj \
-                and 'url' in msg_upload_api_obj['data']:
+                if (
+                    'code' in msg_upload_api_obj
+                    and 0 == msg_upload_api_obj['code']
+                    and 'data' in msg_upload_api_obj
+                    and 'url' in msg_upload_api_obj['data']
+                ):
                     res = msg_upload_api_obj['data']['url']
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             res = None
         return res
 
 
-def get_msgid(key:str):
-    global sdkMsgidinfo
+def get_msgid(key: str):
     res = sdkMsgidinfo.get(key, 0)
     if type(res) is int:
         res += 1
@@ -1048,20 +1057,21 @@ def get_msgid(key:str):
         res = None
     return res
 
+
 def init_api_json(raw_str):
     res_data = None
     tmp_obj = None
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         flag_is_active = True
     if flag_is_active:
-        if type(tmp_obj) == dict:
+        if type(tmp_obj) is dict:
             res_data = tmp_obj.copy()
-        elif type(tmp_obj) == list:
+        elif type(tmp_obj) is list:
             res_data = tmp_obj.copy()
     return res_data
 
@@ -1073,10 +1083,9 @@ def init_api_do_mapping(src_type, src_data):
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
