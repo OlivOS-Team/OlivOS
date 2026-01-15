@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -18,7 +18,6 @@ from gevent import pywsgi
 from flask import Flask
 from flask import current_app
 from flask import request
-from flask import g
 
 import OlivOS
 
@@ -47,13 +46,27 @@ gCheckList = [
     'lagrange_default'
 ]
 
+
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port, tx_queue=None,
-                 debug_mode=False, logger_proc=None, scan_interval=0.001, dead_interval=16,
-                 Flask_server_xpath='/OlivOSMsgApi'):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='Flask_rx', scan_interval=scan_interval,
-                                         dead_interval=dead_interval, rx_queue=None, tx_queue=tx_queue,
-                                         logger_proc=logger_proc)
+    def __init__(
+        self, Proc_name, Flask_namespace, Flask_server_methods, Flask_host, Flask_port,
+        tx_queue=None,
+        debug_mode=False,
+        logger_proc=None,
+        scan_interval=0.001,
+        dead_interval=16,
+        Flask_server_xpath='/OlivOSMsgApi'
+    ):
+        OlivOS.API.Proc_templet.__init__(
+            self,
+            Proc_name=Proc_name,
+            Proc_type='Flask_rx',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=None,
+            tx_queue=tx_queue,
+            logger_proc=logger_proc
+        )
         self.Proc_config['Flask_namespace'] = Flask_namespace
         self.Proc_config['Flask_app'] = None
         self.Proc_config['Flask_name'] = Proc_name
@@ -85,7 +98,7 @@ class server(OlivOS.API.Proc_templet):
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 try:
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-                except:
+                except Exception:
                     pass
                 return '200'
 
@@ -93,20 +106,39 @@ class server(OlivOS.API.Proc_templet):
         self.app()
         self.set_config()
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running on port [{1}]', [
-                self.Proc_config['Flask_name'],
-                str(self.Proc_config['Flask_server_port'])
-            ], modelName
-        ))
-        self.log(2, OlivOS.L10NAPI.getTrans('OlivOS flask server [{0}] is running on [{1}]', [
-                self.Proc_config['Flask_name'],
-                f"http://127.0.0.1:{self.Proc_config['Flask_server_port']}{self.Proc_config['Flask_server_xpath']}/qq/onebot/default"
-            ], modelName
-        ))
+        self.log(
+            2, OlivOS.L10NAPI.getTrans(
+                'OlivOS flask server [{0}] is running on port [{1}]', [
+                    self.Proc_config['Flask_name'],
+                    str(self.Proc_config['Flask_server_port'])
+                ],
+                modelName
+            )
+        )
+        self.log(
+            2, OlivOS.L10NAPI.getTrans(
+                'OlivOS flask server [{0}] is running on [{1}]', [
+                    self.Proc_config['Flask_name'],
+                    (
+                        f"http://127.0.0.1:{self.Proc_config['Flask_server_port']}"
+                        f"{self.Proc_config['Flask_server_xpath']}/qq/onebot/default"
+                    )
+                ],
+                modelName
+            )
+        )
         if self.Proc_config['config'].debug_mode:
-            self.Proc_config['Flask_app'].run(host=self.Proc_config['Flask_server_host'],
-                                              port=self.Proc_config['Flask_server_port'])
+            self.Proc_config['Flask_app'].run(
+                host=self.Proc_config['Flask_server_host'],
+                port=self.Proc_config['Flask_server_port']
+            )
         else:
-            server = pywsgi.WSGIServer((self.Proc_config['Flask_server_host'], self.Proc_config['Flask_server_port']),
-                                       self.Proc_config['Flask_app'], log=None)
+            server = pywsgi.WSGIServer(
+                (
+                    self.Proc_config['Flask_server_host'],
+                    self.Proc_config['Flask_server_port']
+                ),
+                self.Proc_config['Flask_app'],
+                log=None
+            )
             server.serve_forever()

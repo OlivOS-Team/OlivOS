@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,11 +10,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import sys
 import json
 import requests as req
 from urllib import parse
@@ -48,6 +47,7 @@ lagrangeModelMap = [
 
 gFlagCheckList = []
 
+
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
@@ -76,14 +76,19 @@ class send_onebot_post_json_T(object):
         self.node_ext = ''
 
     def send_onebot_post_json(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
+        if (
+            type(self.bot_info) is not bot_info_T
+            or self.bot_info.host == ''
+            or self.bot_info.port == -1
+            or self.obj is None
+            or self.node_ext == ''
+        ):
             return None
         else:
             try:
-                # clear_dict = {k: v for k, v in self.obj.__dict__.items() if v != -1}
                 clear_dict = self.obj.__dict__
                 if clear_dict.get('message_type') == 'private':
-                    clear_dict.pop('group_id','No "group_id"')
+                    clear_dict.pop('group_id', 'No "group_id"')
                 json_str_tmp = json.dumps(obj=clear_dict, ensure_ascii=False)
                 tmp_host = self.bot_info.host
                 if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
@@ -112,7 +117,7 @@ class send_onebot_post_json_T(object):
                         self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
                 return msg_res
-            except:
+            except Exception:
                 traceback.print_exc()
 
 
@@ -130,7 +135,7 @@ class api_templet(object):
         this_post_json.node_ext = self.node_ext
         try:
             self.res = this_post_json.send_onebot_post_json()
-        except:
+        except Exception:
             self.res = None
         return self.res
 
@@ -141,7 +146,7 @@ class api_templet(object):
         this_post_json.node_ext = self.node_ext + '_async'
         try:
             self.res = this_post_json.send_onebot_post_json()
-        except:
+        except Exception:
             self.res = None
         return self.res
 
@@ -152,12 +157,17 @@ class api_templet(object):
         this_post_json.node_ext = self.node_ext + '_rate_limited'
         try:
             self.res = this_post_json.send_onebot_post_json()
-        except:
+        except Exception:
             self.res = None
         return self.res
 
     def do_api_get(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.node_ext == '':
+        if (
+            type(self.bot_info) is not bot_info_T
+            or self.bot_info.host == ''
+            or self.bot_info.port == -1
+            or self.node_ext == ''
+        ):
             return None
         try:
             tmp_host = self.bot_info.host
@@ -182,10 +192,11 @@ class api_templet(object):
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - GET succeed: ' + msg_res.text)
             self.res = msg_res
             return msg_res
-        except:
+        except Exception:
             traceback.print_exc()
             self.res = None
             return None
+
 
 class event(object):
     def __init__(self, raw):
@@ -204,7 +215,7 @@ class event(object):
     def event_load(self, raw):
         try:
             res = json.loads(raw)
-        except:
+        except Exception:
             res = None
         return res
 
@@ -216,10 +227,12 @@ def format_cq_code_msg(msg):
     elif type(msg) is list:
         res = ''
         for msg_this in msg:
-            if type(msg_this) is dict \
-            and 'type' in msg_this \
-            and 'data' in msg_this \
-            and type(msg_this['data']) is dict:
+            if (
+                type(msg_this) is dict
+                and 'type' in msg_this
+                and 'data' in msg_this
+                and type(msg_this['data']) is dict
+            ):
                 if msg_this['type'] == 'text':
                     if 'text' in msg_this['data']:
                         res += msg_this['data']['text']
@@ -230,13 +243,15 @@ def format_cq_code_msg(msg):
                             cq_params.append(f"name={msg_this['data']['name']}")
                         res += f"[CQ:at,{','.join(cq_params)}]"
                 else:
-                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]) + ']'
+                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [
+                        f"{key_this}={msg_this['data'][key_this]}"
+                        for key_this in msg_this['data']
+                    ]) + ']'
     return res
 
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
-    global gFlagCheckList
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -522,15 +537,16 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.json['interval']
             )
 
-def formatMessage(data:str, msgType:str = 'para'):
+
+def formatMessage(data: str, msgType: str = 'para'):
     res = data
     data_obj = OlivOS.messageAPI.Message_templet(
-        mode_rx = 'old_string',
-        data_raw = data
+        mode_rx='old_string',
+        data_raw=data
     )
     for data_obj_this in data_obj.data:
         if type(data_obj_this) is OlivOS.messageAPI.PARA.image:
-            if data_obj_this.data['url'] != None:
+            if data_obj_this.data['url'] is not None:
                 data_obj_this.data['file'] = data_obj_this.data['url']
                 data_obj_this.data['url'] = None
             url_path = data_obj_this.data['file']
@@ -543,7 +559,7 @@ def formatMessage(data:str, msgType:str = 'para'):
                         if os.path.exists(file_path):
                             data_obj_this.data['file'] = 'file:///%s' % file_path
     if msgType == 'para':
-        res = paraMapper(paraList = data_obj.data, msgType = 'para')
+        res = paraMapper(paraList=data_obj.data, msgType='para')
     else:
         res = data_obj.get('old_string')
     return res
@@ -566,35 +582,34 @@ def paraMapper(paraList, msgType='para'):
             res += para.CQ()
     return res
 
+
 # 支持OlivOS API调用的方法实现
 class event_action(object):
     def reply_private_msg(target_event, message):
         event_action.send_private_msg(
-            target_event = target_event,
-            user_id = target_event.data.user_id,
-            message = message
+            target_event=target_event,
+            user_id=target_event.data.user_id,
+            message=message
         )
 
     def reply_group_msg(target_event, message):
         event_action.send_group_msg(
-            target_event = target_event,
-            user_id = target_event.data.group_id,
-            message = message
+            target_event=target_event,
+            user_id=target_event.data.group_id,
+            message=message
         )
 
     def send_private_msg(target_event, user_id, message):
-        global paraMsgMap
         msgType = 'msg'
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
         this_msg.data.user_id = str(user_id)
         if target_event.bot_info.platform['model'] in paraMsgMap:
             msgType = 'para'
-        this_msg.data.message = formatMessage(data = message, msgType = msgType)
+        this_msg.data.message = formatMessage(data=message, msgType=msgType)
         this_msg.do_api()
 
     def send_group_msg(target_event, group_id, message):
-        global paraMsgMap
         msgType = 'msg'
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
@@ -603,7 +618,7 @@ class event_action(object):
             del this_msg.data.user_id
         if target_event.bot_info.platform['model'] in paraMsgMap:
             msgType = 'para'
-        this_msg.data.message = formatMessage(data = message, msgType = msgType)
+        this_msg.data.message = formatMessage(data=message, msgType=msgType)
         this_msg.do_api()
 
     def delete_msg(target_event, message_id):
@@ -620,7 +635,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
@@ -645,7 +660,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['messages'] = init_api_do_mapping_for_dict(raw_obj, ['messages'], list)
         return res_data
@@ -780,7 +795,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -796,7 +811,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -810,7 +825,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -829,7 +844,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
@@ -846,7 +861,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
@@ -871,18 +886,19 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
                 res_data['data']['user_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
                 res_data['data']['group_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
                 res_data['data']['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj, ['join_time'], int)
-                res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj, ['last_sent_time'],
-                                                                                           int)
-                res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                              ['shut_up_timestamp'],
-                                                                                              int)
+                res_data['data']['times']['last_sent_time'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['last_sent_time'], int
+                )
+                res_data['data']['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['shut_up_timestamp'], int
+                )
                 res_data['data']['role'] = init_api_do_mapping_for_dict(raw_obj, ['role'], str)
                 res_data['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['card'], str)
                 res_data['data']['title'] = init_api_do_mapping_for_dict(raw_obj, ['title'], str)
@@ -897,7 +913,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
@@ -905,12 +921,15 @@ class event_action(object):
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
                     tmp_res_data_this['user_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], int))
                     tmp_res_data_this['group_id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
-                    tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(raw_obj_this, ['join_time'],
-                                                                                           int)
-                    tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(raw_obj_this,
-                                                                                                ['last_sent_time'], int)
-                    tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(raw_obj_this, [
-                        'shut_up_timestamp'], int)
+                    tmp_res_data_this['times']['join_time'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['join_time'], int
+                    )
+                    tmp_res_data_this['times']['last_sent_time'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['last_sent_time'], int
+                    )
+                    tmp_res_data_this['times']['shut_up_timestamp'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['shut_up_timestamp'], int
+                    )
                     tmp_res_data_this['role'] = init_api_do_mapping_for_dict(raw_obj_this, ['role'], str)
                     tmp_res_data_this['card'] = init_api_do_mapping_for_dict(raw_obj_this, ['card'], str)
                     tmp_res_data_this['title'] = init_api_do_mapping_for_dict(raw_obj_this, ['title'], str)
@@ -925,7 +944,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -938,7 +957,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -951,29 +970,33 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['online'] = init_api_do_mapping_for_dict(raw_obj, ['online'], bool)
-                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                       'packet_received'],
-                                                                                             int)
-                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                         ['stat', 'packet_sent'], int)
-                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                         ['stat', 'packet_lost'], int)
-                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                        'message_received'],
-                                                                                              int)
-                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                          ['stat', 'message_sent'], int)
-                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                        'disconnect_times'],
-                                                                                              int)
-                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'lost_times'],
-                                                                                        int)
-                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                         'last_message_time'],
-                                                                                               int)
+                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'packet_received'], int
+                )
+                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'packet_sent'], int
+                )
+                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'packet_lost'], int
+                )
+                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'message_received'], int
+                )
+                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'message_sent'], int
+                )
+                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'disconnect_times'], int
+                )
+                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'lost_times'], int
+                )
+                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['stat', 'last_message_time'], int
+                )
         return res_data
 
     def get_version_info(target_event):
@@ -984,7 +1007,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['app_name'], str)
                 res_data['data']['version_full'] = init_api_do_mapping_for_dict(raw_obj, ['app_full_name'], str)
@@ -1012,7 +1035,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['tiny_id'], str))
@@ -1035,7 +1058,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 model = target_event.bot_info.platform['model']
                 for raw_obj_this in raw_obj:
@@ -1127,7 +1150,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['file_count'] = init_api_do_mapping_for_dict(raw_obj, ['file_count'], int)
                 res_data['data']['limit_count'] = init_api_do_mapping_for_dict(raw_obj, ['limit_count'], int)
@@ -1148,7 +1171,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1168,7 +1191,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1185,7 +1208,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 res_data['data']['url'] = init_api_do_mapping_for_dict(raw_obj, ['url'], str)
         return res_data
@@ -1233,7 +1256,7 @@ class event_action(object):
         this_msg.data.group_id = int(group_id)
         this_msg.data.file_id = str(file_id)
         this_msg.do_api()
-    
+
     def get_essence_msg_list(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
         raw_obj = None
@@ -1246,7 +1269,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1286,7 +1309,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1314,7 +1337,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1350,7 +1373,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if type(raw_obj) is dict:
                 res_data['active'] = True
                 # 处理邀请加群申请
                 if 'invited_requests' in raw_obj or 'InvitedRequest' in raw_obj:
@@ -1390,10 +1413,10 @@ class event_action(object):
             this_msg = api.friend_poke(get_SDK_bot_info_from_Event(target_event))
             this_msg.data.user_id = int(user_id)
             this_msg.do_api()
-            
+
     def set_msg_emoji_like(target_event, message_id, emoji_id, is_set=True, group_id=None):
         model = target_event.bot_info.platform['model']
-        
+
         if model in lagrangeModelMap:
             # Lagrange 用 set_group_reaction
             this_msg = api.set_group_reaction(get_SDK_bot_info_from_Event(target_event))
@@ -1404,7 +1427,7 @@ class event_action(object):
             this_msg.data.code = str(emoji_id)
             this_msg.data.is_add = is_set
             this_msg.do_api()
-            
+
         elif model in napcatModelMap:
             # NapCat 用 set_msg_emoji_like
             this_msg = api.set_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
@@ -1412,7 +1435,7 @@ class event_action(object):
             this_msg.data.emoji_id = int(emoji_id)
             this_msg.data.set = is_set
             this_msg.do_api()
-            
+
         elif model in llonebotModelMap:
             # LLOneBot 用 set_msg_emoji_like，根据 is_set 使用不同的 API
             if is_set:
@@ -1433,37 +1456,36 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if type(tmp_obj) is dict:
         if 'status' in tmp_obj:
-            if type(tmp_obj['status']) == str:
+            if type(tmp_obj['status']) is str:
                 if tmp_obj['status'] == 'ok':
                     flag_is_active = True
         if 'retcode' in tmp_obj:
-            if type(tmp_obj['retcode']) == int:
+            if type(tmp_obj['retcode']) is int:
                 if tmp_obj['retcode'] == 0:
                     flag_is_active = True
     if flag_is_active:
         if 'data' in tmp_obj:
-            if type(tmp_obj['data']) == dict:
+            if type(tmp_obj['data']) is dict:
                 res_data = tmp_obj['data'].copy()
-            elif type(tmp_obj['data']) == list:
+            elif type(tmp_obj['data']) is list:
                 res_data = tmp_obj['data'].copy()
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if type(src_data) is src_type:
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if type(tmp_src_data) is dict:
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
@@ -2376,7 +2398,7 @@ class api(object):
             def __init__(self):
                 self.group_id = -1
                 self.notice_id = ''
-                
+
     class set_group_reaction(api_templet):
         """Lagrange 贴表情"""
         def __init__(self, bot_info=None):
