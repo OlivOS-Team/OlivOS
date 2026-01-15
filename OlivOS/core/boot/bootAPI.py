@@ -1186,7 +1186,6 @@ def update_get_func(
 
 # 进程监控
 def bootMonitor(varDict: dict):
-    global gMonitorReg
     try:
         gMonitorReg.setdefault('Proc_dict', {'keys': []})
         if (
@@ -1268,7 +1267,6 @@ def log(logger_proc, log_level, log_message, log_segment=None):
 
 
 def logG(log_level, log_message, log_segment=None):
-    global gLoggerProc
     log(
         logger_proc=gLoggerProc,
         log_level=log_level,
