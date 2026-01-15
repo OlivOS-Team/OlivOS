@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -16,7 +16,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
-import subprocess
 import sys
 import os
 import threading
@@ -24,7 +23,6 @@ import time
 import json
 import multiprocessing
 import platform
-import signal
 import psutil
 import atexit
 import importlib
@@ -37,6 +35,7 @@ modelName = 'bootAPI'
 
 gMonitorReg = {}
 gLoggerProc = None
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -72,39 +71,39 @@ class Entity(object):
         logger_proc = None
 
         preLoadPrint('OlivOS - Witness Union')
-        start_up_show_str = ('''
+        start_up_show_str = (r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
-_  / / /_  /  __  / __ | / /_  / / /____ \ 
-/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ / 
-\____/ /_____/___/  _____/  \____/ /____/  
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
 ''')
         print(start_up_show_str)
         print('･ﾟ( ﾉヮ´ )(`ヮ´ )σ`∀´) ﾟ∀ﾟ)σ' + ' [OlivOS - Witness Union]\n')
 
-        preLoadPrint('init config from [%s] ... ' % basic_conf_path)
+        preLoadPrint(f"init config from [{basic_conf_path}] ... ")
         try:
             with open(basic_conf_path, 'r', encoding='utf-8') as basic_conf_f:
                 basic_conf = json.loads(basic_conf_f.read())
-        except:
-            preLoadPrint('init config from [%s] ... not hit' % basic_conf_path)
+        except Exception:
+            preLoadPrint(f"init config from [{basic_conf_path}] ... not hit")
             releaseDir('./conf')
             basic_conf = OlivOS.bootDataAPI.default_Conf
             preLoadPrint('init config from default ... done')
         else:
-            preLoadPrint('init config from [%s] ... done' % basic_conf_path)
+            preLoadPrint(f"init config from [{basic_conf_path}] ... done")
 
-        preLoadPrint('patch config from [%s] ... ' % patch_conf_path)
+        preLoadPrint(f"patch config from [{patch_conf_path}] ... ")
         try:
             with open(patch_conf_path, 'r', encoding='utf-8') as patch_conf_f:
                 patch_conf = json.loads(patch_conf_f.read())
-        except:
-            preLoadPrint('patch config from [%s] ... not hit' % patch_conf_path)
+        except Exception:
+            preLoadPrint(f"patch config from [{patch_conf_path}] ... not hit")
             releaseDir('./conf')
             preLoadPrint('patch config from default ... done')
         else:
             basic_conf = get_patch_config(basic_conf, patch_conf)
-            preLoadPrint('patch config from [%s] ... done' % patch_conf_path)
+            preLoadPrint(f"patch config from [{patch_conf_path}] ... done")
 
         preLoadPrint('init models from config ... ')
         if basic_conf is not None:
@@ -125,12 +124,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         main_control = OlivOS.API.Control(
             name=basic_conf['system']['name'],
             init_list=basic_conf['system']['init'],
-            control_queue=multiprocessing_dict[basic_conf['system']['control_queue']],
+            control_queue=multiprocessing_dict[
+                basic_conf['system']['control_queue']
+            ],
             scan_interval=basic_conf['system']['interval']
         )
 
         for basic_conf_models_this_name in main_control.init_list:
-            main_control.control_queue.put(main_control.packet('init', basic_conf_models_this_name), block=False)
+            main_control.control_queue.put(
+                main_control.packet('init', basic_conf_models_this_name),
+                block=False
+            )
 
         preLoadPrint('get init args ...')
         # 判断启动参数
@@ -151,8 +155,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 continue
             else:
                 try:
-                    rx_packet_data = main_control.control_queue.get(block=False)
-                except:
+                    rx_packet_data = main_control.control_queue.get(
+                        block=False
+                    )
+                except Exception:
                     continue
             if rx_packet_data.action == 'init':
                 # 兼容Win平台多进程，避免形成fork-bomb
@@ -168,37 +174,47 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if 'auto' == tmp_proc_mode_raw:
                     tmp_proc_mode = 'threading'
                 if basic_conf_models_this['enable']:
-                    logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will init', [
-                            basic_conf_models_this['name']
-                        ],
+                    logG(1, OlivOS.L10NAPI.getTrans(
+                        'OlivOS model [{0}] will init',
+                        [basic_conf_models_this['name']],
                         modelName
                     ))
                     if basic_conf_models_this['type'] == 'sleep':
                         time.sleep(10)
                     elif basic_conf_models_this['type'] == 'update_check':
                         threading.Thread(
-                            target = OlivOS.updateAPI.OlivOSUpdateGet,
-                            kwargs = {
+                            target=OlivOS.updateAPI.OlivOSUpdateGet,
+                            kwargs={
                                 'logger_proc': Proc_dict[basic_conf_models_this['logger_proc']],
                                 'flagChackOnly': True,
                                 'control_queue': main_control.control_queue
                             }
                         ).start()
                     elif basic_conf_models_this['type'] == 'logger':
-                        Proc_dict[basic_conf_models_this['name']] = OlivOS.diagnoseAPI.logger(
-                            Proc_name=basic_conf_models_this['name'],
-                            scan_interval=basic_conf_models_this['interval'],
-                            dead_interval=basic_conf_models_this['dead_interval'],
-                            logger_queue=multiprocessing_dict[basic_conf_models_this['rx_queue']],
-                            logger_mode=basic_conf_models_this['mode'],
-                            logger_vis_level=basic_conf_models_this['fliter'],
-                            control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']]
-                        )
-                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[
-                            basic_conf_models_this['name']].start_unity(tmp_proc_mode)
+                        Proc_dict[
+                            basic_conf_models_this['name']
+                        ] = OlivOS.diagnoseAPI.logger(
+                                Proc_name=basic_conf_models_this['name'],
+                                scan_interval=basic_conf_models_this['interval'],
+                                dead_interval=basic_conf_models_this['dead_interval'],
+                                logger_queue=multiprocessing_dict[basic_conf_models_this['rx_queue']],
+                                logger_mode=basic_conf_models_this['mode'],
+                                logger_vis_level=basic_conf_models_this['fliter'],
+                                control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']]
+                            )
+                        Proc_Proc_dict[
+                            basic_conf_models_this['name']
+                        ] = Proc_dict[
+                                basic_conf_models_this['name']
+                            ].start_unity(
+                                tmp_proc_mode
+                            )
                         for this_bot_info in plugin_bot_info_dict:
-                            plugin_bot_info_dict[this_bot_info].debug_logger = Proc_dict[basic_conf_models_this['name']]
-                        logger_proc = Proc_dict[basic_conf_models_this['name']]
+                            plugin_bot_info_dict[
+                                this_bot_info
+                            ].debug_logger = Proc_dict[
+                                    basic_conf_models_this['name']
+                                ]
                         gLoggerProc = Proc_dict[basic_conf_models_this['name']]
                     elif basic_conf_models_this['type'] == 'plugin':
                         proc_plugin_func_dict = {}
@@ -254,7 +270,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                                     flag_need_enable = True
                         if not flag_need_enable:
                             continue
@@ -276,13 +294,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                                     flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                     tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                     multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
@@ -297,18 +319,23 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         debug_mode=False
                                     )
                                     Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
-                                        tmp_proc_mode)
+                                        tmp_proc_mode
+                                    )
                     elif basic_conf_models_this['type'] == 'qqRed_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
                                     flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                     tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                     multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
@@ -327,13 +354,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'dingtalk_link':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
                                     flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'dingtalk_link':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.dingtalkLinkServerAPI.gCheckList:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                     tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                     multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
@@ -566,13 +597,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                                     flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                     tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                     multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
@@ -702,7 +737,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 callbackData=tmp_callbackData
                             )
                             tmp_res = HostUI_obj.start()
-                            if tmp_res != True:
+                            if tmp_res is not True:
                                 killMain()
                             if HostUI_obj.UIData['flag_commit']:
                                 plugin_bot_info_dict = HostUI_obj.UIData['Account_data']
@@ -751,8 +786,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
                         if platform.system() == 'Windows':
                             threading.Thread(
-                                target = OlivOS.libEXEModelAPI.startGoCqhttpLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libEXEModelAPI.startGoCqhttpLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -765,8 +800,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'walleq_lib_exe_model':
                         if platform.system() == 'Windows':
                             threading.Thread(
-                                target = OlivOS.libWQEXEModelAPI.startWalleQLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libWQEXEModelAPI.startWalleQLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -779,8 +814,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'cwcb_lib_exe_model':
                         if platform.system() == 'Windows':
                             threading.Thread(
-                                target = OlivOS.libCWCBEXEModelAPI.startCWCBQLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libCWCBEXEModelAPI.startCWCBQLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -793,8 +828,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'opqbot_lib_exe_model':
                         if platform.system() == 'Windows':
                             threading.Thread(
-                                target = OlivOS.libOPQBotEXEModelAPI.startOPQBotLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libOPQBotEXEModelAPI.startOPQBotLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -807,8 +842,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'napcat_lib_exe_model':
                         if platform.system() == 'Windows':
                             threading.Thread(
-                                target = OlivOS.libNapCatEXEModelAPI.startNapCatLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libNapCatEXEModelAPI.startNapCatLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -823,8 +858,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             if not OlivOS.libAstralQsignEXEModelAPI.isBotActive(plugin_bot_info_dict):
                                 continue
                             threading.Thread(
-                                target = OlivOS.libAstralQsignEXEModelAPI.startAstralQsignLibExeModel,
-                                kwargs = {
+                                target=OlivOS.libAstralQsignEXEModelAPI.startAstralQsignLibExeModel,
+                                kwargs={
                                     'plugin_bot_info_dict': plugin_bot_info_dict,
                                     'basic_conf_models_this': basic_conf_models_this,
                                     'multiprocessing_dict': multiprocessing_dict,
@@ -864,7 +899,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 block=False
                             )
             elif rx_packet_data.action == 'send':
-                if type(rx_packet_data.key) == dict:
+                if type(rx_packet_data.key) is dict:
                     if 'target' in rx_packet_data.key:
                         if 'type' in rx_packet_data.key['target']:
                             flag_target_all = (rx_packet_data.key['target']['type'] == 'all')
@@ -873,7 +908,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 flag_fliter = rx_packet_data.key['target']['fliter']
                             for tmp_Proc_name in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[tmp_Proc_name]
-                                if flag_target_all or basic_conf_models_this['type'] == rx_packet_data.key['target']['type']:
+                                if (
+                                    flag_target_all
+                                    or basic_conf_models_this['type'] == rx_packet_data.key['target']['type']
+                                ):
                                     model_name = basic_conf_models_this['name']
                                     if 'hash' in rx_packet_data.key['target']:
                                         model_name = '%s=%s' % (
@@ -888,7 +926,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                                         rx_packet_data,
                                                         block=False
                                                     )
-                                            except Exception as e:
+                                            except Exception:
                                                 traceback.print_exc()
                                         if flag_fliter in ['all', 'rx_only']:
                                             try:
@@ -897,19 +935,21 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                                         rx_packet_data,
                                                         block=False
                                                     )
-                                            except Exception as e:
+                                            except Exception:
                                                 traceback.print_exc()
             elif rx_packet_data.action == 'init_type_open_webview_page':
                 if platform.system() == 'Windows':
-                    if type(rx_packet_data.key) is dict \
-                    and 'target' in rx_packet_data.key \
-                    and type(rx_packet_data.key['target']) is dict \
-                    and 'data' in rx_packet_data.key \
-                    and type(rx_packet_data.key['data']) is dict \
-                    and 'action' in rx_packet_data.key['target'] \
-                    and 'name' in rx_packet_data.key['target'] \
-                    and 'title' in rx_packet_data.key['data'] \
-                    and 'url' in rx_packet_data.key['data']:
+                    if (
+                        type(rx_packet_data.key) is dict
+                        and 'target' in rx_packet_data.key
+                        and type(rx_packet_data.key['target']) is dict
+                        and 'data' in rx_packet_data.key
+                        and type(rx_packet_data.key['data']) is dict
+                        and 'action' in rx_packet_data.key['target']
+                        and 'name' in rx_packet_data.key['target']
+                        and 'title' in rx_packet_data.key['data']
+                        and 'url' in rx_packet_data.key['data']
+                    ):
                         if 'init' == rx_packet_data.key['target']['action']:
                             for basic_conf_models_this_key in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[basic_conf_models_this_key]
@@ -934,15 +974,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('processing')
             elif rx_packet_data.action == 'init_type_open_tx_turingTest_webview_page':
                 if platform.system() == 'Windows':
-                    if type(rx_packet_data.key) is dict \
-                    and 'target' in rx_packet_data.key \
-                    and type(rx_packet_data.key['target']) is dict \
-                    and 'data' in rx_packet_data.key \
-                    and type(rx_packet_data.key['data']) is dict \
-                    and 'action' in rx_packet_data.key['target'] \
-                    and 'name' in rx_packet_data.key['target'] \
-                    and 'title' in rx_packet_data.key['data'] \
-                    and 'url' in rx_packet_data.key['data']:
+                    if (
+                        type(rx_packet_data.key) is dict
+                        and 'target' in rx_packet_data.key
+                        and type(rx_packet_data.key['target']) is dict
+                        and 'data' in rx_packet_data.key
+                        and type(rx_packet_data.key['data']) is dict
+                        and 'action' in rx_packet_data.key['target']
+                        and 'name' in rx_packet_data.key['target']
+                        and 'title' in rx_packet_data.key['data']
+                        and 'url' in rx_packet_data.key['data']
+                    ):
                         if 'init' == rx_packet_data.key['target']['action']:
                             for basic_conf_models_this_key in basic_conf_models:
                                 basic_conf_models_this = basic_conf_models[basic_conf_models_this_key]
@@ -966,33 +1008,43 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     if model_name not in Proc_Proc_dict:
                                         Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('processing')
             elif rx_packet_data.action == 'call_system_event':
-                if type(rx_packet_data.key) is dict \
-                and 'action' in rx_packet_data.key \
-                and type(rx_packet_data.key['action']) is list:
+                if (
+                    type(rx_packet_data.key) is dict
+                    and 'action' in rx_packet_data.key
+                    and type(rx_packet_data.key['action']) is list
+                ):
                     for event_this in rx_packet_data.key['action']:
-                        if 'event' in basic_conf['system'] \
-                        and event_this in basic_conf['system']['event']:
+                        if (
+                            'event' in basic_conf['system']
+                            and event_this in basic_conf['system']['event']
+                        ):
                             for model_this in basic_conf['system']['event'][event_this]:
                                 main_control.control_queue.put(
                                     main_control.packet('init', model_this),
                                     block=False
                                 )
             elif rx_packet_data.action == 'call_system_stop_type_event':
-                if type(rx_packet_data.key) is dict \
-                and 'action' in rx_packet_data.key \
-                and type(rx_packet_data.key['action']) is list:
+                if (
+                    type(rx_packet_data.key) is dict
+                    and 'action' in rx_packet_data.key
+                    and type(rx_packet_data.key['action']) is list
+                ):
                     for event_this in rx_packet_data.key['action']:
-                        if 'type_event' in basic_conf['system'] \
-                        and event_this in basic_conf['system']['type_event']:
+                        if (
+                            'type_event' in basic_conf['system']
+                            and event_this in basic_conf['system']['type_event']
+                        ):
                             for model_this in basic_conf['system']['type_event'][event_this]:
                                 main_control.control_queue.put(
                                     main_control.packet('stop_type', model_this),
                                     block=False
                                 )
             elif rx_packet_data.action == 'call_account_update':
-                if type(rx_packet_data.key) is dict \
-                and 'data' in rx_packet_data.key \
-                and type(rx_packet_data.key['data']) is dict:
+                if (
+                    type(rx_packet_data.key) is dict
+                    and 'data' in rx_packet_data.key
+                    and type(rx_packet_data.key['data']) is dict
+                ):
                     plugin_bot_info_dict = rx_packet_data.key['data']
                     main_control.control_queue.put(
                         main_control.packet(
@@ -1026,8 +1078,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 list_stop = []
                 for tmp_Proc_name in Proc_Proc_dict:
                     try:
-                        if tmp_Proc_name in Proc_dict \
-                        and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type:
+                        if (
+                            tmp_Proc_name in Proc_dict
+                            and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type
+                        ):
                             Proc_Proc_dict[tmp_Proc_name].terminate()
                             Proc_Proc_dict[tmp_Proc_name].join()
                             list_stop.append(tmp_Proc_name)
@@ -1036,7 +1090,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 ],
                                 modelName
                             ))
-                    except Exception as e:
+                    except Exception:
                         traceback.print_exc()
                 for tmp_Proc_name in list_stop:
                     Proc_dict.pop(tmp_Proc_name)
@@ -1055,7 +1109,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         Proc_Proc_dict.pop(tmp_Proc_name)
                     if tmp_Proc_name in Proc_dict:
                         Proc_dict.pop(tmp_Proc_name)
-                except Exception as e:
+                except Exception:
                     traceback.print_exc()
             elif rx_packet_data.action == 'exit_total':
                 killMain()
@@ -1081,6 +1135,7 @@ def get_patch_config(basic_conf: dict, patch_conf: dict):
             patch_config_by_path(basic_conf, patch_conf, ['models', i])
     return res
 
+
 def patch_config_by_path(basic_conf: dict, patch_conf: dict, path: list):
     basic_conf_this = basic_conf
     patch_conf_this = patch_conf
@@ -1091,19 +1146,24 @@ def patch_config_by_path(basic_conf: dict, patch_conf: dict, path: list):
             basic_conf_this = basic_conf_this[path[idx]]
             patch_conf_this = patch_conf_this[path[idx]]
         conf_key = path[-1]
-        if conf_key in basic_conf_this \
-        and conf_key in patch_conf_this:
+        if (
+            conf_key in basic_conf_this
+            and conf_key in patch_conf_this
+        ):
             flag_same_type = False
             if type(basic_conf_this[conf_key]) is type(patch_conf_this[conf_key]):
                 flag_same_type = True
-            elif type(basic_conf_this[conf_key]) in (int, float) \
-            and type(patch_conf_this[conf_key]) in (int, float):
+            elif (
+                type(basic_conf_this[conf_key]) in (int, float)
+                and type(patch_conf_this[conf_key]) in (int, float)
+            ):
                 flag_same_type = True
             if flag_same_type:
                 if type(basic_conf_this[conf_key]) is dict:
                     basic_conf_this[conf_key].update(patch_conf_this[conf_key])
                 else:
                     basic_conf_this[conf_key] = patch_conf_this[conf_key]
+
 
 def update_get_func(
         Proc_dict,
@@ -1123,13 +1183,16 @@ def update_get_func(
                         block=False
                     )
 
+
 # 进程监控
-def bootMonitor(varDict:dict):
+def bootMonitor(varDict: dict):
     global gMonitorReg
     try:
         gMonitorReg.setdefault('Proc_dict', {'keys': []})
-        if 'Proc_dict' in varDict \
-        and type(varDict['Proc_dict']) is dict:
+        if (
+            'Proc_dict' in varDict
+            and type(varDict['Proc_dict']) is dict
+        ):
             flagNeedRefresh = False
             for Proc_name in gMonitorReg['Proc_dict']['keys']:
                 if Proc_name not in varDict['Proc_dict']:
@@ -1149,17 +1212,20 @@ def bootMonitor(varDict:dict):
                     ))
             if flagNeedRefresh:
                 gMonitorReg['Proc_dict']['keys'] = copy.deepcopy(list(varDict['Proc_dict'].keys()))
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
+
 
 # 进程管理
 def killByPid(pid):
     parent = psutil.Process(pid)
     kill_process_and_its_children(parent)
 
+
 def killMain():
     parent = psutil.Process(os.getpid())
     kill_process_and_its_children(parent)
+
 
 def kill_process(p):
     try:
@@ -1189,6 +1255,7 @@ def kill_process_children(p):
             else:
                 kill_process(child)
 
+
 # 日志工具
 def log(logger_proc, log_level, log_message, log_segment=None):
     if log_segment is None:
@@ -1196,8 +1263,9 @@ def log(logger_proc, log_level, log_message, log_segment=None):
     try:
         if logger_proc is not None:
             logger_proc.log(log_level, log_message, log_segment)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
+
 
 def logG(log_level, log_message, log_segment=None):
     global gLoggerProc
@@ -1208,17 +1276,20 @@ def logG(log_level, log_message, log_segment=None):
         log_segment=log_segment
     )
 
+
 # 启动画面的操作
 def setSplashClose():
     if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
         import pyi_splash
         pyi_splash.close()
 
-def setSplashText(msg:str):
+
+def setSplashText(msg: str):
     if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
         import pyi_splash
         pyi_splash.update_text(msg)
 
-def preLoadPrint(msg:str):
+
+def preLoadPrint(msg: str):
     print(msg)
-    #setSplashText(text)
+    # setSplashText(text)
