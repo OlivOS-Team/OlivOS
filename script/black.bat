@@ -1,3 +1,3 @@
 cd ..\
-python -m black . -l 128 --extend-exclude .\\OlivOS\\thirdPartyModule
+python -m black . -l 120 --skip-string-normalization --extend-exclude .\\OlivOS\\thirdPartyModule
 cd .\script
