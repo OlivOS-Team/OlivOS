@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,15 +10,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import multiprocessing
 import platform
 import threading
 import time
-import datetime
 import sys
 import importlib
 import os
@@ -36,6 +34,7 @@ modelName = 'pluginAPI'
 
 gProc = None
 
+
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -45,7 +44,7 @@ def removeDir(dir_path):
     try:
         if os.path.exists(dir_path):
             shutil.rmtree(dir_path)
-    except:
+    except Exception:
         pass
 
 
@@ -130,7 +129,9 @@ class shallow(OlivOS.API.Proc_templet):
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
-        self.database = OlivOS.userModule.UserConfDB.DataBaseAPI(self.log, max_thread=None, timeout=self.Proc_info.dead_interval)
+        self.database = (
+            OlivOS.userModule.UserConfDB.DataBaseAPI(self.log, max_thread=None, timeout=self.Proc_info.dead_interval)
+        )
         self.load_plugin_list()
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
@@ -143,9 +144,9 @@ class shallow(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     continue
-                if type(rx_packet_data) == OlivOS.API.Control.packet:
+                if type(rx_packet_data) is OlivOS.API.Control.packet:
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
@@ -179,10 +180,12 @@ class shallow(OlivOS.API.Proc_templet):
     def on_control_rx(self, packet):
         if type(packet) is OlivOS.API.Control.packet:
             if 'send' == packet.action:
-                if type(packet.key) is dict \
-                and 'data' in packet.key \
-                and type(packet.key['data']) \
-                and 'action' in packet.key['data']:
+                if (
+                    type(packet.key) is dict
+                    and 'data' in packet.key
+                    and type(packet.key['data'])
+                    and 'action' in packet.key['data']
+                ):
                     if 'account_update' == packet.key['data']['action']:
                         self.set_restart()
 
@@ -211,7 +214,7 @@ class shallow(OlivOS.API.Proc_templet):
         return self.Proc_data['main_tk']
 
     def run_plugin(self, sdk_event):
-        #plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
+        # plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
         plugin_event = OlivOS.API.Event(sdk_event=sdk_event)
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=plugin_event.base_info['self_id'],
@@ -268,7 +271,9 @@ class shallow(OlivOS.API.Proc_templet):
                     plugin_event.plugin_info['namespace'] = self.plugin_models_dict[plugin_models_index_this][
                         'namespace']
                     if 'compatible_svn' in self.plugin_models_dict[plugin_models_index_this]:
-                        plugin_event.plugin_info['compatible_svn'] = self.plugin_models_dict[plugin_models_index_this]['compatible_svn']
+                        plugin_event.plugin_info['compatible_svn'] = (
+                            self.plugin_models_dict[plugin_models_index_this]['compatible_svn']
+                        )
                     else:
                         plugin_event.plugin_info['compatible_svn'] = OlivOS.infoAPI.OlivOS_compatible_svn_default
                     if 'message_mode' in self.plugin_models_dict[plugin_models_index_this]:
@@ -343,7 +348,7 @@ class shallow(OlivOS.API.Proc_templet):
             except Exception as e:
                 # traceback.print_exc()
                 self.log(4, OlivOS.L10NAPI.getTrans(
-                        'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
+                    'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
                         plugin_name,
                         plugin_event.plugin_info['func_type'],
                         str(e),
@@ -361,7 +366,7 @@ class shallow(OlivOS.API.Proc_templet):
                 new_list.append(plugin_models_index_this)
             else:
                 self.log(4, OlivOS.L10NAPI.getTrans(
-                        'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}', [
+                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}', [
                         plugin_models_index_this,
                         self.Proc_name,
                         'namespace failed'
@@ -383,8 +388,10 @@ class shallow(OlivOS.API.Proc_templet):
             './plugin/tmp/%s/data' % plugin_models_index_this
         ]
         for dataPathFrom in dataPathFromList:
-            if os.path.exists(dataPathFrom) \
-            and os.path.isdir(dataPathFrom):
+            if (
+                os.path.exists(dataPathFrom)
+                and os.path.isdir(dataPathFrom)
+            ):
                 try:
                     removeDir(dataPath)
                     shutil.copytree(dataPathFrom, dataPath)
@@ -452,7 +459,7 @@ class shallow(OlivOS.API.Proc_templet):
                 tmp_plugin_list_this = None
                 if plugin_models_this['menu_config'] is not None:
                     plugin_models_this_menu = plugin_models_this['menu_config']
-                    if type(plugin_models_this_menu) == list:
+                    if type(plugin_models_this_menu) is list:
                         if len(plugin_models_this_menu) > 0:
                             tmp_plugin_list_this = []
                             for plugin_models_this_menu_this in plugin_models_this_menu:
@@ -520,19 +527,19 @@ class shallow(OlivOS.API.Proc_templet):
     def find_plugins_recursive(self, base_path, current_path='', depth=0, max_depth=10):
         """
         递归查找插件目录
-        base_path: 基础路径 
+        base_path: 基础路径
         current_path: 当前相对路径
         depth: 当前递归深度
         max_depth: 最大递归深度
-        
+
         return 插件路径列表
         """
         if depth > max_depth:
             return []
-        
+
         plugin_list = []
         full_path = os.path.join(base_path, current_path) if current_path else base_path
-        
+
         try:
             items = os.listdir(full_path)
         except Exception as e:
@@ -627,7 +634,7 @@ class shallow(OlivOS.API.Proc_templet):
                                 app_json_path = os.path.join(plugin_path, plugin_dir_this, 'app.json')
                                 with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
                                     plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
-                        except:
+                        except Exception:
                             traceback.print_exc()
                             plugin_models_app_conf = None
                         plugin_models_dict_this = {}
@@ -638,14 +645,18 @@ class shallow(OlivOS.API.Proc_templet):
                             # 获取插件的模块名
                             plugin_module_name = os.path.basename(plugin_dir_this.rstrip(os.sep).rstrip('/'))
                             # 获取插件所在的文件夹路径
-                            plugin_folder_path = os.path.dirname(plugin_dir_this) if os.sep in plugin_dir_this or '/' in plugin_dir_this else ''
-                            
+                            plugin_folder_path = (
+                                os.path.dirname(plugin_dir_this)
+                                if os.sep in plugin_dir_this or '/' in plugin_dir_this
+                                else ''
+                            )
+
                             # 优先使用 app.json 中定义的 namespace,如果没有则使用插件模块名
                             if 'namespace' in plugin_models_app_conf:
                                 plugin_namespace = plugin_models_app_conf['namespace']
                             else:
                                 plugin_namespace = plugin_module_name
-                            
+
                             plugin_models_dict_this = {
                                 'appconf': plugin_models_app_conf,
                                 'priority': plugin_models_app_conf['priority'],
@@ -763,11 +774,15 @@ class shallow(OlivOS.API.Proc_templet):
                 # 从这里开始导入实际模块
                 plugin_models_dict_this = plugin_models_dict[plugin_models_dict_this_key]['data']
                 plugin_namespace = plugin_models_dict_this_key  # 这是 namespace
-                plugin_dir_this = plugin_models_dict[plugin_models_dict_this_key].get('plugin_dir', plugin_namespace)  # 这是实际目录路径
+                plugin_dir_this = (
+                    plugin_models_dict[plugin_models_dict_this_key].get('plugin_dir', plugin_namespace)  # 这是实际目录路径
+                )
                 flag_is_opk = plugin_models_dict[plugin_models_dict_this_key]['isOPK']
                 # 处理子目录中的插件
                 # 获取插件的模块名
-                plugin_module_name = plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
+                plugin_module_name = (
+                    plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
+                )
                 # 获取插件所在的父目录
                 plugin_folder_path = plugin_models_dict_this.get('folder_path', '')
                 if plugin_folder_path:
@@ -779,7 +794,7 @@ class shallow(OlivOS.API.Proc_templet):
                     # 添加到 sys.path (如果还没有添加)
                     if plugin_parent_full_path not in sys.path:
                         sys.path.insert(0, plugin_parent_full_path)
-                
+
                 plugin_models_tmp = importlib.import_module(plugin_module_name)
                 plugin_models_dict_this['model'] = plugin_models_tmp
                 if hasattr(plugin_models_tmp, 'main'):

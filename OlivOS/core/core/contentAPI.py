@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,16 +10,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 import OlivOS
 
-from enum import Enum
 import time
 import os
-import sys
 
 
 class api_result_error_template(object):
@@ -209,7 +207,6 @@ class api_result_data_template(object):
                 }
             )
 
-
     class get_group_file_system_info(dict):
         def __init__(self):
             self['active'] = False
@@ -295,11 +292,17 @@ def get_Event_from_fake_SDK(target_event):
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if target_event.platform['platform'] in OlivOS.messageAPI.dictMessageType:
         if target_event.platform['sdk'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']]:
-            if target_event.platform['model'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][
-                target_event.platform['sdk']]:
-                target_event.plugin_info['message_mode_rx'] = \
-                    OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']][
-                        target_event.platform['model']]
+            if target_event.platform['model'] in (
+                OlivOS.messageAPI.dictMessageType
+                [target_event.platform['platform']]
+                [target_event.platform['sdk']]
+            ):
+                target_event.plugin_info['message_mode_rx'] = (
+                        OlivOS.messageAPI.dictMessageType
+                        [target_event.platform['platform']]
+                        [target_event.platform['sdk']]
+                        [target_event.platform['model']]
+                    )
     target_event.plugin_info['name'] = target_event.sdk_event.fakename
     if True:
         if target_event.sdk_event.data['type'] == 'fake_event':
@@ -319,13 +322,13 @@ class fake_sdk_event(object):
         tmp_data = {
             'type': 'fake_event'
         }
-        if type(data) == dict:
+        if type(data) is dict:
             tmp_data.update(data)
         self.raw = self.event_dump(data)
         self.data = tmp_data
         self.platform = {}
         self.platform.update(tmp_platform)
-        if type(platform) == dict:
+        if type(platform) is dict:
             self.platform.update(platform)
         self.active = False
         self.bot_info = bot_info
@@ -340,12 +343,13 @@ class fake_sdk_event(object):
     def event_dump(self, raw):
         try:
             res = str(raw)
-        except:
+        except Exception:
             res = None
         return res
 
+
 # 通过路径转换与拼接将提供的路径重定向至指定目录
-def resourcePathTransform(ftype:str, path:str):
+def resourcePathTransform(ftype: str, path: str):
     releaseDir('data')
     releaseDir(os.path.join('data', ftype))
     exePath = os.path.realpath('.')
@@ -360,6 +364,7 @@ def resourcePathTransform(ftype:str, path:str):
             os.path.relpath(os.path.realpath(path), exePath)
         )
     return res
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):

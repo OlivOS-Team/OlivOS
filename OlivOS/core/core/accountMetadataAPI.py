@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -8,13 +8,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 @File      :   OlivOS/accountAPI.py
 @Author    :   MetaLeo元理
-@Contact   :   
+@Contact   :
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
-
-import OlivOS
 
 accountTypeList = [
     'QQ/NapCat/默认',
@@ -232,7 +230,7 @@ accountTypeDataList_platform_sdk_model = {
             'walleq_hide',
             'walleq_show',
             'walleq_show_Android_Phone',
-            #'walleq_show_Android_Pad',
+            # 'walleq_show_Android_Pad',
             'walleq_show_Android_Watch',
             'walleq_show_iPad',
             'walleq_show_iMac',
@@ -242,7 +240,7 @@ accountTypeDataList_platform_sdk_model = {
             'opqbot_port',
             'opqbot_port_old',
             'napcat',
-            #'napcat_hide',
+            # 'napcat_hide',
             'napcat_show',
             'napcat_show_new',
             'napcat_show_old',

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,12 +10,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 import ctypes
-import multiprocessing
 import platform
 import time
 import datetime
@@ -119,14 +118,14 @@ class logger(OlivOS.API.Proc_templet):
                 '-invisiable': 28
             },
             'color_win': {
-                'BLACK': 0,  # None
-                'BLUE': 1 << 0,  # B
-                'GREEN': 1 << 1,  # G
-                'RED': 1 << 2,  # R
-                'YELLOW': 1 << 1 | 1 << 2,  # G + R
-                'MAGENTA': 1 << 0 | 1 << 2,  # B + R
-                'CYAN': 1 << 0 | 1 << 1,  # B + G
-                'WHITE': 1 << 0 | 1 << 1 | 1 << 2  # G + B + R
+                'BLACK': 0,                         # None
+                'BLUE': 1 << 0,                     # B
+                'GREEN': 1 << 1,                    # G
+                'RED': 1 << 2,                      # R
+                'YELLOW': 1 << 1 | 1 << 2,          # G + R
+                'MAGENTA': 1 << 0 | 1 << 2,         # B + R
+                'CYAN': 1 << 0 | 1 << 1,            # B + G
+                'WHITE': 1 << 0 | 1 << 1 | 1 << 2   # G + B + R
             },
             'type_win': {
                 'front': 0,
@@ -189,7 +188,7 @@ class logger(OlivOS.API.Proc_templet):
         releaseDir(logfile_dir)
         self.log_output_shader_init()
         self.log(2, OlivOS.L10NAPI.getTrans('Welcome to OlivOS {0}', [OlivOS.infoAPI.OlivOS_Version_Short], modelName))
-        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding='utf-8') as logfile_f:
+        with open('%s/%s' % (logfile_dir, logfile_file_unity), 'w', encoding='utf-8'):
             pass
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS diagnose logger [{0}] is running', [self.Proc_name], modelName))
         flag_need_refresh = False
@@ -204,7 +203,7 @@ class logger(OlivOS.API.Proc_templet):
             else:
                 try:
                     packet_this = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     continue
                 self.log_output(packet_this, flag_need_refresh)
             if flag_need_refresh:
@@ -216,9 +215,11 @@ class logger(OlivOS.API.Proc_templet):
         if log_segment is None:
             log_segment = []
         try:
-            self.Proc_config['logger_queue'].put(self.log_packet(log_level, log_message, time.time(), log_segment),
-                                                 block=False)
-        except:
+            self.Proc_config['logger_queue'].put(
+                self.log_packet(log_level, log_message, time.time(), log_segment),
+                block=False
+            )
+        except Exception:
             pass
 
     def save_logfile(self):
@@ -228,12 +229,12 @@ class logger(OlivOS.API.Proc_templet):
             with open('%s/%s' % (logfile_dir, file_name), 'a+', encoding='utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
-                except:
+                except Exception:
                     pass
             with open('%s/%s' % (logfile_dir, file_name_unity), 'a+', encoding='utf-8') as logfile_f:
                 try:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
-                except:
+                except Exception:
                     pass
             self.Proc_data['data_tmp']['logfile'] = ''
 
@@ -246,27 +247,27 @@ class logger(OlivOS.API.Proc_templet):
             keylist = [self.Proc_config['color_dict']['shader']['default']]
         for keylist_this in keylist:
             keylist_new_this = None
-            if type(keylist_this) == list:
+            if type(keylist_this) is list:
                 keylist_new_this = ''
                 for keylist_this_this in keylist_this:
                     keylist_new_this += str(keylist_this_this)
-            elif type(keylist_this) == int:
+            elif type(keylist_this) is int:
                 keylist_new_this = str(keylist_this)
-            elif type(keylist_this) == str:
+            elif type(keylist_this) is str:
                 keylist_new_this = keylist_this
             if keylist_new_this == '':
                 keylist_new_this = None
             if keylist_new_this is not None:
-                if type(keylist_new_this) == str:
+                if type(keylist_new_this) is str:
                     keylist_new.append(keylist_new_this)
         keylist_str = '\033[%sm' % (';'.join(keylist_new),)
         return keylist_str
 
     def log_output_shader_init(self):
         tmp_logger_mode_list = []
-        if type(self.Proc_config['logger_mode']) == str:
+        if type(self.Proc_config['logger_mode']) is str:
             tmp_logger_mode_list = [self.Proc_config['logger_mode']]
-        elif type(self.Proc_config['logger_mode']) == list:
+        elif type(self.Proc_config['logger_mode']) is list:
             tmp_logger_mode_list = self.Proc_config['logger_mode']
         if 'console_color' in tmp_logger_mode_list and platform.system() == 'Windows':
             self.Proc_data['extend_data']['std_out_handle'] = ctypes.windll.kernel32.GetStdHandle(
@@ -293,20 +294,20 @@ class logger(OlivOS.API.Proc_templet):
             if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['front']:
                 tmp_color = self.Proc_config['color_dict']['mapping']['front'][log_packet_this['log_level']]
             if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['background']:
-                tmp_color_bak = self.Proc_config['color_dict']['mapping']['background'][log_packet_this['log_level']]
+                tmp_color_bak = (  # noqa: F841
+                    self.Proc_config['color_dict']['mapping']['background'][log_packet_this['log_level']]
+                )
             if log_packet_this['log_level'] in self.Proc_config['color_dict']['mapping']['shader']:
                 tmp_shader = self.Proc_config['color_dict']['mapping']['shader'][log_packet_this['log_level']]
         if platform.system() == 'Windows':
             if flag_have_color and self.Proc_data['extend_data']['std_out_handle'] is not None:
                 ctypes.windll.kernel32.SetConsoleTextAttribute(
                     self.Proc_data['extend_data']['std_out_handle'],
-                    self.Proc_config['color_dict']['shader_win'][
-                        tmp_shader
-                    ] | self.Proc_config['color_dict']['color_win'][
-                        tmp_color
-                    ] << self.Proc_config['color_dict']['type_win'][
-                        'front'
-                    ]
+                    (
+                        self.Proc_config['color_dict']['shader_win'][tmp_shader]
+                        | self.Proc_config['color_dict']['color_win'][tmp_color]
+                        << self.Proc_config['color_dict']['type_win']['front']
+                    )
                 )
             print(log_output_str)
             ctypes.windll.kernel32.SetConsoleTextAttribute(
@@ -345,9 +346,9 @@ class logger(OlivOS.API.Proc_templet):
             if self.Proc_data['logfile_count'] <= 0 or flag_need_refresh_out:
                 self.Proc_data['logfile_count'] = self.Proc_config['logfile_count']
                 flag_need_refresh = True
-            if type(self.Proc_config['logger_mode']) == str:
+            if type(self.Proc_config['logger_mode']) is str:
                 tmp_logger_mode_list = [self.Proc_config['logger_mode']]
-            elif type(self.Proc_config['logger_mode']) == list:
+            elif type(self.Proc_config['logger_mode']) is list:
                 tmp_logger_mode_list = self.Proc_config['logger_mode']
             for tmp_logger_mode_list_this in tmp_logger_mode_list:
                 if tmp_logger_mode_list_this in [
@@ -370,21 +371,25 @@ class logger(OlivOS.API.Proc_templet):
                         self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
                         if flag_need_refresh:
                             self.save_logfile()
-        if type(self.Proc_config['logger_mode']) == list and 'native' in self.Proc_config['logger_mode']:
-            self.__sendControlEventSend('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'logger',
-                    'event': 'log',
+        if (
+            type(self.Proc_config['logger_mode']) is list
+            and 'native' in self.Proc_config['logger_mode']
+        ):
+            self.__sendControlEventSend(
+                'send', {
+                    'target': {
+                        'type': 'nativeWinUI'
+                    },
                     'data': {
-                        'data': log_packet_this,
-                        'str': self.__get_log_message(log_packet_this)
+                        'action': 'logger',
+                        'event': 'log',
+                        'data': {
+                            'data': log_packet_this,
+                            'str': self.__get_log_message(log_packet_this)
+                        }
                     }
                 }
-            }
-                                        )
+            )
 
     def __get_log_message(self, log_packet_this):
         log_output_str_1 = ''

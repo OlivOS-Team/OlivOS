@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,14 +10,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
 import json
 import re
 
-import OlivOS
 import traceback
 
 # platform sdk model
@@ -170,7 +169,7 @@ class Message_templet(object):
         self.data_raw = data_raw
         try:
             self.init_data()
-        except:
+        except Exception:
             self.active = False
             self.data = []
 
@@ -266,7 +265,7 @@ class Message_templet(object):
 
     def init_from_olivos_para(self):
         tmp_data = []
-        if type(self.data_raw) == list:
+        if type(self.data_raw) is list:
             for data_raw_this in self.data_raw:
                 if data_raw_this.__class__.__base__ == PARA_templet:
                     tmp_data.append(data_raw_this)
@@ -276,19 +275,25 @@ class Message_templet(object):
 
     def init_from_obv12_para(self):
         tmp_data = []
-        if type(self.data_raw) == list:
+        if type(self.data_raw) is list:
             for data_raw_this in self.data_raw:
-                if type(data_raw_this) is dict \
-                and 'type' in data_raw_this \
-                and 'data' in data_raw_this \
-                and type(data_raw_this['data']) is dict:
-                    if 'text' == data_raw_this['type'] \
-                    and 'text' in data_raw_this['data']:
+                if (
+                    type(data_raw_this) is dict
+                    and 'type' in data_raw_this
+                    and 'data' in data_raw_this
+                    and type(data_raw_this['data']) is dict
+                ):
+                    if (
+                        'text' == data_raw_this['type']
+                        and 'text' in data_raw_this['data']
+                    ):
                         tmp_data.append(
                             PARA.text(data_raw_this['data']['text'])
                         )
-                    elif 'mention' == data_raw_this['type'] \
-                    and 'user_id' in data_raw_this['data']:
+                    elif (
+                        'mention' == data_raw_this['type']
+                        and 'user_id' in data_raw_this['data']
+                    ):
                         tmp_data.append(
                             PARA.at(str(data_raw_this['data']['user_id']))
                         )
@@ -296,32 +301,44 @@ class Message_templet(object):
                         tmp_data.append(
                             PARA.at('all')
                         )
-                    elif 'image' == data_raw_this['type'] \
-                    and 'file_id' in data_raw_this['data']:
+                    elif (
+                        'image' == data_raw_this['type']
+                        and 'file_id' in data_raw_this['data']
+                    ):
                         tmp_this = PARA.image(data_raw_this['data']['file_id'])
                         if 'url' in data_raw_this['data']:
                             tmp_this.data['url'] = data_raw_this['data']['url']
-                        if 'flush' in data_raw_this['data'] \
-                        and True is data_raw_this['data']['flush']:
+                        if (
+                            'flush' in data_raw_this['data']
+                            and True is data_raw_this['data']['flush']
+                        ):
                             tmp_this.data['type'] = 'flush'
                         tmp_data.append(tmp_this)
-                    elif 'voice' == data_raw_this['type'] \
-                    and 'file_id' in data_raw_this['data']:
+                    elif (
+                        'voice' == data_raw_this['type']
+                        and 'file_id' in data_raw_this['data']
+                    ):
                         tmp_this = PARA.record(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
-                    elif 'audio' == data_raw_this['type'] \
-                    and 'file_id' in data_raw_this['data']:
+                    elif (
+                        'audio' == data_raw_this['type']
+                        and 'file_id' in data_raw_this['data']
+                    ):
                         tmp_this = PARA.record(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
-                    elif 'video' == data_raw_this['type'] \
-                    and 'file_id' in data_raw_this['data']:
+                    elif (
+                        'video' == data_raw_this['type']
+                        and 'file_id' in data_raw_this['data']
+                    ):
                         tmp_this = PARA.video(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
-                    elif 'location' == data_raw_this['type'] \
-                    and 'latitude' in data_raw_this['data'] \
-                    and 'longitude' in data_raw_this['data'] \
-                    and 'title' in data_raw_this['data'] \
-                    and 'content' in data_raw_this['data']:
+                    elif (
+                        'location' == data_raw_this['type']
+                        and 'latitude' in data_raw_this['data']
+                        and 'longitude' in data_raw_this['data']
+                        and 'title' in data_raw_this['data']
+                        and 'content' in data_raw_this['data']
+                    ):
                         tmp_this = PARA.location(
                             lat=data_raw_this['data']['latitude'],
                             lon=data_raw_this['data']['longitude'],
@@ -329,21 +346,29 @@ class Message_templet(object):
                             content=data_raw_this['data']['content']
                         )
                         tmp_data.append(tmp_this)
-                    elif 'face' == data_raw_this['type'] \
-                    and 'id' in data_raw_this['data']:
+                    elif (
+                        'face' == data_raw_this['type']
+                        and 'id' in data_raw_this['data']
+                    ):
                         tmp_data.append(PARA.face(data_raw_this['data']['id']))
                     elif 'dice' == data_raw_this['type']:
                         tmp_data.append(PARA.dice())
                     elif 'rps' == data_raw_this['type']:
                         tmp_data.append(PARA.rps())
-                    elif 'reply' == data_raw_this['type'] \
-                    and 'message_id' in data_raw_this['data']:
+                    elif (
+                        'reply' == data_raw_this['type']
+                        and 'message_id' in data_raw_this['data']
+                    ):
                         tmp_data.append(PARA.reply(str(data_raw_this['data']['message_id'])))
-                    elif 'json' == data_raw_this['type'] \
-                    and 'data' in data_raw_this['data']:
+                    elif (
+                        'json' == data_raw_this['type']
+                        and 'data' in data_raw_this['data']
+                    ):
                         tmp_data.append(PARA.json(data_raw_this['data']['data']))
-                    elif 'xml' == data_raw_this['type'] \
-                    and 'data' in data_raw_this['data']:
+                    elif (
+                        'xml' == data_raw_this['type']
+                        and 'data' in data_raw_this['data']
+                    ):
                         tmp_data.append(PARA.xml(data_raw_this['data']['data']))
             self.data = tmp_data
         else:
@@ -622,8 +647,10 @@ class PARA_templet(object):
             if type(self) is PARA.text:
                 paraType = 'text'
                 paraData['text'] = str(self.data['text'])
-            elif type(self) is PARA.at \
-            and self.data['id'] == 'all':
+            elif (
+                type(self) is PARA.at
+                and self.data['id'] == 'all'
+            ):
                 paraType = 'mention_all'
             elif type(self) is PARA.at:
                 paraType = 'mention'
@@ -661,7 +688,7 @@ class PARA_templet(object):
             elif type(self) is PARA.xml:
                 paraType = 'xml'
                 paraData['data'] = self.data['data']
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             paraType = None
         if paraType is None:
@@ -675,13 +702,13 @@ class PARA_templet(object):
 
     def kaiheila(self):
         code_tmp = '${'
-        if type(self) == PARA.at:
+        if type(self) is PARA.at:
             if self.data is not None:
                 for key_this in self.data:
                     if self.data[key_this] is not None:
                         code_tmp += '@'
                         code_tmp += '#' + str(self.data[key_this])
-        elif type(self) == PARA.text:
+        elif type(self) is PARA.text:
             if self.data is not None:
                 if type(self.data['text']) is str:
                     return self.data['text']
@@ -694,13 +721,13 @@ class PARA_templet(object):
 
     def fanbook(self):
         code_tmp = '${'
-        if type(self) == PARA.at:
+        if type(self) is PARA.at:
             if self.data is not None:
                 for key_this in self.data:
                     if self.data[key_this] is not None:
                         code_tmp += '@'
                         code_tmp += '!' + str(self.data[key_this])
-        elif type(self) == PARA.text:
+        elif type(self) is PARA.text:
             if self.data is not None:
                 if type(self.data['text']) is str:
                     return self.data['text']
@@ -713,13 +740,13 @@ class PARA_templet(object):
 
     def dodo(self):
         code_tmp = '<'
-        if type(self) == PARA.at:
+        if type(self) is PARA.at:
             if self.data is not None:
                 for key_this in self.data:
                     if self.data[key_this] is not None:
                         code_tmp += '@'
                         code_tmp += '!' + str(self.data[key_this])
-        elif type(self) == PARA.text:
+        elif type(self) is PARA.text:
             if self.data is not None:
                 if type(self.data['text']) is str:
                     return self.data['text']
@@ -731,11 +758,11 @@ class PARA_templet(object):
         return code_tmp
 
     def xiaoheihe(self):
-        if type(self) == PARA.at:
+        if type(self) is PARA.at:
             if self.data is not None and 'id' in self.data and self.data['id'] is not None:
                 return f"@{{id:{self.data['id']}}}"
             return ''
-        elif type(self) == PARA.text:
+        elif type(self) is PARA.text:
             if self.data is not None:
                 if type(self.data['text']) is str:
                     return self.data['text']

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,15 +10,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
-import OlivOS
-
 
 def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res='N/A'):
-    global globalMetaTableTemp
     tmp_res = default_res
     tmp_src = tmp_res
     tmp_globalMetaTableTemp = globalMetaTableTemp.copy()
@@ -27,7 +24,7 @@ def getTextByMetaTableFormat(src_table, fwd_key, format_patch, default_res='N/A'
         tmp_globalMetaTableTemp.update(format_patch)
         try:
             tmp_res = tmp_src.format(**tmp_globalMetaTableTemp)
-        except:
+        except Exception:
             tmp_res = default_res
     return tmp_res
 
@@ -37,7 +34,7 @@ def getPairMapping(pair_list=None):
         pair_list = []
     tmp_res = {}
     for pair_list_this in pair_list:
-        if type(pair_list_this) == list:
+        if type(pair_list_this) is list:
             if len(pair_list_this) == 2:
                 tmp_res[pair_list_this[0]] = str(pair_list_this[1])
             else:
@@ -75,11 +72,19 @@ globalMetaTable = {
     'event_group_message_sent_log': 'Host({host_id}) Group({group_id}) User[{nickname}]({user_id}) : {message}',
     'event_group_file_upload_log': 'Group({group_id}) User({user_id}) : {name}',
     'event_group_admin_log': 'Group({group_id}) User({user_id}) Action({action})',
-    'event_group_member_decrease_log': 'Host({host_id}) Group({group_id}) User({user_id}) <- Operator({operator_id}) Action({action})',
-    'event_group_member_increase_log': 'Host({host_id}) Group({group_id}) User({user_id}) <- Operator({operator_id}) Action({action})',
-    'event_group_ban_log': 'Group({group_id}) User({user_id}) <- Operator({operator_id}) Duration({duration}) Action({action})',
+    'event_group_member_decrease_log': (
+        'Host({host_id}) Group({group_id}) User({user_id}) <- Operator({operator_id}) Action({action})'
+    ),
+    'event_group_member_increase_log': (
+        'Host({host_id}) Group({group_id}) User({user_id}) <- Operator({operator_id}) Action({action})'
+    ),
+    'event_group_ban_log': (
+        'Group({group_id}) User({user_id}) <- Operator({operator_id}) Duration({duration}) Action({action})'
+    ),
     'event_friend_add_log': 'User({user_id})',
-    'event_group_message_recall_log': 'Group({group_id}) User({user_id}) <- Operator({operator_id}) Message_id({message_id})',
+    'event_group_message_recall_log': (
+        'Group({group_id}) User({user_id}) <- Operator({operator_id}) Message_id({message_id})'
+    ),
     'event_private_message_recall_log': 'User({user_id}) Message_id({message_id})',
     'event_poke_log': 'Group({group_id}) User({user_id}) -> Target({target_id})',
     'event_group_lucky_king_log': 'Group({group_id}) User({user_id}) -> Target({target_id})',
