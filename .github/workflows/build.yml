@@ -175,11 +175,11 @@ jobs:
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         set OLIVOS_DEBUG=1
-        pyinstaller ./main_debug.spec
+        pyinstaller ./OlivOS.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-Win
-        cp ./dist/main.exe ./OlivOS-win/OlivOS_debug.exe
+        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS_debug.exe
     - name: Upload Artifact OlivOS
       uses: actions/upload-artifact@v4
       with:
