@@ -1,4 +1,5 @@
-# -*- mode: python ; coding: utf-8 -*-
+# -*- coding: utf-8 -*-
+# -*- mode: python -*-
 
 import sys
 import argparse
@@ -94,10 +95,12 @@ else:
 exe = EXE(**exe_params)
 
 # 打印构建信息
-print("构建配置信息:")
-print(f"  平台: {sys.platform}")
-print(f"  调试模式: {'是' if args.debug_mode else '否'}")
-print(f"  启动画面: {'启用' if splash else '禁用'}")
-print(f"  UPX压缩: {'启用' if not args.no_upx else '禁用'}")
-print(f"  输出名称: {args.name}")
-print(f"  控制台: {'显示' if exe_params['console'] else '隐藏'}")
+# 简单的纯ASCII输出
+print("\n[Build Info]")
+print("Platform:", sys.platform)
+print("Debug:", "ON" if args.debug_mode else "OFF")
+print("Splash:", "ON" if splash else "OFF")
+print("UPX:", "ON" if not args.no_upx else "OFF")
+print("Name:", args.app_name)
+print("Console:", "SHOW" if exe_params['console'] else "HIDE")
+print()
