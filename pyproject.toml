@@ -101,3 +101,10 @@ dev = [
 Homepage = "https://doc.olivos.wiki/"
 Repository = "https://github.com/OlivOS-Team/OlivOS"
 Issues = "https://github.com/OlivOS-Team/OlivOS/issues"
+
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+extend-exclude = '''
+.\\OlivOS\\thirdPartyModule
+'''
