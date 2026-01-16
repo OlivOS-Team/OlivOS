@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,16 +10,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
-
-import OlivOS
 
 import urllib
 import platform
 if platform.system() == 'Windows':
     import winreg
+
 
 def get_system_proxy():
     res = None
@@ -43,7 +42,8 @@ def get_system_proxy():
             res[res_this] = res[res_this].lstrip('%s://' % res_this)
     return res
 
-def get_system_proxy_tuple(proxy_type = 'http'):
+
+def get_system_proxy_tuple(proxy_type='http'):
     res = (None, None, None)
     res_data = get_system_proxy()
     if res_data is not None:
