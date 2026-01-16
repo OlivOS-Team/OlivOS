@@ -39,9 +39,9 @@ pyz = PYZ(
     cipher=block_cipher
 )
 
-# Splash配置（仅Windows非调试模式）
+# Splash配置
 splash = None
-if is_windows and not is_debug:
+if is_windows:
     splash = Splash(
         './resource/intro.jpg',
         binaries=a.binaries,
@@ -65,7 +65,8 @@ exe_params = {
     'strip': False,
     'upx': True,
     'upx_exclude': [],
-    'icon': 'resource/favoricon.ico'
+    'icon': 'resource/favoricon.ico',
+    'onefile': True
 }
 
 # 根据平台和调试模式调整参数
@@ -73,7 +74,7 @@ if splash:
     exe_params['splash'] = splash
     exe_params['splash.binaries'] = splash.binaries
 
-# 控制台设置：调试模式或非Windows平台显示控制台
+# 控制台设置
 exe_params['console'] = is_debug or not is_windows
 
 # 运行时临时目录设置
