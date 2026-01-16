@@ -86,7 +86,7 @@
 全部版本: [![GitHub release](https://img.shields.io/github/release-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases) [![GitHub Release Date](https://img.shields.io/github/release-date-pre/OlivOS-Team/OlivOS.svg)](https://github.com/OlivOS-Team/OlivOS/releases)
 
 ### 源码版本
-请确保你已经安装了Python3以及git，当前我们主要使用`3.7.5`以及`3.11.0`两个版本的Python。  
+请确保你已经安装了 Python3 以及 git，当前我们主要使用`3.11.0`版本的Python，理论上支持`>=3.10.8`版本以及，`3.7.5`作为历史兼容版本。  
 
 + 首先，克隆本项目的源码  
 ```bash
@@ -95,11 +95,11 @@ cd OlivOS
 ```
 + 安装依赖环境
 ```bash
-pip install -r requirements310_pure.txt
+pip install .
 ```
-对于`3.7.5`版本的Python，有单独提供的依赖描述文件
+对于`3.7.5`版本的Python，需要以兼容配置安装依赖
 ```bash
-pip install -r requirements_pure.txt
+pip install .[py37]
 ```
 + 启动环境
 ```
