@@ -154,8 +154,10 @@ class Event(object):
         if type(OlivOS.pluginAPI.gProc) is OlivOS.pluginAPI.shallow:
             self.plugin_info['control_queue'] = OlivOS.pluginAPI.gProc.Proc_info.control_queue
             self.log_func = OlivOS.pluginAPI.gProc.log
-        if self.plugin_info['control_queue'] is None \
-        and type(Proc) is OlivOS.pluginAPI.shallow:
+        if (
+            self.plugin_info['control_queue'] is None
+            and type(Proc) is OlivOS.pluginAPI.shallow
+        ):
             self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
         if type(self.log_func) is None:
             self.log_func = Proc.log
@@ -234,14 +236,16 @@ class Event(object):
                     )
                     # 从at部分移除name
                     for para_this in temp_message_sdk.data:
-                        if type(para_this) == OlivOS.messageAPI.PARA.at:
+                        if type(para_this) is OlivOS.messageAPI.PARA.at:
                             if 'name' in para_this.data:
                                 new_data = para_this.data.copy()
                                 del new_data['name']
                                 para_this.data = new_data
                     # 使用临时副本生成消息
-                    if self.plugin_info['message_mode_tx'] == 'olivos_para' \
-                    or temp_message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                    if (
+                        self.plugin_info['message_mode_tx'] == 'olivos_para'
+                        or temp_message_sdk.mode_rx != self.plugin_info['message_mode_tx']
+                    ):
                         self.data.message = temp_message_sdk.get(self.plugin_info['message_mode_tx'])
                         self.data.raw_message = temp_message_sdk.get(self.plugin_info['message_mode_tx'])
                     else:
@@ -249,8 +253,10 @@ class Event(object):
                         self.data.raw_message = temp_message_sdk.data_raw
                 else:
                     # 如果message_sdk不存在（通常不会发生），使用原始逻辑
-                    if self.plugin_info['message_mode_tx'] == 'olivos_para' \
-                    or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                    if (
+                        self.plugin_info['message_mode_tx'] == 'olivos_para'
+                        or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']
+                    ):
                         self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
                         self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
                     else:
@@ -258,8 +264,10 @@ class Event(object):
                         self.data.raw_message = self.data.raw_message_sdk.data_raw
             else:
                 # 插件版本大于等于OlivOS_SVN_Compatible，保持原始逻辑
-                if self.plugin_info['message_mode_tx'] == 'olivos_para' \
-                or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']:
+                if (
+                    self.plugin_info['message_mode_tx'] == 'olivos_para'
+                    or self.data.message_sdk.mode_rx != self.plugin_info['message_mode_tx']
+                ):
                     self.data.message = self.data.message_sdk.get(self.plugin_info['message_mode_tx'])
                     self.data.raw_message = self.data.raw_message_sdk.get(self.plugin_info['message_mode_tx'])
                 else:
@@ -482,7 +490,7 @@ class Event(object):
             if flag_lazy:
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
-    
+
     class private_message_sent(object):
         def __init__(self, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
@@ -517,7 +525,7 @@ class Event(object):
                 self.sender['nickname'] = 'Nobody'
                 self.sender['name'] = 'Nobody'
                 self.extend['host_group_id'] = None
-    
+
     class group_message_sent(object):
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
@@ -660,10 +668,10 @@ class Event(object):
                 if flag_log and event_obj is not None:
                     if warppedRes is None:
                         callback_msg = 'done'
-                    elif warppedRes.__class__.__base__ == dict:
+                    elif warppedRes.__class__.__base__ is dict:
                         if 'active' in warppedRes:
                             if warppedRes['active'] is True:
-                                if type(val_list) == list and 'data' in warppedRes:
+                                if type(val_list) is list and 'data' in warppedRes:
                                     callback_msg_list = []
                                     for val_list_this in val_list:
                                         if val_list_this in warppedRes['data']:
@@ -719,12 +727,15 @@ class Event(object):
     def __message_router(self, message):
         tmp_message_obj = None
         tmp_message = None
-        if type(message) == str or type(message) == list:
+        if (
+            type(message) is str
+            or type(message) is list
+        ):
             tmp_message_obj = OlivOS.messageAPI.Message_templet(
                 self.plugin_info['message_mode_tx'],
                 message
             )
-        elif type(message) == OlivOS.messageAPI.Message_templet:
+        elif type(message) is OlivOS.messageAPI.Message_templet:
             tmp_message_obj = message
         else:
             error_note = 'Wrong message type from plugin, please check your plugin first'
@@ -754,8 +765,10 @@ class Event(object):
                     'friend_add_request'
                 ]
         ):
-            if hasattr(self.data, 'extend') \
-            and 'host_group_id' in self.data.extend:
+            if (
+                hasattr(self.data, 'extend')
+                and 'host_group_id' in self.data.extend
+            ):
                 self.__send('private', self.data.user_id, tmp_message, host_id=self.data.extend['host_group_id'],
                             flag_log=False)
             else:
@@ -865,8 +878,10 @@ class Event(object):
         elif self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 if flag_type == 'private':
-                    if 'host_id' in self.data.__dict__ \
-                    and self.data.host_id is not None:
+                    if (
+                        'host_id' in self.data.__dict__
+                        and self.data.host_id is not None
+                    ):
                         # 此处缺少接口
                         pass
                     else:
@@ -878,8 +893,10 @@ class Event(object):
                         OlivOS.onebotV12SDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if flag_type == 'private':
-                    if 'host_id' in self.data.__dict__ \
-                    and self.data.host_id is not None:
+                    if (
+                        'host_id' in self.data.__dict__
+                        and self.data.host_id is not None
+                    ):
                         # 此处缺少接口
                         pass
                     else:
@@ -891,30 +908,52 @@ class Event(object):
                         OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
                 if flag_type == 'private':
-                    OlivOS.qqRedSDK.event_action.send_msg(self, 1, target_id, tmp_message, self.plugin_info['control_queue'])
+                    OlivOS.qqRedSDK.event_action.send_msg(
+                        self, 1, target_id, tmp_message, self.plugin_info['control_queue']
+                    )
                 elif flag_type == 'group':
-                    OlivOS.qqRedSDK.event_action.send_msg(self, 2, target_id, tmp_message, self.plugin_info['control_queue'])
+                    OlivOS.qqRedSDK.event_action.send_msg(
+                        self, 2, target_id, tmp_message, self.plugin_info['control_queue']
+                    )
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 if flag_type == 'private':
-                    OlivOS.OPQBotSDK.event_action.send_msg(self, 'private', target_id, tmp_message, self.plugin_info['control_queue'])
+                    OlivOS.OPQBotSDK.event_action.send_msg(
+                        self, 'private', target_id, tmp_message, self.plugin_info['control_queue']
+                    )
                 elif flag_type == 'group':
-                    OlivOS.OPQBotSDK.event_action.send_msg(self, 'group', target_id, tmp_message, self.plugin_info['control_queue'])
+                    OlivOS.OPQBotSDK.event_action.send_msg(
+                        self, 'group', target_id, tmp_message, self.plugin_info['control_queue']
+                    )
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
-                if hasattr(self.data, 'extend') \
-                and 'reply_msg_id' in self.data.extend:
-                    OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                if (
+                    hasattr(self.data, 'extend')
+                    and 'reply_msg_id' in self.data.extend
+                ):
+                    OlivOS.qqGuildSDK.event_action.send_msg(
+                        self, target_id, tmp_message, self.data.extend['reply_msg_id']
+                    )
                 else:
                     OlivOS.qqGuildSDK.event_action.send_msg(self, target_id, tmp_message)
             elif flag_type == 'private':
-                if hasattr(self.data, 'extend') \
-                and host_id is not None and not flag_log:
-                    OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
-                elif hasattr(self.data, 'extend') \
-                and 'flag_from_direct' in self.data.extend:
-                    if hasattr(self.data, 'extend') \
-                    and self.data.extend['flag_from_direct']:
-                        OlivOS.qqGuildSDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                if (
+                    hasattr(self.data, 'extend')
+                    and host_id is not None and not flag_log
+                ):
+                    OlivOS.qqGuildSDK.event_action.send_msg(
+                        self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                    )
+                elif (
+                    hasattr(self.data, 'extend')
+                    and 'flag_from_direct' in self.data.extend
+                ):
+                    if (
+                        hasattr(self.data, 'extend')
+                        and self.data.extend['flag_from_direct']
+                    ):
+                        OlivOS.qqGuildSDK.event_action.send_msg(
+                            self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                        )
                     else:
                         # 主动私聊待实现
                         pass
@@ -922,19 +961,29 @@ class Event(object):
                     # 主动私聊待实现
                     pass
         elif self.platform['sdk'] == 'qqGuildv2_link':
-            if hasattr(self.data, 'extend') \
-            and self.data.extend.get('flag_from_qq', False):
+            if (
+                hasattr(self.data, 'extend')
+                and self.data.extend.get('flag_from_qq', False)
+            ):
                 if flag_type == 'group':
-                    if hasattr(self.data, 'extend') \
-                    and 'reply_msg_id' in self.data.extend:
-                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                    if (
+                        hasattr(self.data, 'extend')
+                        and 'reply_msg_id' in self.data.extend
+                    ):
+                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
+                        )
                     else:
                         OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
-                    if hasattr(self.data, 'extend') \
-                    and 'flag_from_direct' in self.data.extend:
+                    if (
+                        hasattr(self.data, 'extend')
+                        and 'flag_from_direct' in self.data.extend
+                    ):
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                                self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                            )
                         else:
                             # 主动私聊待实现
                             pass
@@ -943,20 +992,32 @@ class Event(object):
                         pass
             else:
                 if flag_type == 'group':
-                    if hasattr(self.data, 'extend') \
-                    and 'reply_msg_id' in self.data.extend:
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message, self.data.extend['reply_msg_id'])
+                    if (
+                        hasattr(self.data, 'extend')
+                        and 'reply_msg_id' in self.data.extend
+                    ):
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
+                        )
                     else:
                         OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
-                    if hasattr(self.data, 'extend') \
-                    and host_id is not None:
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
-                    elif  hasattr(self.data, 'extend') \
-                    and 'flag_from_direct' in self.data.extend \
-                    and 'reply_msg_id' in self.data.extend:
+                    if (
+                        hasattr(self.data, 'extend')
+                        and host_id is not None
+                    ):
+                        OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                        )
+                    elif (
+                        hasattr(self.data, 'extend')
+                        and 'flag_from_direct' in self.data.extend
+                        and 'reply_msg_id' in self.data.extend
+                    ):
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_msg(self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True)
+                            OlivOS.qqGuildv2SDK.event_action.send_msg(
+                                self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                            )
                         else:
                             # 主动私聊待实现
                             pass
@@ -983,7 +1044,9 @@ class Event(object):
                 if host_id is not None:
                     OlivOS.mhyVilaSDK.event_action.send_group_msg(self, target_id, tmp_message, host_id=host_id)
                 elif 'host_id' in self.data.__dict__:
-                    OlivOS.mhyVilaSDK.event_action.send_group_msg(self, target_id, tmp_message, host_id=self.data.host_id)
+                    OlivOS.mhyVilaSDK.event_action.send_group_msg(
+                        self, target_id, tmp_message, host_id=self.data.host_id
+                    )
             elif flag_type == 'private':
                 pass
         elif self.platform['sdk'] == 'hackChat_link':
@@ -1247,7 +1310,12 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
 
-    def set_doubt_friends_add_request(self, flag: str, approve: bool = True, flag_log: bool = True, remote: bool = False):
+    def set_doubt_friends_add_request(
+        self, flag: str,
+        approve: bool = True,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
         if remote:
             pass
         else:
@@ -1268,22 +1336,6 @@ class Event(object):
             pass
         else:
             return self.__get_group_system_msg(count, flag_log=True)
-
-    @callbackLogger('get_group_notice')
-    def __get_group_notice(self, group_id, flag_log=True):
-        res_data = OlivOS.contentAPI.api_result_data_template.get_group_notice()
-        if self.platform['sdk'] == 'onebot':
-            if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
-                pass
-            elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
-                res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
-        return res_data
-
-    def get_group_notice(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
-        if remote:
-            pass
-        else:
-            return self.__get_group_notice(group_id, flag_log=True)
 
     @callbackLogger('group_poke')
     def __group_poke(self, group_id, user_id, flag_log=True):
@@ -1325,7 +1377,13 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
 
-    def send_group_notice(self, group_id: 'str|int', content: str, image: str = None, flag_log: bool = True, remote: bool = False, **kwargs):
+    def send_group_notice(
+        self, group_id: 'str|int', content: str,
+        image: str = None,
+        flag_log: bool = True,
+        remote: bool = False,
+        **kwargs
+    ):
         if remote:
             pass
         else:
@@ -1596,7 +1654,9 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
-                    OlivOS.onebotSDK.event_action.set_group_special_title(self, group_id, user_id, special_title, duration)
+                    OlivOS.onebotSDK.event_action.set_group_special_title(
+                        self, group_id, user_id, special_title, duration
+                    )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1615,7 +1675,9 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
-                OlivOS.OPQBotSDK.event_action.set_friend_add_request(self, flag, approve, self.plugin_info['control_queue'])
+                OlivOS.OPQBotSDK.event_action.set_friend_add_request(
+                    self, flag, approve, self.plugin_info['control_queue']
+                )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -1634,7 +1696,9 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
-                OlivOS.OPQBotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, self.plugin_info['control_queue'])
+                OlivOS.OPQBotSDK.event_action.set_group_add_request(
+                    self, flag, sub_type, approve, self.plugin_info['control_queue']
+                )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
 
@@ -2076,8 +2140,12 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
         return res_data
 
-    def get_group_root_files(self, group_id: 'str|int', file_count: 'int|None' = None, flag_log: bool = True, 
-                             remote: bool = False):
+    def get_group_root_files(
+        self, group_id: 'str|int',
+        file_count: 'int|None' = None,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
         res_data = None
         if remote:
             pass
@@ -2092,7 +2160,9 @@ class Event(object):
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
-                res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(self, group_id, folder_id, file_count)
+                res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(
+                    self, group_id, folder_id, file_count
+                )
         return res_data
 
     def get_group_files_by_folder(self, group_id: 'str|int', folder_id: str, file_count: 'int|None' = None,
@@ -2146,7 +2216,11 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
 
-    def rename_group_file_folder(self, group_id: 'str|int', folder_id: str, new_folder_name: str, flag_log: bool = True, remote: bool = False):
+    def rename_group_file_folder(
+        self, group_id: 'str|int', folder_id: str, new_folder_name: str,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
         if remote:
             pass
         else:
@@ -2158,9 +2232,15 @@ class Event(object):
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
-                OlivOS.onebotSDK.event_action.rename_group_file(self, group_id, file_id, current_parent_directory, new_name)
+                OlivOS.onebotSDK.event_action.rename_group_file(
+                    self, group_id, file_id, current_parent_directory, new_name
+                )
 
-    def rename_group_file(self, group_id: 'str|int', file_id: str, current_parent_directory: str, new_name: str, flag_log: bool = True, remote: bool = False):
+    def rename_group_file(
+        self, group_id: 'str|int', file_id: str, current_parent_directory: str, new_name: str,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
         if remote:
             pass
         else:
@@ -2188,12 +2268,18 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
 
-    def set_msg_emoji_like(self, message_id: 'str|int', emoji_id: 'str|int', is_set: bool = True, 
-                          group_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
+    def set_msg_emoji_like(
+        self, message_id: 'str|int', emoji_id: 'str|int',
+        is_set: bool = True,
+        group_id: 'str|int|None' = None,
+        flag_log: bool = True,
+        remote: bool = False
+    ):
         if remote:
             pass
         else:
             self.__set_msg_emoji_like(message_id, emoji_id, is_set, group_id, flag_log)
+
 
 class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
@@ -2205,7 +2291,7 @@ class StoppableThread(threading.Thread):
         if self.root is not None:
             try:
                 self.root.on_terminate()
-            except Exception as e:
+            except Exception:
                 traceback.print_exc()
         self._stop_event.set()
         self.stop_thread()
@@ -2218,7 +2304,7 @@ class StoppableThread(threading.Thread):
 
     def stopped(self):
         return self._stop_event.is_set()
- 
+
     def _async_raise(self, tid, exctype):
         """raises the exception, performs cleanup if needed"""
         tid = ctypes.c_long(tid)
@@ -2285,12 +2371,12 @@ class Proc_templet(object):
             else:
                 try:
                     packet = self.Proc_info.control_rx_queue.get(block=False)
-                except:
+                except Exception:
                     continue
                 self.on_control_rx(packet)
 
     def on_control_rx(self, packet):
-        #print("!!!! " + self.Proc_name + str(packet.__dict__))
+        # print("!!!! " + self.Proc_name + str(packet.__dict__))
         pass
 
     def on_terminate(self):
