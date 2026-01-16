@@ -23,13 +23,8 @@ jobs:
     - name: Run Flake8 Check
       run: |
         python ./script/flake8_check.py
-
-  upload-on-flake8-check-failure:
-    runs-on: ubuntu-latest
-    needs: [run-flake8-check]
-    if: failure()
-    steps:
     - name: Upload Flake8 Output
+      if: failure()
       uses: actions/upload-artifact@v4
       with:
         name: flake8_output
