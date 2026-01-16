@@ -8,7 +8,7 @@ block_cipher = None
 is_windows = sys.platform.startswith('win')
 is_linux = sys.platform.startswith('linux')
 is_mac = sys.platform.startswith('darwin')
-is_debug = os.getenv('OLIVOS_DEBUG') == 1
+is_debug = os.getenv('OLIVOS_DEBUG') == '1'
 
 print(
     f"is_windows: {is_windows}\n"
