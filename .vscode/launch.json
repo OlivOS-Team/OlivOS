@@ -14,7 +14,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/script/flake8_check.py",
             "args": ["--exit-zero"],
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "justMyCode": false
         }
     ]
