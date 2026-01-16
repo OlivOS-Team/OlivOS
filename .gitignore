@@ -8,3 +8,4 @@ logfile/*
 flake8_output.log
 *.egg-info
 build
+dist
