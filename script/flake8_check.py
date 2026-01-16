@@ -31,10 +31,9 @@ def main():
                 f.write(result.stdout)
                 print(result.stdout, end='')
 
-            if result.stderr:
-                f.write("\n[标准错误输出]\n")
-                f.write(result.stderr)
-                # 通常flake8的错误也打印到stdout，这里stderr多为运行时错误
+            # if result.stderr:
+            #     f.write("\n[标准错误输出]\n")
+            #     f.write(result.stderr)
 
         if result.returncode == 0:
             print(f"检查完成。详细结果已输出至: {log_file.absolute()}")
