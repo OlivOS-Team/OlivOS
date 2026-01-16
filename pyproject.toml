@@ -7,7 +7,7 @@ name = "olivos"
 version = "0.11.83"
 description = "OlivOS / Witness Union，一个强大的跨平台交互栈与机器人框架"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.7"
 authors = [
     {name = "OlivOS-Team", email = "benzenpenxil@foxmail.com"}
 ]
@@ -15,6 +15,7 @@ license = {text = "AGPLv3 License"}
 classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
