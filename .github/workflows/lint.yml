@@ -19,8 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements310.txt
-        python -m pip install flake8
+        python -m pip install .[extend,build,dev]
     - name: Run Flake8 Check
       run: |
         python ./script/flake8_check.py --exit-zero
