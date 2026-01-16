@@ -21,7 +21,6 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[extend,build,dev]
     - name: Run Flake8 Check
-      continue-on-error: true
       run: |
         python ./script/flake8_check.py
 
