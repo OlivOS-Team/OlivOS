@@ -36,9 +36,9 @@ from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 
 
 DATABASE_SVN = 1
-DATABASE_PATH = os.path.join(".","plugin","conf","UserConfAll.db")
+DATABASE_PATH = os.path.join(".", "plugin", "conf", "UserConfAll.db")
 DATABASE_SQL = {
-# CREATE
+    # CREATE
     # 每个插件预先在总表中
     "create.table.master": """\
 CREATE TABLE IF NOT EXISTS table_master(
@@ -65,7 +65,7 @@ BEGIN
 END;
 """,
 
-# INSERT (使用 replace 代替 update, 操作更加方便)
+    # INSERT (使用 replace 代替 update, 操作更加方便)
     "insert.table_master": """\
 INSERT OR REPLACE INTO table_master(
     "hash_namespace", "str_namespace"
@@ -79,8 +79,8 @@ INSERT OR REPLACE INTO table_namespace_{namespace_hash}(
 VALUES (:hash_key_basic, :str_key_conf_name, :raw_value);
 """,
 
-# SELECT 查询语句
-    "select.master.namespace":"""\
+    # SELECT 查询语句
+    "select.master.namespace": """\
 SELECT str_namespace FROM table_master
 """,
     "select.namespace.conf": """\
@@ -88,22 +88,26 @@ SELECT raw_value FROM table_namespace_{namespace_hash}
 WHERE hash_key_basic = :hash_key_basic AND str_key_conf_name = :str_key_conf_name
 """,
 
-# pragma 元数据（配置项数据库自身的版本号）
+    # pragma 元数据（配置项数据库自身的版本号）
     "pragma.get.version": """PRAGMA user_version ;""",
     "pragma.set.version": """PRAGMA user_version = {ver} ;""",
 
 }
 
-def get_namespace_hash(namespace:"str|None"):
+
+def get_namespace_hash(namespace: "str|None"):
     if namespace == "unity" or namespace is None:
         return "unity"
     return get_hash(namespace)
 
+
 def get_user_hash(platform: "str", user_id: "str|int", *args):
     return get_hash("user", platform, str(user_id), *args)
 
-def get_group_hash(platform: "str", group_id: "str|int", host_id: "str|int|None"=None, *args):
+
+def get_group_hash(platform: "str", group_id: "str|int", host_id: "str|int|None" = None, *args):
     return get_hash("group", platform, str(group_id), str(host_id), *args)
+
 
 def get_hash(*data):
     if len(data) == 0 or data[0] == "--NONEED--":
@@ -111,6 +115,7 @@ def get_hash(*data):
     sha1 = hashlib.sha1()
     sha1.update("-".join(map(str, data)).encode("utf-8"))
     return sha1.hexdigest()
+
 
 class DataBaseAPI:
     class _sqlconn:
@@ -147,12 +152,11 @@ class DataBaseAPI:
         self._init_database()
         # atexit.register(self.stop)
 
-
     def __init_thread(self):
         "线程池中每个线程的初始化过程，进行数据库连接"
         name = threading.current_thread().name
         # 为方便在主线程一并关闭所有连接 check_same_thread 设为 False
-        conn= sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout, check_same_thread=False)
+        conn = sqlite3.connect(database=DATABASE_PATH, timeout=self.timeout, check_same_thread=False)
         self.__conn_all[name] = conn
         # self.proc_log(0, f"thread init <{name}>")
 
@@ -245,20 +249,25 @@ class DataBaseAPI:
         for conn in self.__conn_all.values():
             conn.close()
 
-    def get_config(self, namespace: "str | None", key: "str", basic_hashed: "str | None" =None,  default_value=None, pkl=False):
+    def get_config(
+        self, namespace: "str | None", key: "str",
+        basic_hashed: "str | None" = None,
+        default_value=None,
+        pkl=False
+    ):
         """
         最基本的配置项读取操作，返回对应的键值
 
         `namespace`: 如果这个配置项希望被其他插件共同使用（如是否为管理员等权限），则填写 None
                      否则此处应当填写当前插件 app.json 中的命名空间
-        
+
         `key`: 具体存储的配置项名称 (应为字符串)
 
         `basic_hashed`: 经过 sha1 处理的基本用户信息，如果不存在用户信息，则填写 None
             具体的计算函数应当使用当前模块给定函数：
             - 用户哈希： OlivOS.userModule.UserConfDB.get_user_hash(platform, user_id)
             - 群组哈希： OlivOS.userModule.UserConfDB.get_group_hash(platform, group_id, host_id=None)
-        
+
         `default_value`: 如果存在，则当该配置项不存在时，返回这个值 默认为 `None`
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
@@ -294,7 +303,11 @@ class DataBaseAPI:
             else:
                 return val_raw
 
-    def set_config(self, namespace: "str | None", key: "str", value, basic_hashed: "str | None"=None, pkl=False):
+    def set_config(
+        self, namespace: "str | None", key: "str", value,
+        basic_hashed: "str | None" = None,
+        pkl=False
+    ):
         """
         最基本的配置项写入操作，返回对应的键值
 
@@ -332,7 +345,11 @@ class DataBaseAPI:
         self._exec(sql_this, param)
         return True
 
-    def get_user_config(self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int", default_value=None, pkl=False):
+    def get_user_config(
+        self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int",
+        default_value=None,
+        pkl=False
+    ):
         """
         读取对应用户配置项
 
@@ -345,7 +362,7 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_user_hash(
-            platform=platform, 
+            platform=platform,
             user_id=user_id,
         )
         return self.get_config(
@@ -356,7 +373,12 @@ class DataBaseAPI:
             pkl=pkl
         )
 
-    def get_group_config(self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int", host_id: "None|str|int"=None, default_value=None, pkl=False):
+    def get_group_config(
+        self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int",
+        host_id: "None|str|int" = None,
+        default_value=None,
+        pkl=False
+    ):
         """
         读取对应群组配置项
 
@@ -370,8 +392,8 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_group_hash(
-            platform=platform, 
-            group_id=str(group_id), 
+            platform=platform,
+            group_id=str(group_id),
             host_id=str(host_id),
         )
         return self.get_config(
@@ -414,8 +436,8 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_user_hash(
-            platform=platform, 
-            user_id=str(user_id), 
+            platform=platform,
+            user_id=str(user_id),
         )
         return self.set_config(
             namespace=namespace,
@@ -425,7 +447,11 @@ class DataBaseAPI:
             pkl=pkl
         )
 
-    def set_group_config(self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int", host_id: "str|int|None"=None, pkl=False):
+    def set_group_config(
+        self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int",
+        host_id: "str|int|None" = None,
+        pkl=False
+    ):
         """
         设置对应群组配置项
 
@@ -439,9 +465,9 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         basic_hash = get_group_hash(
-            platform=platform, 
-            group_id=str(group_id), 
-            host_id=str(host_id), 
+            platform=platform,
+            group_id=str(group_id),
+            host_id=str(host_id),
             # *other_arg
         )
         return self.set_config(
@@ -471,7 +497,11 @@ class DataBaseAPI:
             pkl=pkl
         )
 
-    def get_group_config_from_event(self, namespace: "str|None", key: "str", plugin_event, default_value=None, pkl=False):
+    def get_group_config_from_event(
+        self, namespace: "str|None", key: "str", plugin_event,
+        default_value=None,
+        pkl=False
+    ):
         """
         读取消息事件对应群组的配置项
 
@@ -519,7 +549,11 @@ class DataBaseAPI:
             pkl=pkl
         )
 
-    def get_user_config_from_event(self, namespace: "str|None", key: "str", plugin_event, default_value=None, pkl=False):
+    def get_user_config_from_event(
+        self, namespace: "str|None", key: "str", plugin_event,
+        default_value=None,
+        pkl=False
+    ):
         """
         读取消息事件对应用户的配置项
 
@@ -540,6 +574,7 @@ class DataBaseAPI:
             default_value=default_value,
             pkl=pkl
         )
+
     def set_user_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event, pkl=False):
         """
         设置消息事件对应用户的配置项
@@ -561,4 +596,3 @@ class DataBaseAPI:
             user_id=user_id,
             pkl=pkl
         )
-
