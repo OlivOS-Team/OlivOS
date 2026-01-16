@@ -10,6 +10,13 @@ is_linux = sys.platform.startswith('linux')
 is_mac = sys.platform.startswith('darwin')
 is_debug = os.getenv('PYINSTALLER_DEBUG') == 1
 
+print(
+    f"is_windows: {is_windows}\n"
+    f"is_linux: {is_linux}\n"
+    f"is_mac: {is_mac}\n"
+    f"is_debug: {is_debug}\n"
+)
+
 a = Analysis(
     ['main.py'],
     pathex=['./'],
