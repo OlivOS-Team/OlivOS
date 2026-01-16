@@ -95,7 +95,6 @@ else:
 exe = EXE(**exe_params)
 
 # 打印构建信息
-# 简单的纯ASCII输出
 print("\n[Build Info]")
 print("Platform:", sys.platform)
 print("Debug:", "ON" if args.debug_mode else "OFF")
@@ -103,4 +102,3 @@ print("Splash:", "ON" if splash else "OFF")
 print("UPX:", "ON" if not args.no_upx else "OFF")
 print("Name:", args.app_name)
 print("Console:", "SHOW" if exe_params['console'] else "HIDE")
-print()
