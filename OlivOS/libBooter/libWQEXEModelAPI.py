@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,13 +20,7 @@ import threading
 import time
 import os
 import traceback
-import json
-import copy
-import random
-import uuid
-import hashlib
 import platform
-import shutil
 
 import OlivOS
 
@@ -88,6 +82,7 @@ def startWalleQLibExeModel(
                     debug_mode=False
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
@@ -200,8 +195,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.flag_run = False
-        if 'model_Proc' in self.Proc_data \
-        and self.Proc_data['model_Proc'] is not None:
+        if (
+            'model_Proc' in self.Proc_data
+            and self.Proc_data['model_Proc'] is not None
+        ):
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -220,7 +217,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                     if 'input' == rx_packet_data.key['data']['action']:
@@ -327,7 +324,7 @@ class server(OlivOS.API.Proc_templet):
 
 
 class wqTypeConfig(object):
-    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T):
+    def __init__(self, bot_info_dict: OlivOS.API.bot_info_T):
         self.bot_info_dict = bot_info_dict
         self.config_file_str = ''
         self.config_file_format = {}
@@ -380,6 +377,7 @@ interval = 5
 
         with open('./conf/walleq/' + self.bot_info_dict.hash + '/walle-q.toml', 'w+', encoding='utf-8') as tmp:
             tmp.write(self.config_file_str)
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):

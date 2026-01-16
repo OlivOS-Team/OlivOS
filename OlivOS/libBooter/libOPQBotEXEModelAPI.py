@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,11 +20,6 @@ import threading
 import time
 import os
 import traceback
-import json
-import copy
-import random
-import uuid
-import hashlib
 import re
 import platform
 import shutil
@@ -88,6 +83,7 @@ def startOPQBotLibExeModel(
                     debug_mode=False
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
+
 
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
@@ -208,8 +204,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.flag_run = False
-        if 'model_Proc' in self.Proc_data \
-        and self.Proc_data['model_Proc'] is not None:
+        if (
+            'model_Proc' in self.Proc_data
+            and self.Proc_data['model_Proc'] is not None
+        ):
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -228,7 +226,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                     if 'input' == rx_packet_data.key['data']['action']:
@@ -264,16 +262,16 @@ class server(OlivOS.API.Proc_templet):
                     modelName
                 ))
 
-    def check_model_stdout(self, line_data:str):
+    def check_model_stdout(self, line_data: str):
         if self.Proc_data['qrcode_flag']:
             try:
                 matchRes = re.match(
                     r'^\d{4}\/\d{2}\/\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3}\s\[C\]\s{2}User\s\d+\s登录成功,即将刷新相关数据$',
                     line_data
                 )
-                if matchRes != None:
+                if matchRes is not None:
                     self.Proc_data['qrcode_flag'] = False
-            except:
+            except Exception:
                 pass
 
     def check_model_flag(self):
@@ -282,7 +280,7 @@ class server(OlivOS.API.Proc_templet):
             if not self.Proc_data['qrcode_flag']:
                 break
             time.sleep(0.2)
-        #print("self.Proc_data['qrcode_flag'] = " + str(self.Proc_data['qrcode_flag']))
+        # print("self.Proc_data['qrcode_flag'] = " + str(self.Proc_data['qrcode_flag']))
         if self.Proc_data['qrcode_flag']:
             self.send_QRCode_event(
                 f'http://'
@@ -360,12 +358,14 @@ class server(OlivOS.API.Proc_templet):
                 block=False
             )
 
+
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
+
 def copyFile(src, dst):
     try:
-        shutil.copyfile(src = src, dst = dst)
-    except:
+        shutil.copyfile(src=src, dst=dst)
+    except Exception:
         pass

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -20,13 +20,7 @@ import threading
 import time
 import os
 import traceback
-import json
-import copy
-import random
-import uuid
-import hashlib
 import platform
-import shutil
 
 import OlivOS
 
@@ -98,6 +92,7 @@ def startCWCBQLibExeModel(
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
+
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, target_proc=None, debug_mode=False, bot_info_dict=None):
@@ -144,16 +139,16 @@ class server(OlivOS.API.Proc_templet):
                     'OlivOS libCWCBEXEModel server [{0}] will run under visiable mode',
                     [self.Proc_name], modelName
                 ))
-                #self.clear_qrcode()
-                #self.Proc_data['check_qrcode_flag'] = False
+                # self.clear_qrcode()
+                # self.Proc_data['check_qrcode_flag'] = False
                 self.Proc_data['check_stdin'] = False
                 time.sleep(2)
-                #self.Proc_data['check_qrcode_flag'] = True
+                # self.Proc_data['check_qrcode_flag'] = True
                 self.Proc_data['check_stdin'] = True
-                #threading.Thread(
-                #    target=self.check_qrcode,
-                #    args=()
-                #).start()
+                # threading.Thread(
+                #     target=self.check_qrcode,
+                #     args=()
+                # ).start()
                 cwcbInstallCommand()
                 tmp_env = dict(os.environ)
                 model_Proc = subprocess.Popen(
@@ -194,8 +189,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.flag_run = False
-        if 'model_Proc' in self.Proc_data \
-        and self.Proc_data['model_Proc'] is not None:
+        if (
+            'model_Proc' in self.Proc_data
+            and self.Proc_data['model_Proc'] is not None
+        ):
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -214,7 +211,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                     if 'input' == rx_packet_data.key['data']['action']:
@@ -319,9 +316,10 @@ class server(OlivOS.API.Proc_templet):
                 block=False
             )
 
+
 def cwcbInstallCommand():
     releaseDir('./lib')
-    res = '''
+    res = r'''
 @echo off
 chcp 65001
 >nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
@@ -344,8 +342,9 @@ pause
     with open('./lib/install_cwcb.bat', 'w+', encoding='utf-8') as tmp:
         tmp.write(res)
 
+
 class cwcbTypeConfig(object):
-    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T):
+    def __init__(self, bot_info_dict: OlivOS.API.bot_info_T):
         self.bot_info_dict = bot_info_dict
         self.config_file_str = ''
         self.config_file_format = {}
@@ -382,6 +381,7 @@ cache_days = 3
 
         with open('./conf/ComWeChatBotClient/' + self.bot_info_dict.hash + '/.env', 'w+', encoding='utf-8') as tmp:
             tmp.write(self.config_file_str)
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):

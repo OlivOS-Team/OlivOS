@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -21,12 +21,7 @@ import time
 import os
 import traceback
 import json
-import copy
-import random
-import uuid
-import hashlib
 import platform
-import shutil
 import zipfile
 
 import OlivOS
@@ -55,6 +50,7 @@ gCheck9922List = [
     'napcat_show_new_9_9_22',
     'napcat_show_new'
 ]
+
 
 def startNapCatLibExeModel(
     plugin_bot_info_dict,
@@ -139,6 +135,7 @@ def startNapCatLibExeModel(
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
+
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, target_proc=None, debug_mode=False, bot_info_dict=None):
@@ -176,18 +173,44 @@ class server(OlivOS.API.Proc_templet):
             releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
             try:
                 if self.Proc_data['bot_info_dict'].platform['model'] in gCheck9922List:
-                    unzip('./lib/NapCat-QQ-Win-9.9.22-40990.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+                    unzip(
+                        './lib/NapCat-QQ-Win-9.9.22-40990.zip',
+                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                    )
+                    napcatTypeConfig(
+                        self.Proc_data['bot_info_dict'],
+                        self.Proc_config['target_proc'],
+                        version='9.9.19'
+                    ).setConfig()
                 elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9919List:
-                    unzip('./lib/NapCat-QQ-Win-9.9.19-34740.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19').setConfig()
+                    unzip(
+                        './lib/NapCat-QQ-Win-9.9.19-34740.zip',
+                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                    )
+                    napcatTypeConfig(
+                        self.Proc_data['bot_info_dict'],
+                        self.Proc_config['target_proc'],
+                        version='9.9.19'
+                    ).setConfig()
                 elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9912List:
-                    unzip('./lib/NapCatNew.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
+                    unzip(
+                        './lib/NapCatNew.zip',
+                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                    )
+                    napcatTypeConfig(
+                        self.Proc_data['bot_info_dict'],
+                        self.Proc_config['target_proc']
+                    ).setConfig()
                 else:
-                    unzip('./lib/NapCat.zip', f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
-            except:
+                    unzip(
+                        './lib/NapCat.zip',
+                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                    )
+                    napcatTypeConfig(
+                        self.Proc_data['bot_info_dict'],
+                        self.Proc_config['target_proc']
+                    ).setConfig()
+            except Exception:
                 self.log(3, OlivOS.L10NAPI.getTrans(
                     'OlivOS libNapCatEXEModel server [{0}] can`t found target lib',
                     [self.Proc_name], modelName
@@ -298,7 +321,11 @@ class server(OlivOS.API.Proc_templet):
                 ))
                 tmp_env = dict(os.environ)
                 subprocess.call(
-                    'start cmd /K "title NapCat For OlivOS| .\\napcat-utf8.bat -q ' + str(self.Proc_data['bot_info_dict'].id) + '"',
+                    (
+                        'start cmd /K "title NapCat For OlivOS| .\\napcat-utf8.bat -q '
+                        + str(self.Proc_data['bot_info_dict'].id)
+                        + '"'
+                    ),
                     shell=True,
                     cwd='.\\conf\\napcat\\' + self.Proc_data['bot_info_dict'].hash,
                     env=tmp_env
@@ -307,8 +334,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.flag_run = False
-        if 'model_Proc' in self.Proc_data \
-        and self.Proc_data['model_Proc'] is not None:
+        if (
+            'model_Proc' in self.Proc_data
+            and self.Proc_data['model_Proc'] is not None
+        ):
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -327,7 +356,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                     if 'input' == rx_packet_data.key['data']['action']:
@@ -389,7 +418,7 @@ class server(OlivOS.API.Proc_templet):
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except:
+            except Exception:
                 pass
         while count > 0 and self.Proc_data['check_qrcode_flag']:
             if os.path.exists(file_path):
@@ -441,7 +470,7 @@ class server(OlivOS.API.Proc_templet):
 
 
 class napcatTypeConfig(object):
-    def __init__(self, bot_info_dict:OlivOS.API.bot_info_T, target_proc, version='9.9.11'):
+    def __init__(self, bot_info_dict: OlivOS.API.bot_info_T, target_proc, version='9.9.11'):
         self.bot_info_dict = bot_info_dict
         self.target_proc = target_proc
         self.config_file_str = ''
@@ -454,7 +483,9 @@ class napcatTypeConfig(object):
             self.config_file_format['uin'] = str(self.bot_info_dict.id)
             self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
             self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
-            self.config_file_format['url'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+            self.config_file_format['url'] = (
+                f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+            )
 
             self.config_file_data = {
                 "network": {
@@ -490,15 +521,21 @@ class napcatTypeConfig(object):
                 "parseMultMsg": False
             }
 
-            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii = False, indent = 4)
+            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii=False, indent=4)
 
-            with open(f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json', 'w+', encoding='utf-8') as tmp:
+            with open(
+                f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json',
+                'w+',
+                encoding='utf-8'
+            ) as tmp:
                 tmp.write(self.config_file_str)
         else:
             self.config_file_format['uin'] = str(self.bot_info_dict.id)
             self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
             self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
-            self.config_file_format['postUrls'] = f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+            self.config_file_format['postUrls'] = (
+                f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+            )
 
             self.config_file_data = {
                 "http": {
@@ -530,14 +567,20 @@ class napcatTypeConfig(object):
                 "token": ""
             }
 
-            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii = False, indent = 4)
+            self.config_file_str = json.dumps(self.config_file_data, ensure_ascii=False, indent=4)
 
-            with open(f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json', 'w+', encoding='utf-8') as tmp:
+            with open(
+                f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json',
+                'w+',
+                encoding='utf-8'
+            ) as tmp:
                 tmp.write(self.config_file_str)
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+
 
 def support_gbk(zip_file: zipfile.ZipFile):
     name_to_info = zip_file.NameToInfo
@@ -545,13 +588,14 @@ def support_gbk(zip_file: zipfile.ZipFile):
     for name, info in name_to_info.copy().items():
         try:
             real_name = name.encode('cp437').decode('gbk')
-        except:
+        except Exception:
             real_name = name
         if real_name != name:
             info.filename = real_name
             del name_to_info[name]
             name_to_info[real_name] = info
     return zip_file
+
 
 def unzip(zip_file_path, target_dir):
     with support_gbk(zipfile.ZipFile(zip_file_path, 'r', zipfile.ZIP_DEFLATED)) as zip_file:

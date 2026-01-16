@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   MetaLeo元理
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -33,6 +33,7 @@ gCheckList = [
     'gocqhttp_show_Android_Phone',
     'gocqhttp_show_Android_Pad'
 ]
+
 
 def startAstralQsignLibExeModel(
     plugin_bot_info_dict,
@@ -70,6 +71,7 @@ def startAstralQsignLibExeModel(
             )
             Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
+
 class server(OlivOS.API.Proc_templet):
     def __init__(
         self,
@@ -99,7 +101,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_dict'] = {}
         if type(bot_info_dict) is dict:
             self.Proc_data['bot_info_dict'] = bot_info_dict
-        self.server_data=server_data
+        self.server_data = server_data
         self.flag_run = True
 
     def run(self):
@@ -116,7 +118,11 @@ class server(OlivOS.API.Proc_templet):
             tmp_env = dict(os.environ)
             tmp_env['FORCE_TTY'] = ''
             model_Proc = subprocess.Popen(
-                f".\\uninstall.bat \"localhost\" \"{self.server_data['port']}\" \"{getOTPPASSWORD()}\" \"{self.server_data['token']}\"",
+                (
+                    f".\\uninstall.bat"
+                    f" \"localhost\" \"{self.server_data['port']}\""
+                    f" \"{getOTPPASSWORD()}\" \"{self.server_data['token']}\""
+                ),
                 cwd='.\\conf\\astral-qsign',
                 shell=True,
                 stdin=subprocess.PIPE,
@@ -195,7 +201,7 @@ class server(OlivOS.API.Proc_templet):
             if self.Proc_data['bot_info_dict'][bot_info_key].platform['model'] in gCheckList:
                 self.setGoCqhttpModelEnableSend(self.Proc_data['bot_info_dict'][bot_info_key].hash)
 
-    def sendLog(self, log_level:int, log_message:str, log_message_list:list):
+    def sendLog(self, log_level: int, log_message: str, log_message_list: list):
         self.log(
             log_level,
             OlivOS.L10NAPI.getTrans(
@@ -206,7 +212,7 @@ class server(OlivOS.API.Proc_templet):
             [('AstralQsign', 'default')]
         )
 
-    def sendLogSim(self, log_level:int, log_message:str, log_message_list:list):
+    def sendLogSim(self, log_level: int, log_message: str, log_message_list: list):
         self.log(
             log_level,
             OlivOS.L10NAPI.getTrans(
@@ -218,15 +224,18 @@ class server(OlivOS.API.Proc_templet):
         )
 
 
-def isBotActive(plugin_bot_info_dict:dict):
+def isBotActive(plugin_bot_info_dict: dict):
     flag_need_enable = False
     for bot_info_key in plugin_bot_info_dict:
-        if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot' \
-        and plugin_bot_info_dict[bot_info_key].platform['platform'] == 'qq' \
-        and plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.libAstralQsignEXEModelAPI.gCheckList \
-        and plugin_bot_info_dict[bot_info_key].extends.get('qsign-server-protocal', None) == 'AstralQsign':
+        if (
+            plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot'
+            and plugin_bot_info_dict[bot_info_key].platform['platform'] == 'qq'
+            and plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.libAstralQsignEXEModelAPI.gCheckList
+            and plugin_bot_info_dict[bot_info_key].extends.get('qsign-server-protocal', None) == 'AstralQsign'
+        ):
             flag_need_enable = True
     return flag_need_enable
+
 
 def getOTPPASSWORD():
     ts = str(int(time.time()))
@@ -236,9 +245,11 @@ def getOTPPASSWORD():
     res = f'{ts}{hash_tmp.hexdigest()}'
     return res
 
+
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+
 
 def support_gbk(zip_file: zipfile.ZipFile):
     name_to_info = zip_file.NameToInfo
@@ -246,13 +257,14 @@ def support_gbk(zip_file: zipfile.ZipFile):
     for name, info in name_to_info.copy().items():
         try:
             real_name = name.encode('cp437').decode('gbk')
-        except:
+        except Exception:
             real_name = name
         if real_name != name:
             info.filename = real_name
             del name_to_info[name]
             name_to_info[real_name] = info
     return zip_file
+
 
 def unzip(zip_file_path, target_dir):
     with support_gbk(zipfile.ZipFile(zip_file_path, 'r', zipfile.ZIP_DEFLATED)) as zip_file:
