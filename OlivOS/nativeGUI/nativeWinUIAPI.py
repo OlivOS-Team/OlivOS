@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -24,14 +24,12 @@ import re
 import datetime
 import webbrowser
 import platform
-import traceback
 
 from PIL import Image
 from PIL import ImageTk
 
 from tkinter import ttk
 from tkinter import messagebox
-from tkinter import filedialog
 
 dictColorContext = {
     'color_001': '#00A0EA',
@@ -44,6 +42,7 @@ dictColorContext = {
 
 gTerminalDataMax = 128
 gTerminalDataStep = 8
+
 
 class dock(OlivOS.API.Proc_templet):
     def __init__(
@@ -68,7 +67,6 @@ class dock(OlivOS.API.Proc_templet):
             control_queue=control_queue,
             logger_proc=logger_proc
         )
-        global gTerminalDataMax
         self.Proc_config['ready_for_restart'] = False
         self.bot_info = bot_info_dict
         self.busy = False
@@ -129,13 +127,17 @@ class dock(OlivOS.API.Proc_templet):
     def on_control_rx(self, packet):
         if type(packet) is OlivOS.API.Control.packet:
             if 'send' == packet.action:
-                if type(packet.key) is dict \
-                and 'data' in packet.key \
-                and type(packet.key['data']) \
-                and 'action' in packet.key['data']:
+                if (
+                    type(packet.key) is dict
+                    and 'data' in packet.key
+                    and type(packet.key['data'])
+                    and 'action' in packet.key['data']
+                ):
                     if 'account_update' == packet.key['data']['action']:
-                        if 'data' in packet.key['data'] \
-                        and type(packet.key['data']['data']) is dict:
+                        if (
+                            'data' in packet.key['data']
+                            and type(packet.key['data']['data']) is dict
+                        ):
                             self.bot_info = packet.key['data']['data']
                         self.UIData['shallow_napcat_menu_list'] = None
                         self.UIData['shallow_opqbot_menu_list'] = None
@@ -167,12 +169,12 @@ class dock(OlivOS.API.Proc_templet):
                 self.busy = True
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if rx_packet_data is not None:
-                    if type(rx_packet_data) == OlivOS.API.Control.packet:
+                    if type(rx_packet_data) is OlivOS.API.Control.packet:
                         if rx_packet_data.action == 'send':
-                            if type(rx_packet_data.key) == dict:
+                            if type(rx_packet_data.key) is dict:
                                 if 'data' in rx_packet_data.key:
                                     if 'action' in rx_packet_data.key['data']:
                                         if 'update_data' == rx_packet_data.key['data']['action']:
@@ -195,10 +197,12 @@ class dock(OlivOS.API.Proc_templet):
                                             if self.UIObject['root_shallow'] is not None:
                                                 self.updateShallow()
                                         elif 'account_edit' == rx_packet_data.key['data']['action']:
-                                            if 'event' in rx_packet_data.key['data'] \
-                                            and 'account_edit_on' == rx_packet_data.key['data']['event'] \
-                                            and 'bot_info' in rx_packet_data.key['data'] \
-                                            and type(rx_packet_data.key['data']['bot_info']) is dict:
+                                            if (
+                                                'event' in rx_packet_data.key['data']
+                                                and 'account_edit_on' == rx_packet_data.key['data']['event']
+                                                and 'bot_info' in rx_packet_data.key['data']
+                                                and type(rx_packet_data.key['data']['bot_info']) is dict
+                                            ):
                                                 OlivOS.multiLoginUIAPI.run_HostUI_asayc(
                                                     plugin_bot_info_dict=rx_packet_data.key['data']['bot_info'],
                                                     control_queue=self.Proc_info.control_queue
@@ -206,11 +210,17 @@ class dock(OlivOS.API.Proc_templet):
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
                                         elif 'logger' == rx_packet_data.key['data']['action']:
-                                            self.UIObject['root_OlivOS_terminal_data'].append(rx_packet_data.key['data']['data'])
-                                            if len(self.UIObject['root_OlivOS_terminal_data']) > self.UIObject['root_OlivOS_terminal_data_max']:
+                                            self.UIObject['root_OlivOS_terminal_data'].append(
+                                                rx_packet_data.key['data']['data']
+                                            )
+                                            if len(
+                                                self.UIObject['root_OlivOS_terminal_data']
+                                            ) > self.UIObject['root_OlivOS_terminal_data_max']:
                                                 self.UIObject['root_OlivOS_terminal_data'].pop(0)
                                             if self.UIObject['root_OlivOS_terminal'] is not None:
-                                                self.UIObject['root_OlivOS_terminal'].tree_add_line(rx_packet_data.key['data']['data'])
+                                                self.UIObject['root_OlivOS_terminal'].tree_add_line(
+                                                    rx_packet_data.key['data']['data']
+                                                )
                                         elif 'napcat' == rx_packet_data.key['data']['action']:
                                             if 'event' in rx_packet_data.key['data']:
                                                 if 'init' == rx_packet_data.key['data']['event']:
@@ -219,7 +229,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_napcat_menu_list'].append(
                                                                 [
@@ -234,25 +246,35 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startNapCatTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_napcat_terminal_data']:
                                                             self.UIObject['root_napcat_terminal_data'][hash] = []
-                                                        self.UIObject['root_napcat_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_napcat_terminal_data'][hash]) > self.UIObject['root_napcat_terminal_data_max']:
+                                                        self.UIObject['root_napcat_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data']
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_napcat_terminal_data'][hash]
+                                                        ) > self.UIObject['root_napcat_terminal_data_max']:
                                                             self.UIObject['root_napcat_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_napcat_terminal']:
-                                                            self.UIObject['root_napcat_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_napcat_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data']
+                                                            )
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'path' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'path' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
                                                                 try:
                                                                     self.UIObject['root_qrcode_window'][hash].stop()
-                                                                except:
+                                                                except Exception:
                                                                     pass
                                                             self.UIObject['root_qrcode_window'][hash] = QRcodeUI(
                                                                 Model_name='qrcode_window',
@@ -274,7 +296,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_gocqhttp_menu_list'].append(
                                                                 [
@@ -289,25 +313,35 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startGoCqhttpTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_gocqhttp_terminal_data']:
                                                             self.UIObject['root_gocqhttp_terminal_data'][hash] = []
-                                                        self.UIObject['root_gocqhttp_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_gocqhttp_terminal_data'][hash]) > self.UIObject['root_gocqhttp_terminal_data_max']:
+                                                        self.UIObject['root_gocqhttp_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data']
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_gocqhttp_terminal_data'][hash]
+                                                        ) > self.UIObject['root_gocqhttp_terminal_data_max']:
                                                             self.UIObject['root_gocqhttp_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_gocqhttp_terminal']:
-                                                            self.UIObject['root_gocqhttp_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_gocqhttp_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data']
+                                                            )
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'path' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'path' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
                                                                 try:
                                                                     self.UIObject['root_qrcode_window'][hash].stop()
-                                                                except:
+                                                                except Exception:
                                                                     pass
                                                             self.UIObject['root_qrcode_window'][hash] = QRcodeUI(
                                                                 Model_name='qrcode_window',
@@ -319,8 +353,10 @@ class dock(OlivOS.API.Proc_templet):
                                                             )
                                                             self.UIObject['root_qrcode_window'][hash].start()
                                                 elif 'token_get' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'token' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'token' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         self.setGoCqhttpModelSend(
                                                             hash=rx_packet_data.key['data']['hash'],
@@ -337,7 +373,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_walleq_menu_list'].append(
                                                                 [
@@ -352,25 +390,35 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startWalleQTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_walleq_terminal_data']:
                                                             self.UIObject['root_walleq_terminal_data'][hash] = []
-                                                        self.UIObject['root_walleq_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_walleq_terminal_data'][hash]) > self.UIObject['root_walleq_terminal_data_max']:
+                                                        self.UIObject['root_walleq_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data']
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_walleq_terminal_data'][hash]
+                                                        ) > self.UIObject['root_walleq_terminal_data_max']:
                                                             self.UIObject['root_walleq_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_walleq_terminal']:
-                                                            self.UIObject['root_walleq_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_walleq_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data']
+                                                            )
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'path' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'path' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash in self.bot_info:
                                                             if hash in self.UIObject['root_qrcode_window']:
                                                                 try:
                                                                     self.UIObject['root_qrcode_window'][hash].stop()
-                                                                except:
+                                                                except Exception:
                                                                     pass
                                                             self.UIObject['root_qrcode_window'][hash] = QRcodeUI(
                                                                 Model_name='qrcode_window',
@@ -392,7 +440,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_cwcb_menu_list'].append(
                                                                 [
@@ -407,16 +457,24 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startCWCBTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_cwcb_terminal_data']:
                                                             self.UIObject['root_cwcb_terminal_data'][hash] = []
-                                                        self.UIObject['root_cwcb_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_cwcb_terminal_data'][hash]) > self.UIObject['root_cwcb_terminal_data_max']:
+                                                        self.UIObject['root_cwcb_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data']
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_cwcb_terminal_data'][hash]
+                                                        ) > self.UIObject['root_cwcb_terminal_data_max']:
                                                             self.UIObject['root_cwcb_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_cwcb_terminal']:
-                                                            self.UIObject['root_cwcb_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_cwcb_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data']
+                                                            )
                                                 elif 'cwcb_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startCWCBTerminalUI(rx_packet_data.key['data']['hash'])
@@ -428,7 +486,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_opqbot_menu_list'].append(
                                                                 [
@@ -443,22 +503,32 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.updateShallow()
                                                     self.startOPQBotTerminalUISend(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         if hash not in self.UIObject['root_opqbot_terminal_data']:
                                                             self.UIObject['root_opqbot_terminal_data'][hash] = []
-                                                        self.UIObject['root_opqbot_terminal_data'][hash].append(rx_packet_data.key['data']['data'])
-                                                        if len(self.UIObject['root_opqbot_terminal_data'][hash]) > self.UIObject['root_opqbot_terminal_data_max']:
+                                                        self.UIObject['root_opqbot_terminal_data'][hash].append(
+                                                            rx_packet_data.key['data']['data']
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_opqbot_terminal_data'][hash]
+                                                        ) > self.UIObject['root_opqbot_terminal_data_max']:
                                                             self.UIObject['root_opqbot_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_opqbot_terminal']:
-                                                            self.UIObject['root_opqbot_terminal'][hash].tree_add_line(rx_packet_data.key['data']['data'])
+                                                            self.UIObject['root_opqbot_terminal'][hash].tree_add_line(
+                                                                rx_packet_data.key['data']['data']
+                                                            )
                                                 elif 'qrcode' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'path' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'path' in rx_packet_data.key['data']
+                                                    ):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         path = rx_packet_data.key['data']['path']
-                                                        #print(rx_packet_data.key['data'])
+                                                        # print(rx_packet_data.key['data'])
                                                         self.sendOpenQRcodeUrl(hash, path)
                                                 elif 'opqbot_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
@@ -471,7 +541,9 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         if rx_packet_data.key['data']['hash'] in self.bot_info:
                                                             tmp_title = '%s' % (
-                                                                str(self.bot_info[rx_packet_data.key['data']['hash']].id)
+                                                                str(
+                                                                    self.bot_info[rx_packet_data.key['data']['hash']].id
+                                                                )
                                                             )
                                                             self.UIData['shallow_virtual_terminal_menu_list'].append(
                                                                 [
@@ -489,9 +561,11 @@ class dock(OlivOS.API.Proc_templet):
                                                     if 'hash' in rx_packet_data.key['data']:
                                                         self.startVirtualTerminalUI(rx_packet_data.key['data']['hash'])
                                                 elif 'log' == rx_packet_data.key['data']['event']:
-                                                    if 'hash' in rx_packet_data.key['data'] \
-                                                    and 'data' in rx_packet_data.key['data'] \
-                                                    and 'name' in rx_packet_data.key['data']:
+                                                    if (
+                                                        'hash' in rx_packet_data.key['data']
+                                                        and 'data' in rx_packet_data.key['data']
+                                                        and 'name' in rx_packet_data.key['data']
+                                                    ):
                                                         user_conf = {
                                                             "user_name": "未知",
                                                             "user_id": "-1",
@@ -499,16 +573,38 @@ class dock(OlivOS.API.Proc_templet):
                                                             "target_id": "-1",
                                                             "group_role": "member",
                                                         }
-                                                        if "user_conf" in rx_packet_data.key['data'] and rx_packet_data.key['data']["user_conf"] is not None:
+                                                        if (
+                                                            "user_conf" in rx_packet_data.key['data']
+                                                            and rx_packet_data.key['data']["user_conf"] is not None
+                                                        ):
                                                             user_conf.update(rx_packet_data.key['data']["user_conf"])
                                                         hash = rx_packet_data.key['data']['hash']
-                                                        if hash not in self.UIObject['root_virtual_terminal_terminal_data']:
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash] = []
-                                                        self.UIObject['root_virtual_terminal_terminal_data'][hash].append(rx_packet_data.key['data'])
-                                                        if len(self.UIObject['root_virtual_terminal_terminal_data'][hash]) > self.UIObject['root_virtual_terminal_terminal_data_max']:
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash].pop(0)
+                                                        if hash not in (
+                                                            self.UIObject['root_virtual_terminal_terminal_data']
+                                                        ):
+                                                            (
+                                                                self.UIObject
+                                                                ['root_virtual_terminal_terminal_data']
+                                                                [hash]
+                                                            ) = []
+                                                        (
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash]
+                                                            .append(rx_packet_data.key['data'])
+                                                        )
+                                                        if len(
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash]
+                                                        ) > self.UIObject['root_virtual_terminal_terminal_data_max']:
+                                                            (
+                                                                self.UIObject
+                                                                ['root_virtual_terminal_terminal_data']
+                                                                [hash]
+                                                                .pop(0)
+                                                            )
                                                         if hash in self.UIObject['root_virtual_terminal_terminal']:
-                                                            self.UIObject['root_virtual_terminal_terminal'][hash].tree_add_line(rx_packet_data.key['data'], user_conf)
+                                                            (
+                                                                self.UIObject['root_virtual_terminal_terminal'][hash]
+                                                                .tree_add_line(rx_packet_data.key['data'], user_conf)
+                                                            )
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
 
@@ -521,9 +617,23 @@ class dock(OlivOS.API.Proc_templet):
                 platform_platform = str(bot_info.platform.get('platform', ''))
                 platform_sdk = str(bot_info.platform.get('sdk', ''))
                 platform_model = str(bot_info.platform.get('model', ''))
-                server_auto = str(bot_info.post_info.auto) if hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'auto') else 'False'
-                server_type = str(bot_info.post_info.type) if hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'type') else 'post'
-                
+                server_auto = (
+                    str(bot_info.post_info.auto)
+                    if (
+                        hasattr(bot_info, 'post_info')
+                        and hasattr(bot_info.post_info, 'auto')
+                    )
+                    else 'False'
+                )
+                server_type = (
+                    str(bot_info.post_info.type)
+                    if (
+                        hasattr(bot_info, 'post_info')
+                        and hasattr(bot_info.post_info, 'type')
+                    )
+                    else 'post'
+                )
+
                 list_data_check = [
                     platform_platform,
                     platform_sdk,
@@ -536,7 +646,9 @@ class dock(OlivOS.API.Proc_templet):
                     flag_hit = True
                     if type_this in OlivOS.accountMetadataAPI.accountTypeMappingList:
                         for list_data_check_i in range(len(list_data_check)):
-                            if list_data_check[list_data_check_i] != str(OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]):
+                            if list_data_check[list_data_check_i] != str(
+                                OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]
+                            ):
                                 flag_hit = False
                                 break
                         if flag_hit:
@@ -545,23 +657,25 @@ class dock(OlivOS.API.Proc_templet):
                 for type_this in OlivOS.accountMetadataAPI.accountTypeList:
                     if type_this in OlivOS.accountMetadataAPI.accountTypeMappingList:
                         mapping = OlivOS.accountMetadataAPI.accountTypeMappingList[type_this]
-                        if (len(mapping) >= 3 and 
-                            str(mapping[0]) == platform_platform and 
-                            str(mapping[1]) == platform_sdk and 
-                            str(mapping[2]) == platform_model):
+                        if (
+                            len(mapping) >= 3
+                            and str(mapping[0]) == platform_platform
+                            and str(mapping[1]) == platform_sdk
+                            and str(mapping[2]) == platform_model
+                        ):
                             return type_this
-        except:
+        except Exception:
             pass
         return '自定义'
-    
-    def getAccountDisplayInfo(self, botHash, bot_info, flagInit = False):
+
+    def getAccountDisplayInfo(self, botHash, bot_info, flagInit=False):
         """
         获取账号显示信息（名称和协议端）
         """
         account_name = "未知账号"
         try:
             account_name = str(bot_info.id)
-        except:
+        except Exception:
             pass
         if not flagInit:
             try:
@@ -578,19 +692,19 @@ class dock(OlivOS.API.Proc_templet):
                     account_name = f'{account_name}({str(bot_info.id)})'
                 else:
                     account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
-            except:
+            except Exception:
                 try:
                     account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
-                except:
+                except Exception:
                     pass
         platform_name = self.getPlatformDisplayName(bot_info)
         return account_name, platform_name
 
-    def updateAccountList(self, flagInit = False):
+    def updateAccountList(self, flagInit=False):
         self.UIData['shallow_account_list_new'] = []
         if self.bot_info and type(self.bot_info) is dict:
             for botHash, bot_info in self.bot_info.items():
-                account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info, flagInit = flagInit)
+                account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info, flagInit=flagInit)
                 self.UIData['shallow_account_list_new'].append((botHash, account_name, platform_name))
             self.UIData['shallow_account_list_new'].sort(key=lambda x: x[1])
 
@@ -625,11 +739,11 @@ class dock(OlivOS.API.Proc_templet):
         account_list = self.UIData['shallow_account_list']
         account_count = len(account_list)
         if 0 == account_count:
-            self.updateAccountList(flagInit = True)
+            self.updateAccountList(flagInit=True)
             self.mergeAccountList()
         for botHash, account_name, platform_name in account_list:
             account_items.append(['account_info', f"{account_name} - {platform_name}", botHash])
-        
+
         self.UIData['shallow_menu_list'] = []
         self.UIData['shallow_menu_list'].extend([
             ['打开终端', self.startOlivOSTerminalUISend]
@@ -665,7 +779,7 @@ class dock(OlivOS.API.Proc_templet):
             ['更新OlivOS', self.sendOlivOSUpdateGet],
             ['退出OlivOS', self.setOlivOSExit]
         ])
-        
+
         for data_this in self.UIData['shallow_menu_list']:
             if data_this[0] in ['NapCat管理', 'OPQBot管理', 'gocqhttp管理', 'walleq管理', 'ComWeChat管理', '虚拟终端']:
                 if data_this[1] is not None:
@@ -793,7 +907,7 @@ class dock(OlivOS.API.Proc_templet):
             if hash in self.UIObject['root_gocqhttp_terminal']:
                 try:
                     self.UIObject['root_gocqhttp_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_gocqhttp_terminal'][hash] = gocqhttpTerminalUI(
                 Model_name='gocqhttp_terminal',
@@ -809,7 +923,7 @@ class dock(OlivOS.API.Proc_templet):
             if hash in self.UIObject['root_walleq_terminal']:
                 try:
                     self.UIObject['root_walleq_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_walleq_terminal'][hash] = walleqTerminalUI(
                 Model_name='walleq_terminal',
@@ -825,7 +939,7 @@ class dock(OlivOS.API.Proc_templet):
             if hash in self.UIObject['root_cwcb_terminal']:
                 try:
                     self.UIObject['root_cwcb_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_cwcb_terminal'][hash] = CWCBTerminalUI(
                 Model_name='cwcb_terminal',
@@ -841,7 +955,7 @@ class dock(OlivOS.API.Proc_templet):
             if hash in self.UIObject['root_opqbot_terminal']:
                 try:
                     self.UIObject['root_opqbot_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_opqbot_terminal'][hash] = opqbotTerminalUI(
                 Model_name='opqbot_terminal',
@@ -857,7 +971,7 @@ class dock(OlivOS.API.Proc_templet):
             if hash in self.UIObject['root_napcat_terminal']:
                 try:
                     self.UIObject['root_napcat_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_napcat_terminal'][hash] = napcatTerminalUI(
                 Model_name='napcat_terminal',
@@ -875,24 +989,25 @@ class dock(OlivOS.API.Proc_templet):
         return resFunc
 
     def startVirtualTerminalUISend(self, hash):
-        self.sendRxEvent('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'virtual_terminal',
-                'event': 'virtual_terminal_on',
-                'hash': hash,
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'virtual_terminal',
+                    'event': 'virtual_terminal_on',
+                    'hash': hash,
+                }
             }
-        }
-                                  )
+        )
 
     def startVirtualTerminalUI(self, hash):
         if hash in self.bot_info:
             if hash in self.UIObject['root_virtual_terminal_terminal']:
                 try:
                     self.UIObject['root_virtual_terminal_terminal'][hash].stop()
-                except:
+                except Exception:
                     pass
             self.UIObject['root_virtual_terminal_terminal'][hash] = VirtualTerminalUI(
                 Model_name='virtual_terminal',
@@ -904,21 +1019,22 @@ class dock(OlivOS.API.Proc_templet):
             self.UIObject['root_virtual_terminal_terminal'][hash].start()
 
     def startOlivOSTerminalUISend(self):
-        self.sendRxEvent('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'OlivOS_terminal_on'
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'OlivOS_terminal_on'
+                }
             }
-        }
-                                  )
+        )
 
     def startOlivOSTerminalUI(self):
         if self.UIObject['root_OlivOS_terminal'] is not None:
             try:
                 self.UIObject['root_OlivOS_terminal'].stop()
-            except:
+            except Exception:
                 pass
         self.UIObject['root_OlivOS_terminal'] = OlivOSTerminalUI(
             Model_name='OlivOS_terminal',
@@ -929,94 +1045,101 @@ class dock(OlivOS.API.Proc_templet):
         self.UIObject['root_OlivOS_terminal'].start()
 
     def setGoCqhttpModelSend(self, hash, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'gocqhttp_lib_exe_model',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'gocqhttp_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
             }
-        }
-                                  )
+        )
 
     def setWalleQModelSend(self, hash, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'walleq_lib_exe_model',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'walleq_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
             }
-        }
-                                  )
+        )
 
     def setCWCBModelSend(self, hash, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'cwcb_lib_exe_model',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'cwcb_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
             }
-        }
-                                  )
+        )
 
     def setOPQBotModelSend(self, hash, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'opqbot_lib_exe_model',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'opqbot_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
             }
-        }
-                                  )
+        )
 
     def setNapCatModelSend(self, hash, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'napcat_lib_exe_model',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'napcat_lib_exe_model',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data
+                }
             }
-        }
-                                  )
+        )
 
     def setVirtualModelSend(self, hash, data, user_conf=None):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'terminal_link',
-                'hash': hash
-            },
-            'data': {
-                'action': 'input',
-                'data': data,
-                'user_conf': user_conf
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'terminal_link',
+                    'hash': hash
+                },
+                'data': {
+                    'action': 'input',
+                    'data': data,
+                    'user_conf': user_conf
+                }
             }
-        }
-                                  )
+        )
 
     def startPluginEditSend(self):
-        self.sendRxEvent('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'plugin_edit_menu_on'
+        self.sendRxEvent(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'plugin_edit_menu_on'
+                }
             }
-        }
-                                  )
+        )
 
     def sendRxEvent(self, action, data):
         if self.Proc_info.rx_queue is not None:
@@ -1046,9 +1169,9 @@ class dock(OlivOS.API.Proc_templet):
             for obj_this in self.UIObject['root_plugin_edit']:
                 try:
                     self.UIObject['root_plugin_edit'][obj_this]['obj'].tree_load()
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
 
     def setOlivOSExit(self):
@@ -1061,17 +1184,18 @@ class dock(OlivOS.API.Proc_templet):
         return resFunc
 
     def sendPluginControlEvent(self, pluginNameSpace, eventName):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'plugin'
-            },
-            'data': {
-                'action': 'plugin_menu',
-                'namespace': pluginNameSpace,
-                'event': eventName
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'plugin'
+                },
+                'data': {
+                    'action': 'plugin_menu',
+                    'namespace': pluginNameSpace,
+                    'event': eventName
+                }
             }
-        }
-                                  )
+        )
 
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
@@ -1124,8 +1248,10 @@ class dock(OlivOS.API.Proc_templet):
         self.sendOpenWebviewEvent('forum_page', 'OlivOS论坛', 'https://forum.olivos.run/')
 
     def sendOpenQRcodeUrl(self, hash, url):
-        if type(self.bot_info) is dict \
-        and hash in self.bot_info:
+        if (
+            type(self.bot_info) is dict
+            and hash in self.bot_info
+        ):
             try:
                 res = tkinter.messagebox.askquestion(f'请使用账号 {self.bot_info[hash].id} 扫码', "是否使用内置浏览器?")
                 if res == 'yes':
@@ -1137,9 +1263,9 @@ class dock(OlivOS.API.Proc_templet):
 
     def sendOpenWebviewEvent(
         self,
-        name:str,
-        title:str,
-        url:str
+        name: str,
+        title: str,
+        url: str
     ):
         OlivOS.webviewUIAPI.sendOpenWebviewPage(
             self.Proc_info.control_queue,
@@ -1198,9 +1324,19 @@ class QRcodeUI(object):
 
         self.UIObject['root_qrcode_img_data'] = Image.open(self.path)
         try:
-            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize((500, 500), Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
+            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize(
+                (500, 500),
+                (
+                    Image.Resampling.LANCZOS
+                    if hasattr(Image, 'Resampling')
+                    else Image.LANCZOS
+                )
+            )
         except AttributeError:
-            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize((500, 500), Image.ANTIALIAS)
+            self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize(
+                (500, 500),
+                Image.ANTIALIAS
+            )
         self.UIObject['root_qrcode_img'] = ImageTk.PhotoImage(self.UIObject['root_qrcode_img_data'])
         self.UIObject['root_qrcode_label'] = tkinter.Label(self.UIObject['root'])
         self.UIObject['root_qrcode_label'].config(image=self.UIObject['root_qrcode_img'])
@@ -1483,16 +1619,16 @@ class gocqhttpTerminalUI(object):
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_gocqhttp_terminal_data']:
             for line in self.root.UIObject['root_gocqhttp_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line, flagInit = True)
+                self.tree_add_line(line, flagInit=True)
 
-    def tree_add_line(self, data, flagInit = False):
+    def tree_add_line(self, data, flagInit=False):
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace('\\', '\\\\')
-        res_data = res_data.replace(' ', '\ ')
-        if len(res_data.replace('\ ', '')) > 0:
+        res_data = res_data.replace(' ', '\\ ')
+        if len(res_data.replace('\\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
@@ -1505,8 +1641,8 @@ class gocqhttpTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
         if not flagInit and platform.system() == 'Windows':
@@ -1515,32 +1651,38 @@ class gocqhttpTerminalUI(object):
                     r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请选择提交滑块ticket方式:.*$',
                     res_data_raw
                 )
-                if matchRes != None:
+                if matchRes is not None:
                     self.tree_add_line('=================================================================')
                     self.tree_add_line('        【推荐】　选择手动抓取ticket方式将会允许OlivOS接管验证流程　【推荐】')
                     self.tree_add_line('=================================================================')
 
                 matchRes = re.match(
-                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://ti\.qq\.com/safe/tools/captcha/sms-verify-login\?[^\s]+).*$',
+                    (
+                        r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+'
+                        r'->\s+(http[s]{0,1}://ti\.qq\.com/safe/tools/captcha/sms-verify-login\?[^\s]+).*$'
+                    ),
                     res_data_raw
                 )
-                if matchRes != None:
+                if matchRes is not None:
                     matchResList = list(matchRes.groups())
                     if len(matchResList) == 1:
                         matchResUrl = matchResList[0]
                         self.show_tx_url_webbrowser(matchResUrl)
 
                 matchRes = re.match(
-                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s账号已开启设备锁，请前往\s+->\s+(http[s]{0,1}://accounts\.qq\.com/safe/verify[^\s]+).*$',
+                    (
+                        r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s账号已开启设备锁，请前往\s+'
+                        r'->\s+(http[s]{0,1}://accounts\.qq\.com/safe/verify[^\s]+).*$'
+                    ),
                     res_data_raw
                 )
-                if matchRes != None:
+                if matchRes is not None:
                     matchResList = list(matchRes.groups())
                     if len(matchResList) == 1:
                         matchResUrl = matchResList[0]
                         matchResUrl = matchResUrl.replace('accounts.qq.com/safe/verify', 'accounts.qq.com/safe/qrcode')
                         self.show_url_webbrowser(matchResUrl)
-            except:
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -1805,16 +1947,16 @@ class walleqTerminalUI(object):
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_walleq_terminal_data']:
             for line in self.root.UIObject['root_walleq_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line, flagInit = True)
+                self.tree_add_line(line, flagInit=True)
 
-    def tree_add_line(self, data, flagInit = False):
+    def tree_add_line(self, data, flagInit=False):
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
         res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace('\\', '\\\\')
-        res_data = res_data.replace(' ', '\ ')
-        if len(res_data.replace('\ ', '')) > 0:
+        res_data = res_data.replace(' ', '\\ ')
+        if len(res_data.replace('\\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
@@ -1827,22 +1969,25 @@ class walleqTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
         if not flagInit and platform.system() == 'Windows':
             try:
                 matchRes = re.match(
-                    r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$',
+                    (
+                        r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+'
+                        r'->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$'
+                    ),
                     res_data_raw
                 )
-                if matchRes != None:
+                if matchRes is not None:
                     matchResList = list(matchRes.groups())
                     if len(matchResList) == 1:
                         matchResUrl = matchResList[0]
                         self.show_url_webbrowser(matchResUrl)
-            except:
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -1874,7 +2019,6 @@ class walleqTerminalUI(object):
 
     def exit(self):
         self.root.UIObject['root_walleq_terminal'].pop(self.bot.hash)
-
 
 
 class CWCBTerminalUI(object):
@@ -2100,16 +2244,15 @@ class CWCBTerminalUI(object):
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_cwcb_terminal_data']:
             for line in self.root.UIObject['root_cwcb_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line, flagInit = True)
+                self.tree_add_line(line, flagInit=True)
 
-    def tree_add_line(self, data, flagInit = False):
+    def tree_add_line(self, data, flagInit=False):
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
-        res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace('\\', '\\\\')
-        res_data = res_data.replace(' ', '\ ')
-        if len(res_data.replace('\ ', '')) > 0:
+        res_data = res_data.replace(' ', '\\ ')
+        if len(res_data.replace('\\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
@@ -2122,8 +2265,8 @@ class CWCBTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -2155,7 +2298,6 @@ class CWCBTerminalUI(object):
 
     def exit(self):
         self.root.UIObject['root_cwcb_terminal'].pop(self.bot.hash)
-
 
 
 class opqbotTerminalUI(object):
@@ -2381,16 +2523,15 @@ class opqbotTerminalUI(object):
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_opqbot_terminal_data']:
             for line in self.root.UIObject['root_opqbot_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line, flagInit = True)
+                self.tree_add_line(line, flagInit=True)
 
-    def tree_add_line(self, data, flagInit = False):
+    def tree_add_line(self, data, flagInit=False):
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
-        res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace('\\', '\\\\')
-        res_data = res_data.replace(' ', '\ ')
-        if len(res_data.replace('\ ', '')) > 0:
+        res_data = res_data.replace(' ', '\\ ')
+        if len(res_data.replace('\\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
@@ -2403,8 +2544,8 @@ class opqbotTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -2661,16 +2802,15 @@ class napcatTerminalUI(object):
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_napcat_terminal_data']:
             for line in self.root.UIObject['root_napcat_terminal_data'][self.bot.hash]:
-                self.tree_add_line(line, flagInit = True)
+                self.tree_add_line(line, flagInit=True)
 
-    def tree_add_line(self, data, flagInit = False):
+    def tree_add_line(self, data, flagInit=False):
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
-        res_data_raw = res_data
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data_1 = res_data
         res_data = res_data.replace('\\', '\\\\')
-        res_data = res_data.replace(' ', '\ ')
-        if len(res_data.replace('\ ', '')) > 0:
+        res_data = res_data.replace(' ', '\\ ')
+        if len(res_data.replace('\\ ', '')) > 0:
             try:
                 iid = self.UIObject['tree'].insert(
                     '',
@@ -2683,8 +2823,8 @@ class napcatTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -2710,14 +2850,12 @@ class napcatTerminalUI(object):
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
 
-
     def stop(self):
         self.exit()
         self.UIObject['root'].destroy()
 
     def exit(self):
         self.root.UIObject['root_napcat_terminal'].pop(self.bot.hash)
-
 
 
 class OlivOSTerminalUI(object):
@@ -2993,7 +3131,9 @@ class OlivOSTerminalUI(object):
         #    height = height
         # )
         self.UIObject[obj_name].configure(state='readonly')
-        # self.UIObject[obj_name].bind('<<ComboboxSelected>>', lambda x : self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name))
+        # self.UIObject[obj_name].bind(
+        #     '<<ComboboxSelected>>', lambda x: self.tree_edit_UI_Combobox_ComboboxSelected(x, action, obj_name)
+        # )
 
     def tree_init_line(self):
         tmp_count_old = 0
@@ -3004,7 +3144,7 @@ class OlivOSTerminalUI(object):
                     self.tree_add_line(line)
                 tmp_count_old = tmp_count_new
                 tmp_count_new = len(self.root.UIObject['root_OlivOS_terminal_data'])
-        except:
+        except Exception:
             pass
 
     def tree_add_line(self, data):
@@ -3026,7 +3166,7 @@ class OlivOSTerminalUI(object):
             if len(sig_list) >= 2:
                 sig_02, sig_03 = sig_03, sig_list[1][0]
             if len(sig_list) >= 3:
-                sig_01, sig_02, sig_03 = sig_02, sig_03, sig_list[2][0]
+                sig_01, sig_02, sig_03 = sig_02, sig_03, sig_list[2][0]  # noqa: F841
             log_level = OlivOS.diagnoseAPI.level_dict[data_raw['log_level']]
             if len(res_data) > 0:
                 try:
@@ -3044,8 +3184,8 @@ class OlivOSTerminalUI(object):
                     keep_tree_thin(self.UIObject['tree'])
                     if self.UIData['flag_tree_is_bottom']:
                         self.UIObject['tree'].see(iid)
-                        #self.UIObject['tree'].update()
-                except:
+                        # self.UIObject['tree'].update()
+                except Exception:
                     pass
 
     def stopManual(self):
@@ -3054,7 +3194,7 @@ class OlivOSTerminalUI(object):
             self.root.UIObject['root_shallow'].UIObject['shallow_root'].notify(
                 '已最小化至托盘'
             )
-        except:
+        except Exception:
             pass
         self.stop()
 
@@ -3079,7 +3219,7 @@ class VirtualTerminalUI(object):
             # self.userConfDataInit(self.root.user_conf_data)
             self.UIConfig = {}
             self.UIConfig.update(dictColorContext)
-        
+
         def start(self):
             self.UIObject['root'] = tkinter.Toplevel(
                 master=self.root.UIObject['root'],
@@ -3221,7 +3361,6 @@ class VirtualTerminalUI(object):
                 value=datadict['group_role']
             )
 
-
         def setUserConfDataFunc(self):
             """
                 根据编辑界面中的用户信息数据，更新 VirtualTerminalUI 的用户信息
@@ -3238,7 +3377,6 @@ class VirtualTerminalUI(object):
             else:
                 tmp_data['target_id'] = self.root.bot.id        # 当为私聊消息时，target_id 为 bot 的 id
             self.root.user_conf_data = tmp_data
-
 
         def buttom_action(self, name, action):
             if name in self.UIObject:
@@ -3277,7 +3415,7 @@ class VirtualTerminalUI(object):
                 background=self.UIConfig['color_001'],
                 foreground=self.UIConfig['color_004']
             )
-            #self.UIData['style'].map("TCheckbutton", background=[("active", "darkgrey")])
+            # self.UIData['style'].map("TCheckbutton", background=[("active", "darkgrey")])
 
         def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
@@ -3289,10 +3427,10 @@ class VirtualTerminalUI(object):
                 fg=self.UIConfig['color_004']
             )
             self.UIObject[obj_name + '=Label'].place(
-               x = x - width_t,
-               y = y,
-               width = width_t,
-               height = height
+               x=x - width_t,
+               y=y,
+               width=width_t,
+               height=height
             )
             # self.UIData[str_name] = tkinter.BooleanVar(
             #     master=self.UIObject[obj_name],
@@ -3311,8 +3449,8 @@ class VirtualTerminalUI(object):
             #     bd=0
             # )
             self.UIObject[obj_name].place(
-               x = x,
-               y = y
+               x=x,
+               y=y
             )
 
         def root_ComboBox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
@@ -3331,10 +3469,10 @@ class VirtualTerminalUI(object):
                 fg=self.UIConfig['color_004']
             )
             self.UIObject[obj_name + '=Label'].place(
-               x = x - width_t,
-               y = y,
-               width = width_t,
-               height = height
+               x=x - width_t,
+               y=y,
+               width=width_t,
+               height=height
             )
             # self.UIData[str_name] = tkinter.StringVar(
             #     master=self.UIObject[obj_name],
@@ -3352,13 +3490,17 @@ class VirtualTerminalUI(object):
             #     bd=0
             # )
             self.UIObject[obj_name].place(
-               x = x,
-               y = y,
-               width = width,
-               height = height
+               x=x,
+               y=y,
+               width=width,
+               height=height
             )
 
-        def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'):
+        def root_Entry_init(
+            self, obj_root, obj_name, str_name, x, y, width_t, width, height, action,
+            title='',
+            mode='NONE'
+        ):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(
                 self.UIObject[obj_root],
                 text=title
@@ -3368,10 +3510,10 @@ class VirtualTerminalUI(object):
                 fg=self.UIConfig['color_004']
             )
             self.UIObject[obj_name + '=Label'].place(
-               x = x - width_t,
-               y = y,
-               width = width_t,
-               height = height
+               x=x - width_t,
+               y=y,
+               width=width_t,
+               height=height
             )
             self.UIObject[obj_name] = tkinter.Entry(
                 self.UIObject[obj_root],
@@ -3383,16 +3525,15 @@ class VirtualTerminalUI(object):
                 bd=0
             )
             self.UIObject[obj_name].place(
-               x = x,
-               y = y,
-               width = width,
-               height = height
+               x=x,
+               y=y,
+               width=width,
+               height=height
             )
             if mode == 'SAFE':
                 self.UIObject[obj_name].configure(
                     show='●'
                 )
-
 
         def stop(self):
             self.exit()
@@ -3555,12 +3696,12 @@ class VirtualTerminalUI(object):
         if action == 'show':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
-                msg = msg.replace('\ ', ' ')
+                msg = msg.replace('\\ ', ' ')
                 messagebox.showinfo('日志内容', msg)
         elif action == 'copy':
             msg = get_tree_force(self.UIObject['tree'])['text']
             if len(msg) > 0:
-                msg = msg.replace('\ ', ' ')
+                msg = msg.replace('\\ ', ' ')
                 self.UIObject['root'].clipboard_clear()
                 self.UIObject['root'].clipboard_append(msg)
                 self.UIObject['root'].update()
@@ -3575,7 +3716,7 @@ class VirtualTerminalUI(object):
             self.UIObject["root_terminal_account_edit"] = None
         elif self.UIObject['root_terminal_account_edit'] is not None:
             self.UIObject['root_terminal_account_edit'].stop()
-        
+
         self.UIObject['root_terminal_account_edit'] = self.VirtualTerminalUI_AccountEdit(
             Model_name=self.Model_name,
             root=self,
@@ -3636,7 +3777,6 @@ class VirtualTerminalUI(object):
         if user_conf is None:
             user_conf = data["user_conf"]
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
-        res_data_1 = res_data
         res_data = res_data.replace(' ', r'\ ')
         res_data = res_data.replace('\r\n', '\n')
         if not user_conf['flag_group']:
@@ -3660,8 +3800,8 @@ class VirtualTerminalUI(object):
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
-                    #self.UIObject['tree'].update()
-            except:
+                    # self.UIObject['tree'].update()
+            except Exception:
                 pass
 
     def buttom_action(self, name, action):
@@ -3716,10 +3856,10 @@ class shallow(object):
 
     def getMenu(self, data):
         if data is not None:
-            if type(data) == list:
+            if type(data) is list:
                 list_new = []
                 for item_this in data:
-                    if type(item_this) == list:
+                    if type(item_this) is list:
                         # 处理账号信息项（禁用）
                         if len(item_this) == 3 and item_this[0] == 'account_info':
                             list_new.append(
@@ -3754,7 +3894,10 @@ class shallow(object):
                                 )
                             )
                         elif len(item_this) == 3:
-                            if type(item_this[1]) == str and type(item_this[2]) == str:
+                            if (
+                                type(item_this[1]) is str
+                                and type(item_this[2]) is str
+                            ):
                                 list_new.append(
                                     pystray.MenuItem(
                                         item_this[0],
@@ -3765,7 +3908,11 @@ class shallow(object):
                                     )
                                 )
                         elif len(item_this) == 4:
-                            if type(item_this[1]) == str and type(item_this[2]) == str and type(item_this[3]) == str:
+                            if (
+                                type(item_this[1]) is str
+                                and type(item_this[2]) is str
+                                and type(item_this[3]) is str
+                            ):
                                 if item_this[3] == 'gocqhttp':
                                     list_new.append(
                                         pystray.MenuItem(
@@ -3991,14 +4138,14 @@ class pluginManageUI(object):
         tmp_tree_item_children = self.UIObject['tree'].get_children()
         for tmp_tree_item_this in tmp_tree_item_children:
             self.UIObject['tree'].delete(tmp_tree_item_this)
-        
+
         # 清空映射表
         self.UIData['item_namespace_map'] = {}
-        
-        if self.root != None:
+
+        if self.root is not None:
             if self.root.UIData['shallow_plugin_data_dict'] is not None:
                 tmp_plugin_menu_dict = self.root.UIData['shallow_plugin_data_dict']
-                
+
                 # 收集所有插件并按优先级排序
                 plugin_list = []
                 for plugin_namespace in tmp_plugin_menu_dict:
@@ -4007,13 +4154,13 @@ class pluginManageUI(object):
                     folder_path = plugin_this[5] if len(plugin_this) > 5 else ''
                     # 规范化路径
                     folder_path = folder_path.replace('\\', '/')
-                    
+
                     # 构建完整路径
                     if folder_path:
                         full_path = '/' + folder_path + '/' + os.path.basename(plugin_namespace)
                     else:
                         full_path = '/' + os.path.basename(plugin_namespace)
-                    
+
                     plugin_list.append({
                         'namespace': plugin_namespace,
                         'name': plugin_this[0],
@@ -4022,10 +4169,10 @@ class pluginManageUI(object):
                         'priority': priority,
                         'full_path': full_path
                     })
-                
+
                 # 按优先级排序
                 sorted_plugins = sorted(plugin_list, key=lambda x: x['priority'])
-                
+
                 # 插入到树中
                 for plugin_data in sorted_plugins:
                     if self.UIData['show_path']:
@@ -4054,7 +4201,7 @@ class pluginManageUI(object):
                             )
                         )
                     self.UIData['item_namespace_map'][item_id] = plugin_data['namespace']
-    
+
     def toggleDisplayMode(self):
         """切换显示/隐藏路径列"""
         if self.UIData['show_path']:
@@ -4079,7 +4226,7 @@ class pluginManageUI(object):
             self.UIObject['tree'].column('NAME', width=120)
             self.UIObject['tree'].column('VERSION', width=120)
             self.UIObject['tree'].column('AUTHOR', width=90)
-        
+
         # 重新加载插件列表以应用新的列配置
         self.tree_load()
 
@@ -4148,7 +4295,7 @@ class pluginManageUI(object):
                 self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
                 self.UIData['root_Label_INFO_StringVar'].set('未找到插件信息')
                 return
-            
+
             tmp_info_str = '这个插件的作者很懒，没有写介绍。'
             tmp_priority_str = 'N/A'
             if plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
@@ -4157,10 +4304,10 @@ class pluginManageUI(object):
                 if len(plugin_menu_now) > 6:
                     tmp_priority_str = str(plugin_menu_now[6])
                 # 获取介绍
-                if type(plugin_menu_now[4]) == str:
+                if type(plugin_menu_now[4]) is str:
                     if plugin_menu_now[4] != 'N/A':
                         tmp_info_str = plugin_menu_now[4]
-            
+
             self.UIData['root_Label_PRIORITY_StringVar'].set(tmp_priority_str)
             self.UIData['root_Label_INFO_StringVar'].set(tmp_info_str)
 
@@ -4169,7 +4316,7 @@ class pluginManageUI(object):
 
     def pluginMenu(self, name):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
-        
+
         selected_item = self.UIObject['tree'].focus()
         if not selected_item:
             self.UIObject['tree_rightkey_menu'].add_command(label='未选定插件', command=None)
@@ -4178,25 +4325,26 @@ class pluginManageUI(object):
                 self.UIData['click_record'][name].y_root
             )
             return
-        
+
         # 从映射表获取插件的 namespace
         plugin_namespace_now = self.UIData['item_namespace_map'].get(selected_item, None)
-        
+
         if plugin_namespace_now and plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
             plugin_menu_now = self.root.UIData['shallow_plugin_data_dict'][plugin_namespace_now]
-            if type(plugin_menu_now[3]) == list:
+            if type(plugin_menu_now[3]) is list:
                 for plugin_menu_this in plugin_menu_now[3]:
-                    self.UIObject['tree_rightkey_menu'].add_command(label=plugin_menu_this[0],
-                                                                    command=self.root.sendPluginControlEventFunc(
-                                                                        plugin_menu_this[1],
-                                                                        plugin_menu_this[2]
-                                                                    )
-                                                                    )
+                    self.UIObject['tree_rightkey_menu'].add_command(
+                        label=plugin_menu_this[0],
+                        command=self.root.sendPluginControlEventFunc(
+                            plugin_menu_this[1],
+                            plugin_menu_this[2]
+                        )
+                    )
             else:
                 self.UIObject['tree_rightkey_menu'].add_command(label='无选项', command=None)
         else:
             self.UIObject['tree_rightkey_menu'].add_command(label='未找到插件', command=None)
-        
+
         self.UIObject['tree_rightkey_menu'].post(
             self.UIData['click_record'][name].x_root,
             self.UIData['click_record'][name].y_root
@@ -4206,12 +4354,14 @@ class pluginManageUI(object):
 def get_tree_force(tree_obj: ttk.Treeview):
     return tree_obj.item(tree_obj.focus())
 
+
 # 此函数用于确保传入的tree组件的条目数不超过指定数目
 def keep_tree_thin(tree_obj: ttk.Treeview, max_num: int = gTerminalDataMax, step_num: int = gTerminalDataStep):
     items = tree_obj.get_children()
     if len(items) > max_num:
         for i in range(min(max_num, step_num)):
             tree_obj.delete(items[i])
+
 
 def releaseBase64Data(dir_path, file_name, base64_data):
     if not os.path.exists(dir_path):

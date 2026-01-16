@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -18,6 +18,7 @@ import OlivOS
 
 import webview
 import os
+
 
 class page(OlivOS.API.Proc_templet):
     def __init__(
@@ -53,7 +54,7 @@ class page(OlivOS.API.Proc_templet):
         releaseDir('./data')
         releaseDir('./data/webview')
         releaseDir('./data/webview/%s' % self.Proc_name)
-        if self.UIData['url'] != None:
+        if self.UIData['url'] is not None:
             webview.create_window(
                 title=self.UIData['title'],
                 url=self.UIData['url'],
@@ -73,11 +74,12 @@ class page(OlivOS.API.Proc_templet):
         else:
             pass
 
+
 def sendOpenWebviewPage(
     control_queue,
-    name:str,
-    title:str,
-    url:str
+    name: str,
+    title: str,
+    url: str
 ):
     if control_queue is not None:
         control_queue.put(

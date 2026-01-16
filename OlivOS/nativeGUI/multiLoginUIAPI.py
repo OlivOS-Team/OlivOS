@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -39,6 +39,7 @@ dictColorContext = {
     'color_006': '#80D7FF'
 }
 
+
 def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
     if platform.system() == 'Windows':
         try:
@@ -53,12 +54,13 @@ def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
                 control_queue=control_queue
             )
             tmp_res = tmp_t.start()
-            if tmp_res != True:
+            if tmp_res is not True:
                 pass
             if tmp_t.UIData['flag_commit']:
                 pass
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
+
 
 def sendAccountUpdate(obj, control_queue, account_data):
     if control_queue is not None:
@@ -105,6 +107,7 @@ def sendAccountUpdate(obj, control_queue, account_data):
             block=False
         )
 
+
 class HostUI(object):
     def __init__(
         self,
@@ -150,22 +153,22 @@ class HostUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        #self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
+        # self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
         self.UIObject['tree']['columns'] = ('ID', 'TYPE')
         self.UIObject['tree'].column('ID', width=200)
         self.UIObject['tree'].column('TYPE', width=200)
-        #self.UIObject['tree'].column('PLATFORM', width=100)
-        #self.UIObject['tree'].column('SDK', width=100)
-        #self.UIObject['tree'].column('MODEL', width=100)
+        # self.UIObject['tree'].column('PLATFORM', width=100)
+        # self.UIObject['tree'].column('SDK', width=100)
+        # self.UIObject['tree'].column('MODEL', width=100)
         self.UIObject['tree'].heading('ID', text='ID')
         self.UIObject['tree'].heading('TYPE', text='账号类型')
-        #self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
-        #self.UIObject['tree'].heading('SDK', text='SDK')
-        #self.UIObject['tree'].heading('MODEL', text='MODEL')
+        # self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
+        # self.UIObject['tree'].heading('SDK', text='SDK')
+        # self.UIObject['tree'].heading('MODEL', text='MODEL')
         self.UIObject['tree']['selectmode'] = 'browse'
         # 这个加载流程现在需要后置
         # 因为它现在需要同时控制 self.UIObject['root_frame_first_root'] 这个遮罩层是否显示
-        #self.tree_load()
+        # self.tree_load()
         self.UIObject['tree'].place(x=0, y=0, width=500, height=350)
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
         self.UIObject['root'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
@@ -227,8 +230,8 @@ class HostUI(object):
 
         # 无账号时的引导遮罩层
         self.UIObject['root_frame_first_root'] = tkinter.Frame(self.UIObject['root'])
-        self.UIObject['root_frame_first_root'].configure(relief = tkinter.FLAT)
-        self.UIObject['root_frame_first_root'].configure(bg = self.UIConfig['color_001'], borderwidth = 0)
+        self.UIObject['root_frame_first_root'].configure(relief=tkinter.FLAT)
+        self.UIObject['root_frame_first_root'].configure(bg=self.UIConfig['color_001'], borderwidth=0)
         # 这个组件使用这两个方法进行显示和隐藏
         # 位置信息依赖此处的数据
         # 是否显示通常受到数据控制其是否显示
@@ -243,7 +246,7 @@ class HostUI(object):
 
         self.UIObject['root_frame_first_root_label_note_new'] = tkinter.Label(
             self.UIObject['root_frame_first_root'],
-            text = '\n'.join(
+            text='\n'.join(
                 [
                     '欢迎使用 OlivOS',
                     '',
@@ -252,9 +255,9 @@ class HostUI(object):
             )
         )
         self.UIObject['root_frame_first_root_label_note_new'].configure(
-            bg = self.UIConfig['color_001'],
-            fg = self.UIConfig['color_004'],
-            font = ('等线', 16, 'bold')
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004'],
+            font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_first_root_label_note_new'].place(
             x=int(518/2 - 518/2),
@@ -277,16 +280,16 @@ class HostUI(object):
 
         self.UIObject['root_frame_first_root_label_note_commit'] = tkinter.Label(
             self.UIObject['root_frame_first_root'],
-            text = '\n'.join(
+            text='\n'.join(
                 [
                     '或者你也可以'
                 ]
             )
         )
         self.UIObject['root_frame_first_root_label_note_commit'].configure(
-            bg = self.UIConfig['color_001'],
-            fg = self.UIConfig['color_004'],
-            font = ('等线', 12, 'bold')
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004'],
+            font=('等线', 12, 'bold')
         )
         self.UIObject['root_frame_first_root_label_note_commit'].place(
             x=391 - 16 * 6 - 8,
@@ -308,8 +311,8 @@ class HostUI(object):
 
         # 确认真的要无账号启动时的引导遮罩层
         self.UIObject['root_frame_skip_root'] = tkinter.Frame(self.UIObject['root'])
-        self.UIObject['root_frame_skip_root'].configure(relief = tkinter.FLAT)
-        self.UIObject['root_frame_skip_root'].configure(bg = self.UIConfig['color_001'], borderwidth = 0)
+        self.UIObject['root_frame_skip_root'].configure(relief=tkinter.FLAT)
+        self.UIObject['root_frame_skip_root'].configure(bg=self.UIConfig['color_001'], borderwidth=0)
         # 这个组件使用这两个方法进行显示和隐藏
         # 位置信息依赖此处的数据
         # 需要按钮流程控制其是否显示
@@ -324,7 +327,7 @@ class HostUI(object):
 
         self.UIObject['root_frame_skip_root_label_note_commit'] = tkinter.Label(
             self.UIObject['root_frame_skip_root'],
-            text = '\n'.join(
+            text='\n'.join(
                 [
                     'OlivOS 的大部分功能都是基于账号进行的',
                     '',
@@ -336,9 +339,9 @@ class HostUI(object):
             )
         )
         self.UIObject['root_frame_skip_root_label_note_commit'].configure(
-            bg = self.UIConfig['color_001'],
-            fg = self.UIConfig['color_004'],
-            font = ('等线', 16, 'bold')
+            bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004'],
+            font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_skip_root_label_note_commit'].place(
             x=int(518/2 - 518/2),
@@ -437,9 +440,9 @@ class HostUI(object):
                 values=(
                     self.UIData['Account_data'][Account_hash_this].id,
                     self.get_account_data_type_name(Account_hash_this)
-                    #self.UIData['Account_data'][Account_hash_this].platform['platform'],
-                    #self.UIData['Account_data'][Account_hash_this].platform['sdk'],
-                    #self.UIData['Account_data'][Account_hash_this].platform['model']
+                    # self.UIData['Account_data'][Account_hash_this].platform['platform'],
+                    # self.UIData['Account_data'][Account_hash_this].platform['sdk'],
+                    # self.UIData['Account_data'][Account_hash_this].platform['model']
                 )
             )
         if len(self.UIData['Account_data']) <= 0:
@@ -477,7 +480,7 @@ class HostUI(object):
     def account_data_commit(self):
         self.UIData['flag_commit'] = True
         self.res = True
-        if type(self.callbackData) == dict:
+        if type(self.callbackData) is dict:
             self.callbackData['res'] = self.res
         sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
@@ -494,8 +497,10 @@ class HostUI(object):
         for type_this in OlivOS.accountMetadataAPI.accountTypeList:
             flag_hit = True
             for list_data_check_i in range(len(list_data_check)):
-                if list_data_check[list_data_check_i] \
-                != OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]:
+                if (
+                    list_data_check[list_data_check_i]
+                    != OlivOS.accountMetadataAPI.accountTypeMappingList[type_this][list_data_check_i]
+                ):
                     flag_hit = False
                     break
             if flag_hit:
@@ -503,6 +508,7 @@ class HostUI(object):
         if flag_hit:
             res = type_this
         return res
+
 
 class TreeEditUI(object):
     def __init__(self, action, Account_data, hash_key=None, edit_commit_callback=None):
@@ -595,28 +601,28 @@ class TreeEditUI(object):
                     'QQ/NapCat/旧': './conf/napcat/{bothash}'
                 },
                 'type_extend_note_list': {
-                    #'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
-                    #'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
-                    #'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
-                    #'QQ/GoCq/旧': ['签名服务器', 'sign-server']
+                    # 'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
+                    # 'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
+                    # 'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
+                    # 'QQ/GoCq/旧': ['签名服务器', 'sign-server']
                     'RED协议': ['HTTP地址'],
                     '钉钉': ["AppKey", "AppSecret"],
                     'Hack.Chat/私有': ["WS地址"]
                 },
                 'type_extends_name_note_list': {
-                    #'QQ/GoCq/默认': ['签名服务器', 'KEY'],
-                    #'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
-                    #'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
-                    #'QQ/GoCq/旧': ['签名服务器', 'KEY']
+                    # 'QQ/GoCq/默认': ['签名服务器', 'KEY'],
+                    # 'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
+                    # 'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
+                    # 'QQ/GoCq/旧': ['签名服务器', 'KEY']
                     'RED协议': ['HTTP地址'],
                     '钉钉': ["AppKey", "AppSecret"],
                     'Hack.Chat/私有': ["WS地址"]
                 },
                 'type_extends_note_list': {
-                    #'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    #'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    #'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    #'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    # 'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    # 'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    # 'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
+                    # 'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
                     'RED协议': {'HTTP地址': 'http-path'},
                     '钉钉': {"AppKey": 'app_key', "AppSecret": "app_secret"},
                     'Hack.Chat/私有': {"WS地址": 'ws_path'}
@@ -935,40 +941,51 @@ class TreeEditUI(object):
             tmp_platform_sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
             tmp_platform_platform = self.UIData['edit_root_Combobox_platform_StringVar'].get()
             tmp_platform_model = self.UIData['edit_root_Combobox_model_StringVar'].get()
-            tmp_extend = self.UIData['edit_root_Entry_Extend_StringVar'].get()
-            tmp_extends = [self.UIData[edit_root_Entry_Extend_this + '_StringVar'].get() for edit_root_Entry_Extend_this in self.UIData['edit_root_Entry_Extend_list']]
-            if tmp_platform_platform == 'qq' \
-            and tmp_platform_sdk == 'onebot' \
-            and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList \
-            and tmp_server_auto == 'True':
+            tmp_extend = self.UIData['edit_root_Entry_Extend_StringVar'].get()  # noqa: F841
+            tmp_extends = [
+                self.UIData[edit_root_Entry_Extend_this + '_StringVar'].get()
+                for edit_root_Entry_Extend_this in self.UIData['edit_root_Entry_Extend_list']
+            ]
+            if (
+                tmp_platform_platform == 'qq'
+                and tmp_platform_sdk == 'onebot'
+                and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList
+                and tmp_server_auto == 'True'
+            ):
                 if tmp_host == '':
                     tmp_host = 'http://127.0.0.1'
                 if tmp_port == '':
                     tmp_port = '58000'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform in ['qq', 'wechat'] \
-            and tmp_platform_sdk == 'onebot' \
-            and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList \
-            and tmp_server_auto == 'True':
+            if (
+                tmp_platform_platform in ['qq', 'wechat']
+                and tmp_platform_sdk == 'onebot'
+                and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList
+                and tmp_server_auto == 'True'
+            ):
                 if tmp_host == '':
                     tmp_host = 'ws://127.0.0.1'
                 if tmp_port == '':
                     tmp_port = '58001'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'qq' \
-            and tmp_platform_sdk == 'onebot' \
-            and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList \
-            and tmp_server_auto == 'False':
+            if (
+                tmp_platform_platform == 'qq'
+                and tmp_platform_sdk == 'onebot'
+                and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
+                and tmp_server_auto == 'False'
+            ):
                 if tmp_host == '':
                     tmp_host = '127.0.0.1'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'qq' \
-            and tmp_platform_sdk == 'onebot' \
-            and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList \
-            and tmp_server_auto == 'True':
+            if (
+                tmp_platform_platform == 'qq'
+                and tmp_platform_sdk == 'onebot'
+                and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
+                and tmp_server_auto == 'True'
+            ):
                 if tmp_host == '':
                     tmp_host = '127.0.0.1'
                 if tmp_platform_model in [
@@ -976,16 +993,20 @@ class TreeEditUI(object):
                 ]:
                     if tmp_port == '':
                         tmp_port = '8086'
-            if tmp_platform_platform == 'qqGuild' \
-            and tmp_platform_sdk == 'qqGuild_link':
+            if (
+                tmp_platform_platform == 'qqGuild'
+                and tmp_platform_sdk == 'qqGuild_link'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'qqGuild' \
-            and tmp_platform_sdk == 'qqGuildv2_link':
+            if (
+                tmp_platform_platform == 'qqGuild'
+                and tmp_platform_sdk == 'qqGuildv2_link'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
@@ -997,8 +1018,10 @@ class TreeEditUI(object):
                 ]:
                     if tmp_port == '':
                         tmp_port = '0'
-            if tmp_platform_platform == 'mhyVila' \
-            and tmp_platform_sdk == 'mhyVila_link':
+            if (
+                tmp_platform_platform == 'mhyVila'
+                and tmp_platform_sdk == 'mhyVila_link'
+            ):
                 tmp_id = tmp_id.strip('\n')
                 if tmp_host == '':
                     tmp_host = 'NONEED'
@@ -1010,11 +1033,13 @@ class TreeEditUI(object):
                     tmp_access_token_new = json.loads(tmp_access_token)
                     if type(tmp_access_token_new) is str:
                         tmp_access_token = tmp_access_token_new
-                except Exception as e:
+                except Exception:
                     pass
-                    #traceback.print_exc()
-            if tmp_platform_platform == 'telegram' \
-            and tmp_platform_sdk == 'telegram_poll':
+                    # traceback.print_exc()
+            if (
+                tmp_platform_platform == 'telegram'
+                and tmp_platform_sdk == 'telegram_poll'
+            ):
                 if tmp_id == '':
                     if len(tmp_access_token.split('.')) > 0:
                         tmp_id = tmp_access_token.split('.')[0]
@@ -1026,8 +1051,10 @@ class TreeEditUI(object):
                     tmp_host = 'https://api.telegram.org'
                 if tmp_port == '':
                     tmp_port = '443'
-            if tmp_platform_platform == 'discord' \
-            and tmp_platform_sdk == 'discord_link':
+            if (
+                tmp_platform_platform == 'discord'
+                and tmp_platform_sdk == 'discord_link'
+            ):
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
                 if tmp_password == '':
@@ -1039,8 +1066,10 @@ class TreeEditUI(object):
                 ]:
                     if tmp_port == '':
                         tmp_port = '0'
-            if tmp_platform_platform == 'kaiheila' \
-            and tmp_platform_sdk == 'kaiheila_link':
+            if (
+                tmp_platform_platform == 'kaiheila'
+                and tmp_platform_sdk == 'kaiheila_link'
+            ):
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
                 if tmp_password == '':
@@ -1049,16 +1078,20 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'xiaoheihe' \
-            and tmp_platform_sdk == 'xiaoheihe_link':
+            if (
+                tmp_platform_platform == 'xiaoheihe'
+                and tmp_platform_sdk == 'xiaoheihe_link'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'biliLive' \
-            and tmp_platform_sdk == 'biliLive_link':
+            if (
+                tmp_platform_platform == 'biliLive'
+                and tmp_platform_sdk == 'biliLive_link'
+            ):
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16) % 100000000000000
                 if tmp_password == '':
@@ -1067,8 +1100,10 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'fanbook' \
-            and tmp_platform_sdk == 'fanbook_poll':
+            if (
+                tmp_platform_platform == 'fanbook'
+                and tmp_platform_sdk == 'fanbook_poll'
+            ):
                 if tmp_id == '':
                     tmp_id = int(getHash(tmp_access_token), 16)
                 if tmp_password == '':
@@ -1077,25 +1112,31 @@ class TreeEditUI(object):
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'dodo' \
-            and tmp_platform_sdk == 'dodo_poll':
+            if (
+                tmp_platform_platform == 'dodo'
+                and tmp_platform_sdk == 'dodo_poll'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'dodo' \
-            and tmp_platform_sdk == 'dodo_link':
+            if (
+                tmp_platform_platform == 'dodo'
+                and tmp_platform_sdk == 'dodo_link'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'terminal' \
-            and tmp_platform_sdk == 'terminal_link' \
-            and tmp_platform_model == 'default':
+            if (
+                tmp_platform_platform == 'terminal'
+                and tmp_platform_sdk == 'terminal_link'
+                and tmp_platform_model == 'default'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
@@ -1104,32 +1145,40 @@ class TreeEditUI(object):
                     tmp_port = '0'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'terminal' \
-            and tmp_platform_sdk == 'terminal_link' \
-            and tmp_platform_model == 'postapi':
+            if (
+                tmp_platform_platform == 'terminal'
+                and tmp_platform_sdk == 'terminal_link'
+                and tmp_platform_model == 'postapi'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
                 if tmp_access_token == '':
                     tmp_access_token = 'NONEED'
-            if tmp_platform_platform == 'terminal' \
-            and tmp_platform_sdk == 'terminal_link' \
-            and tmp_platform_model == 'ff14':
+            if (
+                tmp_platform_platform == 'terminal'
+                and tmp_platform_sdk == 'terminal_link'
+                and tmp_platform_model == 'ff14'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
                     tmp_host = 'NONEED'
-            if tmp_platform_platform == 'hackChat' \
-            and tmp_platform_sdk == 'hackChat_link' \
-            and tmp_platform_model in ['default', 'private']:
+            if (
+                tmp_platform_platform == 'hackChat'
+                and tmp_platform_sdk == 'hackChat_link'
+                and tmp_platform_model in ['default', 'private']
+            ):
                 if tmp_id == '':
                     tmp_id = random.randint(1000000000, 9999999999)
                 if tmp_port == '':
                     tmp_port = '0'
-            if tmp_platform_platform == 'dingtalk' \
-            and tmp_platform_sdk == 'dingtalk_link' \
-            and tmp_platform_model == 'default':
+            if (
+                tmp_platform_platform == 'dingtalk'
+                and tmp_platform_sdk == 'dingtalk_link'
+                and tmp_platform_model == 'default'
+            ):
                 if tmp_password == '':
                     tmp_password = 'NONEED'
                 if tmp_host == '':
@@ -1152,7 +1201,7 @@ class TreeEditUI(object):
                 tmp_id_last = str(tmp_id)
                 try:
                     tmp_id_last = int(tmp_id)
-                except:
+                except Exception:
                     pass
                 tmp_res_bot_info = OlivOS.API.bot_info_T(
                     id=tmp_id_last,
@@ -1173,20 +1222,30 @@ class TreeEditUI(object):
                     tmp_server_auto,
                     tmp_server_type
                 )
-                if type_this is not None \
-                and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
-                and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
-                and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this]) \
-                and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]):
+                if (
+                    type_this is not None
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list']
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list']
+                    and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this])
+                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this])
+                ):
                     tmp_offset = 0
-                    for tmp_Entry_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]:
+                    for tmp_Entry_this in (
+                        self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]
+                    ):
                         if tmp_offset >= len(tmp_extends):
                             break
-                        tmp_res_bot_info.extends[self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]] = tmp_extends[tmp_offset]
+                        tmp_res_bot_info.extends[
+                            self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]
+                        ] = tmp_extends[tmp_offset]
                         tmp_offset += 1
-                if type_this is not None \
-                and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
-                    tmp_res_bot_info.extends['qsign-server-protocal'] = self.UIData['edit_root_Combobox_qsign_protocal_StringVar'].get()
+                if (
+                    type_this is not None
+                    and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']
+                ):
+                    tmp_res_bot_info.extends['qsign-server-protocal'] = (
+                        self.UIData['edit_root_Combobox_qsign_protocal_StringVar'].get()
+                    )
                     tmp_res_bot_info.extends['qsign-server'] = []
                     for tmp_i in range(self.UIData['edit_root_Entry_qsign_num']):
                         key_pare = [
@@ -1200,8 +1259,10 @@ class TreeEditUI(object):
                             tmp_data['addr'] = self.UIData[key_pare[0] + '_StringVar'].get()
                         if key_pare[1] + '_StringVar' in self.UIData:
                             tmp_data['key'] = self.UIData[key_pare[1] + '_StringVar'].get()
-                        if len(tmp_data['addr']) > 0 \
-                        or len(tmp_data['key']) > 0:
+                        if (
+                            len(tmp_data['addr']) > 0
+                            or len(tmp_data['key']) > 0
+                        ):
                             tmp_res_bot_info.extends['qsign-server'].append(tmp_data)
                 self.UIData['Edit_res'] = [
                     tmp_action,
@@ -1233,8 +1294,7 @@ class TreeEditUI(object):
         self.edit_commit_callback(self.UIData['Edit_res'])
         if self.action == 'create' or self.action == 'update':
             if miss_key_list is not None:
-                if type(miss_key_list) == list:
-                    # tmp_messagebox_str = 'Value Not Fount!\nPlease Complete Follow Item:\n-----------------\n%s' % '\n'.join(miss_key_list)
+                if type(miss_key_list) is list:
                     tmp_messagebox_str = '发现未填写条目！请确认完成填写。'
                     messagebox.showwarning('警告', tmp_messagebox_str)
             else:
@@ -1407,7 +1467,7 @@ class TreeEditUI(object):
         elif target == 'edit_root_Combobox_qsign_protocal':
             self.tree_edit_UI_Combobox_update(action, 'qsign_protocal')
 
-    def tree_edit_UI_type_clear_note_GEN(self, tmp_type:str):
+    def tree_edit_UI_type_clear_note_GEN(self, tmp_type: str):
         def tree_edit_UI_type_clear_note():
             if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
                 valDict = {
@@ -1417,7 +1477,7 @@ class TreeEditUI(object):
                 removeDir(dirPath)
         return tree_edit_UI_type_clear_note
 
-    def tree_edit_UI_qsign_list_set_GEN(self, tmp_type:str):
+    def tree_edit_UI_qsign_list_set_GEN(self, tmp_type: str):
         def tree_edit_UI_qsign_list_set():
             if '+' == tmp_type:
                 self.UIData['edit_root_Entry_qsign_num'] += 1
@@ -1453,11 +1513,11 @@ class TreeEditUI(object):
         ] + self.UIData['edit_root_Entry_qsign_list']:
             try:
                 self.UIObject[item_this].place_forget()
-            except:
+            except Exception:
                 pass
             try:
                 self.UIObject[item_this + '=Label'].place_forget()
-            except:
+            except Exception:
                 pass
         tmp_list_type = self.UIData['edit_root_Combobox_dict']['type_list']
         if con_action == 'init':
@@ -1466,7 +1526,7 @@ class TreeEditUI(object):
                 self.UIObject['edit_root_Combobox_Account_type'].current(0)
             if action == 'update':
                 if self.hash_key in self.UIData['Account_data']:
-                    Account_data_this:OlivOS.API.bot_info_T = self.UIData['Account_data'][self.hash_key]
+                    Account_data_this: OlivOS.API.bot_info_T = self.UIData['Account_data'][self.hash_key]
                 tmp_list_match_old = self.UIData['edit_root_Combobox_dict']['type_mapping_list']
                 tmp_list_match = {}
                 tmp_list_data = [
@@ -1479,8 +1539,10 @@ class TreeEditUI(object):
                 for index in [0, 1, 2, 3, 4]:
                     tmp_list_match = {}
                     for tmp_list_match_old_this in tmp_list_match_old:
-                        if tmp_list_match_old_this != '自定义' \
-                        and str(tmp_list_data[index]) == str(tmp_list_match_old[tmp_list_match_old_this][index]):
+                        if (
+                            tmp_list_match_old_this != '自定义'
+                            and str(tmp_list_data[index]) == str(tmp_list_match_old[tmp_list_match_old_this][index])
+                        ):
                             tmp_list_match[tmp_list_match_old_this] = tmp_list_match_old[tmp_list_match_old_this]
                     tmp_list_match_old = tmp_list_match
                 if len(tmp_list_match) > 0:
@@ -1532,8 +1594,9 @@ class TreeEditUI(object):
                         count += 1
                 for entry_this in self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5]:
                     tmp_mode = 'NONE'
-                    if self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][
-                        entry_this] == 'edit_root_Entry_Password':
+                    if (
+                        self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][entry_this]
+                    ) == 'edit_root_Entry_Password':
                         tmp_mode = 'SAFE'
                     self.tree_edit_UI_Entry_init(
                         obj_root='edit_root',
@@ -1550,14 +1613,20 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
-                if tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
-                and tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
-                and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type])\
-                and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type]):
+                if (
+                    tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_note_list']
+                    and tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list']
+                    and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type])
+                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type])
+                ):
                     tmp_offset = 0
                     self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type]
-                    for Entry_Extend_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type]:
-                        if Entry_Extend_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type]:
+                    for Entry_Extend_this in (
+                        self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][tmp_type]
+                    ):
+                        if Entry_Extend_this in (
+                            self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][tmp_type]
+                        ):
                             if tmp_offset >= len(self.UIData['edit_root_Entry_Extend_list']):
                                 break
                             self.tree_edit_UI_Entry_init(
@@ -1632,9 +1701,14 @@ class TreeEditUI(object):
                         if action == 'update':
                             if self.hash_key in self.UIData['Account_data']:
                                 Account_data_this = self.UIData['Account_data'][self.hash_key]
-                                if 'qsign-server-protocal' in Account_data_this.extends \
-                                and type(Account_data_this.extends['qsign-server-protocal']) is str \
-                                and Account_data_this.extends['qsign-server-protocal'] in self.UIData['edit_root_Combobox_qsign_protocal_list']:
+                                if (
+                                    'qsign-server-protocal' in Account_data_this.extends
+                                    and type(Account_data_this.extends['qsign-server-protocal']) is str
+                                    and (
+                                        Account_data_this.extends['qsign-server-protocal']
+                                        in self.UIData['edit_root_Combobox_qsign_protocal_list']
+                                    )
+                                ):
                                     self.UIObject['edit_root_Combobox_qsign_protocal'].current(
                                         self.UIData['edit_root_Combobox_qsign_protocal_list'].index(
                                             Account_data_this.extends['qsign-server-protocal']
@@ -1803,40 +1877,66 @@ class TreeEditUI(object):
                         str(self.UIData['Account_data'][self.hash_key].post_info.auto),
                         str(self.UIData['Account_data'][self.hash_key].post_info.type)
                     )
-                    if type_this is not None \
-                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list'] \
-                    and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'] \
-                    and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this]) \
-                    and list is type(self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]):
+                    if (
+                        type_this is not None
+                        and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_note_list']
+                        and type_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list']
+                        and dict is type(self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this])
+                        and list is type(
+                            self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]
+                        )
+                    ):
                         tmp_offset = 0
-                        for tmp_Entry_this in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]:
+                        for tmp_Entry_this in (
+                            self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list'][type_this]
+                        ):
                             if tmp_offset >= len(self.UIData['edit_root_Entry_Extend_list']):
                                 break
-                            if self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this] \
-                            in self.UIData['Account_data'][self.hash_key].extends:
+                            if (
+                                self.UIData
+                                ['edit_root_Combobox_dict']
+                                ['type_extends_note_list']
+                                [type_this]
+                                [tmp_Entry_this]
+                                in self.UIData['Account_data'][self.hash_key].extends
+                            ):
                                 self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set(
                                     self.UIData['Account_data'][self.hash_key].extends[
-                                        self.UIData['edit_root_Combobox_dict']['type_extends_note_list'][type_this][tmp_Entry_this]
+                                        (
+                                            self.UIData
+                                            ['edit_root_Combobox_dict']
+                                            ['type_extends_note_list']
+                                            [type_this]
+                                            [tmp_Entry_this]
+                                        )
                                     ]
                                 )
                             else:
-                                self.UIData[self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'].set('')
+                                self.UIData[
+                                    self.UIData['edit_root_Entry_Extend_list'][tmp_offset] + '_StringVar'
+                                ].set('')
                             tmp_offset += 1
-                    if type_this is not None \
-                    and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']:
-                        if 'qsign-server' in self.UIData['Account_data'][self.hash_key].extends \
-                        and type(self.UIData['Account_data'][self.hash_key].extends['qsign-server']) is list:
+                    if (
+                        type_this is not None
+                        and type_this in self.UIData['edit_root_Combobox_dict']['type_qsign_array_note_list']
+                    ):
+                        if (
+                            'qsign-server' in self.UIData['Account_data'][self.hash_key].extends
+                            and type(self.UIData['Account_data'][self.hash_key].extends['qsign-server']) is list
+                        ):
                             tmp_i = 0
                             for tmp_data_this in self.UIData['Account_data'][self.hash_key].extends['qsign-server']:
                                 key_pare = [
                                     'edit_root_Entry_qsign_addr_%d' % tmp_i,
                                     'edit_root_Entry_qsign_key_%d' % tmp_i
                                 ]
-                                if type(tmp_data_this) is dict \
-                                and 'addr' in tmp_data_this \
-                                and type(tmp_data_this['addr']) is str \
-                                and 'key' in tmp_data_this \
-                                and type(tmp_data_this['key']) is str:
+                                if (
+                                    type(tmp_data_this) is dict
+                                    and 'addr' in tmp_data_this
+                                    and type(tmp_data_this['addr']) is str
+                                    and 'key' in tmp_data_this
+                                    and type(tmp_data_this['key']) is str
+                                ):
                                     self.UIData[key_pare[0] + '_StringVar'] = tkinter.StringVar()
                                     self.UIData[key_pare[0] + '_StringVar'].set(tmp_data_this['addr'])
                                     self.UIData[key_pare[1] + '_StringVar'] = tkinter.StringVar()
@@ -1849,8 +1949,6 @@ class TreeEditUI(object):
                             if tmp_i > 10:
                                 tmp_i = 10
                             self.UIData['edit_root_Entry_qsign_num'] = tmp_i
-
-
 
     def get_type_name(
         self,
@@ -1871,8 +1969,10 @@ class TreeEditUI(object):
         for type_this in self.UIData['edit_root_Combobox_dict']['type_list']:
             flag_hit = True
             for list_data_check_i in range(len(list_data_check)):
-                if list_data_check[list_data_check_i] \
-                != self.UIData['edit_root_Combobox_dict']['type_mapping_list'][type_this][list_data_check_i]:
+                if (
+                    list_data_check[list_data_check_i]
+                    != self.UIData['edit_root_Combobox_dict']['type_mapping_list'][type_this][list_data_check_i]
+                ):
                     flag_hit = False
                     break
             if flag_hit:
@@ -1916,5 +2016,5 @@ def removeDir(dir_path):
     try:
         if os.path.exists(dir_path):
             shutil.rmtree(dir_path)
-    except:
+    except Exception:
         pass
