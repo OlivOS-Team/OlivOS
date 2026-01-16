@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-'''
+r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -26,7 +26,6 @@ import random
 import uuid
 import hashlib
 import platform
-import shutil
 import webview
 
 import OlivOS
@@ -500,6 +499,7 @@ gProtocalInfo = {
     }
 }
 
+
 def startGoCqhttpLibExeModel(
     plugin_bot_info_dict,
     basic_conf_models_this,
@@ -603,10 +603,16 @@ class server(OlivOS.API.Proc_templet):
             with open('./conf/gocqhttp/filter.json', 'w+') as tmp:
                 tmp.write('{}')
             releaseDir('./conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash)
-            goTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], self.Proc_config['sub_target_proc']).setConfig()
-            if 'qsign-server-protocal' in self.Proc_data['bot_info_dict'].extends \
-            and type(self.Proc_data['bot_info_dict'].extends['qsign-server-protocal']) is str \
-            and self.Proc_data['bot_info_dict'].extends['qsign-server-protocal'] in gProtocalEXECheckList:
+            goTypeConfig(
+                self.Proc_data['bot_info_dict'],
+                self.Proc_config['target_proc'],
+                self.Proc_config['sub_target_proc']
+            ).setConfig()
+            if (
+                'qsign-server-protocal' in self.Proc_data['bot_info_dict'].extends
+                and type(self.Proc_data['bot_info_dict'].extends['qsign-server-protocal']) is str
+                and self.Proc_data['bot_info_dict'].extends['qsign-server-protocal'] in gProtocalEXECheckList
+            ):
                 self.log(2, OlivOS.L10NAPI.getTrans(
                     'OlivOS libEXEModel server [{0}] will run in {1}s...',
                     [self.Proc_name, str(8)], modelName
@@ -700,8 +706,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.flag_run = False
-        if 'model_Proc' in self.Proc_data \
-        and self.Proc_data['model_Proc'] is not None:
+        if (
+            'model_Proc' in self.Proc_data
+            and self.Proc_data['model_Proc'] is not None
+        ):
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -720,7 +728,7 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except:
+                except Exception:
                     rx_packet_data = None
                 if 'data' in rx_packet_data.key and 'action' in rx_packet_data.key['data']:
                     if 'input' == rx_packet_data.key['data']['action']:
@@ -756,17 +764,18 @@ class server(OlivOS.API.Proc_templet):
                 ))
 
     def send_init_event(self):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'gocqhttp',
-                'event': 'init',
-                'hash': self.Proc_data['bot_info_dict'].hash
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'gocqhttp',
+                    'event': 'init',
+                    'hash': self.Proc_data['bot_info_dict'].hash
+                }
             }
-        }
-                                  )
+        )
 
     def clear_gocqhttp(self):
         file_path = './conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash + '/qrcode.png'
@@ -785,20 +794,21 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['check_qrcode_flag'] = False
 
     def send_QRCode_event(self, path: str):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'gocqhttp',
-                'event': 'qrcode',
-                'hash': self.Proc_data['bot_info_dict'].hash,
-                'path': path
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'nativeWinUI'
+                },
+                'data': {
+                    'action': 'gocqhttp',
+                    'event': 'qrcode',
+                    'hash': self.Proc_data['bot_info_dict'].hash,
+                    'path': path
+                }
             }
-        }
-                                  )
+        )
 
-    def check_protocalEXE(self, delayS:int, interval:int):
+    def check_protocalEXE(self, delayS: int, interval: int):
         flag_skip = False
         for i in range(int(delayS / interval)):
             if self.Proc_info.rx_queue.empty():
@@ -806,13 +816,15 @@ class server(OlivOS.API.Proc_templet):
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                    if type(rx_packet_data.key) is dict \
-                    and 'data' in rx_packet_data.key \
-                    and 'action' in rx_packet_data.key['data'] \
-                    and 'skipDelay' == rx_packet_data.key['data']['action']:
+                    if (
+                        type(rx_packet_data.key) is dict
+                        and 'data' in rx_packet_data.key
+                        and 'action' in rx_packet_data.key['data']
+                        and 'skipDelay' == rx_packet_data.key['data']['action']
+                    ):
                         flag_skip = True
                         break
-                except:
+                except Exception:
                     rx_packet_data = None
         if flag_skip:
             time.sleep(2)
@@ -874,17 +886,17 @@ account: # 账号相关
   # 如果遇到 登录 45 错误, 或者发送信息风控的话需要填入一个或多个服务器
   # 不建议设置过多，设置主备各一个即可，超过 5 个只会取前五个
   # 示例:
-  # sign-servers: 
+  # sign-servers:
   #   - url: 'http://127.0.0.1:8080' # 本地签名服务器
   #     key: "114514"  # 相应 key
   #     authorization: "-"   # authorization 内容, 依服务端设置
   #   - url: 'https://signserver.example.com' # 线上签名服务器
-  #     key: "114514"  
-  #     authorization: "-"   
+  #     key: "114514"
+  #     authorization: "-"
   #   ...
-  # 
+  #
   # 服务器可使用docker在本地搭建或者使用他人开放的服务
-  sign-servers: 
+  sign-servers:
 {sign-servers-data}
 
   # 判断签名服务不可用（需要切换）的额外规则
@@ -1039,58 +1051,67 @@ database: # 数据库相关设置
       authorization: '-'
 '''
         self.config_file_format['auto-register'] = 'false'
-        if 'qsign-server' in self.bot_info_dict.extends \
-        and type(self.bot_info_dict.extends['qsign-server']) is list \
-        and len(self.bot_info_dict.extends['qsign-server']) > 0:
+        if (
+            'qsign-server' in self.bot_info_dict.extends
+            and type(self.bot_info_dict.extends['qsign-server']) is list
+            and len(self.bot_info_dict.extends['qsign-server']) > 0
+        ):
             self.config_file_format['sign-servers-data'] = ''
             for tmp_data_this in self.bot_info_dict.extends['qsign-server']:
-                if type(tmp_data_this) is dict \
-                and 'addr' in tmp_data_this \
-                and 'key' in tmp_data_this:
+                if (
+                    type(tmp_data_this) is dict
+                    and 'addr' in tmp_data_this
+                    and 'key' in tmp_data_this
+                ):
                     self.config_file_format['sign-servers-data'] += '''
     - url: '%s'
       key: '%s'
       authorization: '-'
 ''' % (tmp_data_this['addr'], tmp_data_this['key'])
 
-        if 'qsign-server-protocal' in self.bot_info_dict.extends \
-        and type(self.bot_info_dict.extends['qsign-server-protocal']) is str \
-        and self.bot_info_dict.extends['qsign-server-protocal'] in gProtocalEXECheckList:
-                    self.config_file_format['sign-servers-data'] = '''
+        if (
+            'qsign-server-protocal' in self.bot_info_dict.extends
+            and type(self.bot_info_dict.extends['qsign-server-protocal']) is str
+            and self.bot_info_dict.extends['qsign-server-protocal'] in gProtocalEXECheckList
+        ):
+            self.config_file_format['sign-servers-data'] = '''
     - url: 'http://localhost:%s/'
       key: '%s'
       authorization: '-'
 ''' % (str(self.sub_target_proc['server']['port']), str(self.sub_target_proc['server']['token']))
-                    self.config_file_format['auto-register'] = 'true'
+            self.config_file_format['auto-register'] = 'true'
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
 
         with open('./conf/gocqhttp/' + self.bot_info_dict.hash + '/config.yml', 'w+', encoding='utf-8') as tmp:
             tmp.write(self.config_file_str)
 
+
 def accountFix(bot_info_dict, logger_proc):
     releaseDir('./conf')
     releaseDir('./conf/gocqhttp')
     for bot_info_dict_this in bot_info_dict:
         bot_hash = bot_info_dict_this
-        if bot_info_dict[bot_hash].platform['sdk'] == 'onebot' \
-        and bot_info_dict[bot_hash].platform['platform'] == 'qq' \
-        and bot_info_dict[bot_hash].platform['model'] in [
-            'gocqhttp_show_Android_Phone',
-            'gocqhttp_show_Android_Watch',
-            'gocqhttp_show_iMac',
-            'gocqhttp_show_iPad',
-            'gocqhttp_show_Android_Pad'
-        ]:
+        if (
+            bot_info_dict[bot_hash].platform['sdk'] == 'onebot'
+            and bot_info_dict[bot_hash].platform['platform'] == 'qq'
+            and bot_info_dict[bot_hash].platform['model'] in [
+                'gocqhttp_show_Android_Phone',
+                'gocqhttp_show_Android_Watch',
+                'gocqhttp_show_iMac',
+                'gocqhttp_show_iPad',
+                'gocqhttp_show_Android_Pad'
+            ]
+        ):
             releaseDir('./conf/gocqhttp/' + bot_hash)
             file_path = './conf/gocqhttp/' + bot_hash + '/device.json'
             device_info = {}
 
             # 读取文件
             try:
-                with open(file_path, 'r', encoding = 'utf-8') as f:
+                with open(file_path, 'r', encoding='utf-8') as f:
                     device_info = json.loads(f.read())
-            except:
+            except Exception:
                 device_info = {}
 
             # 协议修改
@@ -1112,9 +1133,9 @@ def accountFix(bot_info_dict, logger_proc):
 
             # 刷写回文件
             try:
-                with open(file_path, 'w', encoding = 'utf-8') as f:
-                    f.write(json.dumps(device_info, ensure_ascii = False))
-            except:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(json.dumps(device_info, ensure_ascii=False))
+            except Exception:
                 pass
 
             protocal_info = None
@@ -1122,8 +1143,10 @@ def accountFix(bot_info_dict, logger_proc):
             releaseDir('./conf/gocqhttp/' + bot_hash)
             releaseDir('./conf/gocqhttp/' + bot_hash + '/data')
             releaseDir('./conf/gocqhttp/' + bot_hash + '/data/versions')
-            if 'qsign-server-protocal' in bot_info_dict[bot_hash].extends \
-            and type(bot_info_dict[bot_hash].extends['qsign-server-protocal']) is str:
+            if (
+                'qsign-server-protocal' in bot_info_dict[bot_hash].extends
+                and type(bot_info_dict[bot_hash].extends['qsign-server-protocal']) is str
+            ):
                 if bot_info_dict[bot_hash].platform['model'] in [
                     'gocqhttp_show_Android_Pad',
                     'gocqhttp_show_Android_Phone'
@@ -1132,23 +1155,28 @@ def accountFix(bot_info_dict, logger_proc):
                         'gocqhttp_show_Android_Pad',
                     ]:
                         if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_pad']:
-                            protocal_info = gProtocalInfo['android_pad'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                            protocal_info = gProtocalInfo['android_pad'][
+                                bot_info_dict[bot_hash].extends['qsign-server-protocal']
+                            ]
                         protocal_num = 6
                     elif bot_info_dict[bot_hash].platform['model'] in [
                         'gocqhttp_show_Android_Phone'
                     ]:
                         if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
-                            protocal_info = gProtocalInfo['android_phone'][bot_info_dict[bot_hash].extends['qsign-server-protocal']]
+                            protocal_info = gProtocalInfo['android_phone'][
+                                bot_info_dict[bot_hash].extends['qsign-server-protocal']
+                            ]
                         protocal_num = 1
             if protocal_info is not None:
                 file_path = './conf/gocqhttp/' + bot_hash + '/data/versions/%d.json' % protocal_num
                 try:
-                    with open(file_path, 'w', encoding = 'utf-8') as f:
+                    with open(file_path, 'w', encoding='utf-8') as f:
                         f.write(protocal_info)
-                except:
+                except Exception:
                     pass
 
-def deviceInfoFix(deviceInfo:dict):
+
+def deviceInfoFix(deviceInfo: dict):
     deviceRes = copy.deepcopy(deviceInfo)
     deviceResPatch = {}
     flagRelease = False
@@ -1189,9 +1217,13 @@ def deviceInfoFix(deviceInfo:dict):
             'vendor_os_name': 'mirai'
         })
         deviceResPatch['android_id'] = 'MIRAI.%s.001' % getRandomStringOfInt(6)
-        deviceResPatch['finger_print'] = 'mamoe/mirai/mirai:10/MIRAI.200122.001/%s:user/release-keys' % getRandomStringOfInt(7)
+        deviceResPatch['finger_print'] = (
+            'mamoe/mirai/mirai:10/MIRAI.200122.001/%s:user/release-keys' % getRandomStringOfInt(7)
+        )
         deviceResPatch['boot_id'] = str(uuid.uuid4())
-        deviceResPatch['proc_version'] = 'Linux version 3.0.31-%s (android-build@xxx.xxx.xxx.xxx.com)' % getRandomString(8)
+        deviceResPatch['proc_version'] = (
+            'Linux version 3.0.31-%s (android-build@xxx.xxx.xxx.xxx.com)' % getRandomString(8)
+        )
         deviceResPatch['imei'] = GenIMEI('XXXXXXXXXXXXXXX')
         deviceResPatch['imsi_md5'] = getMD5([deviceResPatch['imei']])
         deviceResPatch['display'] = deviceResPatch['android_id']
@@ -1201,7 +1233,8 @@ def deviceInfoFix(deviceInfo:dict):
 
     return deviceRes
 
-def GenIMEI(src:str):
+
+def GenIMEI(src: str):
     sum = 0
     final = ''
     for i in range(14):
@@ -1210,36 +1243,42 @@ def GenIMEI(src:str):
             toAdd = int(src[i])
         else:
             toAdd = random.randint(0, 9)
-        final += str(toAdd) # 先行进行数值拼接
-        if (i + 1) % 2 == 0: # 针对偶数位进行处理
+        final += str(toAdd)  # 先行进行数值拼接
+        if (i + 1) % 2 == 0:  # 针对偶数位进行处理
             toAdd *= 2
             if toAdd >= 10:
-                toAdd = (toAdd % 10) + 1 # luna algorithm 中间部分
+                toAdd = (toAdd % 10) + 1  # luna algorithm 中间部分
         sum += toAdd
-    ctrlDigit = (sum * 9) % 10 # luna algorithm 求和部分
+    ctrlDigit = (sum * 9) % 10  # luna algorithm 求和部分
     final += str(ctrlDigit)
     return final
 
-def getMD5(src:list):
+
+def getMD5(src: list):
     hashObj = hashlib.new('md5')
     for srcThis in src:
         hashObj.update(str(srcThis).encode(encoding='UTF-8'))
     return hashObj.hexdigest()
 
-def getHEX(src:str):
+
+def getHEX(src: str):
     return ''.join([hex(int(i)).lstrip('0x') for i in src.encode('utf-8')])
 
-def getRandomString(length:int):
+
+def getRandomString(length: int):
     return getRandomStringRange(length, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890')
 
-def getRandomStringOfInt(length:int):
+
+def getRandomStringOfInt(length: int):
     return getRandomStringRange(length, '0123456789')
 
-def getRandomStringRange(length:int, string:str):
+
+def getRandomStringRange(length: int, string: str):
     s = ''
     for i in range(length):
         s += random.choice(string)
     return s
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -1268,11 +1307,12 @@ def setGoCqhttpTokenSend(
             block=False
         )
 
+
 def sendOpentxTuringTestPage(
     control_queue,
-    name:str,
-    title:str,
-    url:str
+    name: str,
+    title: str,
+    url: str
 ):
     if control_queue is not None:
         control_queue.put(
@@ -1292,6 +1332,7 @@ def sendOpentxTuringTestPage(
             block=False
         )
 
+
 def sendStopTxTuringTestPage(control_queue, Proc_name):
     if control_queue is not None:
         control_queue.put(
@@ -1299,12 +1340,14 @@ def sendStopTxTuringTestPage(control_queue, Proc_name):
             block=False
         )
 
+
 def txTuringTest_evaluate_js(window):
     window.evaluate_js(
         r"""
         mqq.invoke = function(a,b,c){return pywebview.api.invoke(b, JSON.stringify(c))};
         """
     )
+
 
 class txTuringTestApi(object):
     def __init__(self, Proc_name, hash, control_queue):
@@ -1314,9 +1357,11 @@ class txTuringTestApi(object):
 
     def invoke(self, b, c):
         data = json.loads(c)
-        if type(data) is dict \
-        and 'ticket' in data \
-        and type(data['ticket']) is str:
+        if (
+            type(data) is dict
+            and 'ticket' in data
+            and type(data['ticket']) is str
+        ):
             setGoCqhttpTokenSend(
                 self.control_queue,
                 self.hash,
@@ -1326,6 +1371,7 @@ class txTuringTestApi(object):
                 self.control_queue,
                 self.Proc_name
             )
+
 
 class txTuringTestPage(OlivOS.API.Proc_templet):
     def __init__(
@@ -1362,7 +1408,7 @@ class txTuringTestPage(OlivOS.API.Proc_templet):
         releaseDir('./data')
         releaseDir('./data/webview')
         releaseDir('./data/webview/%s' % self.Proc_name)
-        if self.UIData['url'] != None:
+        if self.UIData['url'] is not None:
             txTuringTestApi_obj = txTuringTestApi(
                 self.Proc_name,
                 self.Proc_name.split('=')[-1],
