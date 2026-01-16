@@ -59,7 +59,7 @@ exe_params = {
     'a.binaries': a.binaries,
     'a.zipfiles': a.zipfiles,
     'a.datas': a.datas,
-    'name': 'main',
+    'name': 'OlivOS',
     'debug': False,
     'bootloader_ignore_signals': False,
     'strip': False,
