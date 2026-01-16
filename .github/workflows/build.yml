@@ -56,7 +56,8 @@ jobs:
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec --debug-mode
+        set PYINSTALLER_DEBUG=1
+        pyinstaller ./OlivOS.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-Win
@@ -114,7 +115,8 @@ jobs:
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec --debug-mode
+        set PYINSTALLER_DEBUG=1
+        pyinstaller ./OlivOS.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-Win
@@ -172,7 +174,8 @@ jobs:
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec --debug-mode
+        set PYINSTALLER_DEBUG=1
+        pyinstaller ./OlivOS.spec
     - name: Run artifact
       run: |
         mkdir OlivOS-Win

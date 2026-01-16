@@ -1,19 +1,7 @@
-# -*- coding: utf-8 -*-
-# -*- mode: python -*-
+# -*- mode: python ; coding: utf-8 -*-
 
 import sys
-import argparse
-
-# 解析命令行参数
-parser = argparse.ArgumentParser(description='PyInstaller 构建配置')
-parser.add_argument('--debug-mode', action='store_true', help='启用调试模式（显示控制台）')
-parser.add_argument('--no-splash', action='store_true', help='禁用启动画面')
-parser.add_argument('--name', type=str, default='OlivOS', help='输出文件名称')
-parser.add_argument('--no-upx', action='store_true', help='禁用UPX压缩')
-args, unknown_args = parser.parse_known_args()
-
-# 将未知参数保留给 PyInstaller
-sys.argv = [sys.argv[0]] + unknown_args
+import os
 
 block_cipher = None
 
@@ -21,6 +9,9 @@ block_cipher = None
 is_windows = sys.platform.startswith('win')
 is_linux = sys.platform.startswith('linux')
 is_mac = sys.platform.startswith('darwin')
+
+# 判断是否为调试模式（通过环境变量或文件名判断）
+is_debug = os.getenv('PYINSTALLER_DEBUG') or 'debug' in os.path.basename(__file__).lower()
 
 # 基础分析配置
 a = Analysis(
@@ -48,9 +39,9 @@ pyz = PYZ(
     cipher=block_cipher
 )
 
-# Splash配置
+# Splash配置（仅Windows非调试模式）
 splash = None
-if is_windows and not args.no_splash:
+if is_windows and not is_debug:
     splash = Splash(
         './resource/intro.jpg',
         binaries=a.binaries,
@@ -68,22 +59,22 @@ exe_params = {
     'a.binaries': a.binaries,
     'a.zipfiles': a.zipfiles,
     'a.datas': a.datas,
-    'name': args.name,
-    'debug': args.debug_mode,
+    'name': 'main',
+    'debug': False,
     'bootloader_ignore_signals': False,
     'strip': False,
-    'upx': not args.no_upx,
+    'upx': True,
     'upx_exclude': [],
     'icon': 'resource/favoricon.ico'
 }
 
-# 添加Splash相关参数
+# 根据平台和调试模式调整参数
 if splash:
     exe_params['splash'] = splash
     exe_params['splash.binaries'] = splash.binaries
 
-# 控制台设置
-exe_params['console'] = args.debug_mode or not is_windows
+# 控制台设置：调试模式或非Windows平台显示控制台
+exe_params['console'] = is_debug or not is_windows
 
 # 运行时临时目录设置
 if is_windows:
@@ -93,12 +84,3 @@ else:
 
 # 创建EXE
 exe = EXE(**exe_params)
-
-# 打印构建信息
-print("\n[Build Info]")
-print("Platform:", sys.platform)
-print("Debug:", "ON" if args.debug_mode else "OFF")
-print("Splash:", "ON" if splash else "OFF")
-print("UPX:", "ON" if not args.no_upx else "OFF")
-print("Name:", args.name)
-print("Console:", "SHOW" if exe_params['console'] else "HIDE")
