@@ -28,21 +28,21 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False
 )
-splash = Splash(
-    './resource/intro.jpg',
-    binaries=a.binaries,
-    datas=a.datas,
-    text_pos=None,
-    text_size=12,
-    minify_script=True,
-    always_on_top=True,
-)
 pyz = PYZ(
     a.pure,
     a.zipped_data,
     cipher=block_cipher
 )
 if is_windows:
+    splash = Splash(
+        './resource/intro.jpg',
+        binaries=a.binaries,
+        datas=a.datas,
+        text_pos=None,
+        text_size=12,
+        minify_script=True,
+        always_on_top=True,
+    )
     exe = EXE(
         pyz,
         a.scripts,
