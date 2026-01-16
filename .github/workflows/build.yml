@@ -22,7 +22,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements_win.txt
+        python -m pip install .[py37,win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -51,7 +51,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements_win.txt
+        python -m pip install .[py37,win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -80,7 +80,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements_win.txt
+        python -m pip install .[py37,win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -109,7 +109,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements_win.txt
+        python -m pip install .[py37,win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -138,7 +138,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements310_win.txt
+        python -m pip install .[win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -167,7 +167,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements310_win.txt
+        python -m pip install .[win,extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -196,7 +196,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements310.txt
+        python -m pip install .[extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
@@ -225,7 +225,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r ./requirements310.txt
+        python -m pip install .[extend,build]
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
