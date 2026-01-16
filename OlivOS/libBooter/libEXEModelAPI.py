@@ -863,7 +863,6 @@ class goTypeConfig(object):
         self.config_file_format = {}
 
     def setConfig(self):
-        global gProtocalEXECheckList
         self.config_file_str = '''
 account: # 账号相关
   uin: {uin} # QQ账号
