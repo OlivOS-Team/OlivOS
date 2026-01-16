@@ -5,7 +5,7 @@ import argparse
 
 # 解析命令行参数
 parser = argparse.ArgumentParser(description='PyInstaller 构建配置')
-parser.add_argument('--debug', action='store_true', help='启用调试模式（显示控制台）')
+parser.add_argument('--debug-mode', action='store_true', help='启用调试模式（显示控制台）')
 parser.add_argument('--no-splash', action='store_true', help='禁用启动画面')
 parser.add_argument('--name', type=str, default='OlivOS', help='输出文件名称')
 parser.add_argument('--no-upx', action='store_true', help='禁用UPX压缩')
@@ -68,7 +68,7 @@ exe_params = {
     'a.zipfiles': a.zipfiles,
     'a.datas': a.datas,
     'name': args.name,
-    'debug': args.debug,
+    'debug': args.debug_mode,
     'bootloader_ignore_signals': False,
     'strip': False,
     'upx': not args.no_upx,
@@ -82,7 +82,7 @@ if splash:
     exe_params['splash.binaries'] = splash.binaries
 
 # 控制台设置
-exe_params['console'] = args.debug or not is_windows
+exe_params['console'] = args.debug_mode or not is_windows
 
 # 运行时临时目录设置
 if is_windows:
@@ -96,7 +96,7 @@ exe = EXE(**exe_params)
 # 打印构建信息
 print("构建配置信息:")
 print(f"  平台: {sys.platform}")
-print(f"  调试模式: {'是' if args.debug else '否'}")
+print(f"  调试模式: {'是' if args.debug_mode else '否'}")
 print(f"  启动画面: {'启用' if splash else '禁用'}")
 print(f"  UPX压缩: {'启用' if not args.no_upx else '禁用'}")
 print(f"  输出名称: {args.name}")
