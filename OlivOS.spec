@@ -11,7 +11,7 @@ is_linux = sys.platform.startswith('linux')
 is_mac = sys.platform.startswith('darwin')
 
 # 判断是否为调试模式（通过环境变量或文件名判断）
-is_debug = os.getenv('PYINSTALLER_DEBUG') or 'debug' in os.path.basename(__file__).lower()
+is_debug = os.getenv('PYINSTALLER_DEBUG')
 
 # 基础分析配置
 a = Analysis(
