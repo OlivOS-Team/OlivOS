@@ -68,6 +68,7 @@ jobs:
         path: ./OlivOS-Win
 
   build-win64-py314-release:
+    if: false
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
@@ -98,6 +99,7 @@ jobs:
         path: ./OlivOS-Win
 
   build-win64-py314-debug:
+    if: false
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
