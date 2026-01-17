@@ -24,6 +24,6 @@ if __name__ == '__main__':
     if not os.path.exists('./conf'):
         os.makedirs('./conf')
     OlivOS.bootAPI.Entity(
-        basic_conf='./conf/basic.json',
-        patch_conf='./conf/config.json'
+        basic_conf = './conf/basic.json',
+        patch_conf = './conf/config.json'
     ).start()
