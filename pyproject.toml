@@ -113,6 +113,7 @@ extend-exclude = '''
 
 [tool.ruff]
 line-length = 120
+indent-width = 4
 target-version = "py311"
 exclude = [
     "OlivOS/thirdPartyModule/*",
@@ -134,3 +135,10 @@ select = [
 "*/__init__.py" = ["F401"]
 "OlivOS/hook*.py" = ["F401"]
 "OlivOS/core/inlineData/*" = ["E501"]
+
+[tool.ruff.format]
+preview = true
+quote-style = "preserve"
+docstring-code-format = true
+indent-style = "space"
+skip-magic-trailing-comma = true
