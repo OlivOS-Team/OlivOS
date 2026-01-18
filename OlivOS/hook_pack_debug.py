@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -16,45 +15,45 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-# pillow
-from PIL import Image
-
 # sqlite
 import sqlite3
 
+# pillow
+from PIL import Image
+
 # win
 if platform.system() == 'Windows':
-    import win32com.client
     import winsound
+
     import pythoncom
     import webview
+    import win32com.client
 
 # ext pack
 # lxml
-from lxml import etree
-
-# yaml
-import yaml
-
-# pyjson5
-import pyjson5
-
-# openpyxl
-import openpyxl
+import email
+import smtplib
+import sys
 
 # aiohttp
 import aiohttp
 
-# qrcode
-import qrcode
-
 # weblib
 import certifi
 import httpx
+
+# openpyxl
+import openpyxl
 import prompt_toolkit
+
+# pyjson5
+import pyjson5
+
+# qrcode
+import qrcode
 import regex
 import rich
-import smtplib
-import email
 
-import sys
+# yaml
+import yaml
+from lxml import etree

@@ -1,9 +1,8 @@
-# -*- encoding: utf-8 -*-
+import argparse
 import subprocess
 import sys
-from pathlib import Path
 from datetime import datetime
-import argparse
+from pathlib import Path
 
 # 构建命令 - 与平台无关
 cmd = [sys.executable, '-m', 'flake8', './']

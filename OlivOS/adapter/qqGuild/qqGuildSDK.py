@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,10 +13,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-from enum import IntEnum
 import json
-import requests as req
 import time
+from enum import IntEnum
+
+import requests as req
 
 import OlivOS
 
@@ -44,7 +44,7 @@ sdkAPIRouteTemp = {'guild_id': '-1', 'channel_id': '-1', 'user_id': '-1'}
 sdkSubSelfInfo = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None, model='private'):
         self.id = id
         self.access_token = access_token
@@ -66,7 +66,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'qqGuild_link', 'platform': 'qqGuild', 'model': 'default'}
@@ -86,13 +86,13 @@ class event(object):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.op = None
             self.d = None
@@ -136,7 +136,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -180,7 +180,7 @@ class PAYLOAD(object):
 """
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -226,7 +226,7 @@ class api_templet(object):
             return None
 
 
-class API(object):
+class API:
     class getGateway(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -254,11 +254,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.channel_id = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.embed = None  # str
@@ -275,11 +275,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.embed = None  # str
@@ -469,7 +469,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
         if flag_direct:

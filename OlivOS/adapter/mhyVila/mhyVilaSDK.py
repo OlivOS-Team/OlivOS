@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 @ _______________________    ________________
 @ __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,15 @@ r"""
 @Desc      :   None
 """
 
-import json
-import requests as req
-import time
-from datetime import datetime, timezone
+import enum
 import hashlib
 import hmac
+import json
 import struct
-import enum
+import time
+from datetime import UTC, datetime
+
+import requests as req
 
 import OlivOS
 import OlivOS.thirdPartyModule.mhyVilaProto as mhyVilaProto
@@ -40,7 +40,7 @@ sdkSubSelfInfo = {}
 sdkNameDict = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, password='', access_token='', port=0):
         self.bot_id = id
         self.secret = password
@@ -65,7 +65,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
 
 
-class event(object):
+class event:
     def __init__(self, BizType: int, dataTable: dict, botInfo):
         self.payload = dataTable
         self.BizType = BizType
@@ -220,7 +220,7 @@ sendProtoDict = {
 }
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, raw: 'bytearray|None' = None):
         self.active = True
         self.raw = raw
@@ -236,12 +236,12 @@ class payload_template(object):
         if self.is_rx:
             self.load()
 
-    class magicHeader_T(object):
+    class magicHeader_T:
         def __init__(self):
             self.Magic: int = 0xBABEFACE
             self.DataLen: int = 0
 
-    class dataHeader_T(object):
+    class dataHeader_T:
         def __init__(self):
             self.HeaderLen: int = 24  # uint32    变长头总长度，变长头部分所有字段（包括HeaderLen本身）的总长度。 注：也就是说这玩意每个版本是固定的
             self.ID: int = 1  # uint64    协议包序列ID，同一条连接上的发出的协议包应该单调递增，相同序列ID且Flag字段相同的包应该被认为是同一个包
@@ -319,7 +319,7 @@ class payload_template(object):
         )
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, raw):
             payload_template.__init__(self, raw)
@@ -333,7 +333,7 @@ class PAYLOAD(object):
             self.data = self.data_T()
             self.dataProto = sendProtoDict[self.dataHeader.BizType]
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.uid: int = 0
                 self.token: str = ''
@@ -352,9 +352,9 @@ class PAYLOAD(object):
             self.data = self.data_T()
             self.dataProto = sendProtoDict[self.dataHeader.BizType]
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
-                self.client_timestamp: str = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+                self.client_timestamp: str = str(int(datetime.now(UTC).timestamp() * 1000))
 
 
 # 对于POST接口的实现
@@ -366,9 +366,9 @@ def get_bot_secret(bot_info: bot_info_T):
     )
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
-        self.bot_info: 'bot_info_T|None' = None
+        self.bot_info: bot_info_T|None = None
         self.data = None
         self.metadata = None
         self.headdata = self.headdata_T()
@@ -376,7 +376,7 @@ class api_templet(object):
         self.route = None
         self.res = None
 
-    class headdata_T(object):
+    class headdata_T:
         def __init__(self):
             self.vila_id = None
 
@@ -416,7 +416,7 @@ class api_templet(object):
             return None
 
 
-class API(object):
+class API:
     class getWebsocketInfo(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -430,7 +430,7 @@ class API(object):
             self.data = self.data_T()
             self.route = sdkAPIRoute['platform'] + '/sendMessage'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.room_id = -1
                 self.object_name = 'MHY:Text'
@@ -438,7 +438,7 @@ class API(object):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_group_msg(target_event, chat_id, message, host_id=None):
         if host_id is None:
             try:

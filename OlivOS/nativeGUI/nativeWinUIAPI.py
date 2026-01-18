@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,22 +13,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import OlivOS
-
 import base64
-import os
-import pystray
-import tkinter
-import re
 import datetime
-import webbrowser
+import os
 import platform
+import re
+import tkinter
+import webbrowser
+from tkinter import messagebox, ttk
 
-from PIL import Image
-from PIL import ImageTk
+import pystray
+from PIL import Image, ImageTk
 
-from tkinter import ttk
-from tkinter import messagebox
+import OlivOS
 
 dictColorContext = {
     'color_001': '#00A0EA',
@@ -1138,7 +1134,7 @@ class dock(OlivOS.API.Proc_templet):
             self.UIObject['root_shallow'].refresh()
 
 
-class QRcodeUI(object):
+class QRcodeUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None, path=None):
         self.Model_name = Model_name
         self.root = root
@@ -1191,7 +1187,7 @@ class QRcodeUI(object):
         self.UIObject['root'].destroy()
 
 
-class gocqhttpTerminalUI(object):
+class gocqhttpTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
@@ -1486,7 +1482,7 @@ class gocqhttpTerminalUI(object):
         self.root.UIObject['root_gocqhttp_terminal'].pop(self.bot.hash)
 
 
-class walleqTerminalUI(object):
+class walleqTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
@@ -1731,7 +1727,7 @@ class walleqTerminalUI(object):
         self.root.UIObject['root_walleq_terminal'].pop(self.bot.hash)
 
 
-class CWCBTerminalUI(object):
+class CWCBTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
@@ -1950,7 +1946,7 @@ class CWCBTerminalUI(object):
         self.root.UIObject['root_cwcb_terminal'].pop(self.bot.hash)
 
 
-class opqbotTerminalUI(object):
+class opqbotTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
@@ -2169,7 +2165,7 @@ class opqbotTerminalUI(object):
         self.root.UIObject['root_opqbot_terminal'].pop(self.bot.hash)
 
 
-class napcatTerminalUI(object):
+class napcatTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         self.Model_name = Model_name
         self.root = root
@@ -2388,7 +2384,7 @@ class napcatTerminalUI(object):
         self.root.UIObject['root_napcat_terminal'].pop(self.bot.hash)
 
 
-class OlivOSTerminalUI(object):
+class OlivOSTerminalUI:
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None):
         self.Model_name = Model_name
         self.root = root
@@ -2665,8 +2661,8 @@ class OlivOSTerminalUI(object):
         self.root.UIObject['root_OlivOS_terminal'] = None
 
 
-class VirtualTerminalUI(object):
-    class VirtualTerminalUI_AccountEdit(object):
+class VirtualTerminalUI:
+    class VirtualTerminalUI_AccountEdit:
         def __init__(self, Model_name, root: 'VirtualTerminalUI', root_tk=None, bot=None):
             self.Model_name = Model_name
             self.root = root
@@ -3154,7 +3150,7 @@ class VirtualTerminalUI(object):
         self.root.UIObject['root_virtual_terminal_terminal'].pop(self.bot.hash)
 
 
-class shallow(object):
+class shallow:
     def __init__(self, name: str, image: str, root):
         self.name = name
         self.image = image
@@ -3263,7 +3259,7 @@ class shallow(object):
         self.UIObject['shallow_root'].run_detached()
 
 
-class pluginManageUI(object):
+class pluginManageUI:
     def __init__(self, Model_name, logger_proc=None, root=None, key=None):
         self.Model_name = Model_name
         self.root = root

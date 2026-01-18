@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,8 +13,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import time
 import json
+import time
 
 import OlivOS
 
@@ -25,7 +24,7 @@ websocket_host = 'ws://127.0.0.1'
 websocket_port = 8011
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
@@ -46,7 +45,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class platform_bot_info_T(object):
+class platform_bot_info_T:
     def __init__(self, id=-1):
         self.id = id
         self.host = None
@@ -89,7 +88,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(Plugin_bot_info, platform_bot_info):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, json_obj=None, bot_info=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
@@ -146,7 +145,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.chat_id = chat_id
@@ -154,7 +153,7 @@ class event_action(object):
         return this_msg.do_api()
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -175,7 +174,7 @@ class api_templet(object):
         return res
 
 
-class API(object):
+class API:
     class sendMessage(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -184,7 +183,7 @@ class API(object):
             self.node_ext = 'sendMessage'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.text = ''

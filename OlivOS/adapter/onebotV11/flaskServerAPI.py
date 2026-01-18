@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,10 +13,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+from flask import Flask, current_app, request
 from gevent import pywsgi
-from flask import Flask
-from flask import current_app
-from flask import request
 
 import OlivOS
 
@@ -81,7 +78,7 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_server_port'] = Flask_port
         self.Proc_config['config'] = self.config_T(debug_mode)
 
-    class config_T(object):
+    class config_T:
         def __init__(self, debug_mode):
             self.debug_mode = debug_mode
 

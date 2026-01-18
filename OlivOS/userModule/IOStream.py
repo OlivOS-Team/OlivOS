@@ -1,10 +1,11 @@
-import re
 import os
 import pickle
+import re
 import time
 import uuid
+from collections.abc import Callable
+
 from .. import API
-from typing import Callable, Union, Optional
 
 r"""
                         _               _  __    _
@@ -60,11 +61,11 @@ function：标识数据处理函数，为用户自定义函数，需自己编写
 # 此处以下定义IO流方法
 def IO_construct(
     self: API.Event,
-    input_list: Union[list, tuple],
+    input_list: list | tuple,
     plugin_name,
     mode: int = 2,
     default_max_time: int = 30,
-    default_func: Optional[Callable] = None,
+    default_func: Callable | None = None,
 ):
     mode = mode
     string: str = self.data.message
@@ -75,7 +76,7 @@ def IO_construct(
         group = str(self.data.host_id)
     if 'group_id' in self.data.__dict__:
         group = str(self.data.group_id)
-    data_path = 'plugin/tmp/Input/{}_input_log.pickle'.format(plugin_name)
+    data_path = f'plugin/tmp/Input/{plugin_name}_input_log.pickle'
     if not os.path.exists('plugin/tmp/Input'):  # 检验数据文件与目录是否存在
         os.mkdir('plugin/tmp/Input')
     if not os.path.exists('plugin/tmp/Input/input_data'):
@@ -138,7 +139,7 @@ def IO_construct(
         last_time = input_log_data.get('time', time.time())
         dealt_time = time.time() - last_time
         cache_file_name = input_log_data.get('cache_file_name', str(uuid.uuid4()))
-        cache_path = 'plugin/tmp/Input/input_data/{}.pickle'.format(cache_file_name)
+        cache_path = f'plugin/tmp/Input/input_data/{cache_file_name}.pickle'
         if dealt_time > max_time:  # 检验是否超时
             return
         if not os.path.exists(cache_path):

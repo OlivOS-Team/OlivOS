@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import requests as req
-import time
 import hashlib
+import time
+
+import requests as req
 
 import OlivOS
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None, model='default'):
         self.id = id
         self.access_token = access_token
@@ -41,7 +41,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None, model='default', event_id=None):
         self.payload = payload_obj
         self.event_id = event_id

@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,12 +13,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import hashlib
 import json
-import socket
-from contextlib import closing
 import platform
 import random
-import hashlib
+import socket
+from contextlib import closing
 
 import OlivOS
 
@@ -28,11 +27,11 @@ default_account_conf = {'account': []}
 modelName = 'accountAPI'
 
 
-class Account(object):
+class Account:
     def load(path, logger_proc, safe_mode=False):
         account_conf = None
         try:
-            with open(path, 'r', encoding='utf-8') as account_conf_f:
+            with open(path, encoding='utf-8') as account_conf_f:
                 account_conf = json.loads(account_conf_f.read())
         except Exception:
             pass

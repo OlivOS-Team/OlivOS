@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -15,11 +14,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 """
 
 import json
-import requests as req
-from urllib import parse
 import os
 import time
 import traceback
+from urllib import parse
+
+import requests as req
 
 import OlivOS
 
@@ -41,7 +41,7 @@ lagrangeModelMap = ['lagrange_default']
 gFlagCheckList = []
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
@@ -62,7 +62,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class send_onebot_post_json_T(object):
+class send_onebot_post_json_T:
     def __init__(self):
         self.bot_info = None
         self.obj = None
@@ -112,7 +112,7 @@ class send_onebot_post_json_T(object):
                 traceback.print_exc()
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -189,7 +189,7 @@ class api_templet(object):
             return None
 
 
-class event(object):
+class event:
     def __init__(self, raw):
         self.raw = raw
         self.json = self.event_load(raw)
@@ -557,7 +557,7 @@ def paraMapper(paraList, msgType='para'):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def reply_private_msg(target_event, message):
         event_action.send_private_msg(target_event=target_event, user_id=target_event.data.user_id, message=message)
 
@@ -1467,7 +1467,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
 
 
 # onebot协议标准api调用实现
-class api(object):
+class api:
     class send_private_msg(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -1476,7 +1476,7 @@ class api(object):
             self.node_ext = 'send_private_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
                 self.message = ''
@@ -1490,7 +1490,7 @@ class api(object):
             self.node_ext = 'send_group_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.message = ''
@@ -1504,7 +1504,7 @@ class api(object):
             self.node_ext = 'send_group_forward_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.messages = ''
@@ -1517,7 +1517,7 @@ class api(object):
             self.node_ext = 'send_private_forward_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
                 self.messages = ''
@@ -1530,7 +1530,7 @@ class api(object):
             self.node_ext = 'send_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_type = ''
                 self.user_id = -1
@@ -1546,7 +1546,7 @@ class api(object):
             self.node_ext = 'delete_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
 
@@ -1558,7 +1558,7 @@ class api(object):
             self.node_ext = 'get_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
 
@@ -1570,7 +1570,7 @@ class api(object):
             self.node_ext = 'get_forward_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.id = -1
 
@@ -1582,7 +1582,7 @@ class api(object):
             self.node_ext = 'set_essence_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
 
@@ -1594,7 +1594,7 @@ class api(object):
             self.node_ext = 'delete_essence_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
 
@@ -1606,7 +1606,7 @@ class api(object):
             self.node_ext = 'send_like'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
                 self.times = 1
@@ -1619,7 +1619,7 @@ class api(object):
             self.node_ext = 'send_group_sign'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
 
@@ -1631,7 +1631,7 @@ class api(object):
             self.node_ext = 'group_poke'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1644,7 +1644,7 @@ class api(object):
             self.node_ext = 'friend_poke'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
 
@@ -1656,7 +1656,7 @@ class api(object):
             self.node_ext = 'set_group_kick'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1670,7 +1670,7 @@ class api(object):
             self.node_ext = 'set_group_ban'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1684,7 +1684,7 @@ class api(object):
             self.node_ext = 'set_group_anonymous_ban'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.anonymous = None
@@ -1699,7 +1699,7 @@ class api(object):
             self.node_ext = 'set_group_whole_ban'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.enable = True
@@ -1712,7 +1712,7 @@ class api(object):
             self.node_ext = 'set_group_admin'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1726,7 +1726,7 @@ class api(object):
             self.node_ext = 'set_group_anonymous'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.enable = True
@@ -1739,7 +1739,7 @@ class api(object):
             self.node_ext = 'set_group_card'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1753,7 +1753,7 @@ class api(object):
             self.node_ext = 'set_group_name'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.group_name = ''
@@ -1766,7 +1766,7 @@ class api(object):
             self.node_ext = 'set_group_leave'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.is_dismiss = False
@@ -1779,7 +1779,7 @@ class api(object):
             self.node_ext = 'set_group_special_title'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1794,7 +1794,7 @@ class api(object):
             self.node_ext = 'set_friend_add_request'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.flag = ''
                 self.approve = True
@@ -1808,7 +1808,7 @@ class api(object):
             self.node_ext = 'set_group_add_request'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.flag = ''
                 self.sub_type = ''
@@ -1823,7 +1823,7 @@ class api(object):
             self.node_ext = 'get_login_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -1835,7 +1835,7 @@ class api(object):
             self.node_ext = 'get_stranger_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
                 self.no_cache = False
@@ -1848,7 +1848,7 @@ class api(object):
             self.node_ext = 'get_friend_list'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -1860,7 +1860,7 @@ class api(object):
             self.node_ext = 'get_group_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.no_cache = False
@@ -1873,7 +1873,7 @@ class api(object):
             self.node_ext = 'get_group_list'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -1885,7 +1885,7 @@ class api(object):
             self.node_ext = 'get_group_member_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
@@ -1899,7 +1899,7 @@ class api(object):
             self.node_ext = 'get_group_member_list'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
 
@@ -1911,7 +1911,7 @@ class api(object):
             self.node_ext = 'get_cookies'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.domain = ''
 
@@ -1923,7 +1923,7 @@ class api(object):
             self.node_ext = 'get_csrf_token'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -1935,7 +1935,7 @@ class api(object):
             self.node_ext = 'get_credentails'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.domain = ''
 
@@ -1947,7 +1947,7 @@ class api(object):
             self.node_ext = 'get_record'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = ''
                 self.out_format = ''
@@ -1960,7 +1960,7 @@ class api(object):
             self.node_ext = 'get_image'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = ''
 
@@ -1972,7 +1972,7 @@ class api(object):
             self.node_ext = 'can_send_image'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -1990,7 +1990,7 @@ class api(object):
             self.node_ext = 'can_send_record'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -2008,7 +2008,7 @@ class api(object):
             self.node_ext = 'get_status'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -2020,7 +2020,7 @@ class api(object):
             self.node_ext = 'get_version_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -2032,7 +2032,7 @@ class api(object):
             self.node_ext = 'set_restart'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.delay = 0
 
@@ -2044,7 +2044,7 @@ class api(object):
             self.node_ext = 'clean_cache'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -2058,7 +2058,7 @@ class api(object):
             self.node_ext = 'send_guild_channel_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = -1
                 self.channel_id = -1
@@ -2072,7 +2072,7 @@ class api(object):
             self.node_ext = 'get_guild_member_profile'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = -1
                 self.user_id = -1
@@ -2087,7 +2087,7 @@ class api(object):
             self.node_ext = 'upload_group_file'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file = ''
@@ -2102,7 +2102,7 @@ class api(object):
             self.node_ext = 'delete_group_file'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_id = ''
@@ -2117,7 +2117,7 @@ class api(object):
             self.node_ext = 'create_group_file_folder'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.name = ''
@@ -2131,7 +2131,7 @@ class api(object):
             self.node_ext = 'delete_group_folder'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.folder_id = ''
@@ -2144,7 +2144,7 @@ class api(object):
             self.node_ext = 'get_group_file_system_info'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
 
@@ -2156,7 +2156,7 @@ class api(object):
             self.node_ext = 'get_group_root_files'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_count = None
@@ -2169,7 +2169,7 @@ class api(object):
             self.node_ext = 'get_group_files_by_folder'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.folder_id = ''
@@ -2183,7 +2183,7 @@ class api(object):
             self.node_ext = 'get_group_file_url'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_id = ''
@@ -2197,7 +2197,7 @@ class api(object):
             self.node_ext = 'upload_private_file'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = -1
                 self.file = ''
@@ -2213,7 +2213,7 @@ class api(object):
             self.node_ext = 'rename_group_file_folder'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.folder_id = ''
@@ -2229,7 +2229,7 @@ class api(object):
             self.node_ext = 'rename_group_file'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_id = ''
@@ -2246,7 +2246,7 @@ class api(object):
             self.node_ext = 'set_group_file_forever'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_id = ''
@@ -2261,7 +2261,7 @@ class api(object):
             self.node_ext = 'trans_group_file'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.file_id = ''
@@ -2274,7 +2274,7 @@ class api(object):
             self.node_ext = 'get_essence_msg_list'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
 
@@ -2286,7 +2286,7 @@ class api(object):
             self.node_ext = 'get_group_ignore_add_request'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = None
 
@@ -2298,7 +2298,7 @@ class api(object):
             self.node_ext = 'get_doubt_friends_add_request'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.count = 50
 
@@ -2310,7 +2310,7 @@ class api(object):
             self.node_ext = 'get_group_system_msg'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.count = None
 
@@ -2322,7 +2322,7 @@ class api(object):
             self.node_ext = 'set_doubt_friends_add_request'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.flag = ''
                 self.approve = None
@@ -2335,7 +2335,7 @@ class api(object):
             self.node_ext = '_get_group_notice'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
 
@@ -2347,7 +2347,7 @@ class api(object):
             self.node_ext = '_send_group_notice'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.content = ''
@@ -2369,7 +2369,7 @@ class api(object):
             self.node_ext = '_delete_group_notice'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.notice_id = ''
@@ -2384,7 +2384,7 @@ class api(object):
             self.node_ext = 'set_group_reaction'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.group_id = -1
                 self.message_id = -1
@@ -2401,7 +2401,7 @@ class api(object):
             self.node_ext = 'set_msg_emoji_like'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
                 self.emoji_id = -1
@@ -2417,7 +2417,7 @@ class api(object):
             self.node_ext = 'unset_msg_emoji_like'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.message_id = -1
                 self.emoji_id = -1

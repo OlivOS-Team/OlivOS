@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import json
-import requests as req
-import time
-from requests_toolbelt import MultipartEncoder
-import uuid
-import traceback
 import base64
+import json
+import time
+import traceback
+import uuid
 from urllib import parse
+
+import requests as req
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -59,7 +59,7 @@ sdkSubSelfInfo = {}
 sdkRoomAdminRoleId = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
@@ -79,7 +79,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'xiaoheihe_link', 'platform': 'xiaoheihe', 'model': 'default'}
@@ -114,13 +114,13 @@ def get_websocket_url(bot_info: OlivOS.API.bot_info_T):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.sequence = None
             self.type = None
@@ -154,12 +154,12 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
 
-    class sendPing(object):
+    class sendPing:
         def __init__(self):
             pass
 
@@ -172,7 +172,7 @@ class PAYLOAD(object):
 """
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -215,7 +215,7 @@ class api_templet(object):
             return None
 
 
-class API(object):
+class API:
     class sendChannelMessage(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -225,7 +225,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channel_msg'] + '/send'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.addition = None
                 self.room_id = None
@@ -244,7 +244,7 @@ class API(object):
             self.host = sdkAPIHost['chat-upload']
             self.route = sdkAPIRoute['chat-upload']
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = None
 
@@ -283,7 +283,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/nickname'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.nickname = None
                 self.room_id = None
@@ -298,7 +298,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/leave'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.room_id = None
 
@@ -311,7 +311,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/kick_out'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.room_id = None
                 self.to_user_id = None
@@ -325,7 +325,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/ban'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.room_id = None
                 self.to_user_id = None
@@ -341,7 +341,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/users'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.room_id = None
                 self.limit = 300
@@ -384,7 +384,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room'] + '/joined'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.limit = 50
                 self.offset = 0
@@ -424,7 +424,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['room_role'] + '/roles'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.room_id = None
 
@@ -620,7 +620,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, group_id, host_id, message, reply_id=None, flag_direct=False):
         this_msg = None
         res_data = {'type': 'card', 'border_color': '#009FE9', 'size': 'medium', 'modules': []}

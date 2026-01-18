@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,13 +13,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import time
-import json
-import uuid
-import hashlib
 import copy
-from urllib import parse
+import hashlib
+import json
+import time
 import traceback
+import uuid
+from urllib import parse
 
 import OlivOS
 
@@ -35,7 +34,7 @@ gMsgSeqToGroupCodeReg = {}
 gFriendReqTsReg = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1):
         self.id = id
         self.debug_mode = False
@@ -52,7 +51,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
         self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'opqbot_default'}
@@ -311,7 +310,7 @@ def get_Event_from_SDK(target_event):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = None
@@ -394,7 +393,7 @@ def getIdBackport(id):
     return res
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -502,7 +501,7 @@ class PAYLOAD(object):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def getUinfo(target_event, Uid, control_queue):
         res = Uid
         if Uid in gUinfoReg:

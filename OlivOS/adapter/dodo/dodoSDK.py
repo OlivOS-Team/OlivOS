@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,12 +13,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import requests as req
 import json
 import time
 import uuid
-# import urllib
 
+import requests as req
+
+# import urllib
 import OlivOS
 
 dodoAPIHost = {'beta': 'https://apis.mahuatalk.com'}
@@ -27,7 +27,7 @@ dodoAPIHost = {'beta': 'https://apis.mahuatalk.com'}
 dodoAPIRoute = {'tokenmgr': '/island/api/beta/@me', 'apiroot': '/island/api/beta'}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
@@ -47,7 +47,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -84,7 +84,7 @@ class api_templet(object):
             return None
 
 
-class event(object):
+class event:
     def __init__(self, json_obj=None, bot_info=None, islandId=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
@@ -157,7 +157,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message):
         flag_now_type = 'string'
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
@@ -222,7 +222,7 @@ class event_action(object):
                     this_msg.do_api()
 
 
-class API(object):
+class API:
     class extendMyLife(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -255,7 +255,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/channels'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.islandId = 0
 
@@ -267,7 +267,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/messages'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.channelId = 0
                 self.size = 50
@@ -280,7 +280,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/messages/batch'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.islandId = 0
 
@@ -292,7 +292,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/messages/send'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.channelId = 0
                 self.type = 1
@@ -309,7 +309,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/chat/send'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.islandId = 0
                 self.toUid = 0
@@ -327,7 +327,7 @@ class API(object):
             self.host = dodoAPIHost['beta']
             self.route = dodoAPIRoute['apiroot'] + '/member/nickname/edit'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.islandId = 0
                 self.toUid = 0

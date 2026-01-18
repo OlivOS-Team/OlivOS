@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -15,12 +14,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 """
 
 import multiprocessing
+import os
+import platform
 import subprocess
 import threading
 import time
-import os
 import traceback
-import platform
 
 import OlivOS
 
@@ -338,7 +337,7 @@ pause
         tmp.write(res)
 
 
-class cwcbTypeConfig(object):
+class cwcbTypeConfig:
     def __init__(self, bot_info_dict: OlivOS.API.bot_info_T):
         self.bot_info_dict = bot_info_dict
         self.config_file_str = ''

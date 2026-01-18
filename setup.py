@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -15,7 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import setuptools
 
-with open('README.md', 'r', encoding='utf-8') as f:
+with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
 
 setuptools.setup(

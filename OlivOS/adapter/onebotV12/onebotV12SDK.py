@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,10 +13,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import copy
 import json
 import time
 import uuid
-import copy
 
 import OlivOS
 
@@ -28,7 +27,7 @@ gTmpReg = {}
 gUsrReg = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
@@ -56,7 +55,7 @@ def get_SDK_bot_info_from_Event(target_event: OlivOS.API.Event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, raw: dict, bot_info: bot_info_T):
         self.json = self.event_load(raw)
         self.platform = {'sdk': 'onebot', 'platform': bot_info.platform, 'model': 'onebotV12'}
@@ -316,7 +315,7 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
 
 
 # 对于WEBSOCKET接口的PAYLOAD实现
-class payload_template(object):
+class payload_template:
     def __init__(self, eventType: str, data: 'str|None' = None, is_rx: bool = False):
         self.active = True
         self.data = self.data_T()
@@ -326,7 +325,7 @@ class payload_template(object):
         res = {'active': self.active, 'data': str(self.data)}
         return str(res)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.type = None
             self.data = None
@@ -352,7 +351,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data: dict):
             payload_template.__init__(self, 'rxPacket', data, True)
@@ -363,7 +362,7 @@ class PAYLOAD(object):
 
 
 # 对于WEBSOCKET接口的发送数据PAYLOAD实现
-class api_templet(object):
+class api_templet:
     def __init__(self, action: 'str|None' = None, params=None, echo: 'str|None' = None):
         self.action = action
         self.params = params
@@ -398,14 +397,14 @@ def send_ws_event(hash, data, control_queue):
     )
 
 
-class api(object):
+class api:
     class send_message(api_templet):
         def __init__(self):
             api_templet.__init__(self)
             self.action = 'send_message'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.detail_type = 'private'
                 self.user_id = None
@@ -420,7 +419,7 @@ class api(object):
             self.action = 'delete_message'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.message_id = None
 
@@ -430,7 +429,7 @@ class api(object):
             self.action = 'get_message'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.message_id = None
 
@@ -445,7 +444,7 @@ class api(object):
             self.action = 'get_user_info'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.user_id = None
 
@@ -460,7 +459,7 @@ class api(object):
             self.action = 'set_new_friend'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.user_id = None
                 self.request_id = None
@@ -472,7 +471,7 @@ class api(object):
             self.action = 'delete_friend'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.user_id = None
 
@@ -487,7 +486,7 @@ class api(object):
             self.action = 'get_group_info'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
 
@@ -502,7 +501,7 @@ class api(object):
             self.action = 'get_group_member_info'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -513,7 +512,7 @@ class api(object):
             self.action = 'get_group_member_list'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
 
@@ -523,7 +522,7 @@ class api(object):
             self.action = 'set_group_name'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.group_name = None
@@ -534,7 +533,7 @@ class api(object):
             self.action = 'leave_group'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
 
@@ -544,7 +543,7 @@ class api(object):
             self.action = 'kick_group_member'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -555,7 +554,7 @@ class api(object):
             self.action = 'ban_group_member'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -567,7 +566,7 @@ class api(object):
             self.action = 'unban_group_member'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -578,7 +577,7 @@ class api(object):
             self.action = 'set_group_admin'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -589,7 +588,7 @@ class api(object):
             self.action = 'unset_group_admin'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.group_id = None
                 self.user_id = None
@@ -600,7 +599,7 @@ class api(object):
             self.action = 'set_join_group'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.request_id = None
                 self.user_id = None
@@ -620,7 +619,7 @@ class api(object):
             self.action = 'set_group_invited'
             self.params = self.params_T()
 
-        class params_T(object):
+        class params_T:
             def __init__(self):
                 self.request_id = None
                 self.group_id = None
@@ -633,7 +632,7 @@ class api(object):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_private_msg(target_event: OlivOS.API.Event, user_id, message):
         if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash

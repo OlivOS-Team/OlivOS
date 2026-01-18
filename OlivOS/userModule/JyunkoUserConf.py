@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
      ██╗██╗   ██╗██╗   ██╗███╗   ██╗██╗  ██╗ ██████╗
      ██║╚██╗ ██╔╝██║   ██║████╗  ██║██║ ██╔╝██╔═══██╗
@@ -18,8 +17,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import pickle
 import os
+import pickle
 from typing import Any
 
 FILE_NAME = '.' + os.sep + 'user' + os.sep + 'UserConf.dat'

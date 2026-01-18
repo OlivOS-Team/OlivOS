@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -15,14 +14,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 """
 
 import multiprocessing
+import os
+import platform
+import re
+import shutil
 import subprocess
 import threading
 import time
-import os
 import traceback
-import re
-import platform
-import shutil
 
 import OlivOS
 

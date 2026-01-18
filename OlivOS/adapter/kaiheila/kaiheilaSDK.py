@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import json
-import requests as req
-import time
-from requests_toolbelt import MultipartEncoder
-import uuid
-import traceback
 import base64
+import json
+import time
+import traceback
+import uuid
 from urllib import parse
+
+import requests as req
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -54,7 +54,7 @@ sdkSubSelfInfo = {}
 sdkGuildAdminRoleId = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
@@ -74,7 +74,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'kaiheila_link', 'platform': 'kaiheila', 'model': 'default'}
@@ -92,13 +92,13 @@ class event(object):
 
 
 # 对于WEBSOCKET接口的PAYLOAD实现
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.s = None
             self.d = None
@@ -126,7 +126,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -143,7 +143,7 @@ class PAYLOAD(object):
 """
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -185,7 +185,7 @@ class api_templet(object):
             return None
 
 
-class API(object):
+class API:
     class getGateway(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -213,7 +213,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['message'] + '/create'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.type = 1
                 self.target_id = None
@@ -231,7 +231,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['direct-message'] + '/create'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.type = 1
                 self.target_id = None
@@ -249,7 +249,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['user'] + '/view?user_id={user_id}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.user_id = '-1'
 
@@ -262,7 +262,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['user'] + '/view?user_id={user_id}&guild_id={guild_id}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.user_id = '-1'
                 self.guild_id = None
@@ -276,7 +276,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['asset'] + '/create'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = None
 
@@ -324,7 +324,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['game'] + '/create'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.name = 'N/A'
                 self.icon = None
@@ -338,7 +338,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['game'] + '/update'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.id = -1
                 self.name = None
@@ -353,7 +353,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['game'] + '/delete'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.id = -1
 
@@ -366,7 +366,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['game'] + '/activity'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.id = -1
                 self.data_type = 1
@@ -383,7 +383,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['game'] + '/delete-activity'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.data_type = 1
 
@@ -397,7 +397,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild'] + '/list?page={page}&page_size={page_size}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.page = 1
                 self.page_size = 100
@@ -411,7 +411,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild'] + '/view?guild_id={guild_id}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = None
 
@@ -426,7 +426,7 @@ class API(object):
                 '/user-list?guild_id={guild_id}&channel_id={channel_id}&page={page}&page_size={page_size}'
             )
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = None
                 self.channel_id = ''
@@ -442,7 +442,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild'] + '/nickname'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = None
                 self.nickname = None
@@ -457,7 +457,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild'] + '/leave'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = None
 
@@ -470,7 +470,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild'] + '/kickout'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = None
                 self.target_id = None
@@ -484,7 +484,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild-mute'] + '/list?guild_id={guild_id}&return_type={return_type}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = None
                 self.return_type = 'detail'
@@ -498,7 +498,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild-mute'] + '/create'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = None
                 self.user_id = None
@@ -513,7 +513,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['guild-mute'] + '/delete'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.guild_id = None
                 self.user_id = None
@@ -530,7 +530,7 @@ class API(object):
                 '/history?guild_id={guild_id}&start_time={start_time}&end_time={end_time}'
             )
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = None
                 self.start_time = ''
@@ -548,7 +548,7 @@ class API(object):
                 '/list?guild_id={guild_id}&page={page}&page_size={page_size}&type={type}&parent_id={parent_id}'
             )
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = None
                 self.page = 1
@@ -565,7 +565,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channel'] + '/view?target_id={target_id}&need_children={need_children}'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.target_id = None
                 self.need_children = 'false'
@@ -996,7 +996,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message, flag_direct=False, message_type_in='card'):
         message_type = message_type_in
         if target_event is not None:

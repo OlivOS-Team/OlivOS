@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,16 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import sys
-import multiprocessing
-import threading
+import ctypes
 import hashlib
+import html
+import inspect
+import multiprocessing
+import sys
+import threading
 import time
 import traceback
-import inspect
-import ctypes
-import html
-
 from functools import wraps
 
 import OlivOS
@@ -32,20 +30,20 @@ OlivOS_Version = OlivOS.infoAPI.OlivOS_Version
 mod_global_name = sys.modules[__name__]
 
 
-class Control(object):
+class Control:
     def __init__(self, name, init_list, control_queue, scan_interval):
         self.name = name
         self.init_list = init_list
         self.control_queue = control_queue
         self.scan_interval = scan_interval
 
-    class packet(object):
+    class packet:
         def __init__(self, action, key=None):
             self.action = action
             self.key = key
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(
         self,
         id=-1,
@@ -70,7 +68,7 @@ class bot_info_T(object):
         self.debug_mode = False
         self.getHash()
 
-    class post_info_T(object):
+    class post_info_T:
         def __init__(self, host='', port=-1, access_token=None, server_type='post', server_auto=False):
             self.auto = server_auto
             self.type = server_type
@@ -118,7 +116,7 @@ def getMenuEvent(target_event):
     pass
 
 
-class inde_interface_T(object):
+class inde_interface_T:
     def __init__(self, event, platform: str):
         self.platform = platform
         self.event = event
@@ -130,7 +128,7 @@ class inde_interface_T(object):
         return res
 
 
-class Event(object):
+class Event:
     def __init__(self, sdk_event=None, log_func=None, Proc=None):
         self.bot_info = None
         self.platform = {'sdk': None, 'platform': None, 'model': None}
@@ -457,16 +455,16 @@ class Event(object):
                     ],
                 )
 
-    class fake_event(object):
+    class fake_event:
         def __init__(self):
             self.default = None
 
-    class menu(object):
+    class menu:
         def __init__(self, namespace, event):
             self.namespace = namespace
             self.event = event
 
-    class private_message(object):
+    class private_message:
         def __init__(self, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.message = message
@@ -482,7 +480,7 @@ class Event(object):
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
 
-    class private_message_sent(object):
+    class private_message_sent:
         def __init__(self, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.message = message
@@ -498,7 +496,7 @@ class Event(object):
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
 
-    class group_message(object):
+    class group_message:
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.host_id = None
@@ -517,7 +515,7 @@ class Event(object):
                 self.sender['name'] = 'Nobody'
                 self.extend['host_group_id'] = None
 
-    class group_message_sent(object):
+    class group_message_sent:
         def __init__(self, group_id, user_id, message, sub_type, flag_lazy=True):
             self.sub_type = sub_type
             self.host_id = None
@@ -535,7 +533,7 @@ class Event(object):
                 self.sender['nickname'] = 'Nobody'
                 self.extend['host_group_id'] = None
 
-    class group_file_upload(object):
+    class group_file_upload:
         def __init__(self, group_id, user_id, flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
@@ -546,13 +544,13 @@ class Event(object):
                 self.file['size'] = 0
                 self.file['busid'] = -1
 
-    class group_admin(object):
+    class group_admin:
         def __init__(self, group_id, user_id, flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.action = 'unset'
 
-    class group_member_decrease(object):
+    class group_member_decrease:
         def __init__(self, group_id, operator_id, user_id, host_id=None, action='leave', flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
@@ -560,7 +558,7 @@ class Event(object):
             self.action = action
             self.host_id = host_id
 
-    class group_member_increase(object):
+    class group_member_increase:
         def __init__(self, group_id, operator_id, user_id, host_id=None, action='approve', flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
@@ -568,7 +566,7 @@ class Event(object):
             self.action = action
             self.host_id = host_id
 
-    class group_ban(object):
+    class group_ban:
         def __init__(self, group_id, operator_id, user_id, duration, action='unban', flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
@@ -576,65 +574,65 @@ class Event(object):
             self.duration = duration
             self.action = action
 
-    class friend_add(object):
+    class friend_add:
         def __init__(self, user_id, flag_lazy=True):
             self.user_id = user_id
 
-    class group_message_recall(object):
+    class group_message_recall:
         def __init__(self, group_id, operator_id, user_id, message_id, flag_lazy=True):
             self.group_id = group_id
             self.operator_id = operator_id
             self.user_id = user_id
             self.message_id = message_id
 
-    class private_message_recall(object):
+    class private_message_recall:
         def __init__(self, user_id, message_id, flag_lazy=True):
             self.user_id = user_id
             self.message_id = message_id
 
-    class poke(object):
+    class poke:
         def __init__(self, user_id, target_id, group_id='-1', flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.target_id = target_id
 
-    class group_lucky_king(object):
+    class group_lucky_king:
         def __init__(self, group_id, user_id, target_id, flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.target_id = target_id
 
-    class group_honor(object):
+    class group_honor:
         def __init__(self, group_id, user_id, flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.type = None
 
-    class friend_add_request(object):
+    class friend_add_request:
         def __init__(self, user_id, comment='', flag_lazy=True):
             self.user_id = user_id
             self.comment = comment
             self.flag = None
 
-    class group_add_request(object):
+    class group_add_request:
         def __init__(self, group_id, user_id, comment='', flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.comment = comment
             self.flag = None
 
-    class group_invite_request(object):
+    class group_invite_request:
         def __init__(self, group_id, user_id, comment='', flag_lazy=True):
             self.group_id = group_id
             self.user_id = user_id
             self.comment = comment
             self.flag = None
 
-    class lifecycle(object):
+    class lifecycle:
         def __init__(self, action=None, flag_lazy=True):
             self.action = action
 
-    class heartbeat(object):
+    class heartbeat:
         def __init__(self, interval, flag_lazy=True):
             self.interval = interval
 
@@ -2363,7 +2361,7 @@ class StoppableThread(threading.Thread):
         self._async_raise(self.ident, SystemExit)
 
 
-class Proc_templet(object):
+class Proc_templet:
     def __init__(
         self,
         Proc_name='native_plugin',
@@ -2390,7 +2388,7 @@ class Proc_templet(object):
         self.Proc_config = {}
         self.Proc_data = {}
 
-    class Proc_info_T(object):
+    class Proc_info_T:
         def __init__(self, rx_queue, tx_queue, control_queue, logger_proc, scan_interval=0.001, dead_interval=1):
             self.rx_queue = rx_queue
             self.tx_queue = tx_queue
@@ -2467,7 +2465,7 @@ def Proc_start(proc_this):
     return proc_proc_this
 
 
-class Proc_info_T(object):
+class Proc_info_T:
     def __init__(self, rx_queue, tx_queue, logger_proc, scan_interval=0.001):
         self.rx_queue = rx_queue
         self.tx_queue = tx_queue

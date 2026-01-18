@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import hashlib
+import os
+import platform
+import re
 import subprocess
 import time
-import os
 import traceback
-import platform
 import zipfile
-import hashlib
-import re
 
 import OlivOS
 

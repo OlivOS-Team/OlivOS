@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,15 +13,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import OlivOS
-
 import asyncio
-from aiohttp.client import ClientSession
-from aiohttp import cookiejar
-import qrcode
-import time
 import os
+import time
 import traceback
+
+import qrcode
+from aiohttp import cookiejar
+from aiohttp.client import ClientSession
+
+import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):

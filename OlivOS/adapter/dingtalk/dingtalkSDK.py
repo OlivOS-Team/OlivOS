@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,21 +13,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import sys
-import json
-import traceback
-import time
-import uuid
 import base64
 import dataclasses
-import typing
+import json
+import sys
+import time
+import traceback
+import uuid
+from enum import IntEnum
+from urllib import parse
 
 # import mimetypes
 import filetype
-from enum import IntEnum
-
 import requests as req
-from urllib import parse
 
 import OlivOS
 
@@ -68,7 +65,7 @@ class RESPONSE_STATUS_CODE(IntEnum):
     FAIL = 500
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, AppKey=None, AppSecret=None, model='private'):
         self.id = id
         self.app_key = AppKey
@@ -128,7 +125,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'dingtalk_link', 'platform': 'dingtalk', 'model': 'default'}
@@ -153,13 +150,13 @@ class event(object):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.recv_data_raw = {}
             self.headers = {}
@@ -212,7 +209,7 @@ class payload_template(object):
         return res
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -274,7 +271,7 @@ class PAYLOAD(object):
             return super().dump(data=data)
 
 
-class api_templet(object):
+class api_templet:
     """
     对于POST接口的实现
     """
@@ -448,11 +445,11 @@ class API:
             self.route = sdkAPIRoute['old'] + '/media/upload'
 
         @_init_kw_dataclass_safe()
-        class data_T(object):
+        class data_T:
             media: bytes
             mediaType: str
-            mediaName: typing.Optional[str] = None
-            contentType: typing.Optional[str] = None
+            mediaName: str | None = None
+            contentType: str | None = None
 
         def do_api(self, req_type='POST', proxy=None):
             if self.data is None:
@@ -498,9 +495,9 @@ class API:
             self.route = sdkAPIRoute['bot'] + '/messageFiles/download'
 
         @_init_kw_dataclass_safe()
-        class data_T(object):
+        class data_T:
             downloadCode: str
-            robotCode: typing.Optional[str] = None
+            robotCode: str | None = None
 
         def do_api(self, req_type='POST', proxy=None):
             if self.data is None:
@@ -527,7 +524,7 @@ class API:
             self.route = sdkAPIRoute['old'] + '/topapi/v2/user/get'
 
         @_init_kw_dataclass_safe()
-        class data_T(object):
+        class data_T:
             userid: str
             language: str = 'zh_CN'
 
@@ -551,12 +548,12 @@ class API:
             self.route = sdkAPIRoute['bot'] + '/groupMessages/send'
 
         @_init_kw_dataclass_safe()
-        class data_T(object):
+        class data_T:
             msgKey: str
             msgParam: dict
-            openConversationId: typing.Optional[str] = None
-            robotCode: typing.Optional[str] = None
-            coolAppCode: typing.Optional[str] = None
+            openConversationId: str | None = None
+            robotCode: str | None = None
+            coolAppCode: str | None = None
 
             @property
             def str_msgParam(self):
@@ -588,11 +585,11 @@ class API:
             self.route = sdkAPIRoute['bot'] + '/oToMessages/batchSend'
 
         @_init_kw_dataclass_safe()
-        class data_T(object):
+        class data_T:
             msgKey: str
             msgParam: dict
-            userIds: typing.List[str]
-            robotCode: typing.Optional[str] = None
+            userIds: list[str]
+            robotCode: str | None = None
 
             @property
             def str_msgParam(self):
@@ -803,7 +800,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     @staticmethod
     def send_msg(target_event, send_type: str, target_id: 'str', message: 'OlivOS.messageAPI.Message_templet'):
         for message_this in message.data:

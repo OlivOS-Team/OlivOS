@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,15 +13,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import OlivOS
-
-import time
-import aiohttp
-from aiohttp.client import ClientSession
-from enum import IntEnum
-from aiohttp import cookiejar
-from genericpath import exists
 import json
+import time
+from enum import IntEnum
+from genericpath import exists
+
+import aiohttp
+from aiohttp import cookiejar
+from aiohttp.client import ClientSession
+
+import OlivOS
 
 QRCODE_REQUEST_URL = 'http://passport.bilibili.com/qrcode/getLoginUrl'
 CHECK_LOGIN_RESULT = 'http://passport.bilibili.com/qrcode/getLoginInfo'
@@ -33,7 +33,7 @@ ADD_BADWORD_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/Add
 DEL_BADWORD_URL = 'https://api.live.bilibili.com/xlive/web-ucenter/v1/banned/DelShieldKeyword'
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, room_id=None):
         self.id = id
         self.room_id = room_id
@@ -53,7 +53,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
         self.platform = {'sdk': 'biliLive_link', 'platform': 'biliLive', 'model': 'default'}
@@ -119,7 +119,7 @@ def get_Event_from_SDK(target_event: event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],
@@ -177,7 +177,7 @@ class DanmakuPosition(IntEnum):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.cmd = None
@@ -197,7 +197,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class chat(payload_template):
         def __init__(self, message: str):
             payload_template.__init__(self)

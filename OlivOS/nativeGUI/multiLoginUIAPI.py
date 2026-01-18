@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,19 +13,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import tkinter
 import base64
-import os
+import copy
 import hashlib
+import json
+import os
+import platform
 import random
 import shutil
-import platform
+import tkinter
 import traceback
-import json
-import copy
-
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 import OlivOS
 
@@ -74,7 +71,7 @@ def sendAccountUpdate(obj, control_queue, account_data):
         control_queue.put(OlivOS.API.Control.packet('call_system_event', {'action': ['account_update']}), block=False)
 
 
-class HostUI(object):
+class HostUI:
     def __init__(
         self,
         Model_name,
@@ -417,7 +414,7 @@ class HostUI(object):
         return res
 
 
-class TreeEditUI(object):
+class TreeEditUI:
     def __init__(self, action, Account_data, hash_key=None, edit_commit_callback=None):
         self.hash_key = hash_key
         self.action = action

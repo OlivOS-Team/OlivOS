@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,18 +13,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import copy
+import hashlib
+import json
 import multiprocessing
+import os
+import platform
+import random
 import subprocess
 import threading
 import time
-import os
 import traceback
-import json
-import copy
-import random
 import uuid
-import hashlib
-import platform
+
 import webview
 
 import OlivOS
@@ -830,7 +830,7 @@ class server(OlivOS.API.Proc_templet):
             self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
-class goTypeConfig(object):
+class goTypeConfig:
     def __init__(self, bot_info_dict, target_proc, sub_target_proc):
         self.bot_info_dict = bot_info_dict
         self.target_proc = target_proc
@@ -1077,7 +1077,7 @@ def accountFix(bot_info_dict, logger_proc):
 
             # 读取文件
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     device_info = json.loads(f.read())
             except Exception:
                 device_info = {}
@@ -1289,7 +1289,7 @@ def txTuringTest_evaluate_js(window):
     )
 
 
-class txTuringTestApi(object):
+class txTuringTestApi:
     def __init__(self, Proc_name, hash, control_queue):
         self.Proc_name = Proc_name
         self.hash = hash

@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,11 +13,12 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import time
-import json
-import websockets
 import asyncio
+import json
+import time
+
 import requests as req
+import websockets
 
 import OlivOS
 
@@ -80,7 +80,7 @@ class server(OlivOS.API.Proc_templet):
                 asyncio.get_event_loop().run_until_complete(self.run_websockets_tx_connect())
             time.sleep(self.Proc_info.scan_interval)
 
-    class rx_packet(object):
+    class rx_packet:
         def __init__(self, pkg_type, data):
             self.pkg_type = pkg_type
             self.data = data

@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -16,18 +15,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
-import sys
-import os
-import threading
-import time
+import atexit
+import copy
+import importlib
 import json
 import multiprocessing
+import os
 import platform
-import psutil
-import atexit
-import importlib
+import sys
+import threading
+import time
 import traceback
-import copy
+
+import psutil
 
 import OlivOS
 
@@ -42,7 +42,7 @@ def releaseDir(dir_path):
         os.makedirs(dir_path)
 
 
-class Entity(object):
+class Entity:
     def __init__(self, basic_conf=None, patch_conf=None):
         self.Config = {'basic_conf_path': './conf/basic.json', 'patch_conf_path': './conf/config.json'}
         if basic_conf is not None:
@@ -80,7 +80,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
         preLoadPrint(f'init config from [{basic_conf_path}] ... ')
         try:
-            with open(basic_conf_path, 'r', encoding='utf-8') as basic_conf_f:
+            with open(basic_conf_path, encoding='utf-8') as basic_conf_f:
                 basic_conf = json.loads(basic_conf_f.read())
         except Exception:
             preLoadPrint(f'init config from [{basic_conf_path}] ... not hit')
@@ -92,7 +92,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
         preLoadPrint(f'patch config from [{patch_conf_path}] ... ')
         try:
-            with open(patch_conf_path, 'r', encoding='utf-8') as patch_conf_f:
+            with open(patch_conf_path, encoding='utf-8') as patch_conf_f:
                 patch_conf = json.loads(patch_conf_f.read())
         except Exception:
             preLoadPrint(f'patch config from [{patch_conf_path}] ... not hit')

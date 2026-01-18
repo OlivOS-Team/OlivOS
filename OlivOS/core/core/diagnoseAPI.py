@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -15,10 +14,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 """
 
 import ctypes
-import platform
-import time
 import datetime
 import os
+import platform
+import time
 
 import OlivOS
 

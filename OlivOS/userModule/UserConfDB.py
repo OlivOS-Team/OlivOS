@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
  ________  ________  ___  ________       ___    ___ ________  ___  ___  ________  ___  ___
 |\   __  \|\   __  \|\  \|\   ___  \    |\  \  /  /|\_____  \|\  \|\  \|\   __  \|\  \|\  \
@@ -25,15 +24,14 @@ r"""
     limitations under the License.
 """
 
+import gc
+import hashlib
+import os
+import pickle
 import sqlite3
 import threading
-import os
-import hashlib
 import traceback
-import gc
-import pickle
 from concurrent.futures import ThreadPoolExecutor as PoolExecutor
-
 
 DATABASE_SVN = 1
 DATABASE_PATH = os.path.join('.', 'plugin', 'conf', 'UserConfAll.db')
@@ -192,7 +190,7 @@ class DataBaseAPI:
                 self._exec(DATABASE_SQL['pragma.set.version'].format(ver=DATABASE_SVN))
             else:
                 self.proc_log(
-                    3, '用户自定义数据库版本不符合，数据库版本为{0}，OlivOS中所需版本为{1}'.format(svn, DATABASE_SVN)
+                    3, f'用户自定义数据库版本不符合，数据库版本为{svn}，OlivOS中所需版本为{DATABASE_SVN}'
                 )
         for i in namespace_sql:
             self.namespace_list.append(i[0])

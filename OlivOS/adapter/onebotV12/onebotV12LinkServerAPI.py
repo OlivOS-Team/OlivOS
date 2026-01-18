@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -17,8 +16,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import json
 import threading
 import time
-import websocket
 import uuid
+
+import websocket
 
 import OlivOS
 

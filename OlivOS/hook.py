@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -16,17 +15,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
-# pillow
-from PIL import Image
-
 # sqlite
 import sqlite3
 
 # pyjson5
 import pyjson5
 
+# pillow
+from PIL import Image
+
 # win
 if platform.system() == 'Windows':
-    import win32com.client
     import pythoncom
     import webview
+    import win32com.client

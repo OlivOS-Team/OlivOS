@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,9 +13,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import requests as req
 import json
 import time
+
+import requests as req
 
 import OlivOS
 
@@ -27,7 +27,7 @@ fanbookAPIRoute = {'apiroot': '/api/bot'}
 fanbookAPIRouteTemp = {'token': 'TOKEN'}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None):
         self.id = id
         self.access_token = access_token
@@ -47,7 +47,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -77,7 +77,7 @@ class api_templet(object):
             return msg_res.text
 
 
-class event(object):
+class event:
     def __init__(self, json_obj=None, bot_info=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
@@ -226,7 +226,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message):
         flag_now_type = 'string'
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
@@ -302,7 +302,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     return res_data
 
 
-class API(object):
+class API:
     class getMe(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -319,7 +319,7 @@ class API(object):
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/{token}/getUpdates'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.offset = 0
                 self.limit = 100
@@ -333,7 +333,7 @@ class API(object):
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/{token}/sendMessage'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.text = ''
@@ -348,7 +348,7 @@ class API(object):
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/{token}/sendPhoto'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.photo = {'Url': ''}
@@ -361,7 +361,7 @@ class API(object):
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/{token}/getPrivateChat'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.user_id = 0
 
@@ -374,7 +374,7 @@ class API(object):
             self.host = fanbookAPIHost['a1']
             self.route = fanbookAPIRoute['apiroot'] + '/setBotPrivacyMode'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.owner_id = -1
                 self.bot_id = -1

@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,16 +13,16 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import importlib
+import json
+import os
 import platform
+import shutil
+import sys
 import threading
 import time
-import sys
-import importlib
-import os
-import json
 import traceback
 import zipfile
-import shutil
 
 if platform.system() == 'Windows':
     import tkinter
@@ -113,7 +112,7 @@ class shallow(OlivOS.API.Proc_templet):
         self.menu_queue = []
         self.database = None
 
-    class rx_packet(object):
+    class rx_packet:
         def __init__(self, sdk_event):
             self.sdk_event = sdk_event
 
@@ -641,11 +640,11 @@ class shallow(OlivOS.API.Proc_templet):
                         try:
                             if flag_is_opk:
                                 app_json_path = os.path.join(plugin_path_tmp, plugin_dir_this, 'app.json')
-                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
+                                with open(app_json_path, encoding='utf-8') as plugin_models_app_conf_f:
                                     plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
                             else:
                                 app_json_path = os.path.join(plugin_path, plugin_dir_this, 'app.json')
-                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
+                                with open(app_json_path, encoding='utf-8') as plugin_models_app_conf_f:
                                     plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
                         except Exception:
                             traceback.print_exc()

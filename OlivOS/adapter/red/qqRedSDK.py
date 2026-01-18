@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,15 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import time
 import json
+import time
 
 import OlivOS
 
 gBotIdDict = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, nickname=None, password='', chatroom=None):
         self.id = id
         self.nickname = nickname
@@ -47,7 +46,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_data=None, bot_info=None):
         self.payload = payload_data
         self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'red'}
@@ -183,7 +182,7 @@ def get_Event_from_SDK(target_event):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.type = None
@@ -210,7 +209,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -249,7 +248,7 @@ class PAYLOAD(object):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, target_type, target_id, message, control_queue):
         plugin_event_bot_hash = OlivOS.API.getBotHash(
             bot_id=target_event.base_info['self_id'],

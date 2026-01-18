@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,8 +13,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import requests as req
 import json
+
+import requests as req
 
 import OlivOS
 
@@ -26,7 +26,7 @@ sdkSubSelfInfo = {}
 sdkSubInfo = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, host='', port=-1, access_token=None):
         self.id = id
         self.host = host
@@ -58,7 +58,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
     return res
 
 
-class send_telegram_post_json_T(object):
+class send_telegram_post_json_T:
     def __init__(self):
         self.bot_info = None
         self.obj = None
@@ -99,7 +99,7 @@ class send_telegram_post_json_T(object):
             return msg_res
 
 
-class event(object):
+class event:
     def __init__(self, json_obj=None, sdk_mode='poll', bot_info=None):
         self.raw = self.event_dump(json_obj)
         self.json = json_obj
@@ -415,7 +415,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event, chat_id, message):
         this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg_image = API.sendPhoto(get_SDK_bot_info_from_Event(target_event))
@@ -572,7 +572,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     return res_data
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -588,7 +588,7 @@ class api_templet(object):
         return self.res
 
 
-class API(object):
+class API:
     class getMe(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -597,7 +597,7 @@ class API(object):
             self.node_ext = 'getMe'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.default = None
 
@@ -609,7 +609,7 @@ class API(object):
             self.node_ext = 'getUpdates'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.offset = 0
                 self.limit = 100
@@ -623,7 +623,7 @@ class API(object):
             self.node_ext = 'getUpdates'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.offset = 0
                 self.limit = 100
@@ -638,7 +638,7 @@ class API(object):
             self.node_ext = 'sendMessage'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.text = ''
@@ -653,7 +653,7 @@ class API(object):
             self.node_ext = 'sendMessage'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.text = ''
@@ -670,7 +670,7 @@ class API(object):
             self.node_ext = 'sendPhoto'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.photo = ''
@@ -683,7 +683,7 @@ class API(object):
             self.node_ext = 'leaveChat'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
 
@@ -695,7 +695,7 @@ class API(object):
             self.node_ext = 'getChat'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
 
@@ -707,7 +707,7 @@ class API(object):
             self.node_ext = 'getChatMember'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0
                 self.user_id = 0
@@ -720,6 +720,6 @@ class API(object):
             self.node_ext = 'getChatMemberCount'
             self.res = None
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.chat_id = 0

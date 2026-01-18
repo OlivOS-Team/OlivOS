@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import base64
 import json
-import requests as req
-from requests_toolbelt import MultipartEncoder
 import time
 import traceback
-import base64
 import uuid
 from urllib import parse
+
+import requests as req
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -47,7 +47,7 @@ sdkSubSelfInfo = {}
 sdkUserInfo = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, password='', host='', access_token=None):
         self.id = id
         self.clientSecret = password
@@ -79,7 +79,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'dodo_link', 'platform': 'dodo', 'model': 'default'}
@@ -103,7 +103,7 @@ class event(object):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
@@ -113,7 +113,7 @@ class payload_template(object):
         res = {'active': self.active, 'data': str(self.data)}
         return str(res)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.type = None
             self.data = None
@@ -141,7 +141,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -158,7 +158,7 @@ class PAYLOAD(object):
 """
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -204,7 +204,7 @@ class api_templet(object):
             return None
 
 
-class API(object):
+class API:
     class getGateway(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -232,7 +232,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channel'] + '/message/send'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.channelId = '-1'
                 self.messageType = 1
@@ -248,7 +248,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['personal'] + '/message/send'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.dodoSourceId = '-1'
                 self.dodoId = None
@@ -266,7 +266,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['member'] + '/info'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.islandSourceId = '-1'
                 self.islandId = None
@@ -282,7 +282,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['resource'] + '/picture/upload'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = None
 
@@ -508,7 +508,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_msg(target_event: OlivOS.API.Event, chat_id, message):
         this_msg = None
         this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))

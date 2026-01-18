@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,16 +13,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import os
-import sys
-import platform
-import subprocess
-import time
-import requests as req
-import json
-import shutil
-import zipfile
 import hashlib
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+import zipfile
+
+import requests as req
 
 import OlivOS
 

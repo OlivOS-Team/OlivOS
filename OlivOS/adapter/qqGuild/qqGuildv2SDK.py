@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,17 +13,18 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-from enum import IntEnum
-import json
-import requests as req
-import time
-from datetime import datetime, timezone
-import traceback
-import re
-from requests_toolbelt import MultipartEncoder
-import uuid
 import base64
+import json
+import re
+import time
+import traceback
+import uuid
+from datetime import UTC, datetime
+from enum import IntEnum
 from urllib import parse
+
+import requests as req
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -70,7 +70,7 @@ sdkMsgidinfo = {}
 sdkSelfInfo = {}
 
 
-class bot_info_T(object):
+class bot_info_T:
     def __init__(self, id=-1, access_token=None, model='private', intents=0):
         self.id = id
         self.access_token = access_token
@@ -96,7 +96,7 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
-class event(object):
+class event:
     def __init__(self, payload_obj=None, bot_info=None):
         self.payload = payload_obj
         self.platform = {'sdk': 'qqGuildv2_link', 'platform': 'qqGuild', 'model': 'default'}
@@ -116,13 +116,13 @@ class event(object):
 """
 
 
-class payload_template(object):
+class payload_template:
     def __init__(self, data=None, is_rx=False):
         self.active = True
         self.data = self.data_T()
         self.load(data, is_rx)
 
-    class data_T(object):
+    class data_T:
         def __init__(self):
             self.op = None
             self.d = None
@@ -166,7 +166,7 @@ class payload_template(object):
         return self
 
 
-class PAYLOAD(object):
+class PAYLOAD:
     class rxPacket(payload_template):
         def __init__(self, data):
             payload_template.__init__(self, data, True)
@@ -216,7 +216,7 @@ class PAYLOAD(object):
 """
 
 
-class api_templet(object):
+class api_templet:
     def __init__(self):
         self.bot_info = None
         self.data = None
@@ -302,7 +302,7 @@ def getTokenNow(bot_info: bot_info_T):
         bot_id=bot_info.id, platform_sdk='qqGuildv2_link', platform_platform='qqGuild', platform_model='default'
     )
     tmpInfo = sdkTokenInfo.get(plugin_event_bot_hash, [None, -1])
-    tmpTime = int(datetime.now(timezone.utc).timestamp())
+    tmpTime = int(datetime.now(UTC).timestamp())
     if tmpInfo[0] is not None and tmpInfo[1] > tmpTime:
         access_token = sdkTokenInfo[plugin_event_bot_hash][0]
     else:
@@ -337,7 +337,7 @@ def getTokenNow(bot_info: bot_info_T):
     return access_token
 
 
-class API(object):
+class API:
     class getAppAccessToken(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -347,7 +347,7 @@ class API(object):
             self.host = sdkAPIHost['bots']
             self.route = sdkAPIRoute['getAppAccessToken']
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.appId = None
                 self.clientSecret = None
@@ -379,11 +379,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.channel_id = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.embed = None  # str
@@ -402,11 +402,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.guild_id = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.embed = None  # str
@@ -425,11 +425,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.group_openid = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.media = None  # str
@@ -438,7 +438,7 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
-                self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.timestamp = int(datetime.now(UTC).timestamp())
                 self.msg_seq = None
 
     class sendQQDirectMessage(api_templet):
@@ -450,11 +450,11 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.openid = '-1'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.content = None  # str
                 self.msg_type = 0
@@ -462,7 +462,7 @@ class API(object):
                 self.ark = None  # str
                 self.image = None  # str
                 self.msg_id = None  # str
-                self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.timestamp = int(datetime.now(UTC).timestamp())
                 self.msg_seq = None
 
     # 资源文件上传
@@ -475,12 +475,12 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['qq_groups'] + '/{openid}/files'
 
-        class data_T(object):
+        class data_T:
             def __init__(self):
                 self.file = None
                 self.type = 'qq_groups'
 
-        class metadata_T(object):
+        class metadata_T:
             def __init__(self):
                 self.openid = '-1'
 
@@ -829,7 +829,7 @@ def get_Event_from_SDK(target_event):
 
 
 # 支持OlivOS API调用的方法实现
-class event_action(object):
+class event_action:
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         this_msg = None
         msg_id = None

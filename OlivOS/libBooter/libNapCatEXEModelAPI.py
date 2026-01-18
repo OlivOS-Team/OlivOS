@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,14 +13,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import json
 import multiprocessing
+import os
+import platform
 import subprocess
 import threading
 import time
-import os
 import traceback
-import json
-import platform
 import zipfile
 
 import OlivOS
@@ -420,7 +419,7 @@ class server(OlivOS.API.Proc_templet):
             self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
-class napcatTypeConfig(object):
+class napcatTypeConfig:
     def __init__(self, bot_info_dict: OlivOS.API.bot_info_T, target_proc, version='9.9.11'):
         self.bot_info_dict = bot_info_dict
         self.target_proc = target_proc

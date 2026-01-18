@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,19 +13,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
+import os
+import time
+
 import OlivOS
 
-import time
-import os
 
-
-class api_result_error_template(object):
+class api_result_error_template:
     class OlivOSTypeError(TypeError):
         def __init__(self, arg):
             TypeError.__init__(self, arg)
 
 
-class api_result_data_template(object):
+class api_result_data_template:
     class universal_result(dict):
         def __init__(self):
             self['active'] = False
@@ -233,7 +232,7 @@ def get_Event_from_fake_SDK(target_event):
             target_event.data = target_event.fake_event()
 
 
-class fake_sdk_event(object):
+class fake_sdk_event:
     def __init__(self, bot_info, data=None, platform=None, fakename='unity'):
         self.fakename = fakename
         tmp_platform = {'sdk': 'fake', 'platform': 'fake', 'model': 'default'}

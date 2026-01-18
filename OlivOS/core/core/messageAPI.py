@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -16,7 +15,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import json
 import re
-
 import traceback
 
 # platform sdk model
@@ -97,7 +95,7 @@ dictMessageType = {
 }
 
 
-class Message_templet(object):
+class Message_templet:
     def __init__(self, mode_rx, data_raw):
         self.active = True
         self.mode_rx = mode_rx
@@ -504,7 +502,7 @@ class Message_templet(object):
         self.init_from_code_string('OP')
 
 
-class PARA_templet(object):
+class PARA_templet:
     def __init__(self, type=None, data=None):
         self.type = type
         self.data = data
@@ -674,7 +672,7 @@ class PARA_templet(object):
         return str(self.__dict__)
 
 
-class PARA(object):
+class PARA:
     class text(PARA_templet):
         def __init__(self, text=''):
             PARA_templet.__init__(self, 'text', self.data_T(text))

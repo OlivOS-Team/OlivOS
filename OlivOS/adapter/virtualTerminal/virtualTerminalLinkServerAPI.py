@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
@@ -14,16 +13,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 """
 
-import gevent
-from gevent import pywsgi
-from flask import Flask
-from flask import current_app
-from flask import request
-
+import json
 import threading
 import time
-import json
 import uuid
+
+import gevent
+from flask import Flask, current_app, request
+from gevent import pywsgi
 
 import OlivOS
 
