@@ -114,6 +114,12 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+exclude = [
+    "OlivOS/thirdPartyModule/*",
+    "build/*"
+]
+
+[tool.ruff.lint]
 select = [
     "E",
     "W",
@@ -123,12 +129,8 @@ select = [
     "C4",
     "UP"
 ]
-exclude = [
-    "OlivOS/thirdPartyModule/*",
-    "build/*"
-]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "*/__init__.py" = ["F401"]
 "OlivOS/hook*.py" = ["F401"]
 "OlivOS/core/inlineData/*" = ["E501"]
