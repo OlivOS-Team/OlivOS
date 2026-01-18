@@ -368,7 +368,7 @@ def get_bot_secret(bot_info: bot_info_T):
 
 class api_templet:
     def __init__(self):
-        self.bot_info: bot_info_T|None = None
+        self.bot_info: bot_info_T | None = None
         self.data = None
         self.metadata = None
         self.headdata = self.headdata_T()
