@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import multiprocessing
 import subprocess
@@ -30,26 +30,13 @@ modelName = 'libNapCatEXEModelAPI'
 
 resourceUrlPath = OlivOS.infoAPI.resourceUrlPath
 
-gCheckList = [
-    'napcat',
-    'napcat_hide',
-    'napcat_show',
-    'napcat_show_new',
-    'napcat_show_old'
-]
+gCheckList = ['napcat', 'napcat_hide', 'napcat_show', 'napcat_show_new', 'napcat_show_old']
 
-gCheck9912List = [
-    'napcat_show_new_9_9_12'
-]
+gCheck9912List = ['napcat_show_new_9_9_12']
 
-gCheck9919List = [
-    'napcat_show_new_9_9_19'
-]
+gCheck9919List = ['napcat_show_new_9_9_19']
 
-gCheck9922List = [
-    'napcat_show_new_9_9_22',
-    'napcat_show_new'
-]
+gCheck9922List = ['napcat_show_new_9_9_22', 'napcat_show_new']
 
 
 def startNapCatLibExeModel(
@@ -59,7 +46,7 @@ def startNapCatLibExeModel(
     Proc_dict,
     Proc_Proc_dict,
     basic_conf_models,
-    tmp_proc_mode
+    tmp_proc_mode,
 ):
     if platform.system() == 'Windows':
         flagActive = False
@@ -87,7 +74,7 @@ def startNapCatLibExeModel(
                     resouce_name='NapCat-QQ-Win-9.9.11-24568',
                     filePath='./lib/NapCat.zip',
                     filePathUpdate='./lib/NapCat.zip.tmp',
-                    filePathFORCESKIP='./lib/FORCESKIP'
+                    filePathFORCESKIP='./lib/FORCESKIP',
                 )
             if flag9912Active:
                 OlivOS.updateAPI.checkResouceFile(
@@ -96,7 +83,7 @@ def startNapCatLibExeModel(
                     resouce_name='NapCat-QQ-Win-9.9.12-26000',
                     filePath='./lib/NapCatNew.zip',
                     filePathUpdate='./lib/NapCatNew.zip.tmp',
-                    filePathFORCESKIP='./lib/FORCESKIP'
+                    filePathFORCESKIP='./lib/FORCESKIP',
                 )
             if flag9919Active:
                 OlivOS.updateAPI.checkResouceFile(
@@ -105,7 +92,7 @@ def startNapCatLibExeModel(
                     resouce_name='NapCat-QQ-Win-9.9.19-34740',
                     filePath='./lib/NapCat-QQ-Win-9.9.19-34740.zip',
                     filePathUpdate='./lib/NapCat-QQ-Win-9.9.19-34740.zip.tmp',
-                    filePathFORCESKIP='./lib/FORCESKIP'
+                    filePathFORCESKIP='./lib/FORCESKIP',
                 )
             if flag9922Active:
                 OlivOS.updateAPI.checkResouceFile(
@@ -114,7 +101,7 @@ def startNapCatLibExeModel(
                     resouce_name='NapCat-QQ-Win-9.9.22-40990',
                     filePath='./lib/NapCat-QQ-Win-9.9.22-40990.zip',
                     filePathUpdate='./lib/NapCat-QQ-Win-9.9.22-40990.zip.tmp',
-                    filePathFORCESKIP='./lib/FORCESKIP'
+                    filePathFORCESKIP='./lib/FORCESKIP',
                 )
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
@@ -131,14 +118,25 @@ def startNapCatLibExeModel(
                     logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                     target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
-                    debug_mode=False
+                    debug_mode=False,
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
-                 control_queue=None, logger_proc=None, target_proc=None, debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        control_queue=None,
+        logger_proc=None,
+        target_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -148,7 +146,7 @@ class server(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             control_queue=control_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -159,62 +157,42 @@ class server(OlivOS.API.Proc_templet):
         self.flag_run = True
 
     def run(self):
-        if self.Proc_data['bot_info_dict'].platform['model'] in [
-            'napcat',
-            'napcat_show',
-            'napcat_show_new'
-        ]:
+        if self.Proc_data['bot_info_dict'].platform['model'] in ['napcat', 'napcat_show', 'napcat_show_new']:
             self.send_init_event()
         while self.flag_run:
             releaseDir('./lib')
             releaseDir('./conf')
             releaseDir('./conf/napcat')
-            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}")
-            releaseDir(f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/config")
+            releaseDir(f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}')
+            releaseDir(f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}/config')
             try:
                 if self.Proc_data['bot_info_dict'].platform['model'] in gCheck9922List:
                     unzip(
-                        './lib/NapCat-QQ-Win-9.9.22-40990.zip',
-                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                        './lib/NapCat-QQ-Win-9.9.22-40990.zip', f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}'
                     )
                     napcatTypeConfig(
-                        self.Proc_data['bot_info_dict'],
-                        self.Proc_config['target_proc'],
-                        version='9.9.19'
+                        self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19'
                     ).setConfig()
                 elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9919List:
                     unzip(
-                        './lib/NapCat-QQ-Win-9.9.19-34740.zip',
-                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
+                        './lib/NapCat-QQ-Win-9.9.19-34740.zip', f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}'
                     )
                     napcatTypeConfig(
-                        self.Proc_data['bot_info_dict'],
-                        self.Proc_config['target_proc'],
-                        version='9.9.19'
+                        self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], version='9.9.19'
                     ).setConfig()
                 elif self.Proc_data['bot_info_dict'].platform['model'] in gCheck9912List:
-                    unzip(
-                        './lib/NapCatNew.zip',
-                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
-                    )
-                    napcatTypeConfig(
-                        self.Proc_data['bot_info_dict'],
-                        self.Proc_config['target_proc']
-                    ).setConfig()
+                    unzip('./lib/NapCatNew.zip', f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}')
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
                 else:
-                    unzip(
-                        './lib/NapCat.zip',
-                        f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}"
-                    )
-                    napcatTypeConfig(
-                        self.Proc_data['bot_info_dict'],
-                        self.Proc_config['target_proc']
-                    ).setConfig()
+                    unzip('./lib/NapCat.zip', f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}')
+                    napcatTypeConfig(self.Proc_data['bot_info_dict'], self.Proc_config['target_proc']).setConfig()
             except Exception:
-                self.log(3, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libNapCatEXEModel server [{0}] can`t found target lib',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    3,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel server [{0}] can`t found target lib', [self.Proc_name], modelName
+                    ),
+                )
                 break
             if self.Proc_data['bot_info_dict'].platform['model'] in [
                 'napcat',
@@ -222,12 +200,16 @@ class server(OlivOS.API.Proc_templet):
                 'napcat_show_new_9_9_19',
                 'napcat_show_new_9_9_22',
                 'napcat_show_new',
-                'napcat_show'
+                'napcat_show',
             ]:
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libNapCatEXEModel server [{0}] will run under visiable mode',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel server [{0}] will run under visiable mode',
+                        [self.Proc_name],
+                        modelName,
+                    ),
+                )
                 self.clear_napcat()
                 self.Proc_data['check_qrcode_flag'] = False
                 self.Proc_data['check_stdin'] = False
@@ -237,88 +219,77 @@ class server(OlivOS.API.Proc_templet):
                 if self.Proc_data['bot_info_dict'].platform['model'] in [
                     'napcat_show_new_9_9_22',
                     'napcat_show_new_9_9_19',
-                    'napcat_show_new'
+                    'napcat_show_new',
                 ]:
                     threading.Thread(
-                        target=self.check_qrcode,
-                        args=(),
-                        kwargs={'version': '9.9.19'},
-                        daemon=self.deamon
+                        target=self.check_qrcode, args=(), kwargs={'version': '9.9.19'}, daemon=self.deamon
                     ).start()
                     tmp_env = dict(os.environ)
                     model_Proc = subprocess.Popen(
-                        f".\\launcher-win10-user.bat {self.Proc_data['bot_info_dict'].id}",
-                        cwd=f".\\conf\\napcat\\{self.Proc_data['bot_info_dict'].hash}",
+                        f'.\\launcher-win10-user.bat {self.Proc_data["bot_info_dict"].id}',
+                        cwd=f'.\\conf\\napcat\\{self.Proc_data["bot_info_dict"].hash}',
                         shell=True,
                         stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         creationflags=subprocess.CREATE_NEW_CONSOLE,
-                        env=tmp_env
+                        env=tmp_env,
                     )
                     self.Proc_data['model_Proc'] = model_Proc
-                    threading.Thread(
-                        target=self.check_stdin,
-                        args=(model_Proc,),
-                        daemon=self.deamon
-                    ).start()
+                    threading.Thread(target=self.check_stdin, args=(model_Proc,), daemon=self.deamon).start()
                     self.get_model_stdout(model_Proc)
                     # model_Proc.communicate(timeout = None)
-                    self.log(3, OlivOS.L10NAPI.getTrans(
-                        'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...',
-                        [self.Proc_name], modelName
-                    ))
+                    self.log(
+                        3,
+                        OlivOS.L10NAPI.getTrans(
+                            'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...', [self.Proc_name], modelName
+                        ),
+                    )
                     self.Proc_data['model_Proc'] = None
                     time.sleep(8)
-                elif self.Proc_data['bot_info_dict'].platform['model'] in [
-                    'napcat_show_new_9_9_12'
-                ]:
+                elif self.Proc_data['bot_info_dict'].platform['model'] in ['napcat_show_new_9_9_12']:
                     tmp_env = dict(os.environ)
                     subprocess.call(
-                        f"start powershell .\\BootWay05.ps1 -q {self.Proc_data['bot_info_dict'].id}",
+                        f'start powershell .\\BootWay05.ps1 -q {self.Proc_data["bot_info_dict"].id}',
                         shell=True,
                         cwd='.\\conf\\napcat\\' + self.Proc_data['bot_info_dict'].hash,
-                        env=tmp_env
+                        env=tmp_env,
                     )
                     self.flag_run = False
                 else:
-                    threading.Thread(
-                        target=self.check_qrcode,
-                        args=(),
-                        daemon=self.deamon
-                    ).start()
+                    threading.Thread(target=self.check_qrcode, args=(), daemon=self.deamon).start()
                     tmp_env = dict(os.environ)
                     model_Proc = subprocess.Popen(
-                        f".\\napcat-utf8.bat -q {self.Proc_data['bot_info_dict'].id}",
-                        cwd=f".\\conf\\napcat\\{self.Proc_data['bot_info_dict'].hash}",
+                        f'.\\napcat-utf8.bat -q {self.Proc_data["bot_info_dict"].id}',
+                        cwd=f'.\\conf\\napcat\\{self.Proc_data["bot_info_dict"].hash}',
                         shell=True,
                         stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         creationflags=subprocess.CREATE_NEW_CONSOLE,
-                        env=tmp_env
+                        env=tmp_env,
                     )
                     self.Proc_data['model_Proc'] = model_Proc
-                    threading.Thread(
-                        target=self.check_stdin,
-                        args=(model_Proc,),
-                        daemon=self.deamon
-                    ).start()
+                    threading.Thread(target=self.check_stdin, args=(model_Proc,), daemon=self.deamon).start()
                     self.get_model_stdout(model_Proc)
                     # model_Proc.communicate(timeout = None)
-                    self.log(3, OlivOS.L10NAPI.getTrans(
-                        'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...',
-                        [self.Proc_name], modelName
-                    ))
+                    self.log(
+                        3,
+                        OlivOS.L10NAPI.getTrans(
+                            'OlivOS libNapCatEXEModel server [{0}] will retry in 10s...', [self.Proc_name], modelName
+                        ),
+                    )
                     self.Proc_data['model_Proc'] = None
                     time.sleep(8)
-            elif self.Proc_data['bot_info_dict'].platform['model'] in [
-                'napcat_show_old'
-            ]:
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libNapCatEXEModel server [{0}] will run under visiable mode',
-                    [self.Proc_name], modelName
-                ))
+            elif self.Proc_data['bot_info_dict'].platform['model'] in ['napcat_show_old']:
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel server [{0}] will run under visiable mode',
+                        [self.Proc_name],
+                        modelName,
+                    ),
+                )
                 tmp_env = dict(os.environ)
                 subprocess.call(
                     (
@@ -328,16 +299,13 @@ class server(OlivOS.API.Proc_templet):
                     ),
                     shell=True,
                     cwd='.\\conf\\napcat\\' + self.Proc_data['bot_info_dict'].hash,
-                    env=tmp_env
+                    env=tmp_env,
                 )
                 self.flag_run = False
 
     def on_terminate(self):
         self.flag_run = False
-        if (
-            'model_Proc' in self.Proc_data
-            and self.Proc_data['model_Proc'] is not None
-        ):
+        if 'model_Proc' in self.Proc_data and self.Proc_data['model_Proc'] is not None:
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -345,7 +313,7 @@ class server(OlivOS.API.Proc_templet):
         if self.Proc_data['bot_info_dict'].id is not None:
             tmp_self_data = '%s|%s' % (
                 self.Proc_data['bot_info_dict'].platform['platform'],
-                str(self.Proc_data['bot_info_dict'].id)
+                str(self.Proc_data['bot_info_dict'].id),
             )
         return tmp_self_data
 
@@ -365,56 +333,47 @@ class server(OlivOS.API.Proc_templet):
                             input_data = ('%s\r\n' % input_raw).encode('utf-8')
                             model_Proc.stdin.write(input_data)
                             model_Proc.stdin.flush()
-                            log_data = ('%s' % input_raw)
+                            log_data = '%s' % input_raw
                             self.send_log_event(log_data)
-                            self.log(2, log_data, [
-                                (self.getBotIDStr(), 'default'),
-                                ('napcat', 'default'),
-                                ('onebot_send', 'default')
-                            ])
+                            self.log(
+                                2,
+                                log_data,
+                                [(self.getBotIDStr(), 'default'), ('napcat', 'default'), ('onebot_send', 'default')],
+                            )
 
     def get_model_stdout(self, model_Proc: subprocess.Popen):
         for line in iter(model_Proc.stdout.readline, b''):
             try:
                 log_data = ('%s' % line.decode('utf-8', errors='replace')).rstrip('\n')
                 self.send_log_event(log_data)
-                self.log(1, log_data, [
-                    (self.getBotIDStr(), 'default'),
-                    ('napcat', 'default'),
-                    ('onebot', 'default')
-                ])
+                self.log(1, log_data, [(self.getBotIDStr(), 'default'), ('napcat', 'default'), ('onebot', 'default')])
             except Exception as e:
-                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libNapCatEXEModel failed: %s\n%s' % [
-                        str(e),
-                        traceback.format_exc()
-                    ],
-                    modelName
-                ))
+                self.log(
+                    4,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libNapCatEXEModel failed: %s\n%s' % [str(e), traceback.format_exc()], modelName
+                    ),
+                )
 
     def send_init_event(self):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'napcat',
-                    'event': 'init',
-                    'hash': self.Proc_data['bot_info_dict'].hash
-                }
-            }
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
+                'data': {'action': 'napcat', 'event': 'init', 'hash': self.Proc_data['bot_info_dict'].hash},
+            },
         )
 
     def clear_napcat(self):
-        file_path = f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/qrcode.png"
+        file_path = f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}/qrcode.png'
         if os.path.exists(file_path):
             os.remove(file_path)
 
     def check_qrcode(self, version='9.9.11'):
         count = 2 * 60
-        file_path = f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/qrcode.png"
+        file_path = f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}/qrcode.png'
         if version == '9.9.19':
-            file_path = f"./conf/napcat/{self.Proc_data['bot_info_dict'].hash}/cache/qrcode.png"
+            file_path = f'./conf/napcat/{self.Proc_data["bot_info_dict"].hash}/cache/qrcode.png'
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -430,43 +389,35 @@ class server(OlivOS.API.Proc_templet):
 
     def send_QRCode_event(self, path: str):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'napcat',
                     'event': 'qrcode',
                     'hash': self.Proc_data['bot_info_dict'].hash,
-                    'path': path
-                }
-            }
+                    'path': path,
+                },
+            },
         )
 
     def send_log_event(self, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'napcat',
                     'event': 'log',
                     'hash': self.Proc_data['bot_info_dict'].hash,
-                    'data': data
-                }
-            }
+                    'data': data,
+                },
+            },
         )
 
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
-                    action,
-                    data
-                ),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 class napcatTypeConfig(object):
@@ -484,41 +435,41 @@ class napcatTypeConfig(object):
             self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
             self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
             self.config_file_format['url'] = (
-                f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+                f'http://127.0.0.1:{self.target_proc["server"]["port"]}/OlivOSMsgApi/qq/onebot/default'
             )
 
             self.config_file_data = {
-                "network": {
-                    "httpServers": [
+                'network': {
+                    'httpServers': [
                         {
-                            "name": f"httpServer-{self.config_file_format['uin']}",
-                            "enable": True,
-                            "port": self.config_file_format['port'],
-                            "host": "127.0.0.1",
-                            "enableCors": True,
-                            "enableWebsocket": True,
-                            "messagePostFormat": "array",
-                            "token": self.config_file_format['token'],
-                            "debug": False,
+                            'name': f'httpServer-{self.config_file_format["uin"]}',
+                            'enable': True,
+                            'port': self.config_file_format['port'],
+                            'host': '127.0.0.1',
+                            'enableCors': True,
+                            'enableWebsocket': True,
+                            'messagePostFormat': 'array',
+                            'token': self.config_file_format['token'],
+                            'debug': False,
                         }
                     ],
-                    "httpClients": [
+                    'httpClients': [
                         {
-                            "name": f"httpClient-{self.config_file_format['uin']}",
-                            "enable": True,
-                            "url": self.config_file_format['url'],
-                            "messagePostFormat": "array",
-                            "reportSelfMessage": False,
-                            "token": self.config_file_format['token'],
-                            "debug": False,
+                            'name': f'httpClient-{self.config_file_format["uin"]}',
+                            'enable': True,
+                            'url': self.config_file_format['url'],
+                            'messagePostFormat': 'array',
+                            'reportSelfMessage': False,
+                            'token': self.config_file_format['token'],
+                            'debug': False,
                         }
                     ],
-                    "websocketServers": [],
-                    "websocketClients": []
+                    'websocketServers': [],
+                    'websocketClients': [],
                 },
-                "musicSignUrl": "",
-                "enableLocalFile2Url": False,
-                "parseMultMsg": False
+                'musicSignUrl': '',
+                'enableLocalFile2Url': False,
+                'parseMultMsg': False,
             }
 
             self.config_file_str = json.dumps(self.config_file_data, ensure_ascii=False, indent=4)
@@ -526,7 +477,7 @@ class napcatTypeConfig(object):
             with open(
                 f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json',
                 'w+',
-                encoding='utf-8'
+                encoding='utf-8',
             ) as tmp:
                 tmp.write(self.config_file_str)
         else:
@@ -534,37 +485,28 @@ class napcatTypeConfig(object):
             self.config_file_format['token'] = self.bot_info_dict.post_info.access_token
             self.config_file_format['port'] = str(self.bot_info_dict.post_info.port)
             self.config_file_format['postUrls'] = (
-                f"http://127.0.0.1:{self.target_proc['server']['port']}/OlivOSMsgApi/qq/onebot/default"
+                f'http://127.0.0.1:{self.target_proc["server"]["port"]}/OlivOSMsgApi/qq/onebot/default'
             )
 
             self.config_file_data = {
-                "http": {
-                    "enable": True,
-                    "host": "",
-                    "port": self.config_file_format['port'],
-                    "secret": self.config_file_format['token'],
-                    "enableHeart": False,
-                    "enablePost": True,
-                    "postUrls": [
-                        self.config_file_format['postUrls']
-                    ]
+                'http': {
+                    'enable': True,
+                    'host': '',
+                    'port': self.config_file_format['port'],
+                    'secret': self.config_file_format['token'],
+                    'enableHeart': False,
+                    'enablePost': True,
+                    'postUrls': [self.config_file_format['postUrls']],
                 },
-                "ws": {
-                    "enable": False,
-                    "host": "",
-                    "port": 3001
-                },
-                "reverseWs": {
-                    "enable": False,
-                    "urls": []
-                },
-                "debug": False,
-                "heartInterval": 30000,
-                "messagePostFormat": "array",
-                "enableLocalFile2Url": True,
-                "musicSignUrl": "",
-                "reportSelfMessage": False,
-                "token": ""
+                'ws': {'enable': False, 'host': '', 'port': 3001},
+                'reverseWs': {'enable': False, 'urls': []},
+                'debug': False,
+                'heartInterval': 30000,
+                'messagePostFormat': 'array',
+                'enableLocalFile2Url': True,
+                'musicSignUrl': '',
+                'reportSelfMessage': False,
+                'token': '',
             }
 
             self.config_file_str = json.dumps(self.config_file_data, ensure_ascii=False, indent=4)
@@ -572,7 +514,7 @@ class napcatTypeConfig(object):
             with open(
                 f'./conf/napcat/{self.bot_info_dict.hash}/config/onebot11_{self.bot_info_dict.id}.json',
                 'w+',
-                encoding='utf-8'
+                encoding='utf-8',
             ) as tmp:
                 tmp.write(self.config_file_str)
 

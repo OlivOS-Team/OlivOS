@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 formatOffsetLimit = 10
 flagL10NSelection = 'zh-CN'
@@ -228,5 +228,5 @@ dictL10NSTR = {
         'bootAPI_0005': 'OlivOS 组件 [{0}] 已被停止',
         'bootAPI_0006': 'OlivOS 组件 [{0}] 即将停止',
         'qqGuildv2SDK_0001': 'OlivOS QQ官方开放平台 [{0}] 刷新 TOKEN [{1}]',
-    }
+    },
 }

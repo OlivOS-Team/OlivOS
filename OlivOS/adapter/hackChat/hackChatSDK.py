@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -37,7 +37,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         id=plugin_bot_info.id,
         password=plugin_bot_info.password,
         nickname=plugin_bot_info.post_info.access_token,
-        chatroom=plugin_bot_info.post_info.host
+        chatroom=plugin_bot_info.post_info.host,
     )
     return res
 
@@ -77,7 +77,7 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
     user_hash = None
     if target_event.sdk_event.payload.active:
@@ -86,7 +86,7 @@ def get_Event_from_SDK(target_event):
                 bot_id=target_event.sdk_event.payload.data['nick'],
                 platform_sdk=target_event.platform['sdk'],
                 platform_platform=target_event.platform['platform'],
-                platform_model=target_event.platform['model']
+                platform_model=target_event.platform['model'],
             )
         if 'userid' in target_event.sdk_event.payload.data:
             user_hash = target_event.sdk_event.payload.data['userid']
@@ -105,35 +105,18 @@ def get_Event_from_SDK(target_event):
                     ):
                         gBotIdDict[plugin_event_bot_hash] = str(user_this['userid'])
         elif target_event.sdk_event.payload.cmd == 'chat':
-            if (
-                'nick' in target_event.sdk_event.payload.data
-                and 'text' in target_event.sdk_event.payload.data
-            ):
+            if 'nick' in target_event.sdk_event.payload.data and 'text' in target_event.sdk_event.payload.data:
                 target_event.active = True
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_string',
-                    target_event.sdk_event.payload.data['text']
+                    'olivos_string', target_event.sdk_event.payload.data['text']
                 )
                 tmp_user_id = str(user_hash)
-                if (
-                    plugin_event_bot_hash in gBotIdDict
-                    and tmp_user_id == gBotIdDict[plugin_event_bot_hash]
-                ):
+                if plugin_event_bot_hash in gBotIdDict and tmp_user_id == gBotIdDict[plugin_event_bot_hash]:
                     target_event.plugin_info['func_type'] = 'group_message_sent'
-                    target_event.data = target_event.group_message_sent(
-                        str(0),
-                        str(user_hash),
-                        message_obj,
-                        'group'
-                    )
+                    target_event.data = target_event.group_message_sent(str(0), str(user_hash), message_obj, 'group')
                 else:
                     target_event.plugin_info['func_type'] = 'group_message'
-                    target_event.data = target_event.group_message(
-                        str(0),
-                        str(user_hash),
-                        message_obj,
-                        'group'
-                    )
+                    target_event.data = target_event.group_message(str(0), str(user_hash), message_obj, 'group')
                 target_event.data.message_sdk = message_obj
                 target_event.data.message_id = str(-1)
                 target_event.data.raw_message = message_obj
@@ -151,29 +134,17 @@ def get_Event_from_SDK(target_event):
             if True:
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_member_increase'
-                target_event.data = target_event.group_member_increase(
-                    str(0),
-                    str(0),
-                    str(user_hash),
-                    None,
-                    'approve'
-                )
+                target_event.data = target_event.group_member_increase(str(0), str(0), str(user_hash), None, 'approve')
         elif target_event.sdk_event.payload.cmd == 'onlineRemove':
             if True:
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_member_decrease'
-                target_event.data = target_event.group_member_decrease(
-                    str(0),
-                    str(0),
-                    str(user_hash),
-                    None,
-                    'leave'
-                )
+                target_event.data = target_event.group_member_decrease(str(0), str(0), str(user_hash), None, 'leave')
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -209,25 +180,15 @@ class PAYLOAD(object):
         def __init__(self, nickname: str, chatroom: str, password: str = None):
             payload_template.__init__(self)
             self.cmd = 'join'
-            self.data = {
-                "cmd": "join",
-                "channel": chatroom,
-                "nick": nickname
-            }
-            if (
-                type(password) is str
-                and len(password) > 0
-            ):
+            self.data = {'cmd': 'join', 'channel': chatroom, 'nick': nickname}
+            if type(password) is str and len(password) > 0:
                 self.data['password'] = password
 
     class chat(payload_template):
         def __init__(self, message: str):
             payload_template.__init__(self)
             self.cmd = 'chat'
-            self.data = {
-                "cmd": "chat",
-                "text": message
-            }
+            self.data = {'cmd': 'chat', 'text': message}
 
 
 # 支持OlivOS API调用的方法实现
@@ -237,13 +198,10 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         message_new = ''
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_string',
-            message
-        )
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_string', message)
         if message_obj.active:
             for data_this in message_obj.data:
                 if data_this.type == 'text':
@@ -252,41 +210,19 @@ class event_action(object):
                     imagePath = data_this.data['file']
                     if data_this.data['url'] is not None:
                         imagePath = data_this.data['url']
-                    message_new += '![%s](%s)' % (
-                        imagePath,
-                        imagePath
-                    )
+                    message_new += '![%s](%s)' % (imagePath, imagePath)
         if len(message_new) > 0:
-            send_ws_event(
-                plugin_event_bot_hash,
-                PAYLOAD.chat(
-                    message=message_new
-                ).dump(),
-                control_queue
-            )
+            send_ws_event(plugin_event_bot_hash, PAYLOAD.chat(message=message_new).dump(), control_queue)
 
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue is not None:
-        control_queue.put(
-            OlivOS.API.Control.packet(
-                action,
-                data
-            ),
-            block=False
-        )
+        control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 def send_ws_event(hash, data, control_queue):
-    sendControlEventSend('send', {
-        'target': {
-            'type': 'hackChat_link',
-            'hash': hash
-        },
-        'data': {
-            'action': 'send',
-            'data': data
-        }
-    },
-                         control_queue
-                         )
+    sendControlEventSend(
+        'send',
+        {'target': {'type': 'hackChat_link', 'hash': hash}, 'data': {'action': 'send', 'data': data}},
+        control_queue,
+    )

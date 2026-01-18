@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import threading
 import time
@@ -33,7 +33,7 @@ class server(OlivOS.API.Proc_templet):
         tx_queue=None,
         logger_proc=None,
         debug_mode=False,
-        bot_info_dict=None
+        bot_info_dict=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -43,7 +43,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -52,7 +52,7 @@ class server(OlivOS.API.Proc_templet):
             'pulse_interval': None,
             'last_s': None,
             'ws_obj': None,
-            'ws_item': None
+            'ws_item': None,
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
@@ -60,9 +60,7 @@ class server(OlivOS.API.Proc_templet):
         self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] is running')
         while True:
             api_obj = OlivOS.qqGuildSDK.API.getGateway(
-                OlivOS.qqGuildSDK.get_SDK_bot_info_from_Plugin_bot_info(
-                    self.Proc_data['bot_info_dict']
-                )
+                OlivOS.qqGuildSDK.get_SDK_bot_info_from_Plugin_bot_info(self.Proc_data['bot_info_dict'])
             )
             try:
                 api_obj.do_api('GET')
@@ -76,16 +74,10 @@ class server(OlivOS.API.Proc_templet):
 
     def on_message(self, ws, message):
         try:
-            tmp_data_rx_obj = OlivOS.qqGuildSDK.PAYLOAD.rxPacket(
-                data=json.loads(message)
-            )
+            tmp_data_rx_obj = OlivOS.qqGuildSDK.PAYLOAD.rxPacket(data=json.loads(message))
             self.Proc_data['extend_data']['last_s'] = tmp_data_rx_obj.data.s
             if tmp_data_rx_obj.data.op == 0:
-                if tmp_data_rx_obj.data.t in [
-                    'MESSAGE_CREATE',
-                    'DIRECT_MESSAGE_CREATE',
-                    'AT_MESSAGE_CREATE'
-                ]:
+                if tmp_data_rx_obj.data.t in ['MESSAGE_CREATE', 'DIRECT_MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
                     sdk_event = OlivOS.qqGuildSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
@@ -94,14 +86,9 @@ class server(OlivOS.API.Proc_templet):
             elif tmp_data_rx_obj.data.op == 10:
                 self.Proc_data['extend_data']['pulse_interval'] = tmp_data_rx_obj.data.d['heartbeat_interval'] / 1000
                 tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendIdentify(
-                    OlivOS.qqGuildSDK.get_SDK_bot_info_from_Plugin_bot_info(
-                        self.Proc_data['bot_info_dict']
-                    )
+                    OlivOS.qqGuildSDK.get_SDK_bot_info_from_Plugin_bot_info(self.Proc_data['bot_info_dict'])
                 ).dump()
-                threading.Thread(
-                    target=self.run_pulse,
-                    args=()
-                ).start()
+                threading.Thread(target=self.run_pulse, args=()).start()
                 ws.send(tmp_data)
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
             elif tmp_data_rx_obj.data.op == 11:
@@ -125,9 +112,7 @@ class server(OlivOS.API.Proc_templet):
             if tmp_pulse_interval > 1:
                 tmp_pulse_interval -= 1
             time.sleep(tmp_pulse_interval)
-            tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendHeartbeat(
-                self.Proc_data['extend_data']['last_s']
-            ).dump()
+            tmp_data = OlivOS.qqGuildSDK.PAYLOAD.sendHeartbeat(self.Proc_data['extend_data']['last_s']).dump()
             if (
                 tmp_ws_item != self.Proc_data['extend_data']['ws_item']
                 or self.Proc_data['extend_data']['ws_item'] is None
@@ -152,7 +137,7 @@ class server(OlivOS.API.Proc_templet):
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()

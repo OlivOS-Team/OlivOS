@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import requests as req
@@ -23,10 +23,7 @@ import traceback
 
 import OlivOS
 
-paraMsgMap = [
-    'shamrock_default',
-    'para_default'
-]
+paraMsgMap = ['shamrock_default', 'para_default']
 
 napcatModelMap = [
     'napcat',
@@ -37,13 +34,9 @@ napcatModelMap = [
     'napcat_default',
 ]
 
-llonebotModelMap = [
-    'llonebot_default'
-]
+llonebotModelMap = ['llonebot_default']
 
-lagrangeModelMap = [
-    'lagrange_default'
-]
+lagrangeModelMap = ['lagrange_default']
 
 gFlagCheckList = []
 
@@ -63,7 +56,7 @@ def get_SDK_bot_info_from_Event(target_event):
         target_event.bot_info.id,
         target_event.bot_info.post_info.host,
         target_event.bot_info.post_info.port,
-        target_event.bot_info.post_info.access_token
+        target_event.bot_info.post_info.access_token,
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
@@ -106,11 +99,9 @@ class send_onebot_post_json_T(object):
                     if self.bot_info.debug_logger is not None:
                         self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
 
-                headers = {
-                    'Content-Type': 'application/json'
-                }
+                headers = {'Content-Type': 'application/json'}
                 headers.update(token_dict)
-                msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'))
+                msg_res = req.request('POST', send_url, headers=headers, data=json_str_tmp.encode('utf-8'))
 
                 if self.bot_info.debug_mode:
                     if self.bot_info.debug_logger is not None:
@@ -186,7 +177,7 @@ class api_templet(object):
                     self.bot_info.debug_logger.log(0, self.node_ext + ': GET request')
             headers = {}
             headers.update(token_dict)
-            msg_res = req.request("GET", send_url, headers=headers)
+            msg_res = req.request('GET', send_url, headers=headers)
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - GET succeed: ' + msg_res.text)
@@ -227,26 +218,25 @@ def format_cq_code_msg(msg):
     elif type(msg) is list:
         res = ''
         for msg_this in msg:
-            if (
-                type(msg_this) is dict
-                and 'type' in msg_this
-                and 'data' in msg_this
-                and type(msg_this['data']) is dict
-            ):
+            if type(msg_this) is dict and 'type' in msg_this and 'data' in msg_this and type(msg_this['data']) is dict:
                 if msg_this['type'] == 'text':
                     if 'text' in msg_this['data']:
                         res += msg_this['data']['text']
                 elif msg_this['type'] == 'at':
                     if 'qq' in msg_this['data']:
-                        cq_params = [f"qq={msg_this['data']['qq']}"]
+                        cq_params = [f'qq={msg_this["data"]["qq"]}']
                         if 'name' in msg_this['data'] and msg_this['data']['name']:
-                            cq_params.append(f"name={msg_this['data']['name']}")
-                        res += f"[CQ:at,{','.join(cq_params)}]"
+                            cq_params.append(f'name={msg_this["data"]["name"]}')
+                        res += f'[CQ:at,{",".join(cq_params)}]'
                 else:
-                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [
-                        f"{key_this}={msg_this['data'][key_this]}"
-                        for key_this in msg_this['data']
-                    ]) + ']'
+                    res += (
+                        '['
+                        + ','.join(
+                            [f'CQ:{msg_this["type"]}']
+                            + [f'{key_this}={msg_this["data"][key_this]}' for key_this in msg_this['data']]
+                        )
+                        + ']'
+                    )
     return res
 
 
@@ -268,9 +258,7 @@ def get_Event_from_SDK(target_event):
             target_event.plugin_info['func_type'] = 'private_message_sent'
             new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
             target_event.data = target_event.private_message_sent(
-                str(target_event.sdk_event.json['user_id']),
-                new_msg,
-                target_event.sdk_event.json['sub_type']
+                str(target_event.sdk_event.json['user_id']), new_msg, target_event.sdk_event.json['sub_type']
             )
             target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
@@ -291,7 +279,7 @@ def get_Event_from_SDK(target_event):
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
                     new_msg,
-                    target_event.sdk_event.json['sub_type']
+                    target_event.sdk_event.json['sub_type'],
                 )
                 target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
@@ -309,9 +297,7 @@ def get_Event_from_SDK(target_event):
             target_event.plugin_info['func_type'] = 'private_message'
             new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
             target_event.data = target_event.private_message(
-                str(target_event.sdk_event.json['user_id']),
-                new_msg,
-                target_event.sdk_event.json['sub_type']
+                str(target_event.sdk_event.json['user_id']), new_msg, target_event.sdk_event.json['sub_type']
             )
             target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
             target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
@@ -332,7 +318,7 @@ def get_Event_from_SDK(target_event):
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
                     new_msg,
-                    target_event.sdk_event.json['sub_type']
+                    target_event.sdk_event.json['sub_type'],
                 )
                 target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
@@ -353,7 +339,7 @@ def get_Event_from_SDK(target_event):
                     str(target_event.sdk_event.json['channel_id']),
                     str(target_event.sdk_event.json['user_id']),
                     new_msg,
-                    target_event.sdk_event.json['sub_type']
+                    target_event.sdk_event.json['sub_type'],
                 )
                 target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string', new_msg)
                 target_event.data.message_id = str(target_event.sdk_event.json['message_id'])
@@ -382,16 +368,14 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_file_upload'
             target_event.data = target_event.group_file_upload(
-                str(target_event.sdk_event.json['group_id']),
-                str(target_event.sdk_event.json['user_id'])
+                str(target_event.sdk_event.json['group_id']), str(target_event.sdk_event.json['user_id'])
             )
             target_event.data.file.update(target_event.sdk_event.json['file'])
         elif target_event.sdk_event.json['notice_type'] == 'group_admin':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_admin'
             target_event.data = target_event.group_admin(
-                str(target_event.sdk_event.json['group_id']),
-                str(target_event.sdk_event.json['user_id'])
+                str(target_event.sdk_event.json['group_id']), str(target_event.sdk_event.json['user_id'])
             )
             if target_event.sdk_event.json['sub_type'] == 'set':
                 target_event.data.action = 'set'
@@ -401,7 +385,7 @@ def get_Event_from_SDK(target_event):
             target_event.data = target_event.group_member_decrease(
                 str(target_event.sdk_event.json['group_id']),
                 str(target_event.sdk_event.json['operator_id']),
-                str(target_event.sdk_event.json['user_id'])
+                str(target_event.sdk_event.json['user_id']),
             )
             if target_event.sdk_event.json['sub_type'] == 'leave':
                 target_event.data.action = 'leave'
@@ -415,7 +399,7 @@ def get_Event_from_SDK(target_event):
             target_event.data = target_event.group_member_increase(
                 str(target_event.sdk_event.json['group_id']),
                 str(target_event.sdk_event.json.get('operator_id', '-1')),
-                str(target_event.sdk_event.json['user_id'])
+                str(target_event.sdk_event.json['user_id']),
             )
             if target_event.sdk_event.json['sub_type'] == 'approve':
                 target_event.data.action = 'approve'
@@ -428,16 +412,14 @@ def get_Event_from_SDK(target_event):
                 str(target_event.sdk_event.json['group_id']),
                 str(target_event.sdk_event.json['operator_id']),
                 str(target_event.sdk_event.json['user_id']),
-                target_event.sdk_event.json['duration']
+                target_event.sdk_event.json['duration'],
             )
             if target_event.sdk_event.json['sub_type'] == 'ban':
                 target_event.data.action = 'ban'
         elif target_event.sdk_event.json['notice_type'] == 'friend_add':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add'
-            target_event.data = target_event.friend_add(
-                str(target_event.sdk_event.json['user_id'])
-            )
+            target_event.data = target_event.friend_add(str(target_event.sdk_event.json['user_id']))
         elif target_event.sdk_event.json['notice_type'] == 'group_recall':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message_recall'
@@ -445,22 +427,20 @@ def get_Event_from_SDK(target_event):
                 str(target_event.sdk_event.json['group_id']),
                 str(target_event.sdk_event.json['operator_id']),
                 str(target_event.sdk_event.json['user_id']),
-                str(target_event.sdk_event.json['message_id'])
+                str(target_event.sdk_event.json['message_id']),
             )
         elif target_event.sdk_event.json['notice_type'] == 'friend_recall':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_recall'
             target_event.data = target_event.private_message_recall(
-                str(target_event.sdk_event.json['user_id']),
-                str(target_event.sdk_event.json['message_id'])
+                str(target_event.sdk_event.json['user_id']), str(target_event.sdk_event.json['message_id'])
             )
         elif target_event.sdk_event.json['notice_type'] == 'notify':
             if target_event.sdk_event.json['sub_type'] == 'poke':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'poke'
                 target_event.data = target_event.poke(
-                    str(target_event.sdk_event.json['user_id']),
-                    str(target_event.sdk_event.json['target_id'])
+                    str(target_event.sdk_event.json['user_id']), str(target_event.sdk_event.json['target_id'])
                 )
                 if 'group_id' in target_event.sdk_event.json:
                     target_event.data.group_id = str(target_event.sdk_event.json['group_id'])
@@ -472,14 +452,13 @@ def get_Event_from_SDK(target_event):
                 target_event.data = target_event.group_lucky_king(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
-                    str(target_event.sdk_event.json['target_id'])
+                    str(target_event.sdk_event.json['target_id']),
                 )
             elif target_event.sdk_event.json['sub_type'] == 'honor':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_honor'
                 target_event.data = target_event.group_honor(
-                    str(target_event.sdk_event.json['group_id']),
-                    str(target_event.sdk_event.json['user_id'])
+                    str(target_event.sdk_event.json['group_id']), str(target_event.sdk_event.json['user_id'])
                 )
                 if target_event.sdk_event.json['honor_type'] == 'talkative':
                     target_event.data.type = 'talkative'
@@ -496,8 +475,7 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'friend_add_request'
                     target_event.data = target_event.friend_add_request(
-                        str(target_event.sdk_event.json['user_id']),
-                        target_event.sdk_event.json['comment']
+                        str(target_event.sdk_event.json['user_id']), target_event.sdk_event.json['comment']
                     )
                     target_event.data.flag = tmp_flag
                 elif target_event.sdk_event.json['request_type'] == 'group':
@@ -507,7 +485,7 @@ def get_Event_from_SDK(target_event):
                         target_event.data = target_event.group_add_request(
                             str(target_event.sdk_event.json['group_id']),
                             str(target_event.sdk_event.json['user_id']),
-                            target_event.sdk_event.json['comment']
+                            target_event.sdk_event.json['comment'],
                         )
                         target_event.data.flag = tmp_flag
                     elif target_event.sdk_event.json['sub_type'] == 'invite':
@@ -516,7 +494,7 @@ def get_Event_from_SDK(target_event):
                         target_event.data = target_event.group_invite_request(
                             str(target_event.sdk_event.json['group_id']),
                             str(target_event.sdk_event.json['user_id']),
-                            target_event.sdk_event.json['comment']
+                            target_event.sdk_event.json['comment'],
                         )
                         target_event.data.flag = tmp_flag
     elif target_event.base_info['type'] == 'meta_event':
@@ -533,26 +511,21 @@ def get_Event_from_SDK(target_event):
         elif target_event.sdk_event.json['meta_event_type'] == 'heartbeat':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'heartbeat'
-            target_event.data = target_event.heartbeat(
-                target_event.sdk_event.json['interval']
-            )
+            target_event.data = target_event.heartbeat(target_event.sdk_event.json['interval'])
 
 
 def formatMessage(data: str, msgType: str = 'para'):
     res = data
-    data_obj = OlivOS.messageAPI.Message_templet(
-        mode_rx='old_string',
-        data_raw=data
-    )
+    data_obj = OlivOS.messageAPI.Message_templet(mode_rx='old_string', data_raw=data)
     for data_obj_this in data_obj.data:
         if type(data_obj_this) is OlivOS.messageAPI.PARA.image:
             if data_obj_this.data['url'] is not None:
                 data_obj_this.data['file'] = data_obj_this.data['url']
                 data_obj_this.data['url'] = None
             url_path = data_obj_this.data['file']
-            if not url_path.startswith("base64://"):
+            if not url_path.startswith('base64://'):
                 url_parsed = parse.urlparse(url_path)
-                if url_parsed.scheme not in ["http", "https"]:
+                if url_parsed.scheme not in ['http', 'https']:
                     file_path = url_parsed.path
                     if not os.path.isabs(file_path):
                         file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
@@ -586,18 +559,10 @@ def paraMapper(paraList, msgType='para'):
 # 支持OlivOS API调用的方法实现
 class event_action(object):
     def reply_private_msg(target_event, message):
-        event_action.send_private_msg(
-            target_event=target_event,
-            user_id=target_event.data.user_id,
-            message=message
-        )
+        event_action.send_private_msg(target_event=target_event, user_id=target_event.data.user_id, message=message)
 
     def reply_group_msg(target_event, message):
-        event_action.send_group_msg(
-            target_event=target_event,
-            user_id=target_event.data.group_id,
-            message=message
-        )
+        event_action.send_group_msg(target_event=target_event, user_id=target_event.data.group_id, message=message)
 
     def send_private_msg(target_event, user_id, message):
         msgType = 'msg'
@@ -640,12 +605,15 @@ class event_action(object):
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
                 res_data['data']['sender']['id'] = str(
-                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
+                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                )
                 res_data['data']['sender']['name'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'], str)
                 res_data['data']['sender']['user_id'] = str(
-                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int))
-                res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(raw_obj, ['sender', 'nickname'],
-                                                                                      str)
+                    init_api_do_mapping_for_dict(raw_obj, ['sender', 'user_id'], int)
+                )
+                res_data['data']['sender']['nickname'] = init_api_do_mapping_for_dict(
+                    raw_obj, ['sender', 'nickname'], str
+                )
                 res_data['data']['time'] = init_api_do_mapping_for_dict(raw_obj, ['time'], int)
                 res_data['data']['message'] = init_api_do_mapping_for_dict(raw_obj, ['message'], str)
                 res_data['data']['raw_message'] = init_api_do_mapping_for_dict(raw_obj, ['raw_message'], str)
@@ -868,10 +836,12 @@ class event_action(object):
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
-                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['member_count'],
-                                                                                     int)
-                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this,
-                                                                                         ['max_member_count'], int)
+                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['member_count'], int
+                    )
+                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['max_member_count'], int
+                    )
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
@@ -1421,7 +1391,7 @@ class event_action(object):
             # Lagrange 用 set_group_reaction
             this_msg = api.set_group_reaction(get_SDK_bot_info_from_Event(target_event))
             if group_id is None:
-                raise ValueError("Lagrange model requires group_id parameter")
+                raise ValueError('Lagrange model requires group_id parameter')
             this_msg.data.group_id = int(group_id)
             this_msg.data.message_id = int(message_id)
             this_msg.data.code = str(emoji_id)
@@ -2235,6 +2205,7 @@ class api(object):
 
     class rename_group_file_folder(api_templet):
         """LLOneBot 和 Lagrange 支持"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2250,6 +2221,7 @@ class api(object):
 
     class rename_group_file(api_templet):
         """NapCat 支持"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2266,6 +2238,7 @@ class api(object):
 
     class set_group_file_forever(api_templet):
         """LLOneBot 支持 (群文件转永久)"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2280,6 +2253,7 @@ class api(object):
 
     class trans_group_file(api_templet):
         """NapCat 支持 (转存为永久文件)"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2387,6 +2361,7 @@ class api(object):
 
     class del_group_notice(api_templet):
         """删除群公告（支持 Lagrange、NapCat 和 LLOneBot）"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2401,6 +2376,7 @@ class api(object):
 
     class set_group_reaction(api_templet):
         """Lagrange 贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2417,6 +2393,7 @@ class api(object):
 
     class set_msg_emoji_like(api_templet):
         """NapCat/LLOneBot 贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2432,6 +2409,7 @@ class api(object):
 
     class unset_msg_emoji_like(api_templet):
         """LLOneBot 取消贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info

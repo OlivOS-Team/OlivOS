@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 # here put the import lib
 
@@ -23,7 +23,4 @@ import OlivOS
 if __name__ == '__main__':
     if not os.path.exists('./conf'):
         os.makedirs('./conf')
-    OlivOS.bootAPI.Entity(
-        basic_conf='./conf/basic.json',
-        patch_conf='./conf/config.json'
-    ).start()
+    OlivOS.bootAPI.Entity(basic_conf='./conf/basic.json', patch_conf='./conf/config.json').start()

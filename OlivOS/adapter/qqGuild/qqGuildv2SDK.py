@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 from enum import IntEnum
 import json
@@ -32,23 +32,23 @@ modelName = 'qqGuildv2SDK'
 
 
 class intents_T(IntEnum):
-    GUILDS = (1 << 0)  # 频道变更
-    GUILD_MEMBERS = (1 << 1)  # 频道成员变更
-    GUILD_MESSAGES = (1 << 9)  # 消息事件，仅 *私域* 机器人能够设置此 intents。
-    GUILD_MESSAGE_REACTIONS = (1 << 10)  # 戳表情
-    DIRECT_MESSAGE = (1 << 12)  # 私聊消息
-    INTERACTION = (1 << 26)  # 互动事件变更
-    MESSAGE_AUDIT = (1 << 27)  # 消息审核变更
-    FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
-    AUDIO_ACTION = (1 << 29)  # 语音消息
-    PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
-    PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
+    GUILDS = 1 << 0  # 频道变更
+    GUILD_MEMBERS = 1 << 1  # 频道成员变更
+    GUILD_MESSAGES = 1 << 9  # 消息事件，仅 *私域* 机器人能够设置此 intents。
+    GUILD_MESSAGE_REACTIONS = 1 << 10  # 戳表情
+    DIRECT_MESSAGE = 1 << 12  # 私聊消息
+    INTERACTION = 1 << 26  # 互动事件变更
+    MESSAGE_AUDIT = 1 << 27  # 消息审核变更
+    FORUMS_EVENT = 1 << 28  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
+    AUDIO_ACTION = 1 << 29  # 语音消息
+    PUBLIC_GUILD_MESSAGES = 1 << 30  # 消息事件，此为公域的消息事件
+    PUBLIC_QQ_MESSAGES = 1 << 25  # 消息事件，此为公域的普通QQ消息事件
 
 
 sdkAPIHost = {
     'default': 'https://api.sgroup.qq.com',
     'sandbox': 'https://sandbox.api.sgroup.qq.com',
-    'bots': 'https://bots.qq.com'
+    'bots': 'https://bots.qq.com',
 }
 
 sdkAPIRoute = {
@@ -59,14 +59,10 @@ sdkAPIRoute = {
     'gateway': '/gateway',
     'qq_users': '/v2/users',
     'qq_groups': '/v2/groups',
-    'getAppAccessToken': '/app/getAppAccessToken'
+    'getAppAccessToken': '/app/getAppAccessToken',
 }
 
-sdkAPIRouteTemp = {
-    'guild_id': '-1',
-    'channel_id': '-1',
-    'user_id': '-1'
-}
+sdkAPIRouteTemp = {'guild_id': '-1', 'channel_id': '-1', 'user_id': '-1'}
 
 sdkSubSelfInfo = {}
 sdkTokenInfo = {}
@@ -89,7 +85,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         id=plugin_bot_info.id,
         access_token=plugin_bot_info.post_info.access_token,
         model=plugin_bot_info.platform.get('model', 'private'),
-        intents=plugin_bot_info.post_info.port
+        intents=plugin_bot_info.post_info.port,
     )
     res.debug_mode = plugin_bot_info.debug_mode
     return res
@@ -115,9 +111,9 @@ class event(object):
             self.base_info['post_type'] = None
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -195,9 +191,7 @@ class PAYLOAD(object):
                     'token': 'QQBot %s' % (getTokenNow(bot_info)),
                     'intents': tmp_intents,
                     'shard': [0, 1],
-                    'properties': {
-                        'os': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
+                    'properties': {'os': OlivOS.infoAPI.OlivOS_Header_UA},
                 }
             except Exception:
                 self.active = False
@@ -217,9 +211,9 @@ class PAYLOAD(object):
             return res
 
 
-'''
+"""
 对于POST接口的实现
-'''
+"""
 
 
 class api_templet(object):
@@ -252,16 +246,13 @@ class api_templet(object):
             payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-            }
+            headers = {'Content-Type': 'application/json', 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request('POST', send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request('GET', send_url, headers=headers)
 
             self.res = msg_res.text
             return msg_res.text
@@ -288,14 +279,14 @@ class api_templet(object):
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
                 'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
-                'X-Union-Appid': str(self.bot_info.id)
+                'X-Union-Appid': str(self.bot_info.id),
             }
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request('POST', send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request('GET', send_url, headers=headers)
 
             self.res = msg_res.text
             # print(self.res)
@@ -308,17 +299,11 @@ class api_templet(object):
 def getTokenNow(bot_info: bot_info_T):
     access_token = None
     plugin_event_bot_hash = OlivOS.API.getBotHash(
-        bot_id=bot_info.id,
-        platform_sdk='qqGuildv2_link',
-        platform_platform='qqGuild',
-        platform_model='default'
+        bot_id=bot_info.id, platform_sdk='qqGuildv2_link', platform_platform='qqGuild', platform_model='default'
     )
     tmpInfo = sdkTokenInfo.get(plugin_event_bot_hash, [None, -1])
     tmpTime = int(datetime.now(timezone.utc).timestamp())
-    if (
-        tmpInfo[0] is not None
-        and tmpInfo[1] > tmpTime
-    ):
+    if tmpInfo[0] is not None and tmpInfo[1] > tmpTime:
         access_token = sdkTokenInfo[plugin_event_bot_hash][0]
     else:
         msg_this = API.getAppAccessToken(bot_info)
@@ -329,7 +314,7 @@ def getTokenNow(bot_info: bot_info_T):
             raw_obj = init_api_json(msg_this.res)
             sdkTokenInfo[plugin_event_bot_hash] = [
                 raw_obj.get('access_token', None),
-                tmpTime + int(raw_obj.get('expires_in', -1))
+                tmpTime + int(raw_obj.get('expires_in', -1)),
             ]
             access_token = sdkTokenInfo[plugin_event_bot_hash][0]
             try:
@@ -344,8 +329,8 @@ def getTokenNow(bot_info: bot_info_T):
                         OlivOS.L10NAPI.getTrans(
                             'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
                             [plugin_event_bot_hash, access_token],
-                            modelName
-                        )
+                            modelName,
+                        ),
                     )
             except Exception:
                 traceback.print_exc()
@@ -423,11 +408,11 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None     # str
-                self.embed = None       # str
-                self.ark = None         # str
-                self.image = None       # str
-                self.msg_id = None      # str
+                self.content = None  # str
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
                 # self.msg_type = 0
                 # self.timestamp = int(datetime.now(timezone.utc).timestamp())
 
@@ -446,13 +431,13 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None     # str
-                self.media = None       # str
-                self.msg_type = 0       # int
-                self.embed = None       # str
-                self.ark = None         # str
-                self.image = None       # str
-                self.msg_id = None      # str
+                self.content = None  # str
+                self.media = None  # str
+                self.msg_type = 0  # int
+                self.embed = None  # str
+                self.ark = None  # str
+                self.image = None  # str
+                self.msg_id = None  # str
                 self.timestamp = int(datetime.now(timezone.utc).timestamp())
                 self.msg_seq = None
 
@@ -502,9 +487,7 @@ class API(object):
         def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
             try:
                 tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
-                payload = MultipartEncoder(
-                    fields=tmp_payload_dict
-                )
+                payload = MultipartEncoder(fields=tmp_payload_dict)
 
                 tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
                 if self.metadata is not None:
@@ -517,12 +500,12 @@ class API(object):
                     'Content-Length': str(len(self.data.file)),
                     'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
                     'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
-                    'X-Union-Appid': str(self.bot_info.id)
+                    'X-Union-Appid': str(self.bot_info.id),
                 }
 
                 msg_res = None
                 if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                    msg_res = req.request('POST', send_url, headers=headers, data=payload)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -582,12 +565,11 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
-            target_event.sdk_event.base_info['self_id'],
-            target_event.sdk_event.base_info['token']
+            target_event.sdk_event.base_info['self_id'], target_event.sdk_event.base_info['token']
         )
         api_msg_obj = API.getMe(tmp_bot_info)
         try:
@@ -611,38 +593,26 @@ def get_Event_from_SDK(target_event):
             and type(target_event.sdk_event.payload.data.d['user']) is dict
         ):
             sdkSelfInfo[plugin_event_bot_hash] = target_event.sdk_event.payload.data.d['user']
-    elif target_event.sdk_event.payload.data.t in [
-        'GROUP_AT_MESSAGE_CREATE',
-        'GROUP_MESSAGE_CREATE'
-    ]:
+    elif target_event.sdk_event.payload.data.t in ['GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE']:
         message_obj = None
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content'].lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -656,7 +626,7 @@ def get_Event_from_SDK(target_event):
                 str(target_event.sdk_event.payload.data.d['group_id']),
                 str(target_event.sdk_event.payload.data.d['author']['id']),
                 message_obj,
-                'group'
+                'group',
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = target_event.sdk_event.payload.data.d['id']
@@ -694,30 +664,21 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content'].lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -728,9 +689,7 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
-                str(target_event.sdk_event.payload.data.d['author']['id']),
-                message_obj,
-                'friend'
+                str(target_event.sdk_event.payload.data.d['author']['id']), message_obj, 'friend'
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = str(target_event.sdk_event.payload.data.d['id'])
@@ -748,44 +707,31 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['reply_msg_id'] = target_event.sdk_event.payload.data.d['id']
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
-    elif target_event.sdk_event.payload.data.t in [
-        'MESSAGE_CREATE',
-        'AT_MESSAGE_CREATE'
-    ]:
+    elif target_event.sdk_event.payload.data.t in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
         message_obj = None
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.t == 'AT_MESSAGE_CREATE':
                 # 针对某些无法调用 /users/@me 接口的机器人的临时解决方案
                 target_event.sdk_event.payload.data.d['content'] = re.sub(
-                    r'^<@!\d+>', r'',
-                    target_event.sdk_event.payload.data.d['content']
+                    r'^<@!\d+>', r'', target_event.sdk_event.payload.data.d['content']
                 )
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content'].lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -799,7 +745,7 @@ def get_Event_from_SDK(target_event):
                 str(target_event.sdk_event.payload.data.d['channel_id']),
                 str(target_event.sdk_event.payload.data.d['author']['id']),
                 message_obj,
-                'group'
+                'group',
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = target_event.sdk_event.payload.data.d['id']
@@ -836,30 +782,21 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content'].lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -870,9 +807,7 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
-                str(target_event.sdk_event.payload.data.d['author']['id']),
-                message_obj,
-                'friend'
+                str(target_event.sdk_event.payload.data.d['author']['id']), message_obj, 'friend'
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = str(target_event.sdk_event.payload.data.d['id'])
@@ -932,13 +867,8 @@ class event_action(object):
             elif type(message_this) is OlivOS.messageAPI.PARA.text:
                 res += message_this.OP()
                 flag_now_type = 'string'
-            if (
-                size_data == count_data
-                or (
-                    flag_now_type_last != flag_now_type
-                    and flag_now_type_last == 'string'
-                    and len(res) > 0
-                )
+            if size_data == count_data or (
+                flag_now_type_last != flag_now_type and flag_now_type_last == 'string' and len(res) > 0
             ):
                 this_msg.data.content = res
                 this_msg.data.msg_type = 0
@@ -987,10 +917,7 @@ class event_action(object):
                 if this_msg.res is not None:
                     raw_obj = init_api_json(this_msg.res)
                 if raw_obj is not None:
-                    if (
-                        type(raw_obj) is dict
-                        and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int)
-                    ):
+                    if type(raw_obj) is dict and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int):
                         res_data['active'] = True
                         res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
                         res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['id'], str))
@@ -1001,31 +928,25 @@ class event_action(object):
     # 现场上传的就地实现
     def setResourceUploadFast(target_event, url: str, type_path: str = 'images', type_chat: str = 'qq_groups'):
         res = None
-        check_list = {
-            'images': ['.png', 'image/png'],
-            'videos': ['.mp4', 'video/mp4'],
-            'audios': ['.mp3', 'audio/mp3']
-        }
+        check_list = {'images': ['.png', 'image/png'], 'videos': ['.mp4', 'video/mp4'], 'audios': ['.mp3', 'audio/mp3']}
         check_list.setdefault(type_path, ['', 'file/*'])
         try:
             pic_file = None
-            if url.startswith("base64://"):
+            if url.startswith('base64://'):
                 data = url[9:]
-                pic_file = base64.decodebytes(data.encode("utf-8"))
+                pic_file = base64.decodebytes(data.encode('utf-8'))
             else:
                 url_parsed = parse.urlparse(url)
-                if url_parsed.scheme in ["http", "https"]:
+                if url_parsed.scheme in ['http', 'https']:
                     send_url = url
-                    headers = {
-                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
+                    headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
                     msg_res = None
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
                     pic_file = msg_res.content
                 else:
                     file_path = url_parsed.path
                     file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
-                    with open(file_path, "rb") as f:
+                    with open(file_path, 'rb') as f:
                         pic_file = f.read()
 
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))

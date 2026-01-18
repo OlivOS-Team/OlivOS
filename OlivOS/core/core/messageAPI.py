@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import re
@@ -21,12 +21,7 @@ import traceback
 
 # platform sdk model
 dictMessageType = {
-    'wechat': {
-        'onebot': {
-            'onebotV12': 'obv12_para',
-            'ComWeChatBotClient': 'obv12_para'
-        }
-    },
+    'wechat': {'onebot': {'onebotV12': 'obv12_para', 'ComWeChatBotClient': 'obv12_para'}},
     'qq': {
         'onebot': {
             'default': 'old_string',
@@ -61,15 +56,11 @@ dictMessageType = {
             'napcat_show_old': 'old_string',
             'napcat_default': 'old_string',
             'llonebot_default': 'old_string',
-            'lagrange_default': 'old_string'
+            'lagrange_default': 'old_string',
         }
     },
     'qqGuild': {
-        'qqGuild_link': {
-            'default': 'olivos_para',
-            'private': 'olivos_para',
-            'public': 'olivos_para'
-        },
+        'qqGuild_link': {'default': 'olivos_para', 'private': 'olivos_para', 'public': 'olivos_para'},
         'qqGuildv2_link': {
             'default': 'olivos_para',
             'sandbox': 'olivos_para',
@@ -77,87 +68,32 @@ dictMessageType = {
             'private': 'olivos_para',
             'private_intents': 'olivos_para',
             'public': 'olivos_para',
-            'public_intents': 'olivos_para'
-        }
+            'public_intents': 'olivos_para',
+        },
     },
-    'telegram': {
-        'telegram_poll': {
-            'default': 'olivos_para'
-        }
-    },
-    'fanbook': {
-        'fanbook_poll': {
-            'default': 'olivos_para',
-            'private': 'olivos_para'
-        }
-    },
-    'kaiheila': {
-        'kaiheila_link': {
-            'default': 'olivos_para',
-            'card': 'olivos_para',
-            'text': 'olivos_para'
-        }
-    },
-    'xiaoheihe': {
-        'xiaoheihe_link': {
-            'default': 'old_string'
-        }
-    },
+    'telegram': {'telegram_poll': {'default': 'olivos_para'}},
+    'fanbook': {'fanbook_poll': {'default': 'olivos_para', 'private': 'olivos_para'}},
+    'kaiheila': {'kaiheila_link': {'default': 'olivos_para', 'card': 'olivos_para', 'text': 'olivos_para'}},
+    'xiaoheihe': {'xiaoheihe_link': {'default': 'old_string'}},
     'mhyVila': {
         'mhyVila_link': {
             'default': 'olivos_string',
             'public': 'olivos_string',
             'private': 'olivos_string',
-            'sandbox': 'olivos_string'
+            'sandbox': 'olivos_string',
         }
     },
-    'discord': {
-        'discord_link': {
-            'default': 'olivos_para'
-        }
-    },
+    'discord': {'discord_link': {'default': 'olivos_para'}},
     'dodo': {
-        'dodo_link': {
-            'default': 'olivos_para',
-            'v1': 'olivos_para',
-            'v2': 'olivos_para'
-        },
-        'dodo_poll': {
-            'default': 'olivos_para'
-        },
-        'dodobot_ea': {
-            'default': 'olivos_para'
-        }
+        'dodo_link': {'default': 'olivos_para', 'v1': 'olivos_para', 'v2': 'olivos_para'},
+        'dodo_poll': {'default': 'olivos_para'},
+        'dodobot_ea': {'default': 'olivos_para'},
     },
-    'dingtalk': {
-        'dingtalk_link': {
-            'default': 'olivos_para'
-        }
-    },
-    'fake': {
-        'fake': {
-            'default': 'olivos_para'
-        }
-    },
-    'terminal': {
-        'terminal_link': {
-            'default': 'olivos_string',
-            'postapi': 'olivos_string',
-            'ff14': 'olivos_string'
-        }
-    },
-    'hackChat': {
-        'hackChat_link': {
-            'default': 'olivos_string',
-            'private': 'olivos_string'
-        }
-    },
-    'biliLive': {
-        'biliLive_link': {
-            'default': 'olivos_string',
-            'login': 'olivos_string'
-        }
-    }
+    'dingtalk': {'dingtalk_link': {'default': 'olivos_para'}},
+    'fake': {'fake': {'default': 'olivos_para'}},
+    'terminal': {'terminal_link': {'default': 'olivos_string', 'postapi': 'olivos_string', 'ff14': 'olivos_string'}},
+    'hackChat': {'hackChat_link': {'default': 'olivos_string', 'private': 'olivos_string'}},
+    'biliLive': {'biliLive_link': {'default': 'olivos_string', 'login': 'olivos_string'}},
 }
 
 
@@ -186,7 +122,7 @@ class Message_templet(object):
 
     def match_str(self, src_str, match_str_src):
         if len(src_str) >= len(match_str_src):
-            if src_str[:len(match_str_src)] == match_str_src:
+            if src_str[: len(match_str_src)] == match_str_src:
                 return True
         return False
 
@@ -283,53 +219,26 @@ class Message_templet(object):
                     and 'data' in data_raw_this
                     and type(data_raw_this['data']) is dict
                 ):
-                    if (
-                        'text' == data_raw_this['type']
-                        and 'text' in data_raw_this['data']
-                    ):
-                        tmp_data.append(
-                            PARA.text(data_raw_this['data']['text'])
-                        )
-                    elif (
-                        'mention' == data_raw_this['type']
-                        and 'user_id' in data_raw_this['data']
-                    ):
-                        tmp_data.append(
-                            PARA.at(str(data_raw_this['data']['user_id']))
-                        )
+                    if 'text' == data_raw_this['type'] and 'text' in data_raw_this['data']:
+                        tmp_data.append(PARA.text(data_raw_this['data']['text']))
+                    elif 'mention' == data_raw_this['type'] and 'user_id' in data_raw_this['data']:
+                        tmp_data.append(PARA.at(str(data_raw_this['data']['user_id'])))
                     elif 'mention_all' == data_raw_this['type']:
-                        tmp_data.append(
-                            PARA.at('all')
-                        )
-                    elif (
-                        'image' == data_raw_this['type']
-                        and 'file_id' in data_raw_this['data']
-                    ):
+                        tmp_data.append(PARA.at('all'))
+                    elif 'image' == data_raw_this['type'] and 'file_id' in data_raw_this['data']:
                         tmp_this = PARA.image(data_raw_this['data']['file_id'])
                         if 'url' in data_raw_this['data']:
                             tmp_this.data['url'] = data_raw_this['data']['url']
-                        if (
-                            'flush' in data_raw_this['data']
-                            and True is data_raw_this['data']['flush']
-                        ):
+                        if 'flush' in data_raw_this['data'] and True is data_raw_this['data']['flush']:
                             tmp_this.data['type'] = 'flush'
                         tmp_data.append(tmp_this)
-                    elif (
-                        'voice' == data_raw_this['type']
-                        and 'file_id' in data_raw_this['data']
-                    ):
+                    elif 'voice' == data_raw_this['type'] and 'file_id' in data_raw_this['data']:
                         tmp_this = PARA.record(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
-                    elif (
-                        'audio' == data_raw_this['type']
-                        and 'file_id' in data_raw_this['data']
-                    ):
+                    elif 'audio' == data_raw_this['type'] and 'file_id' in data_raw_this['data']:
                         tmp_this = PARA.record(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
-                    elif (
-                        'video' == data_raw_this['type']
-                        and 'file_id' in data_raw_this['data']
-                    ):
+                    elif 'video' == data_raw_this['type'] and 'file_id' in data_raw_this['data']:
                         tmp_this = PARA.video(data_raw_this['data']['file_id'])
                         tmp_data.append(tmp_this)
                     elif (
@@ -343,32 +252,20 @@ class Message_templet(object):
                             lat=data_raw_this['data']['latitude'],
                             lon=data_raw_this['data']['longitude'],
                             title=data_raw_this['data']['title'],
-                            content=data_raw_this['data']['content']
+                            content=data_raw_this['data']['content'],
                         )
                         tmp_data.append(tmp_this)
-                    elif (
-                        'face' == data_raw_this['type']
-                        and 'id' in data_raw_this['data']
-                    ):
+                    elif 'face' == data_raw_this['type'] and 'id' in data_raw_this['data']:
                         tmp_data.append(PARA.face(data_raw_this['data']['id']))
                     elif 'dice' == data_raw_this['type']:
                         tmp_data.append(PARA.dice())
                     elif 'rps' == data_raw_this['type']:
                         tmp_data.append(PARA.rps())
-                    elif (
-                        'reply' == data_raw_this['type']
-                        and 'message_id' in data_raw_this['data']
-                    ):
+                    elif 'reply' == data_raw_this['type'] and 'message_id' in data_raw_this['data']:
                         tmp_data.append(PARA.reply(str(data_raw_this['data']['message_id'])))
-                    elif (
-                        'json' == data_raw_this['type']
-                        and 'data' in data_raw_this['data']
-                    ):
+                    elif 'json' == data_raw_this['type'] and 'data' in data_raw_this['data']:
                         tmp_data.append(PARA.json(data_raw_this['data']['data']))
-                    elif (
-                        'xml' == data_raw_this['type']
-                        and 'data' in data_raw_this['data']
-                    ):
+                    elif 'xml' == data_raw_this['type'] and 'data' in data_raw_this['data']:
                         tmp_data.append(PARA.xml(data_raw_this['data']['data']))
             self.data = tmp_data
         else:
@@ -392,10 +289,10 @@ class Message_templet(object):
             elif tmp_data_type == 'code' and self.match_str(tmp_data_raw[it_data_this:], ']'):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base : it_data_this + 1]
                     tmp_data_raw_this = tmp_data_raw_this_bak
-                    tmp_data_raw_this = tmp_data_raw_this[len('[' + code_key + ':'):]
-                    tmp_data_raw_this = tmp_data_raw_this[:-len(']')]
+                    tmp_data_raw_this = tmp_data_raw_this[len('[' + code_key + ':') :]
+                    tmp_data_raw_this = tmp_data_raw_this[: -len(']')]
                     tmp_data_raw_this_list = tmp_data_raw_this.split(',')
                     tmp_data_type_key = tmp_data_raw_this_list[0]
                     tmp_code_data_list = tmp_data_raw_this_list[1:]
@@ -413,35 +310,31 @@ class Message_templet(object):
                             tmp_code_data_list_this_val += tmp_code_data_list_this_val_this
                         tmp_code_data_dict[tmp_code_data_list_this_key] = tmp_code_data_list_this_val
                     if tmp_data_type_key == 'face':
-                        tmp_para_this = PARA.face(
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id']))
-                        )
+                        tmp_para_this = PARA.face(id=str(self.get_from_dict(tmp_code_data_dict, ['id'])))
                     elif tmp_data_type_key == 'at':
                         if code_key == 'CQ':
                             tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
                         tmp_para_this = PARA.at(
                             id=str(self.get_from_dict(tmp_code_data_dict, ['id'], -1)),
-                            name=self.get_from_dict(tmp_code_data_dict, ['name'], None)
+                            name=self.get_from_dict(tmp_code_data_dict, ['name'], None),
                         )
                     elif tmp_data_type_key == 'reply':
-                        tmp_para_this = PARA.reply(
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], 0))
-                        )
+                        tmp_para_this = PARA.reply(id=str(self.get_from_dict(tmp_code_data_dict, ['id'], 0)))
                     elif tmp_data_type_key == 'image':
                         tmp_para_this = PARA.image(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
                             type=self.get_from_dict(tmp_code_data_dict, ['type'], None),
-                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None)
+                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None),
                         )
                     elif tmp_data_type_key == 'record':
                         tmp_para_this = PARA.record(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'])),
                         )
                     elif tmp_data_type_key == 'video':
                         tmp_para_this = PARA.video(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'])),
                         )
                     elif tmp_data_type_key == 'rps':
                         tmp_para_this = PARA.rps()
@@ -450,9 +343,7 @@ class Message_templet(object):
                     elif tmp_data_type_key == 'shake':
                         tmp_para_this = PARA.shake()
                     elif tmp_data_type_key == 'poke':
-                        tmp_para_this = PARA.poke(
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], -1))
-                        )
+                        tmp_para_this = PARA.poke(id=str(self.get_from_dict(tmp_code_data_dict, ['id'], -1)))
                     elif tmp_data_type_key == 'anonymous':
                         tmp_para_this = PARA.anonymous()
                     elif tmp_data_type_key == 'share':
@@ -460,14 +351,14 @@ class Message_templet(object):
                             url=str(self.get_from_dict(tmp_code_data_dict, ['url'], '')),
                             title=str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
                             content=str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
-                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], '')),
                         )
                     elif tmp_data_type_key == 'location':
                         tmp_para_this = PARA.location(
                             lat=str(self.get_from_dict(tmp_code_data_dict, ['lat'], '')),
                             lon=str(self.get_from_dict(tmp_code_data_dict, ['lon'], '')),
                             title=str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
-                            content=str(self.get_from_dict(tmp_code_data_dict, ['content'], ''))
+                            content=str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
                         )
                     elif tmp_data_type_key == 'music':
                         tmp_para_this = PARA.music(
@@ -477,20 +368,14 @@ class Message_templet(object):
                             audio=str(self.get_from_dict(tmp_code_data_dict, ['audio'], '')),
                             title=str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
                             content=str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
-                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], '')),
                         )
                     elif tmp_data_type_key == 'forward':
-                        tmp_para_this = PARA.forward(
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], 'NULLHASH'))
-                        )
+                        tmp_para_this = PARA.forward(id=str(self.get_from_dict(tmp_code_data_dict, ['id'], 'NULLHASH')))
                     elif tmp_data_type_key == 'xml':
-                        tmp_para_this = PARA.xml(
-                            data=str(self.get_from_dict(tmp_code_data_dict, ['data'], ''))
-                        )
+                        tmp_para_this = PARA.xml(data=str(self.get_from_dict(tmp_code_data_dict, ['data'], '')))
                     elif tmp_data_type_key == 'json':
-                        tmp_para_this = PARA.json(
-                            data=str(self.get_from_dict(tmp_code_data_dict, ['data'], ''))
-                        )
+                        tmp_para_this = PARA.json(data=str(self.get_from_dict(tmp_code_data_dict, ['data'], '')))
                     else:
                         tmp_para_this = PARA.text(tmp_data_raw_this_bak)
                     tmp_data.append(tmp_para_this)
@@ -499,7 +384,7 @@ class Message_templet(object):
             elif it_data_this >= len(tmp_data_raw):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this = tmp_data_raw[it_data_base : it_data_this + 1]
                     tmp_para_this = PARA.text(tmp_data_raw_this)
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this
@@ -523,10 +408,10 @@ class Message_templet(object):
             elif tmp_data_type == 'code' and self.match_str(tmp_data_raw[it_data_this:], '}'):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base : it_data_this + 1]
                     tmp_data_raw_this = tmp_data_raw_this_bak
-                    tmp_data_raw_this = tmp_data_raw_this[len('${'):]
-                    tmp_data_raw_this = tmp_data_raw_this[:-len('}')]
+                    tmp_data_raw_this = tmp_data_raw_this[len('${') :]
+                    tmp_data_raw_this = tmp_data_raw_this[: -len('}')]
                     tmp_data_raw_this_list = tmp_data_raw_this.split('!')
                     tmp_data_raw_this_list_2 = tmp_data_raw_this.split('&')
                     tmp_data_type_key = tmp_data_raw_this_list[0]
@@ -534,13 +419,9 @@ class Message_templet(object):
                     tmp_code_data_list = tmp_data_raw_this_list[1:]
                     tmp_code_data_list_2 = tmp_data_raw_this_list_2[1:]
                     if tmp_data_type_key == '@' and len(tmp_code_data_list) > 0:
-                        tmp_para_this = PARA.at(
-                            id=str(tmp_code_data_list[0])
-                        )
+                        tmp_para_this = PARA.at(id=str(tmp_code_data_list[0]))
                     elif tmp_data_type_key_2 == '@' and len(tmp_code_data_list_2) > 0:
-                        tmp_para_this = PARA.at(
-                            id='all'
-                        )
+                        tmp_para_this = PARA.at(id='all')
                     else:
                         tmp_para_this = PARA.text(tmp_data_raw_this_bak)
                     tmp_data.append(tmp_para_this)
@@ -549,7 +430,7 @@ class Message_templet(object):
             elif it_data_this >= len(tmp_data_raw):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this = tmp_data_raw[it_data_base : it_data_this + 1]
                     tmp_para_this = PARA.text(tmp_data_raw_this)
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this
@@ -573,10 +454,10 @@ class Message_templet(object):
             elif tmp_data_type == 'code' and self.match_str(tmp_data_raw[it_data_this:], '>'):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base:it_data_this + len('>')]
+                    tmp_data_raw_this_bak = tmp_data_raw[it_data_base : it_data_this + len('>')]
                     tmp_data_raw_this = tmp_data_raw_this_bak
-                    tmp_data_raw_this = tmp_data_raw_this[len('<'):]
-                    tmp_data_raw_this = tmp_data_raw_this[:-len('>')]
+                    tmp_data_raw_this = tmp_data_raw_this[len('<') :]
+                    tmp_data_raw_this = tmp_data_raw_this[: -len('>')]
                     tmp_data_raw_this_list = tmp_data_raw_this.split('!')
                     tmp_data_raw_this_list_2 = tmp_data_raw_this.split('&')
                     tmp_data_type_key = tmp_data_raw_this_list[0]
@@ -584,24 +465,18 @@ class Message_templet(object):
                     tmp_code_data_list = tmp_data_raw_this_list[1:]
                     tmp_code_data_list_2 = tmp_data_raw_this_list_2[1:]
                     if tmp_data_type_key == '@' and len(tmp_code_data_list) > 0:
-                        tmp_para_this = PARA.at(
-                            id=str(tmp_code_data_list[0])
-                        )
+                        tmp_para_this = PARA.at(id=str(tmp_code_data_list[0]))
                     elif tmp_data_type_key_2 == '@' and len(tmp_code_data_list_2) > 0:
-                        tmp_para_this = PARA.at(
-                            id='all'
-                        )
+                        tmp_para_this = PARA.at(id='all')
                     else:
-                        tmp_para_this = PARA.at(
-                            id='all'
-                        )
+                        tmp_para_this = PARA.at(id='all')
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this + 1
                 tmp_data_type = 'string'
             elif it_data_this >= len(tmp_data_raw):
                 tmp_para_this = None
                 if it_data_this > it_data_base:
-                    tmp_data_raw_this = tmp_data_raw[it_data_base:it_data_this + 1]
+                    tmp_data_raw_this = tmp_data_raw[it_data_base : it_data_this + 1]
                     tmp_para_this = PARA.text(tmp_data_raw_this)
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this
@@ -647,10 +522,7 @@ class PARA_templet(object):
             if type(self) is PARA.text:
                 paraType = 'text'
                 paraData['text'] = str(self.data['text'])
-            elif (
-                type(self) is PARA.at
-                and self.data['id'] == 'all'
-            ):
+            elif type(self) is PARA.at and self.data['id'] == 'all':
                 paraType = 'mention_all'
             elif type(self) is PARA.at:
                 paraType = 'mention'
@@ -694,10 +566,7 @@ class PARA_templet(object):
         if paraType is None:
             paraType = 'text'
             paraData = {'text': ''}
-        res = {
-            'type': paraType,
-            'data': paraData
-        }
+        res = {'type': paraType, 'data': paraData}
         return res
 
     def kaiheila(self):
@@ -760,7 +629,7 @@ class PARA_templet(object):
     def xiaoheihe(self):
         if type(self) is PARA.at:
             if self.data is not None and 'id' in self.data and self.data['id'] is not None:
-                return f"@{{id:{self.data['id']}}}"
+                return f'@{{id:{self.data["id"]}}}'
             return ''
         elif type(self) is PARA.text:
             if self.data is not None:

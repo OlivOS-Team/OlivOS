@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -24,8 +24,17 @@ import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -34,7 +43,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -43,12 +52,13 @@ class server(OlivOS.API.Proc_templet):
     def run(self):
         self.log(2, 'OlivOS dodobot ea server [' + self.Proc_name + '] is running')
         while True:
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': 'OlivOS/0.0.1'
-            }
-            msg_res = req.request("GET", OlivOS.dodobotEASDK.post_host + ':' + str(
-                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='')
+            headers = {'Content-Type': 'application/json', 'User-Agent': 'OlivOS/0.0.1'}
+            msg_res = req.request(
+                'GET',
+                OlivOS.dodobotEASDK.post_host + ':' + str(OlivOS.dodobotEASDK.post_port) + '/GetAccounts',
+                headers=headers,
+                data='',
+            )
             try:
                 msg_res_obj = json.loads(msg_res.text)
                 if 'Code' in msg_res_obj:
@@ -61,8 +71,9 @@ class server(OlivOS.API.Proc_templet):
                                         msg_res_obj_Data_this
                                     )
                                     if tmp_platform_bot_info is not None:
-                                        self.Proc_data['platform_bot_info_dict'][
-                                            tmp_platform_bot_info.id] = tmp_platform_bot_info
+                                        self.Proc_data['platform_bot_info_dict'][tmp_platform_bot_info.id] = (
+                                            tmp_platform_bot_info
+                                        )
             except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
@@ -75,8 +86,9 @@ class server(OlivOS.API.Proc_templet):
     async def run_websockets_rx_connect(self):
         while True:
             try:
-                async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(
-                        OlivOS.dodobotEASDK.websocket_port)) as websocket:
+                async with websockets.connect(
+                    OlivOS.dodobotEASDK.websocket_host + ':' + str(OlivOS.dodobotEASDK.websocket_port)
+                ) as websocket:
                     while True:
                         tmp_recv_pkg = None
                         tmp_recv_pkg_data = None
@@ -85,10 +97,7 @@ class server(OlivOS.API.Proc_templet):
                             tmp_recv_pkg = json.loads(tmp_recv_pkg_str)
                         except Exception:
                             tmp_recv_pkg = None
-                        if (
-                            tmp_recv_pkg is not None
-                            and type(tmp_recv_pkg) is dict
-                        ):
+                        if tmp_recv_pkg is not None and type(tmp_recv_pkg) is dict:
                             if 'Data' in tmp_recv_pkg:
                                 if type(tmp_recv_pkg['Data']) is str:
                                     try:
@@ -101,7 +110,7 @@ class server(OlivOS.API.Proc_templet):
                                 if bot_info_this_obj.id in self.Proc_data['platform_bot_info_dict']:
                                     sdk_bot_info_this = OlivOS.dodobotEASDK.get_SDK_bot_info_from_Plugin_bot_info(
                                         bot_info_this_obj,
-                                        self.Proc_data['platform_bot_info_dict'][bot_info_this_obj.id]
+                                        self.Proc_data['platform_bot_info_dict'][bot_info_this_obj.id],
                                     )
                                     sdk_event = OlivOS.dodobotEASDK.event(tmp_recv_pkg_data, sdk_bot_info_this)
                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)

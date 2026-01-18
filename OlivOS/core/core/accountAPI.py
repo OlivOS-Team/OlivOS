@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import socket
@@ -23,9 +23,7 @@ import hashlib
 
 import OlivOS
 
-default_account_conf = {
-    'account': []
-}
+default_account_conf = {'account': []}
 
 modelName = 'accountAPI'
 
@@ -46,9 +44,7 @@ class Account(object):
             logger_proc.log(2, OlivOS.L10NAPI.getTrans('init account from [{0}] ... done', [path], modelName))
         plugin_bot_info_dict = {}
         for account_conf_account_this in account_conf['account']:
-            if safe_mode and account_conf_account_this['sdk_type'] not in [
-                'dodo_link'
-            ]:
+            if safe_mode and account_conf_account_this['sdk_type'] not in ['dodo_link']:
                 tmp_password = ''
             else:
                 tmp_password = account_conf_account_this['password']
@@ -62,20 +58,24 @@ class Account(object):
                 access_token=account_conf_account_this['server']['access_token'],
                 platform_sdk=account_conf_account_this['sdk_type'],
                 platform_platform=account_conf_account_this['platform_type'],
-                platform_model=account_conf_account_this['model_type']
+                platform_model=account_conf_account_this['model_type'],
             )
-            if (
-                'extends' in account_conf_account_this
-                and dict is type(account_conf_account_this['extends'])
-            ):
+            if 'extends' in account_conf_account_this and dict is type(account_conf_account_this['extends']):
                 bot_info_tmp.extends = account_conf_account_this['extends']
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
-            logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
-                str(account_conf_account_this['platform_type']),
-                str(account_conf_account_this['id']),
-                bot_info_tmp.hash
-            ], modelName))
+            logger_proc.log(
+                2,
+                OlivOS.L10NAPI.getTrans(
+                    'generate [{0}] account [{1}] as [{2}] ... done',
+                    [
+                        str(account_conf_account_this['platform_type']),
+                        str(account_conf_account_this['id']),
+                        bot_info_tmp.hash,
+                    ],
+                    modelName,
+                ),
+            )
         logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate account ... all done', [], modelName))
         return plugin_bot_info_dict
 
@@ -112,10 +112,7 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                 and basic_conf_models[basic_conf_models_this]['server']['auto'] is True
             ):
                 basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
-                if isInuse(
-                        '127.0.0.1',
-                        basic_conf_models[basic_conf_models_this]['server']['port']
-                ):
+                if isInuse('127.0.0.1', basic_conf_models[basic_conf_models_this]['server']['port']):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
             if (
                 platform.system() == 'Windows'
@@ -124,13 +121,10 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
             ):
                 basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
                 basic_conf_models[basic_conf_models_this]['server']['port'] = random.randint(10000, 65535)
-                basic_conf_models[basic_conf_models_this]['server']['token'] = (
-                    getToken(str(random.randint(10000, 65535)))
+                basic_conf_models[basic_conf_models_this]['server']['token'] = getToken(
+                    str(random.randint(10000, 65535))
                 )
-                if isInuse(
-                        '127.0.0.1',
-                        basic_conf_models[basic_conf_models_this]['server']['port']
-                ):
+                if isInuse('127.0.0.1', basic_conf_models[basic_conf_models_this]['server']['port']):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
         for bot_info_dict_this in bot_info_dict:
             Account_data_this = bot_info_dict[bot_info_dict_this]
@@ -179,6 +173,7 @@ def isInuse(ip, port):
 
 class free_port_selector:
     "对先前的端口获取函数进行二次包装，使得在上下文范围内不会重复生成套接字"
+
     def __init__(self) -> None:
         self._socket_list = []
 
@@ -192,7 +187,7 @@ class free_port_selector:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._socket_list.append(s)     # 通过在分配端口阶段维持所有套接字，理论上可以杜绝 Issue #83
+        self._socket_list.append(s)  # 通过在分配端口阶段维持所有套接字，理论上可以杜绝 Issue #83
         return s.getsockname()[1]
 
     def close(self):

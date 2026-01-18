@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import requests as req
@@ -29,7 +29,7 @@ sdkAPIHost = {
     'wss': 'wss://chat.xiaoheihe.cn',
     'default': 'https://chat.xiaoheihe.cn',
     'native': 'https://chat.xiaoheihe.cn',
-    'chat-upload': 'https://chat-upload.xiaoheihe.cn'
+    'chat-upload': 'https://chat-upload.xiaoheihe.cn',
 }
 
 sdkAPIRoute = {
@@ -38,7 +38,7 @@ sdkAPIRoute = {
     'msg': '/chatroom/v3/msg',
     'chat-upload': '/upload',
     'room': '/chatroom/v2/room',
-    'room_role': '/chatroom/v2/room_role'
+    'room_role': '/chatroom/v2/room_role',
 }
 
 sdkAPIParams = {
@@ -48,7 +48,7 @@ sdkAPIParams = {
     'x_os_type': 'bot',
     'x_app': 'heybox_chat',
     'chat_os_type': 'bot',
-    'chat_version': '1.30.0'
+    'chat_version': '1.30.0',
 }
 
 sdkAPIRouteTemp = {}
@@ -68,19 +68,13 @@ class bot_info_T(object):
 
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
-    res = bot_info_T(
-        plugin_bot_info.id,
-        plugin_bot_info.post_info.access_token
-    )
+    res = bot_info_T(plugin_bot_info.id, plugin_bot_info.post_info.access_token)
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
 
 def get_SDK_bot_info_from_Event(target_event):
-    res = bot_info_T(
-        target_event.bot_info.id,
-        target_event.bot_info.post_info.access_token
-    )
+    res = bot_info_T(target_event.bot_info.id, target_event.bot_info.post_info.access_token)
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
@@ -102,22 +96,22 @@ class event(object):
             self.base_info['post_type'] = None
 
 
-'''
+"""
 对于WEBSOCKET接口的URI生成
-'''
+"""
 
 
 def get_websocket_url(bot_info: OlivOS.API.bot_info_T):
     token = str(bot_info.post_info.access_token)
     tmp_sdkAPIParams = sdkAPIParams.copy()
     tmp_sdkAPIParams['token'] = token
-    send_url = f"{sdkAPIHost['wss']}{sdkAPIRoute['wss']}?{parse.urlencode(tmp_sdkAPIParams)}"
+    send_url = f'{sdkAPIHost["wss"]}{sdkAPIRoute["wss"]}?{parse.urlencode(tmp_sdkAPIParams)}'
     return send_url
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -173,9 +167,9 @@ class PAYLOAD(object):
             return 'PING'
 
 
-'''
+"""
 对于POST接口的实现
-'''
+"""
 
 
 class api_templet(object):
@@ -206,14 +200,14 @@ class api_templet(object):
             headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'Token': self.bot_info.access_token
+                'Token': self.bot_info.access_token,
             }
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request('POST', send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request('GET', send_url, headers=headers)
 
             self.res = msg_res.text
             return msg_res.text
@@ -257,9 +251,7 @@ class API(object):
         def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
             try:
                 tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
-                payload = MultipartEncoder(
-                    fields=tmp_payload_dict
-                )
+                payload = MultipartEncoder(fields=tmp_payload_dict)
 
                 tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
                 send_url = self.host + self.route
@@ -269,12 +261,12 @@ class API(object):
                     'Content-Type': payload.content_type,
                     'Content-Length': str(len(self.data.file)),
                     'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Token': self.bot_info.access_token
+                    'Token': self.bot_info.access_token,
                 }
 
                 msg_res = None
                 if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                    msg_res = req.request('POST', send_url, headers=headers, data=payload)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -372,14 +364,11 @@ class API(object):
                         params['offset'] = str(self.metadata.offset)
 
                 send_url = f'{send_url}?{parse.urlencode(params)}'
-                headers = {
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Token': self.bot_info.access_token
-                }
+                headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA, 'Token': self.bot_info.access_token}
 
                 msg_res = None
                 if req_type == 'GET':
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -415,14 +404,11 @@ class API(object):
                         params['offset'] = str(self.metadata.offset)
 
                 send_url = f'{send_url}?{parse.urlencode(params)}'
-                headers = {
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Token': self.bot_info.access_token
-                }
+                headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA, 'Token': self.bot_info.access_token}
 
                 msg_res = None
                 if req_type == 'GET':
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -455,14 +441,11 @@ class API(object):
                         params['room_id'] = str(self.metadata.room_id)
 
                 send_url = f'{send_url}?{parse.urlencode(params)}'
-                headers = {
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Token': self.bot_info.access_token
-                }
+                headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA, 'Token': self.bot_info.access_token}
 
                 msg_res = None
                 if req_type == 'GET':
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -524,10 +507,7 @@ def determine_user_role(user_data, admin_role_ids):
 
     # 如果 roles 数组中包含任何一个管理员 role_id
     if admin_role_ids is not None:
-        if (
-            type(user_roles) is list
-            and type(admin_role_ids) is list
-        ):
+        if type(user_roles) is list and type(admin_role_ids) is list:
             for admin_role_id in admin_role_ids:
                 if str(admin_role_id) in [str(r) for r in user_roles]:
                     return 'admin'
@@ -548,14 +528,11 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
 
     # 文档里面说的是50，实际上收到的消息type是5
-    if target_event.sdk_event.payload.data.type in [
-        '5',
-        '50'
-    ]:
+    if target_event.sdk_event.payload.data.type in ['5', '50']:
         try:
             if (
                 'room_id' in target_event.sdk_event.payload.data.data
@@ -568,15 +545,12 @@ def get_Event_from_SDK(target_event):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
                 msg_raw = target_event.sdk_event.payload.data.data['msg']
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'xiaoheihe_string',
-                    msg_raw
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('xiaoheihe_string', msg_raw)
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.payload.data.data['channel_id']),
                     str(target_event.sdk_event.payload.data.data['user_id']),
                     msg_raw,
-                    'group'
+                    'group',
                 )
                 target_event.data.host_id = str(target_event.sdk_event.payload.data.data['room_id'])
                 target_event.data.message_sdk = message_obj
@@ -593,16 +567,13 @@ def get_Event_from_SDK(target_event):
                 # 判断发送者角色
                 room_id = str(target_event.sdk_event.payload.data.data['room_id'])
                 user_id = str(target_event.sdk_event.payload.data.data['user_id'])
-                user_data = {
-                    'user_id': user_id
-                }
+                user_data = {'user_id': user_id}
                 if 'is_master' in target_event.sdk_event.payload.data.data:
                     user_data['is_master'] = target_event.sdk_event.payload.data.data['is_master']
                 if 'roles' in target_event.sdk_event.payload.data.data:
                     user_data['roles'] = target_event.sdk_event.payload.data.data['roles']
                 bot_info = bot_info_T(
-                    target_event.sdk_event.base_info['self_id'],
-                    target_event.sdk_event.base_info['token']
+                    target_event.sdk_event.base_info['self_id'], target_event.sdk_event.base_info['token']
                 )
                 admin_role_ids = get_room_admin_role_id(bot_info, room_id)
                 target_event.data.sender['role'] = determine_user_role(user_data, admin_role_ids)
@@ -633,23 +604,13 @@ def get_Event_from_SDK(target_event):
                     # 用户加入房间
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_member_increase'
-                    target_event.data = target_event.group_member_increase(
-                        None,
-                        '-1',
-                        user_id,
-                        host_id
-                    )
+                    target_event.data = target_event.group_member_increase(None, '-1', user_id, host_id)
                     target_event.data.action = 'join'
                 elif state == 0:
                     # 用户退出房间
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_member_decrease'
-                    target_event.data = target_event.group_member_decrease(
-                        None,
-                        '-1',
-                        user_id,
-                        host_id
-                    )
+                    target_event.data = target_event.group_member_decrease(None, '-1', user_id, host_id)
                     target_event.data.action = 'leave'  # 退出房间
             else:
                 target_event.active = False
@@ -662,12 +623,7 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     def send_msg(target_event, group_id, host_id, message, reply_id=None, flag_direct=False):
         this_msg = None
-        res_data = {
-            "type": "card",
-            "border_color": "#009FE9",
-            "size": "medium",
-            "modules": []
-        }
+        res_data = {'type': 'card', 'border_color': '#009FE9', 'size': 'medium', 'modules': []}
         if flag_direct:
             pass
         else:
@@ -690,81 +646,54 @@ class event_action(object):
             elif type(message_this) is OlivOS.messageAPI.PARA.at:
                 # 将 AT 转换为小黑盒格式
                 if 'id' in message_this.data and message_this.data['id'] is not None:
-                    text_buffer += f"@{{id:{message_this.data['id']}}}"
+                    text_buffer += f'@{{id:{message_this.data["id"]}}}'
             elif type(message_this) is OlivOS.messageAPI.PARA.image:
                 # 如果有累积的文本,先发送
                 if text_buffer:
-                    res_data['modules'].append(
-                        {
-                            "type": "section",
-                            "paragraph": [
-                                {
-                                    "type": "plain-text",
-                                    "text": text_buffer.replace('\r\n', '\n').replace('\n', '<br>')
-                                }
-                            ]
-                        }
-                    )
+                    res_data['modules'].append({
+                        'type': 'section',
+                        'paragraph': [
+                            {'type': 'plain-text', 'text': text_buffer.replace('\r\n', '\n').replace('\n', '<br>')}
+                        ],
+                    })
                     text_buffer = ''
                 # 发送图片
                 image_path = event_action.setResourceUploadFast(target_event, message_this.data['file'], 'images')
                 if image_path:
-                    res_data['modules'].append(
-                        {
-                            "type": "images",
-                            "urls": [
-                                {
-                                  "url": image_path
-                                }
-                            ]
-                        }
-                    )
+                    res_data['modules'].append({'type': 'images', 'urls': [{'url': image_path}]})
         # 发送剩余的文本
         if text_buffer:
-            res_data['modules'].append(
-                {
-                    "type": "section",
-                    "paragraph": [
-                        {
-                            "type": "plain-text",
-                            "text": text_buffer.replace('\r\n', '\n').replace('\n', '<br>')
-                        }
-                    ]
-                }
-            )
+            res_data['modules'].append({
+                'type': 'section',
+                'paragraph': [{'type': 'plain-text', 'text': text_buffer.replace('\r\n', '\n').replace('\n', '<br>')}],
+            })
 
         if len(res_data['modules']) > 0:
-            this_msg.data.msg = json.dumps({"data": [res_data]}, ensure_ascii=False)
+            this_msg.data.msg = json.dumps({'data': [res_data]}, ensure_ascii=False)
             this_msg.do_api()
 
     # 现场上传的就地实现
     def setResourceUploadFast(target_event, url: str, type_path: str = 'images'):
         res = None
-        check_list = {
-            'images': ['.png', 'image/png'],
-            'videos': ['.mp4', 'video/mp4'],
-            'audios': ['.mp3', 'audio/mp3']
-        }
+        check_list = {'images': ['.png', 'image/png'], 'videos': ['.mp4', 'video/mp4'], 'audios': ['.mp3', 'audio/mp3']}
         check_list.setdefault(type_path, ['', 'file/*'])
         try:
             pic_file = None
-            if url.startswith("base64://"):
+            if url.startswith('base64://'):
                 data = url[9:]
-                pic_file = base64.decodebytes(data.encode("utf-8"))
+                pic_file = base64.decodebytes(data.encode('utf-8'))
             else:
                 url_parsed = parse.urlparse(url)
-                if url_parsed.scheme in ["http", "https"]:
+                if url_parsed.scheme in ['http', 'https']:
                     send_url = url
-                    headers = {
-                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
+                    headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
                     msg_res = None
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
                     pic_file = msg_res.content
                 else:
                     file_path = url_parsed.path
                     file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
-                    with open(file_path, "rb") as f:
+                    with open(file_path, 'rb') as f:
                         pic_file = f.read()
 
             msg_upload_api = API.setResourceUpload(get_SDK_bot_info_from_Event(target_event))
@@ -795,7 +724,7 @@ class event_action(object):
         this_msg = API.setRoomNickname(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.room_id = str(group_id)
         this_msg.data.to_user_id = int(user_id)
-        this_msg.data.nickname = str(card) if card else ""
+        this_msg.data.nickname = str(card) if card else ''
         try:
             this_msg.do_api('POST')
             if this_msg.res is not None:
@@ -856,7 +785,7 @@ class event_action(object):
         this_msg.data.room_id = str(group_id)
         this_msg.data.to_user_id = int(user_id)
         this_msg.data.duration = int(duration)
-        this_msg.data.reason = "Bot operation"
+        this_msg.data.reason = 'Bot operation'
         try:
             this_msg.do_api('POST')
             if this_msg.res is not None:
@@ -915,9 +844,7 @@ class event_action(object):
                                 )
                                 tmp_res_data_this['group_id'] = str(group_id)
                                 # 判断角色
-                                user_data = {
-                                    'user_id': user_this.get('user_id', '')
-                                }
+                                user_data = {'user_id': user_this.get('user_id', '')}
                                 if 'is_master' in user_this:
                                     user_data['is_master'] = user_this['is_master']
                                 if 'roles' in user_this:
@@ -961,9 +888,7 @@ class event_action(object):
                                     tmp_res_data_this['group_id'] = str(group_id)
 
                                     # 判断角色: owner(房主) / admin(管理员) / member(普通成员)
-                                    user_data = {
-                                        'user_id': user_this.get('user_id', '')
-                                    }
+                                    user_data = {'user_id': user_this.get('user_id', '')}
                                     if 'is_master' in user_this:
                                         user_data['is_master'] = user_this['is_master']
                                     if 'roles' in user_this:
@@ -1015,7 +940,7 @@ class event_action(object):
                                 'is_public': room_this.get('is_public', 0),
                                 'public_id': room_this.get('public_id', ''),
                                 'is_hot': room_this.get('is_hot', 0),
-                                'join_time': room_this.get('join_time', 0)
+                                'join_time': room_this.get('join_time', 0),
                             }
                             res_data['data'].append(tmp_res_data_this)
             else:
@@ -1030,10 +955,7 @@ class event_action(object):
         """
         获取房间角色列表
         """
-        res_data = {
-            'active': False,
-            'data': []
-        }
+        res_data = {'active': False, 'data': []}
         raw_obj = None
         try:
             this_msg = API.getRoomRoleList(get_SDK_bot_info_from_Event(target_event))
@@ -1063,8 +985,8 @@ class event_action(object):
                                     'room_id': role_this.get('room_id', ''),
                                     'del_tag': role_this.get('del_tag', 1),
                                     'creator': role_this.get('creator', '0'),
-                                    'create_time': role_this.get('create_time', 0)
-                                }
+                                    'create_time': role_this.get('create_time', 0),
+                                },
                             }
                             res_data['data'].append(tmp_role_data)
             else:
@@ -1085,8 +1007,7 @@ def init_api_json(raw_str):
         tmp_obj = None
     if type(tmp_obj) is dict:
         # 支持两种返回格式: code == 0 或 status == 'ok'。猜猜为什么要这样呢？乐
-        if ('code' in tmp_obj and tmp_obj['code'] == 0) or \
-           ('status' in tmp_obj and tmp_obj['status'] == 'ok'):
+        if ('code' in tmp_obj and tmp_obj['code'] == 0) or ('status' in tmp_obj and tmp_obj['status'] == 'ok'):
             flag_is_active = True
     if flag_is_active:
         if type(tmp_obj) is dict:

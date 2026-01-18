@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import requests as req
 import json
@@ -41,7 +41,7 @@ def get_SDK_bot_info_from_Event(target_event):
         target_event.bot_info.id,
         target_event.bot_info.post_info.host,
         target_event.bot_info.post_info.port,
-        target_event.bot_info.post_info.access_token
+        target_event.bot_info.post_info.access_token,
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
@@ -52,7 +52,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         plugin_bot_info.id,
         plugin_bot_info.post_info.host,
         plugin_bot_info.post_info.port,
-        plugin_bot_info.post_info.access_token
+        plugin_bot_info.post_info.access_token,
     )
     res.debug_mode = plugin_bot_info.debug_mode
     return res
@@ -75,18 +75,22 @@ class send_telegram_post_json_T(object):
             return None
         else:
             json_str_tmp = json.dumps(obj=self.obj.__dict__)
-            send_url = self.bot_info.host + ':' + str(
-                self.bot_info.port) + '/bot' + self.bot_info.access_token + '/' + self.node_ext
+            send_url = (
+                self.bot_info.host
+                + ':'
+                + str(self.bot_info.port)
+                + '/bot'
+                + self.bot_info.access_token
+                + '/'
+                + self.node_ext
+            )
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ': ' + json_str_tmp)
 
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-            }
-            msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
+            headers = {'Content-Type': 'application/json', 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
+            msg_res = req.request('POST', send_url, headers=headers, data=json_str_tmp)
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
@@ -115,14 +119,12 @@ class event(object):
         if checkByListAnd([
             self.active,
             checkInDictSafe('message', self.json, []),
-            checkInDictSafe('date', self.json, ['message'])
+            checkInDictSafe('date', self.json, ['message']),
         ]):
             self.base_info['time'] = self.json['message']['date']
         else:
             self.base_info['time'] = 0
-        if checkByListAnd([
-            self.active
-        ]):
+        if checkByListAnd([self.active]):
             self.base_info['self_id'] = bot_info.id
             self.base_info['token'] = bot_info.post_info.access_token
             self.base_info['post_type'] = None
@@ -177,9 +179,7 @@ def checkByListAnd(check_list):
 def get_message_obj_from_SDK(target_event):
     message_obj = None
     if True:
-        if checkByListAnd([
-            checkInDictSafe('text', target_event.sdk_event.json, ['message'])
-        ]):
+        if checkByListAnd([checkInDictSafe('text', target_event.sdk_event.json, ['message'])]):
             message_list = []
             tmp_message_raw = target_event.sdk_event.json['message']['text']
             tmp_message_raw_1 = ''
@@ -187,79 +187,45 @@ def get_message_obj_from_SDK(target_event):
             tmp_message_raw_3 = ''
             tmp_message_raw_3 = tmp_message_raw
             tmp_message_offset_count = 0
-            if checkByListAnd([
-                checkInDictSafe('entities', target_event.sdk_event.json, ['message'])
-            ]):
+            if checkByListAnd([checkInDictSafe('entities', target_event.sdk_event.json, ['message'])]):
                 for entities_this in target_event.sdk_event.json['message']['entities']:
                     if entities_this['type'] == 'mention':
                         tmp_message_raw_1 = ''
                         tmp_message_raw_2 = ''
                         tmp_message_raw_3 = ''
-                        tmp_message_raw_1 = tmp_message_raw[tmp_message_offset_count:entities_this['offset']]
+                        tmp_message_raw_1 = tmp_message_raw[tmp_message_offset_count : entities_this['offset']]
                         tmp_message_raw_2 = tmp_message_raw[
-                                            entities_this['offset']:entities_this['offset'] + entities_this['length']]
+                            entities_this['offset'] : entities_this['offset'] + entities_this['length']
+                        ]
                         tmp_message_raw_2 = tmp_message_raw_2[1:]
-                        tmp_message_raw_3 = tmp_message_raw[entities_this['offset'] + entities_this['length']:]
+                        tmp_message_raw_3 = tmp_message_raw[entities_this['offset'] + entities_this['length'] :]
                         tmp_message_offset_count = entities_this['offset'] + entities_this['length']
                         if len(tmp_message_raw_1) > 0:
-                            message_list.append(
-                                OlivOS.messageAPI.PARA.text(
-                                    text=tmp_message_raw_1
-                                )
-                            )
+                            message_list.append(OlivOS.messageAPI.PARA.text(text=tmp_message_raw_1))
                         if len(tmp_message_raw_2) > 0:
-                            message_list.append(
-                                OlivOS.messageAPI.PARA.at(
-                                    id=tmp_message_raw_2
-                                )
-                            )
+                            message_list.append(OlivOS.messageAPI.PARA.at(id=tmp_message_raw_2))
             if len(tmp_message_raw_3) > 0:
-                message_list.append(
-                    OlivOS.messageAPI.PARA.text(
-                        text=tmp_message_raw_3
-                    )
-                )
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                message_list
-            )
+                message_list.append(OlivOS.messageAPI.PARA.text(text=tmp_message_raw_3))
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', message_list)
             target_event.active = True
-        elif checkByListAnd([
-            checkInDictSafe('photo', target_event.sdk_event.json, ['message'])
-        ]):
+        elif checkByListAnd([checkInDictSafe('photo', target_event.sdk_event.json, ['message'])]):
             message_list = []
             if type(target_event.sdk_event.json['message']['photo']) is list:
                 message_list.append(
-                    OlivOS.messageAPI.PARA.image(
-                        target_event.sdk_event.json['message']['photo'][0]['file_id']
-                    )
+                    OlivOS.messageAPI.PARA.image(target_event.sdk_event.json['message']['photo'][0]['file_id'])
                 )
-            if checkByListAnd([
-                checkInDictSafe('caption', target_event.sdk_event.json, ['message'])
-            ]):
+            if checkByListAnd([checkInDictSafe('caption', target_event.sdk_event.json, ['message'])]):
                 message_list.append(
-                    OlivOS.messageAPI.PARA.text(
-                        text=str(target_event.sdk_event.json['message']['caption'])
-                    )
+                    OlivOS.messageAPI.PARA.text(text=str(target_event.sdk_event.json['message']['caption']))
                 )
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                message_list
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', message_list)
             target_event.active = True
-        elif checkByListAnd([
-            checkInDictSafe('sticker', target_event.sdk_event.json, ['message'])
-        ]):
+        elif checkByListAnd([checkInDictSafe('sticker', target_event.sdk_event.json, ['message'])]):
             message_list = []
             message_list.append(
-                OlivOS.messageAPI.PARA.image(
-                    target_event.sdk_event.json['message']['sticker']['file_id']
-                )
+                OlivOS.messageAPI.PARA.image(target_event.sdk_event.json['message']['sticker']['file_id'])
             )
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                message_list
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', message_list)
             target_event.active = True
     return message_obj
 
@@ -276,14 +242,14 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
             target_event.sdk_event.base_info['self_id'],
             telegram_host_default,
             telegram_port_default,
-            target_event.sdk_event.base_info['token']
+            target_event.sdk_event.base_info['token'],
         )
         tmp_api = API.getMe(tmp_bot_info)
         try:
@@ -302,7 +268,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('from', target_event.sdk_event.json, ['message']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
-        checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type'])
+        checkEquelInDictSafe('private', target_event.sdk_event.json, ['message', 'chat', 'type']),
     ]):
         message_obj = None
         message_obj = get_message_obj_from_SDK(target_event)
@@ -310,9 +276,7 @@ def get_Event_from_SDK(target_event):
             return target_event.active
         target_event.plugin_info['func_type'] = 'private_message'
         target_event.data = target_event.private_message(
-            str(target_event.sdk_event.json['message']['from']['id']),
-            message_obj,
-            'friend'
+            str(target_event.sdk_event.json['message']['from']['id']), message_obj, 'friend'
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = str(target_event.sdk_event.json['message']['message_id'])
@@ -338,7 +302,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
-        checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type'])
+        checkEquelInDictSafe('group', target_event.sdk_event.json, ['message', 'chat', 'type']),
     ]):
         message_obj = None
         message_obj = get_message_obj_from_SDK(target_event)
@@ -350,7 +314,7 @@ def get_Event_from_SDK(target_event):
             str(target_event.sdk_event.json['message']['chat']['id']),
             str(target_event.sdk_event.json['message']['from']['id']),
             message_obj,
-            'group'
+            'group',
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = str(target_event.sdk_event.json['message']['message_id'])
@@ -376,7 +340,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'from']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['message', 'from']),
         # checkInDictSafe('text', target_event.sdk_event.json, ['message']),
-        checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type'])
+        checkEquelInDictSafe('supergroup', target_event.sdk_event.json, ['message', 'chat', 'type']),
     ]):
         message_obj = None
         message_obj = get_message_obj_from_SDK(target_event)
@@ -388,7 +352,7 @@ def get_Event_from_SDK(target_event):
             str(target_event.sdk_event.json['message']['chat']['id']),
             str(target_event.sdk_event.json['message']['from']['id']),
             message_obj,
-            'group'
+            'group',
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = target_event.sdk_event.json['message']['message_id']
@@ -412,14 +376,14 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'chat']),
         checkInDictSafe('new_chat_member', target_event.sdk_event.json, ['message']),
-        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'new_chat_member'])
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'new_chat_member']),
     ]):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_member_increase'
         target_event.data = target_event.group_member_increase(
             str(target_event.sdk_event.json['message']['chat']['id']),
             str(target_event.sdk_event.json['message']['from']['id']),
-            target_event.sdk_event.json['message']['new_chat_member']['id']
+            target_event.sdk_event.json['message']['new_chat_member']['id'],
         )
         target_event.data.action = 'invite'
     if checkByListAnd([
@@ -431,14 +395,14 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('chat', target_event.sdk_event.json, ['message']),
         checkInDictSafe('id', target_event.sdk_event.json, ['message', 'chat']),
         checkInDictSafe('left_chat_member', target_event.sdk_event.json, ['message']),
-        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'left_chat_member'])
+        checkInDictSafe('id', target_event.sdk_event.json, ['message', 'left_chat_member']),
     ]):
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_member_decrease'
         target_event.data = target_event.group_member_decrease(
             str(target_event.sdk_event.json['message']['chat']['id']),
             str(target_event.sdk_event.json['message']['from']['id']),
-            target_event.sdk_event.json['message']['left_chat_member']['id']
+            target_event.sdk_event.json['message']['left_chat_member']['id'],
         )
         if target_event.data.operator_id == target_event.data.user_id:
             target_event.data.action = 'leave'

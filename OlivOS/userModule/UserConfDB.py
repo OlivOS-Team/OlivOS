@@ -36,17 +36,17 @@ from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 
 
 DATABASE_SVN = 1
-DATABASE_PATH = os.path.join(".", "plugin", "conf", "UserConfAll.db")
+DATABASE_PATH = os.path.join('.', 'plugin', 'conf', 'UserConfAll.db')
 DATABASE_SQL = {
     # CREATE
     # 每个插件预先在总表中
-    "create.table.master": """\
+    'create.table.master': """\
 CREATE TABLE IF NOT EXISTS table_master(
     hash_namespace        TEXT        PRIMARY KEY,
     str_namespace         TEXT        UNIQUE,
     time_last_update      DATETIME    DEFAULT CURRENT_TIMESTAMP
 );""",
-    "create.table.namespace": """\
+    'create.table.namespace': """\
 CREATE TABLE IF NOT EXISTS table_namespace_{namespace_hash}(
     hash_key_basic            TEXT,
     str_key_conf_name         TEXT,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS table_namespace_{namespace_hash}(
     PRIMARY KEY (hash_key_basic, str_key_conf_name)
 );""",
     # 创建一个触发器，当某个插件对应的命名空间有更新的时候，更新主表中对应插件的那一行
-    "create.trigger.namespace": """\
+    'create.trigger.namespace': """\
 CREATE TRIGGER IF NOT EXISTS trigger_namespace_{namespace_hash}
 BEFORE INSERT ON table_namespace_{namespace_hash}
 FOR EACH ROW
@@ -64,62 +64,59 @@ BEGIN
     WHERE hash_namespace = "{namespace_hash}";
 END;
 """,
-
     # INSERT (使用 replace 代替 update, 操作更加方便)
-    "insert.table_master": """\
+    'insert.table_master': """\
 INSERT OR REPLACE INTO table_master(
     "hash_namespace", "str_namespace"
 )
 VALUES (:hash_namespace, :str_namespace);
 """,
-    "insert.namespace": """\
+    'insert.namespace': """\
 INSERT OR REPLACE INTO table_namespace_{namespace_hash}(
     "hash_key_basic", "str_key_conf_name", "raw_value"
 )
 VALUES (:hash_key_basic, :str_key_conf_name, :raw_value);
 """,
-
     # SELECT 查询语句
-    "select.master.namespace": """\
+    'select.master.namespace': """\
 SELECT str_namespace FROM table_master
 """,
-    "select.namespace.conf": """\
+    'select.namespace.conf': """\
 SELECT raw_value FROM table_namespace_{namespace_hash}
 WHERE hash_key_basic = :hash_key_basic AND str_key_conf_name = :str_key_conf_name
 """,
-
     # pragma 元数据（配置项数据库自身的版本号）
-    "pragma.get.version": """PRAGMA user_version ;""",
-    "pragma.set.version": """PRAGMA user_version = {ver} ;""",
-
+    'pragma.get.version': """PRAGMA user_version ;""",
+    'pragma.set.version': """PRAGMA user_version = {ver} ;""",
 }
 
 
-def get_namespace_hash(namespace: "str|None"):
-    if namespace == "unity" or namespace is None:
-        return "unity"
+def get_namespace_hash(namespace: 'str|None'):
+    if namespace == 'unity' or namespace is None:
+        return 'unity'
     return get_hash(namespace)
 
 
-def get_user_hash(platform: "str", user_id: "str|int", *args):
-    return get_hash("user", platform, str(user_id), *args)
+def get_user_hash(platform: 'str', user_id: 'str|int', *args):
+    return get_hash('user', platform, str(user_id), *args)
 
 
-def get_group_hash(platform: "str", group_id: "str|int", host_id: "str|int|None" = None, *args):
-    return get_hash("group", platform, str(group_id), str(host_id), *args)
+def get_group_hash(platform: 'str', group_id: 'str|int', host_id: 'str|int|None' = None, *args):
+    return get_hash('group', platform, str(group_id), str(host_id), *args)
 
 
 def get_hash(*data):
-    if len(data) == 0 or data[0] == "--NONEED--":
-        return "--NONEED--"
+    if len(data) == 0 or data[0] == '--NONEED--':
+        return '--NONEED--'
     sha1 = hashlib.sha1()
-    sha1.update("-".join(map(str, data)).encode("utf-8"))
+    sha1.update('-'.join(map(str, data)).encode('utf-8'))
     return sha1.hexdigest()
 
 
 class DataBaseAPI:
     class _sqlconn:
         "sqlite 上下文管理实现"
+
         def __init__(self, conn: sqlite3.Connection, log=None):
             # print('start')
             self.conn = conn
@@ -137,7 +134,7 @@ class DataBaseAPI:
                 err_str = traceback.format_exc()
                 self.cur.close()
                 self.conn.rollback()
-                self.log(4, f"配置数据库发生错误： {err_str}")
+                self.log(4, f'配置数据库发生错误： {err_str}')
                 return False
             self.cur.close()
             self.conn.commit()
@@ -182,19 +179,21 @@ class DataBaseAPI:
     def _init_database(self):
         "对数据库进行总体初始化"
         sql_list = [
-            DATABASE_SQL["create.table.master"],
-            DATABASE_SQL["select.master.namespace"],
-            DATABASE_SQL["pragma.get.version"],
+            DATABASE_SQL['create.table.master'],
+            DATABASE_SQL['select.master.namespace'],
+            DATABASE_SQL['pragma.get.version'],
         ]
         res = self._execmany(sql_list)
-        namespace_sql = res[DATABASE_SQL["select.master.namespace"]]
-        svn = res[DATABASE_SQL["pragma.get.version"]][0][0]
+        namespace_sql = res[DATABASE_SQL['select.master.namespace']]
+        svn = res[DATABASE_SQL['pragma.get.version']][0][0]
         if svn != DATABASE_SVN:
             if svn == 0:
                 # svn 不存在，为新建的sqlite数据库
-                self._exec(DATABASE_SQL["pragma.set.version"].format(ver=DATABASE_SVN))
+                self._exec(DATABASE_SQL['pragma.set.version'].format(ver=DATABASE_SVN))
             else:
-                self.proc_log(3, "用户自定义数据库版本不符合，数据库版本为{0}，OlivOS中所需版本为{1}".format(svn, DATABASE_SVN))
+                self.proc_log(
+                    3, '用户自定义数据库版本不符合，数据库版本为{0}，OlivOS中所需版本为{1}'.format(svn, DATABASE_SVN)
+                )
         for i in namespace_sql:
             self.namespace_list.append(i[0])
         self._init_namespace()
@@ -202,17 +201,17 @@ class DataBaseAPI:
     def _init_namespace(self, namespace=None):
         "对每个 namespace 进行分别初始化"
         if namespace is None:
-            namespace = "unity"
-            namespace_hash = "unity"
+            namespace = 'unity'
+            namespace_hash = 'unity'
         else:
             namespace_hash = get_namespace_hash(namespace)
         if namespace in self.namespace_list:
             return True
 
         sql_list = [
-            DATABASE_SQL["create.table.namespace"].format(namespace_hash=namespace_hash),
-            DATABASE_SQL["create.trigger.namespace"].format(namespace_hash=namespace_hash),
-            (DATABASE_SQL["insert.table_master"], {"hash_namespace": namespace_hash, "str_namespace": namespace})
+            DATABASE_SQL['create.table.namespace'].format(namespace_hash=namespace_hash),
+            DATABASE_SQL['create.trigger.namespace'].format(namespace_hash=namespace_hash),
+            (DATABASE_SQL['insert.table_master'], {'hash_namespace': namespace_hash, 'str_namespace': namespace}),
         ]
         self._execmany(sql_list)
         self.namespace_list.append(namespace)
@@ -231,7 +230,12 @@ class DataBaseAPI:
         """
         # self.proc_log(0, f"{sql}, {param}")
         if param is None:
-            r = self._thread_pool.submit(self.__run_sql_thread, [sql,])
+            r = self._thread_pool.submit(
+                self.__run_sql_thread,
+                [
+                    sql,
+                ],
+            )
             return r.result(self.timeout)[sql]
         else:
             r = self._thread_pool.submit(self.__run_sql_thread, [(sql, param)])
@@ -250,10 +254,7 @@ class DataBaseAPI:
             conn.close()
 
     def get_config(
-        self, namespace: "str | None", key: "str",
-        basic_hashed: "str | None" = None,
-        default_value=None,
-        pkl=False
+        self, namespace: 'str | None', key: 'str', basic_hashed: 'str | None' = None, default_value=None, pkl=False
     ):
         """
         最基本的配置项读取操作，返回对应的键值
@@ -272,9 +273,9 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         if basic_hashed is None:
-            basic_hashed = "--NONEED--"
+            basic_hashed = '--NONEED--'
         if namespace is None:
-            namespace = "unity"
+            namespace = 'unity'
 
         namespace_hashed = get_namespace_hash(namespace)
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
@@ -286,10 +287,10 @@ class DataBaseAPI:
             else:
                 return res
 
-        sql_this = DATABASE_SQL["select.namespace.conf"].format(namespace_hash=namespace_hashed)
+        sql_this = DATABASE_SQL['select.namespace.conf'].format(namespace_hash=namespace_hashed)
         param = {
-            "hash_key_basic": basic_hashed,
-            "str_key_conf_name": key,
+            'hash_key_basic': basic_hashed,
+            'str_key_conf_name': key,
         }
 
         res = self._exec(sql_this, param)
@@ -303,11 +304,7 @@ class DataBaseAPI:
             else:
                 return val_raw
 
-    def set_config(
-        self, namespace: "str | None", key: "str", value,
-        basic_hashed: "str | None" = None,
-        pkl=False
-    ):
+    def set_config(self, namespace: 'str | None', key: 'str', value, basic_hashed: 'str | None' = None, pkl=False):
         """
         最基本的配置项写入操作，返回对应的键值
 
@@ -321,11 +318,11 @@ class DataBaseAPI:
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
         if basic_hashed is None:
-            basic_hashed = "--NONEED--"
+            basic_hashed = '--NONEED--'
 
         namespace_hashed = get_namespace_hash(namespace)
         if namespace is None:
-            namespace = "unity"
+            namespace = 'unity'
 
         cache_key = get_hash(namespace_hashed, basic_hashed, key)
 
@@ -336,19 +333,17 @@ class DataBaseAPI:
 
         self.cache[cache_key] = val_raw
 
-        sql_this = DATABASE_SQL["insert.namespace"].format(namespace_hash=namespace_hashed)
+        sql_this = DATABASE_SQL['insert.namespace'].format(namespace_hash=namespace_hashed)
         param = {
-            "hash_key_basic": basic_hashed,
-            "str_key_conf_name": key,
-            "raw_value": val_raw,
+            'hash_key_basic': basic_hashed,
+            'str_key_conf_name': key,
+            'raw_value': val_raw,
         }
         self._exec(sql_this, param)
         return True
 
     def get_user_config(
-        self, namespace: "str|None", key: "str", platform: "str", user_id: "str|int",
-        default_value=None,
-        pkl=False
+        self, namespace: 'str|None', key: 'str', platform: 'str', user_id: 'str|int', default_value=None, pkl=False
     ):
         """
         读取对应用户配置项
@@ -366,18 +361,18 @@ class DataBaseAPI:
             user_id=user_id,
         )
         return self.get_config(
-            namespace=namespace,
-            key=key,
-            basic_hashed=basic_hash,
-            default_value=default_value,
-            pkl=pkl
+            namespace=namespace, key=key, basic_hashed=basic_hash, default_value=default_value, pkl=pkl
         )
 
     def get_group_config(
-        self, namespace: "str|None", key: "str", platform: "str", group_id: "str|int",
-        host_id: "None|str|int" = None,
+        self,
+        namespace: 'str|None',
+        key: 'str',
+        platform: 'str',
+        group_id: 'str|int',
+        host_id: 'None|str|int' = None,
         default_value=None,
-        pkl=False
+        pkl=False,
     ):
         """
         读取对应群组配置项
@@ -397,14 +392,10 @@ class DataBaseAPI:
             host_id=str(host_id),
         )
         return self.get_config(
-            namespace=namespace,
-            key=key,
-            basic_hashed=basic_hash,
-            default_value=default_value,
-            pkl=pkl
+            namespace=namespace, key=key, basic_hashed=basic_hash, default_value=default_value, pkl=pkl
         )
 
-    def get_basic_config(self, namespace: "str|None", key: "str", default_value=None, pkl=False):
+    def get_basic_config(self, namespace: 'str|None', key: 'str', default_value=None, pkl=False):
         """
         读取插件自身配置项（与平台和用户群组无关的配置）
 
@@ -414,16 +405,12 @@ class DataBaseAPI:
         `default_value`: 如果存在，则当该配置项不存在时，返回这个值，默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        basic_hash = "--NONEED--"
+        basic_hash = '--NONEED--'
         return self.get_config(
-            namespace=namespace,
-            key=key,
-            basic_hashed=basic_hash,
-            default_value=default_value,
-            pkl=pkl
+            namespace=namespace, key=key, basic_hashed=basic_hash, default_value=default_value, pkl=pkl
         )
 
-    def set_user_config(self, namespace: "str|None", key: "str", value, platform: "str", user_id: "str|int", pkl=False):
+    def set_user_config(self, namespace: 'str|None', key: 'str', value, platform: 'str', user_id: 'str|int', pkl=False):
         """
         设置对应用户配置项
 
@@ -439,18 +426,17 @@ class DataBaseAPI:
             platform=platform,
             user_id=str(user_id),
         )
-        return self.set_config(
-            namespace=namespace,
-            key=key,
-            value=value,
-            basic_hashed=basic_hash,
-            pkl=pkl
-        )
+        return self.set_config(namespace=namespace, key=key, value=value, basic_hashed=basic_hash, pkl=pkl)
 
     def set_group_config(
-        self, namespace: "str|None", key: "str", value, platform: "str", group_id: "str|int",
-        host_id: "str|int|None" = None,
-        pkl=False
+        self,
+        namespace: 'str|None',
+        key: 'str',
+        value,
+        platform: 'str',
+        group_id: 'str|int',
+        host_id: 'str|int|None' = None,
+        pkl=False,
     ):
         """
         设置对应群组配置项
@@ -470,15 +456,9 @@ class DataBaseAPI:
             host_id=str(host_id),
             # *other_arg
         )
-        return self.set_config(
-            namespace=namespace,
-            key=key,
-            value=value,
-            basic_hashed=basic_hash,
-            pkl=pkl
-        )
+        return self.set_config(namespace=namespace, key=key, value=value, basic_hashed=basic_hash, pkl=pkl)
 
-    def set_basic_config(self, namespace: "str|None", key: "str", value, pkl=False):
+    def set_basic_config(self, namespace: 'str|None', key: 'str', value, pkl=False):
         """
         设置插件自身配置项（与平台和用户群组无关的配置）
 
@@ -488,19 +468,11 @@ class DataBaseAPI:
         `value`: 具体存储的配置项值 (所有sqlite支持的数据类型)
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        basic_hash = "--NONEED--"
-        return self.set_config(
-            namespace=namespace,
-            key=key,
-            value=value,
-            basic_hashed=basic_hash,
-            pkl=pkl
-        )
+        basic_hash = '--NONEED--'
+        return self.set_config(namespace=namespace, key=key, value=value, basic_hashed=basic_hash, pkl=pkl)
 
     def get_group_config_from_event(
-        self, namespace: "str|None", key: "str", plugin_event,
-        default_value=None,
-        pkl=False
+        self, namespace: 'str|None', key: 'str', plugin_event, default_value=None, pkl=False
     ):
         """
         读取消息事件对应群组的配置项
@@ -512,7 +484,7 @@ class DataBaseAPI:
         `default_value`: 当该配置项不存在时，返回这个值，默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        platfrom = plugin_event.platform["platform"]
+        platfrom = plugin_event.platform['platform']
         group_id = plugin_event.data.group_id
         host_id = plugin_event.data.host_id
         return self.get_group_config(
@@ -522,10 +494,10 @@ class DataBaseAPI:
             group_id=group_id,
             host_id=host_id,
             default_value=default_value,
-            pkl=pkl
+            pkl=pkl,
         )
 
-    def set_group_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event, pkl=False):
+    def set_group_config_from_event(self, namespace: 'str|None', key: 'str', value, plugin_event, pkl=False):
         """
         设置消息事件对应群组的配置项
 
@@ -536,23 +508,15 @@ class DataBaseAPI:
         `plugin_event`: OlivOS 框架的事件对象
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        platfrom = plugin_event.platform["platform"]
+        platfrom = plugin_event.platform['platform']
         group_id = plugin_event.data.group_id
         host_id = plugin_event.data.host_id
         return self.set_group_config(
-            namespace=namespace,
-            key=key,
-            value=value,
-            platform=platfrom,
-            group_id=group_id,
-            host_id=host_id,
-            pkl=pkl
+            namespace=namespace, key=key, value=value, platform=platfrom, group_id=group_id, host_id=host_id, pkl=pkl
         )
 
     def get_user_config_from_event(
-        self, namespace: "str|None", key: "str", plugin_event,
-        default_value=None,
-        pkl=False
+        self, namespace: 'str|None', key: 'str', plugin_event, default_value=None, pkl=False
     ):
         """
         读取消息事件对应用户的配置项
@@ -564,18 +528,13 @@ class DataBaseAPI:
         `default_value`: 当该配置项不存在时，返回这个值，默认为 None
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        platfrom = plugin_event.platform["platform"]
+        platfrom = plugin_event.platform['platform']
         user_id = plugin_event.data.user_id
         return self.get_user_config(
-            namespace=namespace,
-            key=key,
-            platform=platfrom,
-            user_id=user_id,
-            default_value=default_value,
-            pkl=pkl
+            namespace=namespace, key=key, platform=platfrom, user_id=user_id, default_value=default_value, pkl=pkl
         )
 
-    def set_user_config_from_event(self, namespace: "str|None", key: "str", value, plugin_event, pkl=False):
+    def set_user_config_from_event(self, namespace: 'str|None', key: 'str', value, plugin_event, pkl=False):
         """
         设置消息事件对应用户的配置项
 
@@ -586,13 +545,8 @@ class DataBaseAPI:
         `plugin_event`: OlivOS 框架的事件对象
         `pkl`: 是否采用 pickle 进行序列化和反序列化 (如果为真，可以通过这个方式保存很多python内置数据结构和实例类型) 默认为 False
         """
-        platfrom = plugin_event.platform["platform"]
+        platfrom = plugin_event.platform['platform']
         user_id = plugin_event.data.user_id
         return self.set_user_config(
-            namespace=namespace,
-            key=key,
-            value=value,
-            platform=platfrom,
-            user_id=user_id,
-            pkl=pkl
+            namespace=namespace, key=key, value=value, platform=platfrom, user_id=user_id, pkl=pkl
         )

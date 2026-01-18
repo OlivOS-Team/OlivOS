@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import OlivOS
 
@@ -37,7 +37,7 @@ dictColorContext = {
     'color_003': '#40C3FF',
     'color_004': '#FFFFFF',
     'color_005': '#000000',
-    'color_006': '#80D7FF'
+    'color_006': '#80D7FF',
 }
 
 gTerminalDataMax = 128
@@ -46,15 +46,15 @@ gTerminalDataStep = 8
 
 class dock(OlivOS.API.Proc_templet):
     def __init__(
-            self,
-            Proc_name='native_nativeWinUI',
-            scan_interval=0.001,
-            dead_interval=1,
-            rx_queue=None,
-            tx_queue=None,
-            logger_proc=None,
-            control_queue=None,
-            bot_info_dict=None
+        self,
+        Proc_name='native_nativeWinUI',
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        control_queue=None,
+        bot_info_dict=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -65,7 +65,7 @@ class dock(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             control_queue=control_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['ready_for_restart'] = False
         self.bot_info = bot_info_dict
@@ -134,10 +134,7 @@ class dock(OlivOS.API.Proc_templet):
                     and 'action' in packet.key['data']
                 ):
                     if 'account_update' == packet.key['data']['action']:
-                        if (
-                            'data' in packet.key['data']
-                            and type(packet.key['data']['data']) is dict
-                        ):
+                        if 'data' in packet.key['data'] and type(packet.key['data']['data']) is dict:
                             self.bot_info = packet.key['data']['data']
                         self.UIData['shallow_napcat_menu_list'] = None
                         self.UIData['shallow_opqbot_menu_list'] = None
@@ -205,7 +202,7 @@ class dock(OlivOS.API.Proc_templet):
                                             ):
                                                 OlivOS.multiLoginUIAPI.run_HostUI_asayc(
                                                     plugin_bot_info_dict=rx_packet_data.key['data']['bot_info'],
-                                                    control_queue=self.Proc_info.control_queue
+                                                    control_queue=self.Proc_info.control_queue,
                                                 )
                                         elif 'plugin_edit_menu_on' == rx_packet_data.key['data']['action']:
                                             self.startPluginEdit()
@@ -213,9 +210,10 @@ class dock(OlivOS.API.Proc_templet):
                                             self.UIObject['root_OlivOS_terminal_data'].append(
                                                 rx_packet_data.key['data']['data']
                                             )
-                                            if len(
-                                                self.UIObject['root_OlivOS_terminal_data']
-                                            ) > self.UIObject['root_OlivOS_terminal_data_max']:
+                                            if (
+                                                len(self.UIObject['root_OlivOS_terminal_data'])
+                                                > self.UIObject['root_OlivOS_terminal_data_max']
+                                            ):
                                                 self.UIObject['root_OlivOS_terminal_data'].pop(0)
                                             if self.UIObject['root_OlivOS_terminal'] is not None:
                                                 self.UIObject['root_OlivOS_terminal'].tree_add_line(
@@ -233,14 +231,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_napcat_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'napcat'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_napcat_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'napcat',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -256,9 +252,10 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.UIObject['root_napcat_terminal_data'][hash].append(
                                                             rx_packet_data.key['data']['data']
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_napcat_terminal_data'][hash]
-                                                        ) > self.UIObject['root_napcat_terminal_data_max']:
+                                                        if (
+                                                            len(self.UIObject['root_napcat_terminal_data'][hash])
+                                                            > self.UIObject['root_napcat_terminal_data_max']
+                                                        ):
                                                             self.UIObject['root_napcat_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_napcat_terminal']:
                                                             self.UIObject['root_napcat_terminal'][hash].tree_add_line(
@@ -282,7 +279,7 @@ class dock(OlivOS.API.Proc_templet):
                                                                 root=self,
                                                                 root_tk=None,
                                                                 bot=self.bot_info[hash],
-                                                                path=rx_packet_data.key['data']['path']
+                                                                path=rx_packet_data.key['data']['path'],
                                                             )
                                                             self.UIObject['root_qrcode_window'][hash].start()
                                                 elif 'napcat_terminal_on' == rx_packet_data.key['data']['event']:
@@ -300,14 +297,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_gocqhttp_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'gocqhttp'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_gocqhttp_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'gocqhttp',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -323,9 +318,10 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.UIObject['root_gocqhttp_terminal_data'][hash].append(
                                                             rx_packet_data.key['data']['data']
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_gocqhttp_terminal_data'][hash]
-                                                        ) > self.UIObject['root_gocqhttp_terminal_data_max']:
+                                                        if (
+                                                            len(self.UIObject['root_gocqhttp_terminal_data'][hash])
+                                                            > self.UIObject['root_gocqhttp_terminal_data_max']
+                                                        ):
                                                             self.UIObject['root_gocqhttp_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_gocqhttp_terminal']:
                                                             self.UIObject['root_gocqhttp_terminal'][hash].tree_add_line(
@@ -349,7 +345,7 @@ class dock(OlivOS.API.Proc_templet):
                                                                 root=self,
                                                                 root_tk=None,
                                                                 bot=self.bot_info[hash],
-                                                                path=rx_packet_data.key['data']['path']
+                                                                path=rx_packet_data.key['data']['path'],
                                                             )
                                                             self.UIObject['root_qrcode_window'][hash].start()
                                                 elif 'token_get' == rx_packet_data.key['data']['event']:
@@ -360,7 +356,7 @@ class dock(OlivOS.API.Proc_templet):
                                                         hash = rx_packet_data.key['data']['hash']
                                                         self.setGoCqhttpModelSend(
                                                             hash=rx_packet_data.key['data']['hash'],
-                                                            data=rx_packet_data.key['data']['token']
+                                                            data=rx_packet_data.key['data']['token'],
                                                         )
                                                 elif 'gocqhttp_terminal_on' == rx_packet_data.key['data']['event']:
                                                     if 'hash' in rx_packet_data.key['data']:
@@ -377,14 +373,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_walleq_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'walleq'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_walleq_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'walleq',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -400,9 +394,10 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.UIObject['root_walleq_terminal_data'][hash].append(
                                                             rx_packet_data.key['data']['data']
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_walleq_terminal_data'][hash]
-                                                        ) > self.UIObject['root_walleq_terminal_data_max']:
+                                                        if (
+                                                            len(self.UIObject['root_walleq_terminal_data'][hash])
+                                                            > self.UIObject['root_walleq_terminal_data_max']
+                                                        ):
                                                             self.UIObject['root_walleq_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_walleq_terminal']:
                                                             self.UIObject['root_walleq_terminal'][hash].tree_add_line(
@@ -426,7 +421,7 @@ class dock(OlivOS.API.Proc_templet):
                                                                 root=self,
                                                                 root_tk=None,
                                                                 bot=self.bot_info[hash],
-                                                                path=rx_packet_data.key['data']['path']
+                                                                path=rx_packet_data.key['data']['path'],
                                                             )
                                                             self.UIObject['root_qrcode_window'][hash].start()
                                                 elif 'walleq_terminal_on' == rx_packet_data.key['data']['event']:
@@ -444,14 +439,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_cwcb_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'ComWeChatBotClient'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_cwcb_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'ComWeChatBotClient',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -467,9 +460,10 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.UIObject['root_cwcb_terminal_data'][hash].append(
                                                             rx_packet_data.key['data']['data']
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_cwcb_terminal_data'][hash]
-                                                        ) > self.UIObject['root_cwcb_terminal_data_max']:
+                                                        if (
+                                                            len(self.UIObject['root_cwcb_terminal_data'][hash])
+                                                            > self.UIObject['root_cwcb_terminal_data_max']
+                                                        ):
                                                             self.UIObject['root_cwcb_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_cwcb_terminal']:
                                                             self.UIObject['root_cwcb_terminal'][hash].tree_add_line(
@@ -490,14 +484,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_opqbot_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'opqbot'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_opqbot_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'opqbot',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -513,9 +505,10 @@ class dock(OlivOS.API.Proc_templet):
                                                         self.UIObject['root_opqbot_terminal_data'][hash].append(
                                                             rx_packet_data.key['data']['data']
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_opqbot_terminal_data'][hash]
-                                                        ) > self.UIObject['root_opqbot_terminal_data_max']:
+                                                        if (
+                                                            len(self.UIObject['root_opqbot_terminal_data'][hash])
+                                                            > self.UIObject['root_opqbot_terminal_data_max']
+                                                        ):
                                                             self.UIObject['root_opqbot_terminal_data'][hash].pop(0)
                                                         if hash in self.UIObject['root_opqbot_terminal']:
                                                             self.UIObject['root_opqbot_terminal'][hash].tree_add_line(
@@ -545,14 +538,12 @@ class dock(OlivOS.API.Proc_templet):
                                                                     self.bot_info[rx_packet_data.key['data']['hash']].id
                                                                 )
                                                             )
-                                                            self.UIData['shallow_virtual_terminal_menu_list'].append(
-                                                                [
-                                                                    tmp_title,
-                                                                    rx_packet_data.key['data']['hash'],
-                                                                    '',
-                                                                    'virtual_terminal'
-                                                                ]
-                                                            )
+                                                            self.UIData['shallow_virtual_terminal_menu_list'].append([
+                                                                tmp_title,
+                                                                rx_packet_data.key['data']['hash'],
+                                                                '',
+                                                                'virtual_terminal',
+                                                            ])
                                                             self.updateShallowMenuList()
                                                     if self.UIObject['root_shallow'] is not None:
                                                         self.updateShallow()
@@ -567,43 +558,52 @@ class dock(OlivOS.API.Proc_templet):
                                                         and 'name' in rx_packet_data.key['data']
                                                     ):
                                                         user_conf = {
-                                                            "user_name": "未知",
-                                                            "user_id": "-1",
-                                                            "flag_group": True,
-                                                            "target_id": "-1",
-                                                            "group_role": "member",
+                                                            'user_name': '未知',
+                                                            'user_id': '-1',
+                                                            'flag_group': True,
+                                                            'target_id': '-1',
+                                                            'group_role': 'member',
                                                         }
                                                         if (
-                                                            "user_conf" in rx_packet_data.key['data']
-                                                            and rx_packet_data.key['data']["user_conf"] is not None
+                                                            'user_conf' in rx_packet_data.key['data']
+                                                            and rx_packet_data.key['data']['user_conf'] is not None
                                                         ):
-                                                            user_conf.update(rx_packet_data.key['data']["user_conf"])
+                                                            user_conf.update(rx_packet_data.key['data']['user_conf'])
                                                         hash = rx_packet_data.key['data']['hash']
-                                                        if hash not in (
-                                                            self.UIObject['root_virtual_terminal_terminal_data']
+                                                        if (
+                                                            hash
+                                                            not in (
+                                                                self.UIObject['root_virtual_terminal_terminal_data']
+                                                            )
                                                         ):
                                                             (
-                                                                self.UIObject
-                                                                ['root_virtual_terminal_terminal_data']
-                                                                [hash]
+                                                                self.UIObject['root_virtual_terminal_terminal_data'][
+                                                                    hash
+                                                                ]
                                                             ) = []
                                                         (
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash]
-                                                            .append(rx_packet_data.key['data'])
+                                                            self.UIObject['root_virtual_terminal_terminal_data'][
+                                                                hash
+                                                            ].append(rx_packet_data.key['data'])
                                                         )
-                                                        if len(
-                                                            self.UIObject['root_virtual_terminal_terminal_data'][hash]
-                                                        ) > self.UIObject['root_virtual_terminal_terminal_data_max']:
+                                                        if (
+                                                            len(
+                                                                self.UIObject['root_virtual_terminal_terminal_data'][
+                                                                    hash
+                                                                ]
+                                                            )
+                                                            > self.UIObject['root_virtual_terminal_terminal_data_max']
+                                                        ):
                                                             (
-                                                                self.UIObject
-                                                                ['root_virtual_terminal_terminal_data']
-                                                                [hash]
-                                                                .pop(0)
+                                                                self.UIObject['root_virtual_terminal_terminal_data'][
+                                                                    hash
+                                                                ].pop(0)
                                                             )
                                                         if hash in self.UIObject['root_virtual_terminal_terminal']:
                                                             (
-                                                                self.UIObject['root_virtual_terminal_terminal'][hash]
-                                                                .tree_add_line(rx_packet_data.key['data'], user_conf)
+                                                                self.UIObject['root_virtual_terminal_terminal'][
+                                                                    hash
+                                                                ].tree_add_line(rx_packet_data.key['data'], user_conf)
                                                             )
                                         elif 'OlivOS_terminal_on' == rx_packet_data.key['data']['action']:
                                             self.startOlivOSTerminalUI()
@@ -619,28 +619,16 @@ class dock(OlivOS.API.Proc_templet):
                 platform_model = str(bot_info.platform.get('model', ''))
                 server_auto = (
                     str(bot_info.post_info.auto)
-                    if (
-                        hasattr(bot_info, 'post_info')
-                        and hasattr(bot_info.post_info, 'auto')
-                    )
+                    if (hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'auto'))
                     else 'False'
                 )
                 server_type = (
                     str(bot_info.post_info.type)
-                    if (
-                        hasattr(bot_info, 'post_info')
-                        and hasattr(bot_info.post_info, 'type')
-                    )
+                    if (hasattr(bot_info, 'post_info') and hasattr(bot_info.post_info, 'type'))
                     else 'post'
                 )
 
-                list_data_check = [
-                    platform_platform,
-                    platform_sdk,
-                    platform_model,
-                    server_auto,
-                    server_type
-                ]
+                list_data_check = [platform_platform, platform_sdk, platform_model, server_auto, server_type]
                 # 使用 accountTypeMappingList 进行匹配
                 for type_this in OlivOS.accountMetadataAPI.accountTypeList:
                     flag_hit = True
@@ -672,7 +660,7 @@ class dock(OlivOS.API.Proc_templet):
         """
         获取账号显示信息（名称和协议端）
         """
-        account_name = "未知账号"
+        account_name = '未知账号'
         try:
             account_name = str(bot_info.id)
         except Exception:
@@ -680,21 +668,17 @@ class dock(OlivOS.API.Proc_templet):
         if not flagInit:
             try:
                 fake_event = OlivOS.API.Event(
-                    OlivOS.contentAPI.fake_sdk_event(
-                        bot_info=bot_info,
-                        fakename='nativeWinUI'
-                    ),
-                    None
+                    OlivOS.contentAPI.fake_sdk_event(bot_info=bot_info, fakename='nativeWinUI'), None
                 )
                 res_data = fake_event.get_login_info(bot_info)
                 if res_data and res_data.get('active') and 'data' in res_data:
                     account_name = res_data['data'].get('name', str(bot_info.id))
                     account_name = f'{account_name}({str(bot_info.id)})'
                 else:
-                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else '未知账号'
             except Exception:
                 try:
-                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else "未知账号"
+                    account_name = str(bot_info.id) if hasattr(bot_info, 'id') else '未知账号'
                 except Exception:
                     pass
         platform_name = self.getPlatformDisplayName(bot_info)
@@ -720,18 +704,11 @@ class dock(OlivOS.API.Proc_templet):
     def updateShallowMenuAccountListSendFunc(self):
         def resFunc():
             self.updateShallowMenuAccountListSend()
+
         return resFunc
 
     def updateShallowMenuAccountListSend(self):
-        self.sendRxEvent('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'update_account_list'
-                }
-            }
-        )
+        self.sendRxEvent('send', {'target': {'type': 'nativeWinUI'}, 'data': {'action': 'update_account_list'}})
 
     def updateShallowMenuList(self):
         tmp_new = []
@@ -742,27 +719,20 @@ class dock(OlivOS.API.Proc_templet):
             self.updateAccountList(flagInit=True)
             self.mergeAccountList()
         for botHash, account_name, platform_name in account_list:
-            account_items.append(['account_info', f"{account_name} - {platform_name}", botHash])
+            account_items.append(['account_info', f'{account_name} - {platform_name}', botHash])
 
         self.UIData['shallow_menu_list'] = []
-        self.UIData['shallow_menu_list'].extend([
-            ['打开终端', self.startOlivOSTerminalUISend]
-        ])
+        self.UIData['shallow_menu_list'].extend([['打开终端', self.startOlivOSTerminalUISend]])
         # 账号菜单项
-        account_menu_title = f"[{account_count}]个账号"
+        account_menu_title = f'[{account_count}]个账号'
         account_list_final = []
         if account_items:
             account_list_final = account_items
-        account_refresh = [
-            ['SEPARATOR'],
-            ['刷新', self.updateShallowMenuAccountListSendFunc()]
-        ]
+        account_refresh = [['SEPARATOR'], ['刷新', self.updateShallowMenuAccountListSendFunc()]]
         self.UIData['shallow_menu_list'].extend([
             ['account_menu', account_menu_title, account_list_final + account_refresh, account_count]
         ])
-        self.UIData['shallow_menu_list'].extend([
-            ['SEPARATOR']
-        ])
+        self.UIData['shallow_menu_list'].extend([['SEPARATOR']])
         self.UIData['shallow_menu_list'].extend([
             # ['账号管理', self.startAccountEditSendFunc()],
             # ['账号管理', None],
@@ -777,7 +747,7 @@ class dock(OlivOS.API.Proc_templet):
             ['重载插件', self.sendPluginRestart],
             ['社区论坛', self.sendOpenForum],
             ['更新OlivOS', self.sendOlivOSUpdateGet],
-            ['退出OlivOS', self.setOlivOSExit]
+            ['退出OlivOS', self.setOlivOSExit],
         ])
 
         for data_this in self.UIData['shallow_menu_list']:
@@ -795,111 +765,107 @@ class dock(OlivOS.API.Proc_templet):
     def startAccountEditSendFunc(self):
         def resFunc():
             self.startAccountEditSend()
+
         return resFunc
 
     def startAccountEditSend(self):
         self.sendControlEventSend(
-            'call_system_event', {
-                'action': [
-                    'account_edit_asayc_start',
-                    'account_edit_asayc_do'
-                ]
-            }
+            'call_system_event', {'action': ['account_edit_asayc_start', 'account_edit_asayc_do']}
         )
 
     def startGoCqhttpTerminalUISendFunc(self, hash):
         def resFunc():
             self.startGoCqhttpTerminalUISend(hash)
+
         return resFunc
 
     def startWalleQTerminalUISendFunc(self, hash):
         def resFunc():
             self.startWalleQTerminalUISend(hash)
+
         return resFunc
 
     def startCWCBTerminalUISendFunc(self, hash):
         def resFunc():
             self.startCWCBTerminalUISend(hash)
+
         return resFunc
 
     def startOPQBotTerminalUISendFunc(self, hash):
         def resFunc():
             self.startOPQBotTerminalUISend(hash)
+
         return resFunc
 
     def startNapCatTerminalUISendFunc(self, hash):
         def resFunc():
             self.startNapCatTerminalUISend(hash)
+
         return resFunc
 
     def startGoCqhttpTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'gocqhttp',
                     'event': 'gocqhttp_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startWalleQTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'walleq',
                     'event': 'walleq_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startCWCBTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'ComWeChatBotClient',
                     'event': 'cwcb_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startOPQBotTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'opqbot',
                     'event': 'opqbot_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startNapCatTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'napcat',
                     'event': 'napcat_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startGoCqhttpTerminalUI(self, hash):
@@ -914,7 +880,7 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_gocqhttp_terminal'][hash].start()
 
@@ -930,7 +896,7 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_walleq_terminal'][hash].start()
 
@@ -946,7 +912,7 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_cwcb_terminal'][hash].start()
 
@@ -962,7 +928,7 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_opqbot_terminal'][hash].start()
 
@@ -978,7 +944,7 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_napcat_terminal'][hash].start()
 
@@ -990,16 +956,15 @@ class dock(OlivOS.API.Proc_templet):
 
     def startVirtualTerminalUISend(self, hash):
         self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'virtual_terminal',
                     'event': 'virtual_terminal_on',
                     'hash': hash,
-                }
-            }
+                },
+            },
         )
 
     def startVirtualTerminalUI(self, hash):
@@ -1014,21 +979,12 @@ class dock(OlivOS.API.Proc_templet):
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
                 root_tk=None,
-                bot=self.bot_info[hash]
+                bot=self.bot_info[hash],
             )
             self.UIObject['root_virtual_terminal_terminal'][hash].start()
 
     def startOlivOSTerminalUISend(self):
-        self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'OlivOS_terminal_on'
-                }
-            }
-        )
+        self.sendRxEvent('send', {'target': {'type': 'nativeWinUI'}, 'data': {'action': 'OlivOS_terminal_on'}})
 
     def startOlivOSTerminalUI(self):
         if self.UIObject['root_OlivOS_terminal'] is not None:
@@ -1037,119 +993,54 @@ class dock(OlivOS.API.Proc_templet):
             except Exception:
                 pass
         self.UIObject['root_OlivOS_terminal'] = OlivOSTerminalUI(
-            Model_name='OlivOS_terminal',
-            logger_proc=self.Proc_info.logger_proc.log,
-            root=self,
-            root_tk=None
+            Model_name='OlivOS_terminal', logger_proc=self.Proc_info.logger_proc.log, root=self, root_tk=None
         )
         self.UIObject['root_OlivOS_terminal'].start()
 
     def setGoCqhttpModelSend(self, hash, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'gocqhttp_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data
-                }
-            }
+            'send',
+            {'target': {'type': 'gocqhttp_lib_exe_model', 'hash': hash}, 'data': {'action': 'input', 'data': data}},
         )
 
     def setWalleQModelSend(self, hash, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'walleq_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data
-                }
-            }
+            'send',
+            {'target': {'type': 'walleq_lib_exe_model', 'hash': hash}, 'data': {'action': 'input', 'data': data}},
         )
 
     def setCWCBModelSend(self, hash, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'cwcb_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data
-                }
-            }
+            'send', {'target': {'type': 'cwcb_lib_exe_model', 'hash': hash}, 'data': {'action': 'input', 'data': data}}
         )
 
     def setOPQBotModelSend(self, hash, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'opqbot_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data
-                }
-            }
+            'send',
+            {'target': {'type': 'opqbot_lib_exe_model', 'hash': hash}, 'data': {'action': 'input', 'data': data}},
         )
 
     def setNapCatModelSend(self, hash, data):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'napcat_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data
-                }
-            }
+            'send',
+            {'target': {'type': 'napcat_lib_exe_model', 'hash': hash}, 'data': {'action': 'input', 'data': data}},
         )
 
     def setVirtualModelSend(self, hash, data, user_conf=None):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'terminal_link',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'input',
-                    'data': data,
-                    'user_conf': user_conf
-                }
-            }
+            'send',
+            {
+                'target': {'type': 'terminal_link', 'hash': hash},
+                'data': {'action': 'input', 'data': data, 'user_conf': user_conf},
+            },
         )
 
     def startPluginEditSend(self):
-        self.sendRxEvent(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'plugin_edit_menu_on'
-                }
-            }
-        )
+        self.sendRxEvent('send', {'target': {'type': 'nativeWinUI'}, 'data': {'action': 'plugin_edit_menu_on'}})
 
     def sendRxEvent(self, action, data):
         if self.Proc_info.rx_queue is not None:
-            self.Proc_info.rx_queue.put(
-                OlivOS.API.Control.packet(
-                    action,
-                    data
-                ),
-                block=False
-            )
+            self.Proc_info.rx_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
     def startPluginEdit(self):
         count_str = str(self.UIObject['root_plugin_edit_count'])
@@ -1160,7 +1051,7 @@ class dock(OlivOS.API.Proc_templet):
                 Model_name='shallow_menu_plugin_manage',
                 logger_proc=self.Proc_info.logger_proc.log,
                 root=self,
-                key=count_str
+                key=count_str,
             )
             self.UIObject['root_plugin_edit'][count_str]['obj'].start()
 
@@ -1185,113 +1076,61 @@ class dock(OlivOS.API.Proc_templet):
 
     def sendPluginControlEvent(self, pluginNameSpace, eventName):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'plugin'
-                },
-                'data': {
-                    'action': 'plugin_menu',
-                    'namespace': pluginNameSpace,
-                    'event': eventName
-                }
-            }
+            'send',
+            {
+                'target': {'type': 'plugin'},
+                'data': {'action': 'plugin_menu', 'namespace': pluginNameSpace, 'event': eventName},
+            },
         )
 
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
-                    action,
-                    data
-                ),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
     def sendControlEvent(self, eventName: str):
         if self.UIObject['root_shallow'] is not None:
-            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
-                '正在退出……'
-            )
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify('正在退出……')
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(eventName, self.Proc_name),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet(eventName, self.Proc_name), block=False)
 
     def sendPluginRestart(self):
         if self.UIObject['root_shallow'] is not None:
-            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
-                '正在重载……'
-            )
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify('正在重载……')
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet('restart_send', 'plugin'),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet('restart_send', 'plugin'), block=False)
 
     def sendOlivOSUpdateGet(self):
         if self.UIObject['root_shallow'] is not None:
-            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
-                '正在检查更新……'
-            )
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify('正在检查更新……')
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet('init_type', 'update_get'),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_get'), block=False)
 
     def sendOpenForum(self):
         if self.UIObject['root_shallow'] is not None:
-            self.UIObject['root_shallow'].UIObject['shallow_root'].notify(
-                '正在前往社区论坛……'
-            )
+            self.UIObject['root_shallow'].UIObject['shallow_root'].notify('正在前往社区论坛……')
         self.sendOpenWebviewEvent('forum_page', 'OlivOS论坛', 'https://forum.olivos.run/')
 
     def sendOpenQRcodeUrl(self, hash, url):
-        if (
-            type(self.bot_info) is dict
-            and hash in self.bot_info
-        ):
+        if type(self.bot_info) is dict and hash in self.bot_info:
             try:
-                res = tkinter.messagebox.askquestion(f'请使用账号 {self.bot_info[hash].id} 扫码', "是否使用内置浏览器?")
+                res = tkinter.messagebox.askquestion(f'请使用账号 {self.bot_info[hash].id} 扫码', '是否使用内置浏览器?')
                 if res == 'yes':
                     self.sendOpenWebviewEvent(f'qrcode_page={hash}', f'请使用账号 {self.bot_info[hash].id} 扫码', url)
                 else:
                     webbrowser.open(url)
             except webbrowser.Error as error_info:
-                tkinter.messagebox.showerror("webbrowser.Error", error_info)
+                tkinter.messagebox.showerror('webbrowser.Error', error_info)
 
-    def sendOpenWebviewEvent(
-        self,
-        name: str,
-        title: str,
-        url: str
-    ):
-        OlivOS.webviewUIAPI.sendOpenWebviewPage(
-            self.Proc_info.control_queue,
-            name,
-            title,
-            url
-        )
+    def sendOpenWebviewEvent(self, name: str, title: str, url: str):
+        OlivOS.webviewUIAPI.sendOpenWebviewPage(self.Proc_info.control_queue, name, title, url)
 
     def startShallowSend(self):
-        self.sendRxEvent('send', {
-            'target': {
-                'type': 'nativeWinUI'
-            },
-            'data': {
-                'action': 'start_shallow'
-            }
-        })
+        self.sendRxEvent('send', {'target': {'type': 'nativeWinUI'}, 'data': {'action': 'start_shallow'}})
 
     def startShallow(self):
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
         if self.UIObject['root_shallow'] is None:
-            self.UIObject['root_shallow'] = shallow(
-                name='OlivOS',
-                image='./resource/tmp_favoricon.ico',
-                root=self
-            )
+            self.UIObject['root_shallow'] = shallow(name='OlivOS', image='./resource/tmp_favoricon.ico', root=self)
             self.UIObject['root_shallow'].start()
 
     def updateShallow(self):
@@ -1316,26 +1155,17 @@ class QRcodeUI(object):
         self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('请登录账号[%s]扫描二维码' % str(self.bot.id))
         self.UIObject['root'].geometry('500x500')
-        self.UIObject['root'].resizable(
-            width=False,
-            height=False
-        )
+        self.UIObject['root'].resizable(width=False, height=False)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['root_qrcode_img_data'] = Image.open(self.path)
         try:
             self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize(
-                (500, 500),
-                (
-                    Image.Resampling.LANCZOS
-                    if hasattr(Image, 'Resampling')
-                    else Image.LANCZOS
-                )
+                (500, 500), (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
             )
         except AttributeError:
             self.UIObject['root_qrcode_img_data'] = self.UIObject['root_qrcode_img_data'].resize(
-                (500, 500),
-                Image.ANTIALIAS
+                (500, 500), Image.ANTIALIAS
             )
         self.UIObject['root_qrcode_img'] = ImageTk.PhotoImage(self.UIObject['root_qrcode_img_data'])
         self.UIObject['root_qrcode_label'] = tkinter.Label(self.UIObject['root'])
@@ -1384,10 +1214,7 @@ class gocqhttpTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -1395,7 +1222,7 @@ class gocqhttpTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -1404,20 +1231,10 @@ class gocqhttpTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         # self.UIObject['tree_yscroll'].place(
         #    x = 800 - 15 - 18,
@@ -1426,20 +1243,10 @@ class gocqhttpTerminalUI(object):
         #    height = 600 - 15 * 2 - 24 - 8
         # )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -1451,19 +1258,11 @@ class gocqhttpTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -1473,22 +1272,14 @@ class gocqhttpTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -1503,6 +1294,7 @@ class gocqhttpTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -1543,16 +1335,11 @@ class gocqhttpTerminalUI(object):
     def root_setGoCqhttpModelSend(self, input_data):
         self.root.setGoCqhttpModelSend(self.bot.hash, input_data)
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -1561,22 +1348,12 @@ class gocqhttpTerminalUI(object):
         # )
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -1585,36 +1362,36 @@ class gocqhttpTerminalUI(object):
         # )
 
     def show_tx_url_webbrowser(self, url):
-        res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置人机验证助手访问 \"" + url + "\" ?")
+        res = tkinter.messagebox.askquestion('请完成验证', '是否使用内置人机验证助手访问 "' + url + '" ?')
         try:
             if res == 'yes':
                 OlivOS.libEXEModelAPI.sendOpentxTuringTestPage(
                     control_queue=self.root.Proc_info.control_queue,
                     name='slider_verification_code=%s' % self.bot.hash,
                     title='请完成验证',
-                    url=url
+                    url=url,
                 )
             else:
                 webbrowser.open(url)
         except webbrowser.Error as error_info:
-            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+            tkinter.messagebox.showerror('webbrowser.Error', error_info)
 
     def show_url_webbrowser(self, url):
-        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        res = tkinter.messagebox.askquestion('请完成验证', '是否通过浏览器访问 "' + url + '" ?')
         try:
             if res == 'yes':
-                res = tkinter.messagebox.askquestion("请完成验证", "是否使用内置浏览器?")
+                res = tkinter.messagebox.askquestion('请完成验证', '是否使用内置浏览器?')
                 if res == 'yes':
                     OlivOS.webviewUIAPI.sendOpenWebviewPage(
                         control_queue=self.root.Proc_info.control_queue,
                         name='slider_verification_code=%s' % self.bot.hash,
                         title='请完成验证',
-                        url=url
+                        url=url,
                     )
                 else:
                     webbrowser.open(url)
         except webbrowser.Error as error_info:
-            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+            tkinter.messagebox.showerror('webbrowser.Error', error_info)
 
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_gocqhttp_terminal_data']:
@@ -1630,14 +1407,7 @@ class gocqhttpTerminalUI(object):
         res_data = res_data.replace(' ', '\\ ')
         if len(res_data.replace('\\ ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_1,
-                    values=(
-                        res_data
-                    )
-                )
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
@@ -1649,7 +1419,7 @@ class gocqhttpTerminalUI(object):
             try:
                 matchRes = re.match(
                     r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请选择提交滑块ticket方式:.*$',
-                    res_data_raw
+                    res_data_raw,
                 )
                 if matchRes is not None:
                     self.tree_add_line('=================================================================')
@@ -1661,7 +1431,7 @@ class gocqhttpTerminalUI(object):
                         r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+'
                         r'->\s+(http[s]{0,1}://ti\.qq\.com/safe/tools/captcha/sms-verify-login\?[^\s]+).*$'
                     ),
-                    res_data_raw
+                    res_data_raw,
                 )
                 if matchRes is not None:
                     matchResList = list(matchRes.groups())
@@ -1674,7 +1444,7 @@ class gocqhttpTerminalUI(object):
                         r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s账号已开启设备锁，请前往\s+'
                         r'->\s+(http[s]{0,1}://accounts\.qq\.com/safe/verify[^\s]+).*$'
                     ),
-                    res_data_raw
+                    res_data_raw,
                 )
                 if matchRes is not None:
                     matchResList = list(matchRes.groups())
@@ -1703,7 +1473,7 @@ class gocqhttpTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -1739,10 +1509,7 @@ class walleqTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -1750,7 +1517,7 @@ class walleqTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -1759,20 +1526,10 @@ class walleqTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         # self.UIObject['tree_yscroll'].place(
         #    x = 800 - 15 - 18,
@@ -1781,20 +1538,10 @@ class walleqTerminalUI(object):
         #    height = 600 - 15 * 2 - 24 - 8
         # )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -1806,19 +1553,11 @@ class walleqTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -1828,22 +1567,14 @@ class walleqTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -1858,6 +1589,7 @@ class walleqTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -1895,16 +1627,11 @@ class walleqTerminalUI(object):
                 self.root.setWalleQModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -1913,22 +1640,12 @@ class walleqTerminalUI(object):
         # )
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -1937,12 +1654,12 @@ class walleqTerminalUI(object):
         # )
 
     def show_url_webbrowser(self, url):
-        res = tkinter.messagebox.askquestion("请完成验证", "是否通过浏览器访问 \"" + url + "\" ?")
+        res = tkinter.messagebox.askquestion('请完成验证', '是否通过浏览器访问 "' + url + '" ?')
         try:
             if res == 'yes':
                 webbrowser.open(url)
         except webbrowser.Error as error_info:
-            tkinter.messagebox.showerror("webbrowser.Error", error_info)
+            tkinter.messagebox.showerror('webbrowser.Error', error_info)
 
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_walleq_terminal_data']:
@@ -1958,14 +1675,7 @@ class walleqTerminalUI(object):
         res_data = res_data.replace(' ', '\\ ')
         if len(res_data.replace('\\ ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_1,
-                    values=(
-                        res_data
-                    )
-                )
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
@@ -1980,7 +1690,7 @@ class walleqTerminalUI(object):
                         r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]\s\[WARNING\]:\s请前往该地址验证\s+'
                         r'->\s+(http[s]{0,1}://captcha\.go-cqhttp\.org/captcha\?[^\s]+).*$'
                     ),
-                    res_data_raw
+                    res_data_raw,
                 )
                 if matchRes is not None:
                     matchResList = list(matchRes.groups())
@@ -2008,7 +1718,7 @@ class walleqTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -2044,10 +1754,7 @@ class CWCBTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -2055,7 +1762,7 @@ class CWCBTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -2064,20 +1771,10 @@ class CWCBTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         # self.UIObject['tree_yscroll'].place(
         #    x = 800 - 15 - 18,
@@ -2086,20 +1783,10 @@ class CWCBTerminalUI(object):
         #    height = 600 - 15 * 2 - 24 - 8
         # )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -2111,19 +1798,11 @@ class CWCBTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -2133,22 +1812,14 @@ class CWCBTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -2163,6 +1834,7 @@ class CWCBTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -2200,16 +1872,11 @@ class CWCBTerminalUI(object):
                 self.root.setCWCBModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -2218,22 +1885,12 @@ class CWCBTerminalUI(object):
         # )
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -2254,14 +1911,7 @@ class CWCBTerminalUI(object):
         res_data = res_data.replace(' ', '\\ ')
         if len(res_data.replace('\\ ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_1,
-                    values=(
-                        res_data
-                    )
-                )
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
@@ -2287,7 +1937,7 @@ class CWCBTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -2323,10 +1973,7 @@ class opqbotTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -2334,7 +1981,7 @@ class opqbotTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -2343,20 +1990,10 @@ class opqbotTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         # self.UIObject['tree_yscroll'].place(
         #    x = 800 - 15 - 18,
@@ -2365,20 +2002,10 @@ class opqbotTerminalUI(object):
         #    height = 600 - 15 * 2 - 24 - 8
         # )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -2390,19 +2017,11 @@ class opqbotTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -2412,22 +2031,14 @@ class opqbotTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -2442,6 +2053,7 @@ class opqbotTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -2479,16 +2091,11 @@ class opqbotTerminalUI(object):
                 self.root.setOPQBotModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -2497,22 +2104,12 @@ class opqbotTerminalUI(object):
         # )
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -2533,14 +2130,7 @@ class opqbotTerminalUI(object):
         res_data = res_data.replace(' ', '\\ ')
         if len(res_data.replace('\\ ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_1,
-                    values=(
-                        res_data
-                    )
-                )
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
@@ -2566,7 +2156,7 @@ class opqbotTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -2602,10 +2192,7 @@ class napcatTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -2613,7 +2200,7 @@ class napcatTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -2622,20 +2209,10 @@ class napcatTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 800 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         # self.UIObject['tree_yscroll'].place(
         #    x = 800 - 15 - 18,
@@ -2644,20 +2221,10 @@ class napcatTerminalUI(object):
         #    height = 600 - 15 * 2 - 24 - 8
         # )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -2669,19 +2236,11 @@ class napcatTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -2691,22 +2250,14 @@ class napcatTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -2721,6 +2272,7 @@ class napcatTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -2758,16 +2310,11 @@ class napcatTerminalUI(object):
                 self.root.setNapCatModelSend(self.bot.hash, input)
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -2776,22 +2323,12 @@ class napcatTerminalUI(object):
         # )
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -2812,14 +2349,7 @@ class napcatTerminalUI(object):
         res_data = res_data.replace(' ', '\\ ')
         if len(res_data.replace('\\ ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_1,
-                    values=(
-                        res_data
-                    )
-                )
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
                     self.UIObject['tree'].see(iid)
@@ -2845,7 +2375,7 @@ class napcatTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -2879,10 +2409,7 @@ class OlivOSTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(0, weight=0)
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
         self.UIObject['root'].bind('<Configure>', self.root_resize)
 
@@ -2894,9 +2421,7 @@ class OlivOSTerminalUI(object):
         for level_this in OlivOS.diagnoseAPI.level_dict:
             self.UIObject['tree'].tag_configure(
                 OlivOS.diagnoseAPI.level_dict[level_this],
-                foreground=OlivOS.diagnoseAPI.level_color_dict[
-                    OlivOS.diagnoseAPI.level_dict[level_this]
-                ]
+                foreground=OlivOS.diagnoseAPI.level_color_dict[OlivOS.diagnoseAPI.level_dict[level_this]],
             )
 
         self.UIObject['tree']['show'] = 'headings'
@@ -2919,36 +2444,16 @@ class OlivOSTerminalUI(object):
         # self.tree_load()
         # self.UIObject['tree'].place(x = 15, y = 15, width = 900 - 15 * 2 - 18 , height = 600 - 15 * 2 - 24 - 8)
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=2, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=2,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=2, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.tree_edit_UI_Combobox_init(
             obj_root='root',
@@ -2960,18 +2465,10 @@ class OlivOSTerminalUI(object):
             width=50,
             height=24,
             action=None,
-            title='等级'
+            title='等级',
         )
         self.UIObject['root_level'].grid(
-            row=1,
-            column=0,
-            sticky="ns",
-            rowspan=1,
-            columnspan=1,
-            padx=(15, 8),
-            pady=(9, 15),
-            ipadx=0,
-            ipady=0
+            row=1, column=0, sticky='ns', rowspan=1, columnspan=1, padx=(15, 8), pady=(9, 15), ipadx=0, ipady=0
         )
         self.UIData['level_list'] = []
         self.UIData['level_find'] = {}
@@ -2992,23 +2489,15 @@ class OlivOSTerminalUI(object):
             width=900,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=1,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=2
+            row=1, column=1, sticky='s', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=0, ipady=2
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stopManual)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stopManual)
 
         self.tree_init_line()
 
@@ -3023,6 +2512,7 @@ class OlivOSTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
@@ -3064,16 +2554,11 @@ class OlivOSTerminalUI(object):
                 pass
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -3081,22 +2566,11 @@ class OlivOSTerminalUI(object):
         #    height = height
         # )
         self.UIData[str_name] = tkinter.StringVar()
-        self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
-        )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name] = tkinter.Entry(self.UIObject[obj_root], textvariable=self.UIData[str_name])
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -3105,14 +2579,8 @@ class OlivOSTerminalUI(object):
         # )
 
     def tree_edit_UI_Combobox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         # self.UIObject[obj_name + '=Label'].place(
         #    x = x - width_t,
         #    y = y,
@@ -3120,10 +2588,7 @@ class OlivOSTerminalUI(object):
         #    height = height
         # )
         self.UIData[str_name] = tkinter.StringVar()
-        self.UIObject[obj_name] = ttk.Combobox(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name]
-        )
+        self.UIObject[obj_name] = ttk.Combobox(self.UIObject[obj_root], textvariable=self.UIData[str_name])
         # self.UIObject[obj_name].place(
         #    x = x,
         #    y = y,
@@ -3174,12 +2639,8 @@ class OlivOSTerminalUI(object):
                         '',
                         tkinter.END,
                         text=res_data,
-                        values=(
-                            str(datetime.datetime.fromtimestamp(int(data_raw['log_time']))),
-                            log_level,
-                            data_str
-                        ),
-                        tag=log_level
+                        values=(str(datetime.datetime.fromtimestamp(int(data_raw['log_time']))), log_level, data_str),
+                        tag=log_level,
                     )
                     keep_tree_thin(self.UIObject['tree'])
                     if self.UIData['flag_tree_is_bottom']:
@@ -3191,9 +2652,7 @@ class OlivOSTerminalUI(object):
     def stopManual(self):
         # 手动关闭时要给用户气泡，不然有些用户不知道自己还开着
         try:
-            self.root.UIObject['root_shallow'].UIObject['shallow_root'].notify(
-                '已最小化至托盘'
-            )
+            self.root.UIObject['root_shallow'].UIObject['shallow_root'].notify('已最小化至托盘')
         except Exception:
             pass
         self.stop()
@@ -3208,7 +2667,7 @@ class OlivOSTerminalUI(object):
 
 class VirtualTerminalUI(object):
     class VirtualTerminalUI_AccountEdit(object):
-        def __init__(self, Model_name, root: "VirtualTerminalUI", root_tk=None, bot=None):
+        def __init__(self, Model_name, root: 'VirtualTerminalUI', root_tk=None, bot=None):
             self.Model_name = Model_name
             self.root = root
             self.root_tk = root_tk
@@ -3221,19 +2680,13 @@ class VirtualTerminalUI(object):
             self.UIConfig.update(dictColorContext)
 
         def start(self):
-            self.UIObject['root'] = tkinter.Toplevel(
-                master=self.root.UIObject['root'],
-                bg=self.UIConfig['color_001']
-            )
+            self.UIObject['root'] = tkinter.Toplevel(master=self.root.UIObject['root'], bg=self.UIConfig['color_001'])
             self.UIObject['root'].title('账号编辑 - %s' % str(self.bot.id))
             self.UIObject['root'].geometry('300x210')
             self.UIObject['root'].minsize(300, 210)
-            self.UIObject['root'].resizable(
-                width=False,
-                height=False
-            )
+            self.UIObject['root'].resizable(width=False, height=False)
             self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
-            self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+            self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
             self.userConfDataInit(self.root.user_conf_data)
 
@@ -3265,9 +2718,8 @@ class VirtualTerminalUI(object):
 
             def root_checkbutton_flag_action_Func(str_name):
                 def resFunc():
-                    self.UIData[str_name].set(
-                        not self.UIData[str_name].get()
-                    )
+                    self.UIData[str_name].set(not self.UIData[str_name].get())
+
                 return resFunc
 
             self.init_style()
@@ -3306,7 +2758,7 @@ class VirtualTerminalUI(object):
                 width_t=80,
                 width=300 - 15 * 2 - 80,
                 height=24,
-                action=["owner", "admin", "member", "unknown"],
+                action=['owner', 'admin', 'member', 'unknown'],
                 title='群组角色:\t',
             )
 
@@ -3317,7 +2769,7 @@ class VirtualTerminalUI(object):
                 x=15 + 80,
                 y=15 + 30 * 5,
                 width=300 - 15 * 2 - 80,
-                height=24
+                height=24,
             )
 
             self.UIObject['root'].mainloop()
@@ -3329,41 +2781,32 @@ class VirtualTerminalUI(object):
                 self.setUserConfDataFunc()
                 # print(self.root.user_conf_data)
                 self.stop()
+
             return resFunc
 
         def userConfDataInit(self, datadict):
             """
-                根据 VirtualTerminalUI 的用户信息，初始化编辑界面中的用户信息数据
+            根据 VirtualTerminalUI 的用户信息，初始化编辑界面中的用户信息数据
             """
             self.UIData['StringVar_user_name'] = tkinter.StringVar(
-                master=self.UIObject['root'],
-                name='StringVar_user_name',
-                value=datadict['user_name']
+                master=self.UIObject['root'], name='StringVar_user_name', value=datadict['user_name']
             )
             self.UIData['StringVar_user_id'] = tkinter.StringVar(
-                master=self.UIObject['root'],
-                name='StringVar_user_id',
-                value=datadict['user_id']
+                master=self.UIObject['root'], name='StringVar_user_id', value=datadict['user_id']
             )
             self.UIData['BoolVar_flag_group'] = tkinter.BooleanVar(
-                master=self.UIObject['root'],
-                name='BoolVar_flag_group',
-                value=datadict['flag_group']
+                master=self.UIObject['root'], name='BoolVar_flag_group', value=datadict['flag_group']
             )
             self.UIData['StringVar_group_id'] = tkinter.StringVar(
-                master=self.UIObject['root'],
-                name='StringVar_group_id',
-                value=datadict['group_id']
+                master=self.UIObject['root'], name='StringVar_group_id', value=datadict['group_id']
             )
             self.UIData['StringVar_group_role'] = tkinter.StringVar(
-                master=self.UIObject['root'],
-                name='StringVar_group_role',
-                value=datadict['group_role']
+                master=self.UIObject['root'], name='StringVar_group_role', value=datadict['group_role']
             )
 
         def setUserConfDataFunc(self):
             """
-                根据编辑界面中的用户信息数据，更新 VirtualTerminalUI 的用户信息
+            根据编辑界面中的用户信息数据，更新 VirtualTerminalUI 的用户信息
             """
             tmp_data = {}
             tmp_data['user_name'] = self.UIData['StringVar_user_name'].get()
@@ -3375,7 +2818,7 @@ class VirtualTerminalUI(object):
                 tmp_data['target_id'] = self.UIData['StringVar_group_id'].get()
 
             else:
-                tmp_data['target_id'] = self.root.bot.id        # 当为私聊消息时，target_id 为 bot 的 id
+                tmp_data['target_id'] = self.root.bot.id  # 当为私聊消息时，target_id 为 bot 的 id
             self.root.user_conf_data = tmp_data
 
         def buttom_action(self, name, action):
@@ -3395,43 +2838,27 @@ class VirtualTerminalUI(object):
                 activeforeground=self.UIConfig['color_001'],
                 bg=self.UIConfig['color_003'],
                 fg=self.UIConfig['color_004'],
-                relief='groove'
+                relief='groove',
             )
             self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
             self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
-            self.UIObject[name].place(
-                x=x,
-                y=y,
-                width=width,
-                height=height
-            )
+            self.UIObject[name].place(x=x, y=y, width=width, height=height)
 
         def init_style(self):
             self.UIData['style'] = ttk.Style(self.UIObject['root'])
             self.UIData['style'].configure(
-                "TCheckbutton",
+                'TCheckbutton',
                 indicatorbackground=self.UIConfig['color_001'],
                 indicatorforeground=self.UIConfig['color_004'],
                 background=self.UIConfig['color_001'],
-                foreground=self.UIConfig['color_004']
+                foreground=self.UIConfig['color_004'],
             )
             # self.UIData['style'].map("TCheckbutton", background=[("active", "darkgrey")])
 
         def root_Checkbutton_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
-            self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_root],
-                text=title
-            )
-            self.UIObject[obj_name + '=Label'].configure(
-                bg=self.UIConfig['color_001'],
-                fg=self.UIConfig['color_004']
-            )
-            self.UIObject[obj_name + '=Label'].place(
-               x=x - width_t,
-               y=y,
-               width=width_t,
-               height=height
-            )
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+            self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
             # self.UIData[str_name] = tkinter.BooleanVar(
             #     master=self.UIObject[obj_name],
             #     name=str_name,
@@ -3441,39 +2868,22 @@ class VirtualTerminalUI(object):
                 variable=self.UIData[str_name],
                 onvalue=True,
                 offvalue=False,
-                style='TCheckbutton'
+                style='TCheckbutton',
             )
             # self.UIObject[obj_name].configure(
             #     bg=self.UIConfig['color_001'],
             #     fg=self.UIConfig['color_004'],
             #     bd=0
             # )
-            self.UIObject[obj_name].place(
-               x=x,
-               y=y
-            )
+            self.UIObject[obj_name].place(x=x, y=y)
 
         def root_ComboBox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
             self.UIObject[obj_name] = tkinter.Label(
-                self.UIObject[obj_root],
-                bg=self.UIConfig['color_001'],
-                width=width,
-                height=height
+                self.UIObject[obj_root], bg=self.UIConfig['color_001'], width=width, height=height
             )
-            self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_root],
-                text=title
-            )
-            self.UIObject[obj_name + '=Label'].configure(
-                bg=self.UIConfig['color_001'],
-                fg=self.UIConfig['color_004']
-            )
-            self.UIObject[obj_name + '=Label'].place(
-               x=x - width_t,
-               y=y,
-               width=width_t,
-               height=height
-            )
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+            self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
             # self.UIData[str_name] = tkinter.StringVar(
             #     master=self.UIObject[obj_name],
             #     name=str_name,
@@ -3489,58 +2899,26 @@ class VirtualTerminalUI(object):
             #     fg=self.UIConfig['color_005'],
             #     bd=0
             # )
-            self.UIObject[obj_name].place(
-               x=x,
-               y=y,
-               width=width,
-               height=height
-            )
+            self.UIObject[obj_name].place(x=x, y=y, width=width, height=height)
 
         def root_Entry_init(
-            self, obj_root, obj_name, str_name, x, y, width_t, width, height, action,
-            title='',
-            mode='NONE'
+            self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
         ):
-            self.UIObject[obj_name + '=Label'] = tkinter.Label(
-                self.UIObject[obj_root],
-                text=title
-            )
-            self.UIObject[obj_name + '=Label'].configure(
-                bg=self.UIConfig['color_001'],
-                fg=self.UIConfig['color_004']
-            )
-            self.UIObject[obj_name + '=Label'].place(
-               x=x - width_t,
-               y=y,
-               width=width_t,
-               height=height
-            )
-            self.UIObject[obj_name] = tkinter.Entry(
-                self.UIObject[obj_root],
-                textvariable=self.UIData[str_name]
-            )
-            self.UIObject[obj_name].configure(
-                bg=self.UIConfig['color_004'],
-                fg=self.UIConfig['color_005'],
-                bd=0
-            )
-            self.UIObject[obj_name].place(
-               x=x,
-               y=y,
-               width=width,
-               height=height
-            )
+            self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+            self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
+            self.UIObject[obj_name] = tkinter.Entry(self.UIObject[obj_root], textvariable=self.UIData[str_name])
+            self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
+            self.UIObject[obj_name].place(x=x, y=y, width=width, height=height)
             if mode == 'SAFE':
-                self.UIObject[obj_name].configure(
-                    show='●'
-                )
+                self.UIObject[obj_name].configure(show='●')
 
         def stop(self):
             self.exit()
             self.UIObject['root'].destroy()
 
         def exit(self):
-            self.root.UIObject["root_terminal_account_edit"] = None
+            self.root.UIObject['root_terminal_account_edit'] = None
 
     def __init__(self, Model_name, logger_proc, root: dock, root_tk=None, bot=None):
         self.Model_name = Model_name
@@ -3553,13 +2931,13 @@ class VirtualTerminalUI(object):
         self.logger_proc = logger_proc
         self.UIConfig.update(dictColorContext)
         self.user_conf_data = {
-            "user_name": "仑质",
-            "user_id": "88888888",
-            "flag_group": True,
-            "group_id": "88888888",
-            "group_role": "owner",
+            'user_name': '仑质',
+            'user_id': '88888888',
+            'flag_group': True,
+            'group_id': '88888888',
+            'group_role': 'owner',
         }
-        self.user_conf_data["target_id"] = self.user_conf_data["group_id"]
+        self.user_conf_data['target_id'] = self.user_conf_data['group_id']
 
     def start(self):
         self.UIObject['root'] = tkinter.Toplevel()
@@ -3572,10 +2950,7 @@ class VirtualTerminalUI(object):
         self.UIObject['root'].grid_columnconfigure(1, weight=2)
         self.UIObject['root'].grid_columnconfigure(2, weight=2)
         self.UIObject['root'].grid_columnconfigure(3, weight=0)
-        self.UIObject['root'].resizable(
-            width=True,
-            height=True
-        )
+        self.UIObject['root'].resizable(width=True, height=True)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.UIObject['style'] = ttk.Style()
@@ -3583,43 +2958,23 @@ class VirtualTerminalUI(object):
 
         self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
         self.UIObject['tree']['show'] = 'headings'
-        self.UIObject['tree']['columns'] = ('DATA')
+        self.UIObject['tree']['columns'] = 'DATA'
         self.UIObject['tree'].column('DATA', width=800 - 15 * 2 - 18 - 5)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
         self.UIObject['tree_rightkey_menu'] = tkinter.Menu(self.UIObject['root'], tearoff=False)
         self.UIObject['tree'].bind('<Button-3>', lambda x: self.tree_rightKey(x))
         self.UIObject['tree'].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            rowspan=1,
-            columnspan=3,
-            padx=(15, 0),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=0, sticky='nsew', rowspan=1, columnspan=3, padx=(15, 0), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
         self.UIObject['tree_yscroll'].grid(
-            row=0,
-            column=3,
-            sticky="nsw",
-            rowspan=1,
-            columnspan=1,
-            padx=(0, 15),
-            pady=(15, 0),
-            ipadx=0,
-            ipady=0
+            row=0, column=3, sticky='nsw', rowspan=1, columnspan=1, padx=(0, 15), pady=(15, 0), ipadx=0, ipady=0
         )
         self.UIData['flag_tree_is_bottom'] = True
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set)
-        )
+        self.UIObject['tree'].configure(yscrollcommand=self.scroll_onChange(self.UIObject['tree_yscroll'].set))
 
         self.root_Entry_init(
             obj_root='root',
@@ -3631,19 +2986,11 @@ class VirtualTerminalUI(object):
             width=800 - 15 * 2,
             height=24,
             action=None,
-            title='输入'
+            title='输入',
         )
-        self.UIObject['root_input'].bind("<Return>", self.root_Entry_enter_Func('root_input'))
+        self.UIObject['root_input'].bind('<Return>', self.root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1,
-            column=0,
-            sticky="s",
-            rowspan=1,
-            columnspan=2,
-            padx=(15, 0),
-            pady=(8, 15),
-            ipadx=0,
-            ipady=4
+            row=1, column=0, sticky='s', rowspan=1, columnspan=2, padx=(15, 0), pady=(8, 15), ipadx=0, ipady=4
         )
 
         self.root_Button_init(
@@ -3653,22 +3000,14 @@ class VirtualTerminalUI(object):
             x=800 - 15 * 2 - 5,
             y=600 - 15 * 1 - 24,
             width=16,
-            height=1
+            height=1,
         )
         self.UIObject['root_button_save'].grid(
-            row=1,
-            column=2,
-            sticky="swe",
-            rowspan=1,
-            columnspan=2,
-            padx=(0, 15),
-            pady=(8, 15),
-            ipadx=8,
-            ipady=0
+            row=1, column=2, sticky='swe', rowspan=1, columnspan=2, padx=(0, 15), pady=(8, 15), ipadx=8, ipady=0
         )
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.tree_init_line()
 
@@ -3683,13 +3022,16 @@ class VirtualTerminalUI(object):
             else:
                 self.UIData['flag_tree_is_bottom'] = False
             return command(*arg, **kwarg)
+
         return res
 
     def tree_rightKey(self, event):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
         self.UIObject['tree_rightkey_menu'].add_command(label='查看', command=lambda: self.rightKey_action('show'))
         self.UIObject['tree_rightkey_menu'].add_command(label='复制', command=lambda: self.rightKey_action('copy'))
-        self.UIObject['tree_rightkey_menu'].add_command(label='编辑账号', command=lambda: self.rightKey_action('account'))
+        self.UIObject['tree_rightkey_menu'].add_command(
+            label='编辑账号', command=lambda: self.rightKey_action('account')
+        )
         self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
 
     def rightKey_action(self, action: str):
@@ -3710,18 +3052,15 @@ class VirtualTerminalUI(object):
 
     def root_AccountEdit_init(self):
         """
-            用于初始化账号编辑界面(如果存在则关闭后重新打开)
+        用于初始化账号编辑界面(如果存在则关闭后重新打开)
         """
-        if "root_terminal_account_edit" not in self.UIObject:
-            self.UIObject["root_terminal_account_edit"] = None
+        if 'root_terminal_account_edit' not in self.UIObject:
+            self.UIObject['root_terminal_account_edit'] = None
         elif self.UIObject['root_terminal_account_edit'] is not None:
             self.UIObject['root_terminal_account_edit'].stop()
 
         self.UIObject['root_terminal_account_edit'] = self.VirtualTerminalUI_AccountEdit(
-            Model_name=self.Model_name,
-            root=self,
-            root_tk=self.root_tk,
-            bot=self.bot
+            Model_name=self.Model_name, root=self, root_tk=self.root_tk, bot=self.bot
         )
         self.UIObject['root_terminal_account_edit'].start()
 
@@ -3738,34 +3077,19 @@ class VirtualTerminalUI(object):
                 self.root.setVirtualModelSend(self.bot.hash, input, self.user_conf_data)
             self.UIData['root_input_StringVar'].set('')
 
-    def root_Entry_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='',
-                        mode='NONE'):
-        self.UIObject[obj_name + '=Label'] = tkinter.Label(
-            self.UIObject[obj_root],
-            text=title
-        )
-        self.UIObject[obj_name + '=Label'].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004']
-        )
+    def root_Entry_init(
+        self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title='', mode='NONE'
+    ):
+        self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
+        self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
         self.UIData[str_name] = tkinter.StringVar()
         self.UIObject[obj_name] = tkinter.Entry(
-            self.UIObject[obj_root],
-            textvariable=self.UIData[str_name],
-            font=('TkDefaultFont 12')
+            self.UIObject[obj_root], textvariable=self.UIData[str_name], font=('TkDefaultFont 12')
         )
-        self.UIObject[obj_name].configure(
-            bg=self.UIConfig['color_004'],
-            fg=self.UIConfig['color_005'],
-            bd=0
-        )
+        self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
         if mode == 'SAFE':
-            self.UIObject[obj_name].configure(
-                show='●'
-            )
-        self.UIObject[obj_name].configure(
-            width=width
-        )
+            self.UIObject[obj_name].configure(show='●')
+        self.UIObject[obj_name].configure(width=width)
 
     def tree_init_line(self):
         if self.bot.hash in self.root.UIObject['root_virtual_terminal_terminal_data']:
@@ -3775,14 +3099,14 @@ class VirtualTerminalUI(object):
     def tree_add_line(self, data, user_conf=None):
         res_data = data['data']
         if user_conf is None:
-            user_conf = data["user_conf"]
+            user_conf = data['user_conf']
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
         res_data = res_data.replace(' ', r'\ ')
         res_data = res_data.replace('\r\n', '\n')
         if not user_conf['flag_group']:
-            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (用户: {user_conf['target_id']})"
+            data_header = f'<{user_conf["user_name"]}> ({user_conf["user_id"]}) -> (用户: {user_conf["target_id"]})'
         else:
-            data_header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (群: {user_conf['target_id']})"
+            data_header = f'<{user_conf["user_name"]}> ({user_conf["user_id"]}) -> (群: {user_conf["target_id"]})'
         data_header = data_header.replace(' ', r'\ ')
         data_header = data_header.replace('\r\n', '\n')
         res_data = '%s\n%s\n%s' % (data_header, res_data, '-' * 25)
@@ -3790,12 +3114,7 @@ class VirtualTerminalUI(object):
         for res_data_list_this in res_data_list:
             try:
                 iid = self.UIObject['tree'].insert(
-                    '',
-                    tkinter.END,
-                    text=res_data_list_this,
-                    values=(
-                        res_data_list_this
-                    )
+                    '', tkinter.END, text=res_data_list_this, values=(res_data_list_this)
                 )
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData['flag_tree_is_bottom']:
@@ -3822,7 +3141,7 @@ class VirtualTerminalUI(object):
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
             relief='groove',
-            height=height
+            height=height,
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
@@ -3862,25 +3181,13 @@ class shallow(object):
                     if type(item_this) is list:
                         # 处理账号信息项（禁用）
                         if len(item_this) == 3 and item_this[0] == 'account_info':
-                            list_new.append(
-                                pystray.MenuItem(
-                                    item_this[1],
-                                    None,
-                                    enabled=True
-                                )
-                            )
+                            list_new.append(pystray.MenuItem(item_this[1], None, enabled=True))
                         # 处理账号菜单项（根据账号数量决定是否禁用）
                         elif len(item_this) == 4 and item_this[0] == 'account_menu':
                             account_count = item_this[3]
                             tmp_sub_menu = self.getMenu(item_this[2])
                             menu_enabled = (tmp_sub_menu not in [None, False]) and account_count > 0
-                            list_new.append(
-                                pystray.MenuItem(
-                                    item_this[1],
-                                    tmp_sub_menu,
-                                    enabled=menu_enabled
-                                )
-                            )
+                            list_new.append(pystray.MenuItem(item_this[1], tmp_sub_menu, enabled=menu_enabled))
                         elif len(item_this) == 1 and item_this[0] == 'SEPARATOR':
                             list_new.append(pystray.Menu.SEPARATOR)
                         elif len(item_this) == 2:
@@ -3890,81 +3197,52 @@ class shallow(object):
                                     item_this[0],
                                     tmp_sub_menu,
                                     enabled=(tmp_sub_menu not in [None, False]),
-                                    default=(item_this[0] in ['打开终端'])
+                                    default=(item_this[0] in ['打开终端']),
                                 )
                             )
                         elif len(item_this) == 3:
-                            if (
-                                type(item_this[1]) is str
-                                and type(item_this[2]) is str
-                            ):
+                            if type(item_this[1]) is str and type(item_this[2]) is str:
                                 list_new.append(
                                     pystray.MenuItem(
-                                        item_this[0],
-                                        self.root.sendPluginControlEventFunc(
-                                            item_this[1],
-                                            item_this[2]
-                                        )
+                                        item_this[0], self.root.sendPluginControlEventFunc(item_this[1], item_this[2])
                                     )
                                 )
                         elif len(item_this) == 4:
-                            if (
-                                type(item_this[1]) is str
-                                and type(item_this[2]) is str
-                                and type(item_this[3]) is str
-                            ):
+                            if type(item_this[1]) is str and type(item_this[2]) is str and type(item_this[3]) is str:
                                 if item_this[3] == 'gocqhttp':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startGoCqhttpTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startGoCqhttpTerminalUISendFunc(item_this[1])
                                         )
                                     )
                                 elif item_this[3] == 'walleq':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startWalleQTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startWalleQTerminalUISendFunc(item_this[1])
                                         )
                                     )
                                 elif item_this[3] == 'ComWeChatBotClient':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startCWCBTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startCWCBTerminalUISendFunc(item_this[1])
                                         )
                                     )
                                 elif item_this[3] == 'opqbot':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startOPQBotTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startOPQBotTerminalUISendFunc(item_this[1])
                                         )
                                     )
                                 elif item_this[3] == 'virtual_terminal':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startVirtualTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startVirtualTerminalUISendFunc(item_this[1])
                                         )
                                     )
                                 elif item_this[3] == 'napcat':
                                     list_new.append(
                                         pystray.MenuItem(
-                                            item_this[0],
-                                            self.root.startNapCatTerminalUISendFunc(
-                                                item_this[1]
-                                            )
+                                            item_this[0], self.root.startNapCatTerminalUISendFunc(item_this[1])
                                         )
                                     )
                 if len(list_new) > 0:
@@ -3980,10 +3258,7 @@ class shallow(object):
         image = Image.open(self.image)
         self.refreshData()
         self.UIObject['shallow_root'] = pystray.Icon(
-            name=self.name,
-            icon=image,
-            title=self.name,
-            menu=self.UIObject['shallow_menu']
+            name=self.name, icon=image, title=self.name, menu=self.UIObject['shallow_menu']
         )
         self.UIObject['shallow_root'].run_detached()
 
@@ -4007,28 +3282,16 @@ class pluginManageUI(object):
         self.UIObject['root'] = tkinter.Toplevel()
         self.UIObject['root'].title('OlivOS 插件管理器')
         self.UIObject['root'].geometry('680x500')
-        self.UIObject['root'].resizable(
-            width=False,
-            height=False
-        )
+        self.UIObject['root'].resizable(width=False, height=False)
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
         self.tree_init()
 
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
-            self.UIObject['root'],
-            orient="vertical",
-            command=self.UIObject['tree'].yview
+            self.UIObject['root'], orient='vertical', command=self.UIObject['tree'].yview
         )
-        self.UIObject['tree_yscroll'].place(
-            x=15 + 500 - 18,
-            y=15,
-            width=18,
-            height=470 - 1
-        )
-        self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
-        )
+        self.UIObject['tree_yscroll'].place(x=15 + 500 - 18, y=15, width=18, height=470 - 1)
+        self.UIObject['tree'].configure(yscrollcommand=self.UIObject['tree_yscroll'].set)
 
         self.tree_UI_Label_init(
             name='root_Label_PRIORITY_title',
@@ -4036,37 +3299,22 @@ class pluginManageUI(object):
             x=525,
             y=15,
             width=140,
-            height=20
+            height=20,
         )
         self.UIData['root_Label_PRIORITY_title_StringVar'].set('优先级')
 
         self.tree_UI_Label_init(
-            name='root_Label_PRIORITY',
-            title='root_Label_PRIORITY_StringVar',
-            x=530,
-            y=35,
-            width=140,
-            height=20
+            name='root_Label_PRIORITY', title='root_Label_PRIORITY_StringVar', x=530, y=35, width=140, height=20
         )
         self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
 
         self.tree_UI_Label_init(
-            name='root_Label_INFO_title',
-            title='root_Label_INFO_title_StringVar',
-            x=525,
-            y=65,
-            width=140,
-            height=20
+            name='root_Label_INFO_title', title='root_Label_INFO_title_StringVar', x=525, y=65, width=140, height=20
         )
         self.UIData['root_Label_INFO_title_StringVar'].set('介绍')
 
         self.tree_UI_Label_init(
-            name='root_Label_INFO',
-            title='root_Label_INFO_StringVar',
-            x=530,
-            y=85,
-            width=140,
-            height=300
+            name='root_Label_INFO', title='root_Label_INFO_StringVar', x=530, y=85, width=140, height=300
         )
         self.UIData['root_Label_INFO_StringVar'].set('未选定插件')
 
@@ -4077,7 +3325,7 @@ class pluginManageUI(object):
             x=530,
             y=(500 - 34 - 15 - 40 * 2),
             width=140,
-            height=34
+            height=34,
         )
 
         self.tree_UI_Button_init(
@@ -4087,7 +3335,7 @@ class pluginManageUI(object):
             x=530,
             y=(500 - 34 - 15 - 40 * 1),
             width=140,
-            height=34
+            height=34,
         )
 
         self.tree_UI_Button_init(
@@ -4097,13 +3345,13 @@ class pluginManageUI(object):
             x=530,
             y=(500 - 34 - 15 - 40 * 0),
             width=140,
-            height=34
+            height=34,
         )
 
         # self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.exit)
 
         self.UIObject['root'].iconbitmap('./resource/tmp_favoricon.ico')
-        self.UIObject['root'].protocol("WM_DELETE_WINDOW", self.stop)
+        self.UIObject['root'].protocol('WM_DELETE_WINDOW', self.stop)
 
         self.UIObject['root'].mainloop()
 
@@ -4167,7 +3415,7 @@ class pluginManageUI(object):
                         'version': plugin_this[1],
                         'author': plugin_this[2],
                         'priority': priority,
-                        'full_path': full_path
+                        'full_path': full_path,
                     })
 
                 # 按优先级排序
@@ -4185,8 +3433,8 @@ class pluginManageUI(object):
                                 plugin_data['full_path'],
                                 plugin_data['name'],
                                 plugin_data['version'],
-                                plugin_data['author']
-                            )
+                                plugin_data['author'],
+                            ),
                         )
                     else:
                         # 不显示路径模式:NAME, VERSION, AUTHOR
@@ -4194,11 +3442,7 @@ class pluginManageUI(object):
                             '',
                             tkinter.END,
                             text=plugin_data['namespace'],
-                            values=(
-                                plugin_data['name'],
-                                plugin_data['version'],
-                                plugin_data['author']
-                            )
+                            values=(plugin_data['name'], plugin_data['version'], plugin_data['author']),
                         )
                     self.UIData['item_namespace_map'][item_id] = plugin_data['namespace']
 
@@ -4240,38 +3484,22 @@ class pluginManageUI(object):
             activeforeground=self.UIConfig['color_001'],
             bg=self.UIConfig['color_003'],
             fg=self.UIConfig['color_004'],
-            relief='groove'
+            relief='groove',
         )
         self.UIObject[name].bind('<Enter>', lambda x: self.buttom_action(name, '<Enter>'))
         self.UIObject[name].bind('<Leave>', lambda x: self.buttom_action(name, '<Leave>'))
         self.UIObject[name].bind('<Button-1>', lambda x: self.clickRecord(name, x))
-        self.UIObject[name].place(
-            x=x,
-            y=y,
-            width=width,
-            height=height
-        )
+        self.UIObject[name].place(x=x, y=y, width=width, height=height)
 
     def tree_UI_Label_init(self, name, title, x, y, width, height):
         self.UIData[title] = tkinter.StringVar()
         self.UIObject[name] = tkinter.Label(
-            self.UIObject['root'],
-            text='N/A',
-            textvariable=self.UIData[title],
-            wraplength=width - 4
+            self.UIObject['root'], text='N/A', textvariable=self.UIData[title], wraplength=width - 4
         )
         self.UIObject[name].configure(
-            bg=self.UIConfig['color_001'],
-            fg=self.UIConfig['color_004'],
-            justify='left',
-            anchor='nw'
+            bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'], justify='left', anchor='nw'
         )
-        self.UIObject[name].place(
-            x=x,
-            y=y,
-            width=width,
-            height=height
-        )
+        self.UIObject[name].place(x=x, y=y, width=width, height=height)
 
     def sendPluginRestart(self):
         self.root.sendPluginRestart()
@@ -4321,8 +3549,7 @@ class pluginManageUI(object):
         if not selected_item:
             self.UIObject['tree_rightkey_menu'].add_command(label='未选定插件', command=None)
             self.UIObject['tree_rightkey_menu'].post(
-                self.UIData['click_record'][name].x_root,
-                self.UIData['click_record'][name].y_root
+                self.UIData['click_record'][name].x_root, self.UIData['click_record'][name].y_root
             )
             return
 
@@ -4335,10 +3562,7 @@ class pluginManageUI(object):
                 for plugin_menu_this in plugin_menu_now[3]:
                     self.UIObject['tree_rightkey_menu'].add_command(
                         label=plugin_menu_this[0],
-                        command=self.root.sendPluginControlEventFunc(
-                            plugin_menu_this[1],
-                            plugin_menu_this[2]
-                        )
+                        command=self.root.sendPluginControlEventFunc(plugin_menu_this[1], plugin_menu_this[2]),
                     )
             else:
                 self.UIObject['tree_rightkey_menu'].add_command(label='无选项', command=None)
@@ -4346,8 +3570,7 @@ class pluginManageUI(object):
             self.UIObject['tree_rightkey_menu'].add_command(label='未找到插件', command=None)
 
         self.UIObject['tree_rightkey_menu'].post(
-            self.UIData['click_record'][name].x_root,
-            self.UIData['click_record'][name].y_root
+            self.UIData['click_record'][name].x_root, self.UIData['click_record'][name].y_root
         )
 
 
@@ -4379,11 +3602,6 @@ def fix_Treeview_color(style):
         # ("!disabled", "!selected", ...) filtered out
         # style.map() returns an empty list for missing options, so this should
         # be future-safe
-        return [elm for elm in style_in.map("Treeview", query_opt=option)
-                if elm[:2] != ("!disabled", "!selected")]
+        return [elm for elm in style_in.map('Treeview', query_opt=option) if elm[:2] != ('!disabled', '!selected')]
 
-    style.map(
-        'Treeview',
-        foreground=fixed_map('foreground', style),
-        background=fixed_map('background', style)
-    )
+    style.map('Treeview', foreground=fixed_map('foreground', style), background=fixed_map('background', style))

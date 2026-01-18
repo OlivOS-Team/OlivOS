@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -37,7 +37,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         id=plugin_bot_info.id,
         password=plugin_bot_info.password,
         nickname=plugin_bot_info.post_info.access_token,
-        chatroom=plugin_bot_info.post_info.host
+        chatroom=plugin_bot_info.post_info.host,
     )
     return res
 
@@ -66,31 +66,30 @@ def get_message_obj(elements: list):
     message_list = []
     for element_this in elements:
         if (
-            'textElement' in element_this and type(element_this['textElement']) is dict
-            and 'atType' in element_this['textElement'] and type(element_this['textElement']['atType']) is int
-            and 'atNtUin' in element_this['textElement'] and type(element_this['textElement']['atNtUin']) is str
+            'textElement' in element_this
+            and type(element_this['textElement']) is dict
+            and 'atType' in element_this['textElement']
+            and type(element_this['textElement']['atType']) is int
+            and 'atNtUin' in element_this['textElement']
+            and type(element_this['textElement']['atNtUin']) is str
             and 2 == element_this['textElement']['atType']
         ):
             message_list.append(OlivOS.messageAPI.PARA.at(id=element_this['textElement']['atNtUin']))
             flag_hit = True
         elif (
-            'textElement' in element_this and type(element_this['textElement']) is dict
-            and 'content' in element_this['textElement'] and type(element_this['textElement']['content']) is str
+            'textElement' in element_this
+            and type(element_this['textElement']) is dict
+            and 'content' in element_this['textElement']
+            and type(element_this['textElement']['content']) is str
         ):
             message_list.append(OlivOS.messageAPI.PARA.text(text=element_this['textElement']['content']))
             flag_hit = True
     if not flag_hit:
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_para',
-            []
-        )
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         message_obj.active = False
     else:
         try:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                message_list
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', message_list)
             message_obj.init_data()
         except Exception:
             message_obj.active = False
@@ -114,20 +113,18 @@ def get_Event_from_SDK(target_event):
         ):
             payload_data = target_event.sdk_event.payload.payload[0]
             if (
-                'chatType' in payload_data and payload_data['chatType'] == 2
-                and 'peerUid' in payload_data and type(payload_data['peerUid']) is str
-                and 'senderUin' in payload_data and type(payload_data['senderUin']) is str
+                'chatType' in payload_data
+                and payload_data['chatType'] == 2
+                and 'peerUid' in payload_data
+                and type(payload_data['peerUid']) is str
+                and 'senderUin' in payload_data
+                and type(payload_data['senderUin']) is str
                 and (
-                    (
-                        'sendNickName' in payload_data
-                        and type(payload_data['sendNickName']) is str
-                    )
-                    or (
-                        'sendMemberName' in payload_data
-                        and type(payload_data['sendMemberName']) is str
-                    )
+                    ('sendNickName' in payload_data and type(payload_data['sendNickName']) is str)
+                    or ('sendMemberName' in payload_data and type(payload_data['sendMemberName']) is str)
                 )
-                and 'elements' in payload_data and type(payload_data['elements']) is list
+                and 'elements' in payload_data
+                and type(payload_data['elements']) is list
                 and len(payload_data['elements']) > 0
             ):
                 message_obj = get_message_obj(payload_data['elements'])
@@ -135,10 +132,7 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'group_message'
                     target_event.data = target_event.group_message(
-                        str(payload_data['peerUid']),
-                        str(payload_data['senderUin']),
-                        message_obj,
-                        'group'
+                        str(payload_data['peerUid']), str(payload_data['senderUin']), message_obj, 'group'
                     )
                     target_event.data.message_sdk = message_obj
                     target_event.data.message_id = str(-1)
@@ -168,9 +162,7 @@ def get_Event_from_SDK(target_event):
                     target_event.active = True
                     target_event.plugin_info['func_type'] = 'private_message'
                     target_event.data = target_event.private_message(
-                        str(payload_data['peerUin']),
-                        message_obj,
-                        'friend'
+                        str(payload_data['peerUin']), message_obj, 'friend'
                     )
                     target_event.data.message_sdk = message_obj
                     target_event.data.message_id = str(-1)
@@ -186,9 +178,9 @@ def get_Event_from_SDK(target_event):
                     target_event.data.host_id = None
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -199,11 +191,7 @@ class payload_template(object):
         self.load(data, is_rx)
 
     def dump(self):
-        res = json.dumps(obj={
-                'type': self.type,
-                'payload': self.payload
-            }
-        )
+        res = json.dumps(obj={'type': self.type, 'payload': self.payload})
         return res
 
     def load(self, data, is_rx: bool):
@@ -231,9 +219,7 @@ class PAYLOAD(object):
         def __init__(self, token: str):
             payload_template.__init__(self)
             self.type = 'meta::connect'
-            self.payload = {
-                "token": token
-            }
+            self.payload = {'token': token}
 
     class messageSend(payload_template):
         def __init__(self, target_type, target_id, message: OlivOS.messageAPI.Message_templet):
@@ -242,28 +228,23 @@ class PAYLOAD(object):
             elements_list = []
             for message_this in message.data:
                 if type(message_this) is OlivOS.messageAPI.PARA.text:
-                    elements_list.append({
-                        "elementType": 1,
-                        "textElement": {
-                            "content": message_this.data['text']
-                        }
-                    })
+                    elements_list.append({'elementType': 1, 'textElement': {'content': message_this.data['text']}})
                 if type(message_this) is OlivOS.messageAPI.PARA.at:
                     elements_list.append({
-                        "elementType": 1,
-                        "textElement": {
-                            "content": message_this.data['id'],
-                            "atType": 2,
-                            "atNtUin": message_this.data['id']
-                        }
+                        'elementType': 1,
+                        'textElement': {
+                            'content': message_this.data['id'],
+                            'atType': 2,
+                            'atNtUin': message_this.data['id'],
+                        },
                     })
             self.payload = {
-                "peer": {
-                    "chatType": target_type,  # private 1, group 2
-                    "peerUin": target_id,
-                    "guildId": None
+                'peer': {
+                    'chatType': target_type,  # private 1, group 2
+                    'peerUin': target_id,
+                    'guildId': None,
                 },
-                "elements": elements_list
+                'elements': elements_list,
             }
 
 
@@ -274,41 +255,24 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         if message.active:
             send_ws_event(
                 plugin_event_bot_hash,
-                PAYLOAD.messageSend(
-                    target_type=target_type,
-                    target_id=target_id,
-                    message=message
-                ).dump(),
-                control_queue
+                PAYLOAD.messageSend(target_type=target_type, target_id=target_id, message=message).dump(),
+                control_queue,
             )
 
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue is not None:
-        control_queue.put(
-            OlivOS.API.Control.packet(
-                action,
-                data
-            ),
-            block=False
-        )
+        control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 def send_ws_event(hash, data, control_queue):
-    sendControlEventSend('send', {
-            'target': {
-                'type': 'qqRed_link',
-                'hash': hash
-            },
-            'data': {
-                'action': 'send',
-                'data': data
-            }
-        },
-        control_queue
+    sendControlEventSend(
+        'send',
+        {'target': {'type': 'qqRed_link', 'hash': hash}, 'data': {'action': 'send', 'data': data}},
+        control_queue,
     )

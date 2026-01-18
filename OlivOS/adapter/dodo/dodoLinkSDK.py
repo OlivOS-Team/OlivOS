@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import requests as req
@@ -29,7 +29,7 @@ sdkAPIHost = {
     'default': 'https://botopen.imdodo.com/api/v2',
     'v2': 'https://botopen.imdodo.com/api/v2',
     'v1': 'https://botopen.imdodo.com/api/v1',
-    'native': 'https://botopen.imdodo.com/api'
+    'native': 'https://botopen.imdodo.com/api',
 }
 
 sdkAPIRoute = {
@@ -38,7 +38,7 @@ sdkAPIRoute = {
     'channel': '/channel',
     'personal': '/personal',
     'member': '/member',
-    'resource': '/resource'
+    'resource': '/resource',
 }
 
 sdkAPIRouteTemp = {}
@@ -62,7 +62,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
         plugin_bot_info.id,
         plugin_bot_info.password,
         plugin_bot_info.post_info.host,
-        plugin_bot_info.post_info.access_token
+        plugin_bot_info.post_info.access_token,
     )
     res.debug_mode = plugin_bot_info.debug_mode
     return res
@@ -73,7 +73,7 @@ def get_SDK_bot_info_from_Event(target_event):
         target_event.bot_info.id,
         target_event.bot_info.password,
         target_event.bot_info.post_info.host,
-        target_event.bot_info.post_info.access_token
+        target_event.bot_info.post_info.access_token,
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
@@ -98,9 +98,9 @@ class event(object):
             self.base_info['post_type'] = None
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -153,9 +153,9 @@ class PAYLOAD(object):
             self.data.sn = last_s
 
 
-'''
+"""
 对于POST接口的实现
-'''
+"""
 
 
 class api_templet(object):
@@ -185,17 +185,14 @@ class api_templet(object):
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'Authorization': 'Bot %s.%s' % (
-                    str(self.bot_info.id),
-                    self.bot_info.access_token
-                )
+                'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token),
             }
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request('POST', send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request('GET', send_url, headers=headers)
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
@@ -292,9 +289,7 @@ class API(object):
         def do_api(self, req_type='POST'):
             try:
                 tmp_payload_dict = {'file': (str(uuid.uuid4()) + '.png', self.data.file, 'image/png')}
-                payload = MultipartEncoder(
-                    fields=tmp_payload_dict
-                )
+                payload = MultipartEncoder(fields=tmp_payload_dict)
 
                 tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
                 send_url_temp = self.host + self.route
@@ -303,15 +298,12 @@ class API(object):
                     'Content-Type': payload.content_type,
                     'Content-Length': str(len(self.data.file)),
                     'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Authorization': 'Bot %s.%s' % (
-                        str(self.bot_info.id),
-                        self.bot_info.access_token
-                    )
+                    'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token),
                 }
 
                 msg_res = None
                 if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                    msg_res = req.request('POST', send_url, headers=headers, data=payload)
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -331,13 +323,13 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
     tmp_bot_info = bot_info_T(
         target_event.sdk_event.base_info['self_id'],
         target_event.sdk_event.base_info['clientSecret'],
         target_event.sdk_event.base_info['publicKey'],
-        target_event.sdk_event.base_info['token']
+        target_event.sdk_event.base_info['token'],
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         api_msg_obj = API.getMe(tmp_bot_info)
@@ -361,8 +353,7 @@ def get_Event_from_SDK(target_event):
                 message_obj = None
                 if target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 1:
                     message_obj = OlivOS.messageAPI.Message_templet(
-                        'dodo_string',
-                        target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
+                        'dodo_string', target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
                     )
                     message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                     message_obj.data_raw = message_obj.data.copy()
@@ -373,7 +364,7 @@ def get_Event_from_SDK(target_event):
                             OlivOS.messageAPI.PARA.image(
                                 target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
                             )
-                        ]
+                        ],
                     )
                 elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 3:
                     message_obj = OlivOS.messageAPI.Message_templet(
@@ -382,7 +373,7 @@ def get_Event_from_SDK(target_event):
                             OlivOS.messageAPI.PARA.video(
                                 target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
                             )
-                        ]
+                        ],
                     )
                 if message_obj is not None:
                     target_event.active = True
@@ -423,12 +414,13 @@ def get_Event_from_SDK(target_event):
                         str(target_event.sdk_event.payload.data.data['eventBody']['channelId']),
                         str(tmp_user_id),
                         message_obj,
-                        'group'
+                        'group',
                     )
                     target_event.data.host_id = str(tmp_host_id)
                     target_event.data.message_sdk = message_obj
                     target_event.data.message_id = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['messageId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['messageId']
+                    )
                     target_event.data.raw_message = message_obj
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
@@ -454,8 +446,7 @@ def get_Event_from_SDK(target_event):
                 message_obj = None
                 if target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 1:
                     message_obj = OlivOS.messageAPI.Message_templet(
-                        'dodo_string',
-                        target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
+                        'dodo_string', target_event.sdk_event.payload.data.data['eventBody']['messageBody']['content']
                     )
                     message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                     message_obj.data_raw = message_obj.data.copy()
@@ -466,7 +457,7 @@ def get_Event_from_SDK(target_event):
                             OlivOS.messageAPI.PARA.image(
                                 target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
                             )
-                        ]
+                        ],
                     )
                 elif target_event.sdk_event.payload.data.data['eventBody']['messageType'] == 3:
                     message_obj = OlivOS.messageAPI.Message_templet(
@@ -475,24 +466,22 @@ def get_Event_from_SDK(target_event):
                             OlivOS.messageAPI.PARA.video(
                                 target_event.sdk_event.payload.data.data['eventBody']['messageBody']['url']
                             )
-                        ]
+                        ],
                     )
                 if message_obj is not None:
                     target_event.active = True
                     tmp_user_info = target_event.sdk_event.payload.data.data['eventBody'][
-                        'personal']  # use personal info from remote instead of local
+                        'personal'
+                    ]  # use personal info from remote instead of local
                     tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody']['dodoSourceId'])
                     if target_event.platform['model'] == 'v1':
                         tmp_user_id = str(target_event.sdk_event.payload.data.data['eventBody'].get('dodoId', None))
                     target_event.plugin_info['func_type'] = 'private_message'
-                    target_event.data = target_event.private_message(
-                        str(tmp_user_id),
-                        message_obj,
-                        'private'
-                    )
+                    target_event.data = target_event.private_message(str(tmp_user_id), message_obj, 'private')
                     target_event.data.message_sdk = message_obj
                     target_event.data.message_id = str(
-                        target_event.sdk_event.payload.data.data['eventBody']['messageId'])
+                        target_event.sdk_event.payload.data.data['eventBody']['messageId']
+                    )
                     target_event.data.raw_message = message_obj
                     target_event.data.raw_message_sdk = message_obj
                     target_event.data.font = None
@@ -507,7 +496,7 @@ def get_Event_from_SDK(target_event):
                             target_event.data.sender['nickname'] = tmp_user_info['nickName']
                             target_event.data.sender['name'] = tmp_user_info['nickName']
                         if 'sex' in tmp_user_info:
-                            if tmp_user_info["sex"] == 0:
+                            if tmp_user_info['sex'] == 0:
                                 target_event.data.sender['sex'] = 'female'
                             elif tmp_user_info['sex'] == 1:
                                 target_event.data.sender['sex'] = 'male'
@@ -524,10 +513,7 @@ class event_action(object):
         this_msg = None
         this_msg = API.sendChannelMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.channelId = str(chat_id)
-        if (
-            target_event is not None
-            and target_event.bot_info.platform['model'] == 'v1'
-        ):
+        if target_event is not None and target_event.bot_info.platform['model'] == 'v1':
             this_msg.host = sdkAPIHost['v1']
         for message_this in message.data:
             if type(message_this) is OlivOS.messageAPI.PARA.text:
@@ -547,10 +533,7 @@ class event_action(object):
         this_msg.data.dodoId = None
         if type(target_event.data) is OlivOS.API.Event.group_message:
             this_msg.data.islandSourceId = str(target_event.data.host_id)
-        if (
-            target_event is not None
-            and target_event.bot_info.platform['model'] == 'v1'
-        ):
+        if target_event is not None and target_event.bot_info.platform['model'] == 'v1':
             this_msg.host = sdkAPIHost['v1']
             this_msg.data.islandSourceId = None
             this_msg.data.dodoId = str(chat_id)
@@ -569,10 +552,7 @@ class event_action(object):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
-        if (
-            target_event is not None
-            and target_event.bot_info.platform['model'] == 'v1'
-        ):
+        if target_event is not None and target_event.bot_info.platform['model'] == 'v1':
             this_msg.host = sdkAPIHost['v1']
         try:
             this_msg.do_api('POST')
@@ -594,31 +574,26 @@ class event_action(object):
         res = None
         try:
             pic_file = None
-            if url.startswith("base64://"):
+            if url.startswith('base64://'):
                 data = url[9:]
-                pic_file = base64.decodebytes(data.encode("utf-8"))
+                pic_file = base64.decodebytes(data.encode('utf-8'))
             else:
                 url_parsed = parse.urlparse(url)
-                if url_parsed.scheme in ["http", "https"]:
+                if url_parsed.scheme in ['http', 'https']:
                     send_url = url
-                    headers = {
-                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
+                    headers = {'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
                     msg_res = None
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request('GET', send_url, headers=headers)
                     pic_file = msg_res.content
 
                 else:
                     file_path = url_parsed.path
                     file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
-                    with open(file_path, "rb") as f:
+                    with open(file_path, 'rb') as f:
                         pic_file = f.read()
 
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
-            if (
-                target_event is not None
-                and target_event.bot_info.platform['model'] == 'v1'
-            ):
+            if target_event is not None and target_event.bot_info.platform['model'] == 'v1':
                 msg_upload_api.host = sdkAPIHost['v1']
             msg_upload_api.data.file = pic_file
             msg_upload_api.do_api()

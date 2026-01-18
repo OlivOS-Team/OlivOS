@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -21,8 +21,17 @@ import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -31,7 +40,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=None,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -66,7 +75,8 @@ class server(OlivOS.API.Proc_templet):
                     if self.Proc_data['bot_info_token_life'][bot_info_this] <= 0:
                         flag_need_extend = True
                         self.Proc_data['bot_info_token_life'][bot_info_this] = self.Proc_data[
-                            'bot_info_token_life_counter']
+                            'bot_info_token_life_counter'
+                        ]
                 if flag_need_extend:
                     sdk_api_tmp_3 = OlivOS.dodoSDK.API.extendMyLife(sdk_bot_info_this)
                     try:
@@ -90,7 +100,7 @@ class server(OlivOS.API.Proc_templet):
                                         for tmp_islands_this in res_obj['data']['islands']:
                                             tmp_islands_this_dict = {
                                                 'id': tmp_islands_this['id'],
-                                                'title': tmp_islands_this['title']
+                                                'title': tmp_islands_this['title'],
                                             }
                                             tmp_island_list.append(tmp_islands_this_dict)
                                     else:
@@ -120,14 +130,15 @@ class server(OlivOS.API.Proc_templet):
                                 if type(res_obj_2['data']) is dict:
                                     if type(res_obj_2['data']['messages']) is list:
                                         for tmp_messages_this in res_obj_2['data']['messages']:
-                                            if self.Proc_data[
-                                                'bot_info_update_id'
-                                            ][bot_info_this] < tmp_messages_this['id']:
+                                            if (
+                                                self.Proc_data['bot_info_update_id'][bot_info_this]
+                                                < tmp_messages_this['id']
+                                            ):
                                                 if tmp_messages_this['uid'] != bot_info_this_obj.id:
                                                     sdk_event = OlivOS.dodoSDK.event(
                                                         tmp_messages_this,
                                                         bot_info_this_obj,
-                                                        sdk_api_tmp_2.data.islandId
+                                                        sdk_api_tmp_2.data.islandId,
                                                     )
                                                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                                                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)

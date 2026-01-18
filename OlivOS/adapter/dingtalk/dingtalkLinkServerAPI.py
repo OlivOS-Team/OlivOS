@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -28,8 +28,17 @@ gCheckList = [
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -38,7 +47,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -48,7 +57,7 @@ class server(OlivOS.API.Proc_templet):
             'pulse_interval': None,
             'last_s': None,
             'ws_obj': None,
-            'ws_item': None
+            'ws_item': None,
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
@@ -57,18 +66,16 @@ class server(OlivOS.API.Proc_templet):
         while True:
             try:
                 api_obj = OlivOS.dingtalkSDK.API.getGateway(
-                    OlivOS.dingtalkSDK.get_SDK_bot_info_from_Plugin_bot_info(
-                        self.Proc_data['bot_info_dict']
-                    )
+                    OlivOS.dingtalkSDK.get_SDK_bot_info_from_Plugin_bot_info(self.Proc_data['bot_info_dict'])
                 )
                 api_obj.do_api('POST')
                 api_obj_json = api_obj.res
                 if api_obj_json is not None:
-                    if "endpoint" in api_obj_json:
+                    if 'endpoint' in api_obj_json:
                         self.Proc_data['extend_data']['websocket_url'] = api_obj_json['endpoint']
                     else:
                         self.Proc_data['extend_data']['websocket_url'] = None
-                    if "ticket" in api_obj_json:
+                    if 'ticket' in api_obj_json:
                         self.Proc_data['extend_data']['websocket_ticket'] = api_obj_json['ticket']
                     else:
                         self.Proc_data['extend_data']['websocket_ticket'] = None
@@ -86,13 +93,11 @@ class server(OlivOS.API.Proc_templet):
     def on_message(self, ws: websocket.WebSocketApp, message):
         try:
             # ws.send()
-            tmp_data_rx_obj = OlivOS.dingtalkSDK.PAYLOAD.rxPacket(
-                data=json.loads(message)
-            )
+            tmp_data_rx_obj = OlivOS.dingtalkSDK.PAYLOAD.rxPacket(data=json.loads(message))
             if tmp_data_rx_obj.active:
                 if tmp_data_rx_obj.data.type in [
-                    "CALLBACK",
-                    "EVENT",
+                    'CALLBACK',
+                    'EVENT',
                     # "SYSTEM"          # 系统消息仅在SDK做处理，不生成事件
                 ]:
                     sdk_event = OlivOS.dingtalkSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
@@ -100,19 +105,19 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
 
             # 对 ws 进行回复
-            if tmp_data_rx_obj.data.type == "SYSTEM":
-                if tmp_data_rx_obj.data.topic == "ping":
+            if tmp_data_rx_obj.data.type == 'SYSTEM':
+                if tmp_data_rx_obj.data.topic == 'ping':
                     resp_data = OlivOS.dingtalkSDK.PAYLOAD.sendPong(tmp_data_rx_obj)
                     self.send(ws, resp_data)
-                if tmp_data_rx_obj.data.topic == "disconnect":
+                if tmp_data_rx_obj.data.topic == 'disconnect':
                     self.log(
                         0,
-                        'OlivOS dingtalk link server [' + self.Proc_name + '] websocket link will be closed by remote!'
+                        'OlivOS dingtalk link server [' + self.Proc_name + '] websocket link will be closed by remote!',
                     )
-            elif tmp_data_rx_obj.data.type == "CALLBACK":
+            elif tmp_data_rx_obj.data.type == 'CALLBACK':
                 resp_data = OlivOS.dingtalkSDK.PAYLOAD.replyCallback(tmp_data_rx_obj)
                 self.send(ws, resp_data)
-            elif tmp_data_rx_obj.data.type == "EVENT":
+            elif tmp_data_rx_obj.data.type == 'EVENT':
                 resp_data = OlivOS.dingtalkSDK.PAYLOAD.replyEvent(tmp_data_rx_obj)
                 self.send(ws, resp_data)
 
@@ -136,8 +141,8 @@ class server(OlivOS.API.Proc_templet):
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
         url_this = (
-            f"{self.Proc_data['extend_data']['websocket_url']}"
-            f"?ticket={self.Proc_data['extend_data']['websocket_ticket']}"
+            f'{self.Proc_data["extend_data"]["websocket_url"]}'
+            f'?ticket={self.Proc_data["extend_data"]["websocket_ticket"]}'
         )
         ws = websocket.WebSocketApp(
             url_this,

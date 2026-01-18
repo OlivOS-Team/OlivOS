@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -40,7 +40,7 @@ class server(OlivOS.API.Proc_templet):
         tx_queue=None,
         logger_proc=None,
         debug_mode=False,
-        bot_info_dict=None
+        bot_info_dict=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -50,27 +50,20 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
-        self.Proc_data['extend_data'] = {
-            'websocket_url': None,
-            'ws_obj': None,
-            'ws_item': None
-        }
+        self.Proc_data['extend_data'] = {'websocket_url': None, 'ws_obj': None, 'ws_item': None}
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] is running', [self.Proc_name], modelName))
-        threading.Thread(
-            target=self.message_router,
-            args=()
-        ).start()
+        threading.Thread(target=self.message_router, args=()).start()
         while True:
             try:
                 self.Proc_data['extend_data']['websocket_url'] = (
-                    f"{self.Proc_data['bot_info_dict'].post_info.host}:{self.Proc_data['bot_info_dict'].post_info.port}"
+                    f'{self.Proc_data["bot_info_dict"].post_info.host}:{self.Proc_data["bot_info_dict"].post_info.port}'
                 )
             except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
@@ -90,30 +83,25 @@ class server(OlivOS.API.Proc_templet):
             traceback.print_exc()
 
     def on_error(self, ws, error):
-        self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS qqRed link server [{0}] websocket link error',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            0,
+            OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] websocket link error', [self.Proc_name], modelName),
+        )
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS qqRed link server [{0}] websocket link close',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            0,
+            OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] websocket link close', [self.Proc_name], modelName),
+        )
 
     def on_open(self, ws: websocket.WebSocketApp):
         ws.send(
-            OlivOS.qqRedSDK.PAYLOAD.metaConnect(
-                token=self.Proc_data['bot_info_dict'].post_info.access_token
-            ).dump()
+            OlivOS.qqRedSDK.PAYLOAD.metaConnect(token=self.Proc_data['bot_info_dict'].post_info.access_token).dump()
         )
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS qqRed link server [{0}] websocket link start',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            2,
+            OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] websocket link start', [self.Proc_name], modelName),
+        )
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
@@ -122,7 +110,7 @@ class server(OlivOS.API.Proc_templet):
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
@@ -130,11 +118,10 @@ class server(OlivOS.API.Proc_templet):
         ws.run_forever(http_proxy_host=proxy_set[0], http_proxy_port=proxy_set[1], proxy_type=proxy_set[2])
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS qqRed link server [{0}] websocket link lost',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            2,
+            OlivOS.L10NAPI.getTrans('OlivOS qqRed link server [{0}] websocket link lost', [self.Proc_name], modelName),
+        )
 
     def message_router(self):
         while True:

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import OlivOS
 
@@ -36,49 +36,30 @@ class api_result_data_template(object):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'message_id': None,
-                    'id': -1,
-                    'sender': {
-                        'id': -1,
-                        'name': None
-                    },
-                    'time': -1,
-                    'message': None,
-                    'raw_message': None
-                }
-            )
+            self['data'].update({
+                'message_id': None,
+                'id': -1,
+                'sender': {'id': -1, 'name': None},
+                'time': -1,
+                'message': None,
+                'raw_message': None,
+            })
 
     class get_forward_msg(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'messages': []
-                }
-            )
+            self['data'].update({'messages': []})
 
     class get_login_info(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'name': None,
-                    'id': -1
-                }
-            )
+            self['data'].update({'name': None, 'id': -1})
 
     class get_user_info_strip(dict):
         def __init__(self):
-            self.update(
-                {
-                    'name': None,
-                    'id': -1
-                }
-            )
+            self.update({'name': None, 'id': -1})
 
     class get_stranger_info(dict):
         def __init__(self):
@@ -93,14 +74,7 @@ class api_result_data_template(object):
 
     class get_group_info_strip(dict):
         def __init__(self):
-            self.update(
-                {
-                    'name': None,
-                    'id': -1,
-                    'memo': None,
-                    'max_member_count': 0
-                }
-            )
+            self.update({'name': None, 'id': -1, 'memo': None, 'max_member_count': 0})
 
     class get_group_info(dict):
         def __init__(self):
@@ -115,22 +89,16 @@ class api_result_data_template(object):
 
     class get_group_member_info_strip(dict):
         def __init__(self):
-            self.update(
-                {
-                    'name': None,
-                    'id': -1,
-                    'user_id': -1,
-                    'group_id': -1,
-                    'times': {
-                        'join_time': 0,
-                        'last_sent_time': 0,
-                        'shut_up_timestamp': 0
-                    },
-                    'role': None,
-                    'card': None,
-                    'title': None
-                }
-            )
+            self.update({
+                'name': None,
+                'id': -1,
+                'user_id': -1,
+                'group_id': -1,
+                'times': {'join_time': 0, 'last_sent_time': 0, 'shut_up_timestamp': 0},
+                'role': None,
+                'card': None,
+                'title': None,
+            })
 
     class get_group_member_info(dict):
         def __init__(self):
@@ -147,11 +115,7 @@ class api_result_data_template(object):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'yes': False
-                }
-            )
+            self['data'].update({'yes': False})
 
         def yes(self):
             if self['data']['yes'] is True:
@@ -162,11 +126,7 @@ class api_result_data_template(object):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'yes': False
-                }
-            )
+            self['data'].update({'yes': False})
 
         def yes(self):
             if self['data']['yes'] is True:
@@ -177,80 +137,49 @@ class api_result_data_template(object):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'online': False,
-                    'status': {
-                        'packet_received': 0,
-                        'packet_sent': 0,
-                        'packet_lost': 0,
-                        'message_received': 0,
-                        'message_sent': 0,
-                        'disconnect_times': 0,
-                        'lost_times': 0,
-                        'last_message_time': 0
-                    }
-                }
-            )
+            self['data'].update({
+                'online': False,
+                'status': {
+                    'packet_received': 0,
+                    'packet_sent': 0,
+                    'packet_lost': 0,
+                    'message_received': 0,
+                    'message_sent': 0,
+                    'disconnect_times': 0,
+                    'lost_times': 0,
+                    'last_message_time': 0,
+                },
+            })
 
     class get_version_info(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'name': None,
-                    'version_full': None,
-                    'version': None,
-                    'path': None,
-                    'os': None
-                }
-            )
+            self['data'].update({'name': None, 'version_full': None, 'version': None, 'path': None, 'os': None})
 
     class get_group_file_system_info(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'file_count': 0,
-                    'limit_count': 0,
-                    'used_space': 0,
-                    'total_space': 0
-                }
-            )
+            self['data'].update({'file_count': 0, 'limit_count': 0, 'used_space': 0, 'total_space': 0})
 
     class get_group_root_files(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'files': [],
-                    'folders': []
-                }
-            )
+            self['data'].update({'files': [], 'folders': []})
 
     class get_group_files_by_folder(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'files': [],
-                    'folders': []
-                }
-            )
+            self['data'].update({'files': [], 'folders': []})
 
     class get_group_file_url(dict):
         def __init__(self):
             self['active'] = False
             self['data'] = {}
-            self['data'].update(
-                {
-                    'url': None
-                }
-            )
+            self['data'].update({'url': None})
 
     class get_essence_msg_list(dict):
         def __init__(self):
@@ -275,10 +204,7 @@ class api_result_data_template(object):
     class get_group_system_msg(dict):
         def __init__(self):
             self['active'] = False
-            self['data'] = {
-                'invited_requests': [],
-                'join_requests': []
-            }
+            self['data'] = {'invited_requests': [], 'join_requests': []}
 
 
 def get_Event_from_fake_SDK(target_event):
@@ -292,17 +218,13 @@ def get_Event_from_fake_SDK(target_event):
     target_event.plugin_info['message_mode_rx'] = 'olivos_para'
     if target_event.platform['platform'] in OlivOS.messageAPI.dictMessageType:
         if target_event.platform['sdk'] in OlivOS.messageAPI.dictMessageType[target_event.platform['platform']]:
-            if target_event.platform['model'] in (
-                OlivOS.messageAPI.dictMessageType
-                [target_event.platform['platform']]
-                [target_event.platform['sdk']]
+            if (
+                target_event.platform['model']
+                in (OlivOS.messageAPI.dictMessageType[target_event.platform['platform']][target_event.platform['sdk']])
             ):
-                target_event.plugin_info['message_mode_rx'] = (
-                        OlivOS.messageAPI.dictMessageType
-                        [target_event.platform['platform']]
-                        [target_event.platform['sdk']]
-                        [target_event.platform['model']]
-                    )
+                target_event.plugin_info['message_mode_rx'] = OlivOS.messageAPI.dictMessageType[
+                    target_event.platform['platform']
+                ][target_event.platform['sdk']][target_event.platform['model']]
     target_event.plugin_info['name'] = target_event.sdk_event.fakename
     if True:
         if target_event.sdk_event.data['type'] == 'fake_event':
@@ -314,14 +236,8 @@ def get_Event_from_fake_SDK(target_event):
 class fake_sdk_event(object):
     def __init__(self, bot_info, data=None, platform=None, fakename='unity'):
         self.fakename = fakename
-        tmp_platform = {
-            'sdk': 'fake',
-            'platform': 'fake',
-            'model': 'default'
-        }
-        tmp_data = {
-            'type': 'fake_event'
-        }
+        tmp_platform = {'sdk': 'fake', 'platform': 'fake', 'model': 'default'}
+        tmp_data = {'type': 'fake_event'}
         if type(data) is dict:
             tmp_data.update(data)
         self.raw = self.event_dump(data)
@@ -357,12 +273,7 @@ def resourcePathTransform(ftype: str, path: str):
     if os.path.isabs(path):
         res = path
     else:
-        res = os.path.join(
-            exePath,
-            'data',
-            ftype,
-            os.path.relpath(os.path.realpath(path), exePath)
-        )
+        res = os.path.join(exePath, 'data', ftype, os.path.relpath(os.path.realpath(path), exePath))
     return res
 
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import json
 import threading
@@ -34,7 +34,7 @@ gCheckList = [
     'walleq_show_Android_Watch',
     'walleq_show_iPad',
     'walleq_show_old',
-    'ComWeChatBotClient'
+    'ComWeChatBotClient',
 ]
 
 
@@ -48,7 +48,7 @@ class server(OlivOS.API.Proc_templet):
         tx_queue=None,
         logger_proc=None,
         debug_mode=False,
-        bot_info_dict=None
+        bot_info_dict=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -58,57 +58,52 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
-        self.Proc_data['bot_info_dict_sdk'] = OlivOS.onebotV12SDK.get_SDK_bot_info_from_Plugin_bot_info(
-            bot_info_dict
-        )
+        self.Proc_data['bot_info_dict_sdk'] = OlivOS.onebotV12SDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict)
         self.Proc_data['extend_data'] = {
             'websocket_url': None,
             'pulse_interval': None,
             'last_s': None,
             'ws_obj': None,
-            'ws_item': None
+            'ws_item': None,
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS onebotV12 link server [{0}] is running', [self.Proc_name], modelName
-        ))
-        threading.Thread(
-            target=self.message_router,
-            args=()
-        ).start()
+        self.log(
+            2, OlivOS.L10NAPI.getTrans('OlivOS onebotV12 link server [{0}] is running', [self.Proc_name], modelName)
+        )
+        threading.Thread(target=self.message_router, args=()).start()
         while True:
             try:
                 self.Proc_data['extend_data']['websocket_url'] = '%s:%d/' % (
                     self.Proc_data['bot_info_dict'].post_info.host,
-                    self.Proc_data['bot_info_dict'].post_info.port
+                    self.Proc_data['bot_info_dict'].post_info.port,
                 )
             except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
                 self.run_websocket_rx_connect_start()
-            self.log(3, OlivOS.L10NAPI.getTrans(
-                'OlivOS onebotV12 link server [{0}] websocket link will retry in {1}s',
-                [self.Proc_name, str(4)],
-                modelName
-            ))
+            self.log(
+                3,
+                OlivOS.L10NAPI.getTrans(
+                    'OlivOS onebotV12 link server [{0}] websocket link will retry in {1}s',
+                    [self.Proc_name, str(4)],
+                    modelName,
+                ),
+            )
             time.sleep(4)
 
     def on_message(self, ws, message):
         try:
-            tmp_data_rx_obj = OlivOS.onebotV12SDK.PAYLOAD.rxPacket(
-                data=json.loads(message)
-            )
+            tmp_data_rx_obj = OlivOS.onebotV12SDK.PAYLOAD.rxPacket(data=json.loads(message))
             if tmp_data_rx_obj.active:
                 if tmp_data_rx_obj.data.type == 'rxPacket':
                     sdk_event = OlivOS.onebotV12SDK.event(
-                        tmp_data_rx_obj.data.data,
-                        self.Proc_data['bot_info_dict_sdk']
+                        tmp_data_rx_obj.data.data, self.Proc_data['bot_info_dict_sdk']
                     )
                     if sdk_event.active:
                         tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
@@ -117,25 +112,28 @@ class server(OlivOS.API.Proc_templet):
             pass
 
     def on_error(self, ws, error):
-        self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS onebotV12 link server [{0}] websocket link error',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            0,
+            OlivOS.L10NAPI.getTrans(
+                'OlivOS onebotV12 link server [{0}] websocket link error', [self.Proc_name], modelName
+            ),
+        )
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.log(0, OlivOS.L10NAPI.getTrans(
-            'OlivOS onebotV12 link server [{0}] websocket link close',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            0,
+            OlivOS.L10NAPI.getTrans(
+                'OlivOS onebotV12 link server [{0}] websocket link close', [self.Proc_name], modelName
+            ),
+        )
 
     def on_open(self, ws):
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS onebotV12 link server [{0}] websocket link start',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            2,
+            OlivOS.L10NAPI.getTrans(
+                'OlivOS onebotV12 link server [{0}] websocket link start', [self.Proc_name], modelName
+            ),
+        )
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
@@ -144,7 +142,7 @@ class server(OlivOS.API.Proc_templet):
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
@@ -153,11 +151,12 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'OlivOS onebotV12 link server [{0}] websocket link lost',
-            [self.Proc_name],
-            modelName
-        ))
+        self.log(
+            2,
+            OlivOS.L10NAPI.getTrans(
+                'OlivOS onebotV12 link server [{0}] websocket link lost', [self.Proc_name], modelName
+            ),
+        )
 
     def message_router(self):
         while True:

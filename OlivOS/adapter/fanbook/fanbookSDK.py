@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import requests as req
 import json
@@ -20,17 +20,11 @@ import time
 
 import OlivOS
 
-fanbookAPIHost = {
-    'a1': 'https://a1.fanbook.mobi'
-}
+fanbookAPIHost = {'a1': 'https://a1.fanbook.mobi'}
 
-fanbookAPIRoute = {
-    'apiroot': '/api/bot'
-}
+fanbookAPIRoute = {'apiroot': '/api/bot'}
 
-fanbookAPIRouteTemp = {
-    'token': 'TOKEN'
-}
+fanbookAPIRouteTemp = {'token': 'TOKEN'}
 
 
 class bot_info_T(object):
@@ -42,19 +36,13 @@ class bot_info_T(object):
 
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
-    res = bot_info_T(
-        plugin_bot_info.id,
-        plugin_bot_info.post_info.access_token
-    )
+    res = bot_info_T(plugin_bot_info.id, plugin_bot_info.post_info.access_token)
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
 
 def get_SDK_bot_info_from_Event(target_event):
-    res = bot_info_T(
-        target_event.bot_info.id,
-        target_event.bot_info.post_info.access_token
-    )
+    res = bot_info_T(target_event.bot_info.id, target_event.bot_info.post_info.access_token)
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
@@ -72,9 +60,7 @@ class api_templet(object):
         if True:
             tmp_payload_dict = {}
             tmp_fanbookAPIRouteTemp = fanbookAPIRouteTemp.copy()
-            tmp_fanbookAPIRouteTemp.update({
-                'token': self.bot_info.access_token
-            })
+            tmp_fanbookAPIRouteTemp.update({'token': self.bot_info.access_token})
             if self.data is not None:
                 for data_this in self.data.__dict__:
                     if self.data.__dict__[data_this] is not None:
@@ -83,12 +69,9 @@ class api_templet(object):
             payload = json.dumps(obj=tmp_payload_dict)
             send_url_temp = self.host + ':' + str(self.port) + self.route
             send_url = send_url_temp.format(**tmp_fanbookAPIRouteTemp)
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-            }
+            headers = {'Content-Type': 'application/json', 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA}
 
-            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+            msg_res = req.request('POST', send_url, headers=headers, data=payload)
 
             self.res = msg_res.text
             return msg_res.text
@@ -172,12 +155,11 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('message_id', target_event.sdk_event.json, ['channel_post']),
         checkInDictSafe('from', target_event.sdk_event.json, ['channel_post']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['channel_post', 'from']),
-        checkEquelInDictSafe('channel', target_event.sdk_event.json, ['channel_post', 'chat', 'type'])
+        checkEquelInDictSafe('channel', target_event.sdk_event.json, ['channel_post', 'chat', 'type']),
     ]):
         message_obj = None
         message_obj = OlivOS.messageAPI.Message_templet(
-            'fanbook_string',
-            target_event.sdk_event.json['channel_post']['text']
+            'fanbook_string', target_event.sdk_event.json['channel_post']['text']
         )
         message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
         message_obj.data_raw = message_obj.data.copy()
@@ -187,7 +169,7 @@ def get_Event_from_SDK(target_event):
             str(target_event.sdk_event.json['channel_post']['chat']['id']),
             str(target_event.sdk_event.json['channel_post']['from']['id']),
             message_obj,
-            'group'
+            'group',
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = str(target_event.sdk_event.json['channel_post']['message_id'])
@@ -211,7 +193,7 @@ def get_Event_from_SDK(target_event):
         checkInDictSafe('message_id', target_event.sdk_event.json, ['channel_post']),
         checkInDictSafe('from', target_event.sdk_event.json, ['channel_post']),
         checkInDictSafe('first_name', target_event.sdk_event.json, ['channel_post', 'from']),
-        checkEquelInDictSafe('channel', target_event.sdk_event.json, ['channel_post', 'chat', 'type'])
+        checkEquelInDictSafe('channel', target_event.sdk_event.json, ['channel_post', 'chat', 'type']),
     ]):
         message_obj = None
         message_para_list = []
@@ -219,17 +201,14 @@ def get_Event_from_SDK(target_event):
             for photo_this in target_event.sdk_event.json['channel_post']['photo']:
                 if 'file_id' in photo_this:
                     message_para_list.append(OlivOS.messageAPI.PARA.image(photo_this['file_id']))
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_para',
-            message_para_list
-        )
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_para', message_para_list)
         target_event.active = True
         target_event.plugin_info['func_type'] = 'group_message'
         target_event.data = target_event.group_message(
             str(target_event.sdk_event.json['channel_post']['chat']['id']),
             str(target_event.sdk_event.json['channel_post']['from']['id']),
             message_obj,
-            'group'
+            'group',
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = str(target_event.sdk_event.json['channel_post']['message_id'])
@@ -372,9 +351,7 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.chat_id = 0
-                self.photo = {
-                    'Url': ''
-                }
+                self.photo = {'Url': ''}
 
     class getPrivateChat(api_templet):
         def __init__(self, bot_info=None):

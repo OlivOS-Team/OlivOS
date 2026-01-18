@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import OlivOS
 
@@ -42,19 +42,13 @@ class bot_info_T(object):
 
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
-    res = bot_info_T(
-        plugin_bot_info.id,
-        plugin_bot_info.post_info.access_token
-    )
+    res = bot_info_T(plugin_bot_info.id, plugin_bot_info.post_info.access_token)
     res.debug_mode = plugin_bot_info.debug_mode
     return res
 
 
 def get_SDK_bot_info_from_Event(target_event):
-    res = bot_info_T(
-        target_event.bot_info.id,
-        target_event.bot_info.post_info.access_token
-    )
+    res = bot_info_T(target_event.bot_info.id, target_event.bot_info.post_info.access_token)
     res.debug_mode = target_event.bot_info.debug_mode
     return res
 
@@ -75,24 +69,8 @@ class event(object):
 
 
 class BiliLiveBot(OlivOS.thirdPartyModule.blivedm.BLiveClient):
-    def __init__(
-            self,
-            room_id,
-            uid=0,
-            session=None,
-            heartbeat_interval=30,
-            ssl=True,
-            loop=None,
-            Proc=None
-    ):
-        super().__init__(
-            room_id,
-            uid=uid,
-            session=session,
-            heartbeat_interval=heartbeat_interval,
-            ssl=ssl,
-            loop=loop
-        )
+    def __init__(self, room_id, uid=0, session=None, heartbeat_interval=30, ssl=True, loop=None, Proc=None):
+        super().__init__(room_id, uid=uid, session=session, heartbeat_interval=heartbeat_interval, ssl=ssl, loop=loop)
         self.Proc = Proc
         handler = SDKHandler()
         self.add_handler(handler)
@@ -123,10 +101,7 @@ def get_Event_from_SDK(target_event: event):
         target_event.plugin_info['func_type'] = 'group_message'
         message_obj = OlivOS.messageAPI.Message_templet('olivos_string', sdk_payload.msg)
         target_event.data = target_event.group_message(
-            str(target_event.sdk_event.base_info['self_id']),
-            str(sdk_payload.uid),
-            sdk_payload.msg,
-            'group'
+            str(target_event.sdk_event.base_info['self_id']), str(sdk_payload.uid), sdk_payload.msg, 'group'
         )
         target_event.data.message_sdk = message_obj
         target_event.data.message_id = '-1'
@@ -150,13 +125,10 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         message_new = ''
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_string',
-            message
-        )
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_string', message)
         if message_obj.active:
             for data_this in message_obj.data:
                 if data_this.type == 'text':
@@ -165,67 +137,44 @@ class event_action(object):
                     imagePath = data_this.data['file']
                     if data_this.data['url'] is not None:
                         imagePath = data_this.data['url']
-                    message_new += '![%s](%s)' % (
-                        imagePath,
-                        imagePath
-                    )
+                    message_new += '![%s](%s)' % (imagePath, imagePath)
         if len(message_new) > 0:
-            send_ws_event(
-                plugin_event_bot_hash,
-                PAYLOAD.chat(
-                    message=message_new
-                ).data,
-                control_queue
-            )
+            send_ws_event(plugin_event_bot_hash, PAYLOAD.chat(message=message_new).data, control_queue)
 
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue is not None:
-        control_queue.put(
-            OlivOS.API.Control.packet(
-                action,
-                data
-            ),
-            block=False
-        )
+        control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 def send_ws_event(hash, data, control_queue):
-    sendControlEventSend('send', {
-        'target': {
-            'type': 'biliLive_link',
-            'hash': hash
-        },
-        'data': {
-            'action': 'send',
-            'data': data
-        }
-    }, control_queue)
+    sendControlEventSend(
+        'send',
+        {'target': {'type': 'biliLive_link', 'hash': hash}, 'data': {'action': 'send', 'data': data}},
+        control_queue,
+    )
 
 
 def send_QRCode_event(hash, path: str, control_queue):
-    sendControlEventSend('send', {
-        'target': {
-            'type': 'nativeWinUI'
+    sendControlEventSend(
+        'send',
+        {
+            'target': {'type': 'nativeWinUI'},
+            'data': {'action': 'gocqhttp', 'event': 'qrcode', 'hash': hash, 'path': path},
         },
-        'data': {
-            'action': 'gocqhttp',
-            'event': 'qrcode',
-            'hash': hash,
-            'path': path
-        }
-    }, control_queue)
+        control_queue,
+    )
 
 
 class DanmakuPosition(IntEnum):
-    TOP = 5,
-    BOTTOM = 4,
+    TOP = (5,)
+    BOTTOM = (4,)
     NORMAL = 1
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -256,10 +205,10 @@ class PAYLOAD(object):
             self.data = {
                 'msg': message,
                 'fontsize': 25,
-                'color': 0xffffff,
+                'color': 0xFFFFFF,
                 'pos': DanmakuPosition.NORMAL,
                 'roomid': -1,
-                'bubble': 0
+                'bubble': 0,
             }
 
 
@@ -280,7 +229,7 @@ async def aiohttpGet(session: ClientSession, url: str):
 
 async def aiohttpPost(session: ClientSession, url: str, **data):
     form = aiohttp.FormData()
-    for (k, v) in data.items():
+    for k, v in data.items():
         form.add_field(k, v)
     async with session.post(url, data=form) as resp:
         resp.raise_for_status()

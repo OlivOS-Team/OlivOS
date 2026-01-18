@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 accountTypeList = [
     'QQ/NapCat/默认',
@@ -70,7 +70,7 @@ accountTypeList = [
     'QQ/NapCat/旧',
     'QQ/OPQ/指定端口/旧',
     'OPQBot/正向WS',
-    '自定义'
+    '自定义',
 ]
 
 accountTypeMappingList = {
@@ -132,10 +132,10 @@ accountTypeMappingList = {
     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket'],
     '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post'],
     'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post'],
-    "钉钉": ["dingtalk", "dingtalk_link", "default",  "True", "websocket"],
+    '钉钉': ['dingtalk', 'dingtalk_link', 'default', 'True', 'websocket'],
     # 这个自定义屁用没有，只是占位用的
     # 对应代码里这个作为缺省项使用，不走这个逻辑
-    '自定义': ['qq', 'default', 'default', 'True', 'post']
+    '自定义': ['qq', 'default', 'default', 'True', 'post'],
 }
 
 accountTypeDataList_platform = [
@@ -152,64 +152,32 @@ accountTypeDataList_platform = [
     'terminal',
     'hackChat',
     'biliLive',
-    "dingtalk"
+    'dingtalk',
 ]
 
 accountTypeDataList_platform_sdk = {
-    'wechat': [
-        'onebot'
-    ],
-    'qq': [
-        'onebot'
-    ],
-    'qqGuild': [
-        'qqGuild_link',
-        'qqGuildv2_link'
-    ],
-    'kaiheila': [
-        'kaiheila_link'
-    ],
-    'xiaoheihe': [
-        'xiaoheihe_link'
-    ],
-    'telegram': [
-        'telegram_poll'
-    ],
+    'wechat': ['onebot'],
+    'qq': ['onebot'],
+    'qqGuild': ['qqGuild_link', 'qqGuildv2_link'],
+    'kaiheila': ['kaiheila_link'],
+    'xiaoheihe': ['xiaoheihe_link'],
+    'telegram': ['telegram_poll'],
     'dodo': [
         'dodo_link'
         # 'dodo_poll',
         # 'dodobot_ea'
     ],
-    'mhyVila': [
-        'mhyVila_link'
-    ],
-    'fanbook': [
-        'fanbook_poll'
-    ],
-    'discord': [
-        'discord_link'
-    ],
-    'terminal': [
-        'terminal_link'
-    ],
-    'hackChat': [
-        'hackChat_link'
-    ],
-    'biliLive': [
-        'biliLive_link'
-    ],
-    "dingtalk": [
-        "dingtalk_link"
-    ]
+    'mhyVila': ['mhyVila_link'],
+    'fanbook': ['fanbook_poll'],
+    'discord': ['discord_link'],
+    'terminal': ['terminal_link'],
+    'hackChat': ['hackChat_link'],
+    'biliLive': ['biliLive_link'],
+    'dingtalk': ['dingtalk_link'],
 }
 
 accountTypeDataList_platform_sdk_model = {
-    'wechat': {
-        'onebot': [
-            'onebotV12',
-            'ComWeChatBotClient'
-        ]
-    },
+    'wechat': {'onebot': ['onebotV12', 'ComWeChatBotClient']},
     'qq': {
         'onebot': [
             # 'gocqhttp',
@@ -246,15 +214,11 @@ accountTypeDataList_platform_sdk_model = {
             'napcat_show_old',
             'napcat_default',
             'llonebot_default',
-            'lagrange_default'
+            'lagrange_default',
         ]
     },
     'qqGuild': {
-        'qqGuild_link': [
-            'private',
-            'public',
-            'default'
-        ],
+        'qqGuild_link': ['private', 'public', 'default'],
         'qqGuildv2_link': [
             'public',
             'public_guild_only',
@@ -263,91 +227,22 @@ accountTypeDataList_platform_sdk_model = {
             'private_intents',
             'sandbox',
             'sandbox_intents',
-            'default'
-        ]
-    },
-    'kaiheila': {
-        'kaiheila_link': [
             'default',
-            'card',
-            'text'
-        ]
-    },
-    'xiaoheihe': {
-        'xiaoheihe_link': [
-            'default'
-        ]
-    },
-    'mhyVila': {
-        'mhyVila_link': [
-            'private',
-            'public',
-            'sandbox',
-            'default'
-        ]
-    },
-    'telegram': {
-        'telegram_poll': [
-            'default'
-        ]
-    },
-    'discord': {
-        'discord_link': [
-            'default',
-            'intents'
-        ]
-    },
-    'dodo': {
-        'dodo_link': [
-            'default',
-            'v1',
-            'v2'
         ],
-        'dodo_poll': [
-            'default'
-        ],
-        'dodobot_ea': [
-            'default'
-        ]
     },
-    'fanbook': {
-        'fanbook_poll': [
-            'default',
-            'private'
-        ]
-    },
-    'terminal': {
-        'terminal_link': [
-            'default',
-            'postapi',
-            'ff14'
-        ]
-    },
-    'hackChat': {
-        'hackChat_link': [
-            'default',
-            'private'
-        ]
-    },
-    'biliLive': {
-        'biliLive_link': [
-            'default',
-            'login'
-        ]
-    },
-    "dingtalk": {
-        "dingtalk_link": [
-            "default"
-        ]
-    }
+    'kaiheila': {'kaiheila_link': ['default', 'card', 'text']},
+    'xiaoheihe': {'xiaoheihe_link': ['default']},
+    'mhyVila': {'mhyVila_link': ['private', 'public', 'sandbox', 'default']},
+    'telegram': {'telegram_poll': ['default']},
+    'discord': {'discord_link': ['default', 'intents']},
+    'dodo': {'dodo_link': ['default', 'v1', 'v2'], 'dodo_poll': ['default'], 'dodobot_ea': ['default']},
+    'fanbook': {'fanbook_poll': ['default', 'private']},
+    'terminal': {'terminal_link': ['default', 'postapi', 'ff14']},
+    'hackChat': {'hackChat_link': ['default', 'private']},
+    'biliLive': {'biliLive_link': ['default', 'login']},
+    'dingtalk': {'dingtalk_link': ['default']},
 }
 
-accountTypeDataList_server_auto = [
-    str(True),
-    str(False)
-]
+accountTypeDataList_server_auto = [str(True), str(False)]
 
-accountTypeDataList_server_type = [
-    'post',
-    'websocket'
-]
+accountTypeDataList_server_type = ['post', 'websocket']

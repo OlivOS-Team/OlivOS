@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -92,10 +92,7 @@ def get_Event_from_SDK(target_event):
                 and type(target_event.sdk_event.payload.Ret) is int
             ):
                 target_event.active = False
-                waitForResSet(
-                    str(target_event.sdk_event.payload.ReqId),
-                    target_event.sdk_event.payload.data
-                )
+                waitForResSet(str(target_event.sdk_event.payload.ReqId), target_event.sdk_event.payload.data)
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_NEW_MSG':
             if (
                 type(target_event.sdk_event.payload.EventData) is dict
@@ -119,12 +116,10 @@ def get_Event_from_SDK(target_event):
                     'olivos_string',
                     get_message(
                         Content=target_event.sdk_event.payload.EventData['MsgBody']['Content'],
-                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
-                    )
+                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', []),
+                    ),
                 )
-                if str(
-                    target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']
-                ) == str(
+                if str(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']) == str(
                     target_event.base_info['self_id']
                 ):
                     target_event.plugin_info['func_type'] = 'group_message_sent'
@@ -132,7 +127,7 @@ def get_Event_from_SDK(target_event):
                         str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
                         str(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']),
                         message_obj,
-                        'group'
+                        'group',
                     )
                 else:
                     target_event.plugin_info['func_type'] = 'group_message'
@@ -140,7 +135,7 @@ def get_Event_from_SDK(target_event):
                         str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
                         str(target_event.sdk_event.payload.EventData['MsgHead']['SenderUin']),
                         message_obj,
-                        'group'
+                        'group',
                     )
                 target_event.data.message_sdk = message_obj
                 target_event.data.message_id = str(-1)
@@ -181,10 +176,7 @@ def get_Event_from_SDK(target_event):
                         gFriendReqTsReg[tmp_FromUin] = int(time.time())
                         target_event.active = True
                         target_event.plugin_info['func_type'] = 'friend_add_request'
-                        target_event.data = target_event.friend_add_request(
-                            tmp_FromUin,
-                            ''
-                        )
+                        target_event.data = target_event.friend_add_request(tmp_FromUin, '')
                         target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgHead']['FromUid'])
             elif (
                 type(target_event.sdk_event.payload.EventData) is dict
@@ -204,14 +196,12 @@ def get_Event_from_SDK(target_event):
                     'olivos_string',
                     get_message(
                         Content=target_event.sdk_event.payload.EventData['MsgBody']['Content'],
-                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', [])
-                    )
+                        AtUinLists=target_event.sdk_event.payload.EventData['MsgBody'].get('AtUinLists', []),
+                    ),
                 )
                 target_event.plugin_info['func_type'] = 'private_message'
                 target_event.data = target_event.private_message(
-                    str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
-                    message_obj,
-                    'private'
+                    str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']), message_obj, 'private'
                 )
                 target_event.data.message_sdk = message_obj
                 target_event.data.message_id = str(-1)
@@ -246,7 +236,7 @@ def get_Event_from_SDK(target_event):
                 target_event.data = target_event.group_member_increase(
                     str(target_event.sdk_event.payload.EventData['MsgHead']['FromUin']),
                     str(target_event.sdk_event.payload.EventData['Event']['Invitor']),
-                    str(target_event.sdk_event.payload.EventData['Event']['Invitee'])
+                    str(target_event.sdk_event.payload.EventData['Event']['Invitee']),
                 )
                 target_event.data.action = 'approve'
         elif False and target_event.sdk_event.payload.EventName == 'ON_EVENT_FRIEND_SYSTEM_MSG_NOTIFY':
@@ -266,13 +256,12 @@ def get_Event_from_SDK(target_event):
                     uin = event_action.getUinfo(
                         target_event=target_event,
                         Uid=target_event.sdk_event.payload.EventData['ReqUid'],
-                        control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                        control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue,
                     )
                 if uin is None:
                     uin = -1
                 target_event.data = target_event.friend_add_request(
-                    str(uin),
-                    target_event.sdk_event.payload.EventData['MsgAdditional']
+                    str(uin), target_event.sdk_event.payload.EventData['MsgAdditional']
                 )
                 target_event.data.flag = str(target_event.sdk_event.payload.EventData['ReqUid'])
         elif target_event.sdk_event.payload.EventName == 'ON_EVENT_GROUP_SYSTEM_MSG_NOTIFY':
@@ -302,24 +291,24 @@ def get_Event_from_SDK(target_event):
                         uin = event_action.getUinfo(
                             target_event=target_event,
                             Uid=target_event.sdk_event.payload.EventData['ActorUid'],
-                            control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue
+                            control_queue=OlivOS.pluginAPI.gProc.Proc_info.control_queue,
                         )
                     if uin is None:
                         uin = -1
                     target_event.data = target_event.group_invite_request(
                         str(target_event.sdk_event.payload.EventData['GroupCode']),
                         str(uin),
-                        target_event.sdk_event.payload.EventData['MsgAdditional']
+                        target_event.sdk_event.payload.EventData['MsgAdditional'],
                     )
                     target_event.data.flag = str(target_event.sdk_event.payload.EventData['MsgSeq'])
-                    gMsgSeqToGroupCodeReg[
-                        target_event.data.flag
-                    ] = target_event.sdk_event.payload.EventData['GroupCode']
+                    gMsgSeqToGroupCodeReg[target_event.data.flag] = target_event.sdk_event.payload.EventData[
+                        'GroupCode'
+                    ]
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -343,11 +332,8 @@ class payload_template(object):
     def dump_CurrentPacket(self):
         res = json.dumps(
             obj={
-                'CurrentPacket': {
-                    'EventData': self.EventData,
-                    'EventName': self.EventName
-                },
-                'CurrentQQ': int(self.CurrentQQ)
+                'CurrentPacket': {'EventData': self.EventData, 'EventName': self.EventName},
+                'CurrentQQ': int(self.CurrentQQ),
             }
         )
         return res
@@ -416,61 +402,46 @@ class PAYLOAD(object):
     class MessageSvc_PbSendMsg(payload_template):
         def __init__(self, ToUin: 'int|str', ToType: int, Content: str, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "MessageSvc.PbSendMsg"
+            self.CgiCmd = 'MessageSvc.PbSendMsg'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    "ToUin": getIdBackport(ToUin),
-                    "ToType": ToType,
-                    "Content": Content
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'ToUin': getIdBackport(ToUin), 'ToType': ToType, 'Content': Content},
             }
 
     class MessageSvc_PbSendMsg_all(payload_template):
         def __init__(self, ToUin: 'int|str', ToType: int, dataPatch: dict, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "MessageSvc.PbSendMsg"
+            self.CgiCmd = 'MessageSvc.PbSendMsg'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    "ToUin": getIdBackport(ToUin),
-                    "ToType": ToType
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'ToUin': getIdBackport(ToUin), 'ToType': ToType},
             }
             self.data['CgiRequest'].update(dataPatch)
 
     class exitGroup(payload_template):
         def __init__(self, Uin: 'int|str', CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "SsoGroup.Op"
+            self.CgiCmd = 'SsoGroup.Op'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    "OpCode": 4247,
-                    "Uin": getIdBackport(Uin)
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'OpCode': 4247, 'Uin': getIdBackport(Uin)},
             }
 
     class GetGroupLists(payload_template):
         def __init__(self, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "GetGroupLists"
+            self.CgiCmd = 'GetGroupLists'
             self.CurrentQQ = str(CurrentQQ)
-            self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {}
-            }
+            self.data = {'ReqId': self.ReqId, 'BotUin': str(self.CurrentQQ), 'CgiCmd': self.CgiCmd, 'CgiRequest': {}}
 
     class PicUp_DataUp(payload_template):
         def __init__(
@@ -482,14 +453,9 @@ class PAYLOAD(object):
             Base64Buf: 'str|None' = None,
         ):
             payload_template.__init__(self)
-            self.CgiCmd = "PicUp.DataUp"
+            self.CgiCmd = 'PicUp.DataUp'
             self.CurrentQQ = str(CurrentQQ)
-            self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {}
-            }
+            self.data = {'ReqId': self.ReqId, 'BotUin': str(self.CurrentQQ), 'CgiCmd': self.CgiCmd, 'CgiRequest': {}}
             self.data['CgiRequest']['CommandId'] = CommandId
             if FilePath is not None:
                 self.data['CgiRequest']['FilePath'] = FilePath
@@ -501,47 +467,37 @@ class PAYLOAD(object):
     class QueryUinByUid(payload_template):
         def __init__(self, UidQuery: 'list[str]', CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "QueryUinByUid"
+            self.CgiCmd = 'QueryUinByUid'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    'Uids': UidQuery
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'Uids': UidQuery},
             }
 
     class SystemMsgAction_Friend(payload_template):
         def __init__(self, ReqUid: int, OpCode: int, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "SystemMsgAction.Friend"
+            self.CgiCmd = 'SystemMsgAction.Friend'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    "ReqUid": ReqUid,
-                    "OpCode": OpCode
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'ReqUid': ReqUid, 'OpCode': OpCode},
             }
 
     class SystemMsgAction_Group(payload_template):
         def __init__(self, MsgSeq: int, MsgType: int, GroupCode: int, OpCode: int, CurrentQQ: 'int|str'):
             payload_template.__init__(self)
-            self.CgiCmd = "SystemMsgAction.Group"
+            self.CgiCmd = 'SystemMsgAction.Group'
             self.CurrentQQ = str(CurrentQQ)
             self.data = {
-                "ReqId": self.ReqId,
-                "BotUin": str(self.CurrentQQ),
-                "CgiCmd": self.CgiCmd,
-                "CgiRequest": {
-                    "MsgSeq": MsgSeq,
-                    "MsgType": MsgType,
-                    "GroupCode": GroupCode,
-                    "OpCode": OpCode
-                }
+                'ReqId': self.ReqId,
+                'BotUin': str(self.CurrentQQ),
+                'CgiCmd': self.CgiCmd,
+                'CgiRequest': {'MsgSeq': MsgSeq, 'MsgType': MsgType, 'GroupCode': GroupCode, 'OpCode': OpCode},
             }
 
 
@@ -553,9 +509,7 @@ class event_action(object):
             res = gUinfoReg[Uid]
         else:
             res_list = event_action.getUinfoCache(
-                target_event=target_event,
-                UidQuery=[Uid],
-                control_queue=control_queue
+                target_event=target_event, UidQuery=[Uid], control_queue=control_queue
             )
             if len(res_list) == 1:
                 res = res_list[0]
@@ -568,18 +522,11 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
-        this_msg = PAYLOAD.QueryUinByUid(
-            UidQuery=UidQuery,
-            CurrentQQ=target_event.base_info['self_id']
-        )
+        this_msg = PAYLOAD.QueryUinByUid(UidQuery=UidQuery, CurrentQQ=target_event.base_info['self_id'])
         waitForResReady(str(this_msg.ReqId))
-        send_ws_event(
-            plugin_event_bot_hash,
-            this_msg.dump(),
-            control_queue
-        )
+        send_ws_event(plugin_event_bot_hash, this_msg.dump(), control_queue)
         res_raw = waitForRes(str(this_msg.ReqId))
         raw_obj = init_api_json(res_raw)
         if raw_obj is not None:
@@ -596,7 +543,7 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         if len(message) > 0:
             send_ws_event(
@@ -605,9 +552,9 @@ class event_action(object):
                     ToUin=target_id,
                     ToType=2 if 'group' == target_type else 1,
                     Content=message,
-                    CurrentQQ=target_event.base_info['self_id']
+                    CurrentQQ=target_event.base_info['self_id'],
                 ).dump(),
-                control_queue
+                control_queue,
             )
 
     def send_solo_all_msg(target_event, target_type, target_id, dataPatch, control_queue):
@@ -615,7 +562,7 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         if type(dataPatch) is dict:
             send_ws_event(
@@ -624,17 +571,14 @@ class event_action(object):
                     ToUin=target_id,
                     ToType=2 if 'group' == target_type else 1,
                     dataPatch=dataPatch,
-                    CurrentQQ=target_event.base_info['self_id']
+                    CurrentQQ=target_event.base_info['self_id'],
                 ).dump(),
-                control_queue
+                control_queue,
             )
 
     def send_msg(target_event, target_type, target_id, message, control_queue):
         message_new = ''
-        message_obj = OlivOS.messageAPI.Message_templet(
-            'olivos_string',
-            message
-        )
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_string', message)
         count_data = 0
         size_data = len(message_obj.data)
         flag_now_type = 'string'
@@ -653,23 +597,18 @@ class event_action(object):
                         control_queue=control_queue,
                         url=data_this.data['file'],
                         type_path='images',
-                        type_chat=2 if 'group' == target_type else 1
+                        type_chat=2 if 'group' == target_type else 1,
                     )
                     flag_now_type = 'image'
-                if (
-                    size_data == count_data
-                    or (
-                        flag_now_type_last != flag_now_type
-                        and flag_now_type_last == 'string'
-                        and len(message_new) > 0
-                    )
+                if size_data == count_data or (
+                    flag_now_type_last != flag_now_type and flag_now_type_last == 'string' and len(message_new) > 0
                 ):
                     event_action.send_solo_msg(
                         target_event=target_event,
                         target_type=target_type,
                         target_id=target_id,
                         message=message_new,
-                        control_queue=control_queue
+                        control_queue=control_queue,
                     )
                     message_new = ''
                     time.sleep(1)
@@ -682,15 +621,15 @@ class event_action(object):
                                 dataPatch={
                                     'Images': [
                                         {
-                                            "FileId": res[2],
-                                            "FileMd5": res[0],
-                                            "FileSize": res[1],
-                                            "Height": 1920,
-                                            "Width": 1080
+                                            'FileId': res[2],
+                                            'FileMd5': res[0],
+                                            'FileSize': res[1],
+                                            'Height': 1920,
+                                            'Width': 1080,
                                         }
                                     ]
                                 },
-                                control_queue=control_queue
+                                control_queue=control_queue,
                             )
                             time.sleep(1)
 
@@ -700,41 +639,31 @@ class event_action(object):
             bot_id=target_event.base_info['self_id'],
             platform_sdk=target_event.platform['sdk'],
             platform_platform=target_event.platform['platform'],
-            platform_model=target_event.platform['model']
+            platform_model=target_event.platform['model'],
         )
         res = [None, None, None]
         data_obj = None
         try:
-            if url.startswith("base64://"):
+            if url.startswith('base64://'):
                 data_obj = PAYLOAD.PicUp_DataUp(
-                    CommandId=type_chat,
-                    Base64Buf=url,
-                    CurrentQQ=target_event.base_info['self_id']
+                    CommandId=type_chat, Base64Buf=url, CurrentQQ=target_event.base_info['self_id']
                 )
             else:
                 url_parsed = parse.urlparse(url)
-                if url_parsed.scheme in ["http", "https"]:
+                if url_parsed.scheme in ['http', 'https']:
                     data_obj = PAYLOAD.PicUp_DataUp(
-                        CommandId=type_chat,
-                        FileUrl=url,
-                        CurrentQQ=target_event.base_info['self_id']
+                        CommandId=type_chat, FileUrl=url, CurrentQQ=target_event.base_info['self_id']
                     )
                 else:
                     file_path = url_parsed.path
                     file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
                     data_obj = PAYLOAD.PicUp_DataUp(
-                        CommandId=type_chat,
-                        FilePath=file_path,
-                        CurrentQQ=target_event.base_info['self_id']
+                        CommandId=type_chat, FilePath=file_path, CurrentQQ=target_event.base_info['self_id']
                     )
 
             if data_obj is not None:
                 waitForResReady(str(data_obj.ReqId))
-                send_ws_event(
-                    plugin_event_bot_hash,
-                    data_obj.dump(),
-                    control_queue
-                )
+                send_ws_event(plugin_event_bot_hash, data_obj.dump(), control_queue)
                 res_raw = waitForRes(str(data_obj.ReqId))
                 raw_obj = init_api_json(res_raw)
                 if raw_obj is not None:
@@ -759,15 +688,12 @@ class event_action(object):
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
                 platform_platform=target_event.platform['platform'],
-                platform_model=target_event.platform['model']
+                platform_model=target_event.platform['model'],
             )
             send_ws_event(
                 plugin_event_bot_hash,
-                PAYLOAD.exitGroup(
-                    Uin=group_id,
-                    CurrentQQ=target_event.base_info['self_id']
-                ).dump(),
-                control_queue
+                PAYLOAD.exitGroup(Uin=group_id, CurrentQQ=target_event.base_info['self_id']).dump(),
+                control_queue,
             )
 
     def set_friend_add_request(target_event, flag: str, approve: bool, control_queue):
@@ -776,17 +702,15 @@ class event_action(object):
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
                 platform_platform=target_event.platform['platform'],
-                platform_model=target_event.platform['model']
+                platform_model=target_event.platform['model'],
             )
             OpCode_int = 3 if approve is True else 5
             send_ws_event(
                 plugin_event_bot_hash,
                 PAYLOAD.SystemMsgAction_Friend(
-                    ReqUid=flag,
-                    OpCode=OpCode_int,
-                    CurrentQQ=target_event.base_info['self_id']
+                    ReqUid=flag, OpCode=OpCode_int, CurrentQQ=target_event.base_info['self_id']
                 ).dump(),
-                control_queue
+                control_queue,
             )
 
     def set_group_add_request(target_event, flag: str, sub_type: str, approve: bool, control_queue):
@@ -795,7 +719,7 @@ class event_action(object):
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
                 platform_platform=target_event.platform['platform'],
-                platform_model=target_event.platform['model']
+                platform_model=target_event.platform['model'],
             )
             sub_type_int = None
             OpCode_int = None
@@ -817,9 +741,9 @@ class event_action(object):
                         MsgType=sub_type_int,
                         GroupCode=GroupCode_this,
                         OpCode=OpCode_int,
-                        CurrentQQ=target_event.base_info['self_id']
+                        CurrentQQ=target_event.base_info['self_id'],
                     ).dump(),
-                    control_queue
+                    control_queue,
                 )
 
     def get_group_list(target_event: OlivOS.API.Event, control_queue):
@@ -829,25 +753,15 @@ class event_action(object):
                 bot_id=target_event.base_info['self_id'],
                 platform_sdk=target_event.platform['sdk'],
                 platform_platform=target_event.platform['platform'],
-                platform_model=target_event.platform['model']
+                platform_model=target_event.platform['model'],
             )
-            this_msg = PAYLOAD.GetGroupLists(
-                CurrentQQ=target_event.base_info['self_id']
-            )
+            this_msg = PAYLOAD.GetGroupLists(CurrentQQ=target_event.base_info['self_id'])
             waitForResReady(str(this_msg.ReqId))
-            send_ws_event(
-                plugin_event_bot_hash,
-                this_msg.dump(),
-                control_queue
-            )
+            send_ws_event(plugin_event_bot_hash, this_msg.dump(), control_queue)
             res_raw = waitForRes(str(this_msg.ReqId))
             raw_obj = init_api_json(res_raw)
             if raw_obj is not None:
-                if (
-                    type(raw_obj) is dict
-                    and 'GroupLists' in raw_obj
-                    and type(raw_obj['GroupLists']) is list
-                ):
+                if type(raw_obj) is dict and 'GroupLists' in raw_obj and type(raw_obj['GroupLists']) is list:
                     res_data['active'] = True
                     for raw_obj_this in raw_obj['GroupLists']:
                         tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -866,27 +780,14 @@ class event_action(object):
 
 def sendControlEventSend(action, data, control_queue):
     if control_queue is not None:
-        control_queue.put(
-            OlivOS.API.Control.packet(
-                action,
-                data
-            ),
-            block=False
-        )
+        control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 def send_ws_event(hash, data, control_queue):
-    sendControlEventSend('send', {
-            'target': {
-                'type': 'OPQBot_link',
-                'hash': hash
-            },
-            'data': {
-                'action': 'send',
-                'data': data
-            }
-        },
-        control_queue
+    sendControlEventSend(
+        'send',
+        {'target': {'type': 'OPQBot_link', 'hash': hash}, 'data': {'action': 'send', 'data': data}},
+        control_queue,
     )
 
 
@@ -944,10 +845,7 @@ def waitForRes(echo: str):
     index_limit = int(limit / interval)
     for i in range(index_limit):
         time.sleep(interval)
-        if (
-            echo in gResReg
-            and gResReg[echo] is not None
-        ):
+        if echo in gResReg and gResReg[echo] is not None:
             res = gResReg[echo]
             gResReg.pop(echo)
             break

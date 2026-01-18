@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import copy
 
@@ -32,15 +32,8 @@ def getTransByL10N(srcWord: str, spec: list, L10N: str, prefix: 'str|None' = Non
         flagL10N = L10N
     for key in OlivOS.L10NDataAPI.dictL10NSTR[flagL10NDefault]:
         if (
-            (
-                (
-                    type(prefix) is str
-                    and key.startswith(prefix)
-                )
-                or type(prefix) is not str
-            )
-            and srcWord == OlivOS.L10NDataAPI.dictL10NSTR[flagL10NDefault][key]
-        ):
+            (type(prefix) is str and key.startswith(prefix)) or type(prefix) is not str
+        ) and srcWord == OlivOS.L10NDataAPI.dictL10NSTR[flagL10NDefault][key]:
             dstWordKey = key
             break
     if (

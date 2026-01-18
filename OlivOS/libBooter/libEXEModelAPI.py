@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import multiprocessing
 import subprocess
@@ -43,16 +43,14 @@ gCheckList = [
     'gocqhttp_show_iMac',
     'gocqhttp_show_iPad',
     'gocqhttp_show_Android_Pad',
-    'gocqhttp_show_old'
+    'gocqhttp_show_old',
 ]
 
-gProtocalEXECheckList = [
-    'AstralQsign'
-]
+gProtocalEXECheckList = ['AstralQsign']
 
 gProtocalInfo = {
     'android_pad': {
-        'AstralQsign': '''{
+        'AstralQsign': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537272384,
     "sub_app_id": 537272384,
@@ -68,8 +66,8 @@ gProtocalInfo = {
     "dump_time": 1728390173,
     "qua": "V1_AND_SQ_9.1.55_9176_HDBM_T",
     "protocol_type": 6
-}''',
-        '9.1.55': '''{
+}""",
+        '9.1.55': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537272384,
     "sub_app_id": 537272384,
@@ -85,8 +83,8 @@ gProtocalInfo = {
     "dump_time": 1728390173,
     "qua": "V1_AND_SQ_9.1.55_9176_HDBM_T",
     "protocol_type": 6
-}''',
-        '9.0.95': '''{
+}""",
+        '9.0.95': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537241756,
     "sub_app_id": 537241756,
@@ -102,8 +100,8 @@ gProtocalInfo = {
     "dump_time": 1713424357,
     "qua": "V1_AND_SQ_9.0.95_7368_YYB_D",
     "protocol_type": 6
-}''',
-        '9.0.56': '''{
+}""",
+        '9.0.56': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537220362,
     "sub_app_id": 537220362,
@@ -119,8 +117,8 @@ gProtocalInfo = {
     "dump_time": 1713424357,
     "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.85': '''{
+}""",
+        '8.9.85': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537180607,
     "sub_app_id": 537180607,
@@ -136,8 +134,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.83': '''{
+}""",
+        '8.9.83': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537178685,
     "sub_app_id": 537178685,
@@ -153,8 +151,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.80': '''{
+}""",
+        '8.9.80': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537176902,
     "sub_app_id": 537176902,
@@ -170,8 +168,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.73': '''{
+}""",
+        '8.9.73': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537171018,
     "sub_app_id": 537171018,
@@ -187,8 +185,8 @@ gProtocalInfo = {
     "dump_time": 1690715354,
     "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
     "protocol_type": 6
-}''',
-        '8.9.71': '''{
+}""",
+        '8.9.71': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537170072,
     "sub_app_id": 537170072,
@@ -204,8 +202,8 @@ gProtocalInfo = {
     "dump_time": 1688560152,
     "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.70': '''{
+}""",
+        '8.9.70': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537169976,
     "sub_app_id": 537169976,
@@ -221,8 +219,8 @@ gProtocalInfo = {
     "dump_time": 1690350020,
     "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.68': '''{
+}""",
+        '8.9.68': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537168361,
     "sub_app_id": 537168361,
@@ -238,8 +236,8 @@ gProtocalInfo = {
     "dump_time": 1689780543,
     "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.63': '''{
+}""",
+        '8.9.63': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537164888,
     "sub_app_id": 537164888,
@@ -255,8 +253,8 @@ gProtocalInfo = {
     "dump_time": 1687796862,
     "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
     "protocol_type": 6
-}''',
-        '8.9.58': '''{
+}""",
+        '8.9.58': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537161402,
     "sub_app_id": 537161402,
@@ -272,10 +270,10 @@ gProtocalInfo = {
     "dump_time": 1686334718,
     "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
     "protocol_type": 6
-}'''
+}""",
     },
     'android_phone': {
-        'AstralQsign': '''{
+        'AstralQsign': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537272373,
     "sub_app_id": 537272373,
@@ -291,8 +289,8 @@ gProtocalInfo = {
     "dump_time": 1728390173,
     "qua": "V1_AND_SQ_9.1.55_9176_HDBM_T",
     "protocol_type": 1
-}''',
-        '9.1.55': '''{
+}""",
+        '9.1.55': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537272373,
     "sub_app_id": 537272373,
@@ -308,8 +306,8 @@ gProtocalInfo = {
     "dump_time": 1728390173,
     "qua": "V1_AND_SQ_9.1.55_9176_HDBM_T",
     "protocol_type": 1
-}''',
-        '9.0.95': '''{
+}""",
+        '9.0.95': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537242075,
     "sub_app_id": 537242075,
@@ -325,8 +323,8 @@ gProtocalInfo = {
     "dump_time": 1713424357,
     "qua": "V1_AND_SQ_9.0.95_7368_YYB_D",
     "protocol_type": 1
-}''',
-        '9.0.56': '''{
+}""",
+        '9.0.56': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537220362,
     "sub_app_id": 537220362,
@@ -342,8 +340,8 @@ gProtocalInfo = {
     "dump_time": 1713424357,
     "qua": "V1_AND_SQ_9.0.56_6372_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.85': '''{
+}""",
+        '8.9.85': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537180568,
     "sub_app_id": 537180568,
@@ -359,8 +357,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.85_4766_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.83': '''{
+}""",
+        '8.9.83': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537178646,
     "sub_app_id": 537178646,
@@ -376,8 +374,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.83_4680_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.80': '''{
+}""",
+        '8.9.80': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537176863,
     "sub_app_id": 537176863,
@@ -393,8 +391,8 @@ gProtocalInfo = {
     "dump_time": 1692110632,
     "qua": "V1_AND_SQ_8.9.80_4614_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.73': '''{
+}""",
+        '8.9.73': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537171007,
     "sub_app_id": 537171007,
@@ -410,8 +408,8 @@ gProtocalInfo = {
     "dump_time": 1690715354,
     "qua": "V1_AND_SQ_8.9.73_4354_HDBM_T",
     "protocol_type": 1
-}''',
-        '8.9.71': '''{
+}""",
+        '8.9.71': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537170024,
     "sub_app_id": 537170024,
@@ -427,8 +425,8 @@ gProtocalInfo = {
     "dump_time": 1688560152,
     "qua": "V1_AND_SQ_8.9.71_4332_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.70': '''{
+}""",
+        '8.9.70': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537169928,
     "sub_app_id": 537169928,
@@ -444,8 +442,8 @@ gProtocalInfo = {
     "dump_time": 1690350020,
     "qua": "V1_AND_SQ_8.9.70_4330_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.68': '''{
+}""",
+        '8.9.68': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537168313,
     "sub_app_id": 537168313,
@@ -461,8 +459,8 @@ gProtocalInfo = {
     "dump_time": 1689780543,
     "qua": "V1_AND_SQ_8.9.68_4264_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.63': '''{
+}""",
+        '8.9.63': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537164840,
     "sub_app_id": 537164840,
@@ -478,8 +476,8 @@ gProtocalInfo = {
     "dump_time": 1687796862,
     "qua": "V1_AND_SQ_8.9.63_4194_YYB_D",
     "protocol_type": 1
-}''',
-        '8.9.58': '''{
+}""",
+        '8.9.58': """{
     "apk_id": "com.tencent.mobileqq",
     "app_id": 537163098,
     "sub_app_id": 537163098,
@@ -495,8 +493,8 @@ gProtocalInfo = {
     "dump_time": 1686334718,
     "qua": "V1_AND_SQ_8.9.58_4106_YYB_D",
     "protocol_type": 1
-}'''
-    }
+}""",
+    },
 }
 
 
@@ -507,7 +505,7 @@ def startGoCqhttpLibExeModel(
     Proc_dict,
     Proc_Proc_dict,
     basic_conf_models,
-    tmp_proc_mode
+    tmp_proc_mode,
 ):
     if platform.system() == 'Windows':
         flagActive = False
@@ -522,7 +520,7 @@ def startGoCqhttpLibExeModel(
                 resouce_name='AstralGocq-20250316001',
                 filePath='./lib/go-cqhttp.exe',
                 filePathUpdate='./lib/go-cqhttp.exe.tmp',
-                filePathFORCESKIP='./lib/FORCESKIP'
+                filePathFORCESKIP='./lib/FORCESKIP',
             )
         for bot_info_key in plugin_bot_info_dict:
             if plugin_bot_info_dict[bot_info_key].platform['model'] in gCheckList:
@@ -540,7 +538,7 @@ def startGoCqhttpLibExeModel(
                     bot_info_dict=plugin_bot_info_dict[bot_info_key],
                     target_proc=basic_conf_models[basic_conf_models_this['target_proc']],
                     sub_target_proc=basic_conf_models.get(basic_conf_models_this.get('sub_target_proc', None), None),
-                    debug_mode=False
+                    debug_mode=False,
                 )
                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
@@ -558,7 +556,7 @@ class server(OlivOS.API.Proc_templet):
         target_proc=None,
         sub_target_proc=None,
         debug_mode=False,
-        bot_info_dict=None
+        bot_info_dict=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -569,7 +567,7 @@ class server(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             control_queue=control_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -587,16 +585,18 @@ class server(OlivOS.API.Proc_templet):
             'gocqhttp_show_Android_Watch',
             'gocqhttp_show_iMac',
             'gocqhttp_show_iPad',
-            'gocqhttp_show_Android_Pad'
+            'gocqhttp_show_Android_Pad',
         ]:
             self.send_init_event()
         while self.flag_run:
             releaseDir('./lib')
             if not os.path.exists('./lib/go-cqhttp.exe'):
-                self.log(3, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] can`t found target lib',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    3,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel server [{0}] can`t found target lib', [self.Proc_name], modelName
+                    ),
+                )
                 break
             releaseDir('./conf')
             releaseDir('./conf/gocqhttp')
@@ -604,19 +604,19 @@ class server(OlivOS.API.Proc_templet):
                 tmp.write('{}')
             releaseDir('./conf/gocqhttp/' + self.Proc_data['bot_info_dict'].hash)
             goTypeConfig(
-                self.Proc_data['bot_info_dict'],
-                self.Proc_config['target_proc'],
-                self.Proc_config['sub_target_proc']
+                self.Proc_data['bot_info_dict'], self.Proc_config['target_proc'], self.Proc_config['sub_target_proc']
             ).setConfig()
             if (
                 'qsign-server-protocal' in self.Proc_data['bot_info_dict'].extends
                 and type(self.Proc_data['bot_info_dict'].extends['qsign-server-protocal']) is str
                 and self.Proc_data['bot_info_dict'].extends['qsign-server-protocal'] in gProtocalEXECheckList
             ):
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] will run in {1}s...',
-                    [self.Proc_name, str(8)], modelName
-                ))
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel server [{0}] will run in {1}s...', [self.Proc_name, str(8)], modelName
+                    ),
+                )
                 self.check_protocalEXE(8, 0.25)
             if False and (self.Proc_data['bot_info_dict'].platform['model'] in ['gocqhttp', 'gocqhttp_hide']):
                 model_Proc = subprocess.Popen(
@@ -625,17 +625,16 @@ class server(OlivOS.API.Proc_templet):
                     shell=True,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stderr=subprocess.PIPE,
                 )
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] is running',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans('OlivOS libEXEModel server [{0}] is running', [self.Proc_name], modelName),
+                )
                 model_Proc.communicate(timeout=None)
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] exited',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    2, OlivOS.L10NAPI.getTrans('OlivOS libEXEModel server [{0}] exited', [self.Proc_name], modelName)
+                )
             elif self.Proc_data['bot_info_dict'].platform['model'] in [
                 'gocqhttp',
                 'gocqhttp_show',
@@ -643,23 +642,21 @@ class server(OlivOS.API.Proc_templet):
                 'gocqhttp_show_Android_Watch',
                 'gocqhttp_show_iMac',
                 'gocqhttp_show_iPad',
-                'gocqhttp_show_Android_Pad'
+                'gocqhttp_show_Android_Pad',
             ]:
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] will run under visiable mode',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel server [{0}] will run under visiable mode', [self.Proc_name], modelName
+                    ),
+                )
                 self.clear_gocqhttp()
                 self.Proc_data['check_qrcode_flag'] = False
                 self.Proc_data['check_stdin'] = False
                 time.sleep(2)
                 self.Proc_data['check_qrcode_flag'] = True
                 self.Proc_data['check_stdin'] = True
-                threading.Thread(
-                    target=self.check_qrcode,
-                    args=(),
-                    daemon=self.deamon
-                ).start()
+                threading.Thread(target=self.check_qrcode, args=(), daemon=self.deamon).start()
                 tmp_env = dict(os.environ)
                 # 依据 https://github.com/Mrs4s/go-cqhttp/pull/1772 的改动
                 tmp_env['FORCE_TTY'] = ''
@@ -671,45 +668,40 @@ class server(OlivOS.API.Proc_templet):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
-                    env=tmp_env
+                    env=tmp_env,
                 )
                 self.Proc_data['model_Proc'] = model_Proc
-                threading.Thread(
-                    target=self.check_stdin,
-                    args=(model_Proc,),
-                    daemon=self.deamon
-                ).start()
+                threading.Thread(target=self.check_stdin, args=(model_Proc,), daemon=self.deamon).start()
                 self.get_model_stdout(model_Proc)
                 # model_Proc.communicate(timeout = None)
-                self.log(3, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] will retry in 10s...',
-                    [self.Proc_name], modelName
-                ))
+                self.log(
+                    3,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel server [{0}] will retry in 10s...', [self.Proc_name], modelName
+                    ),
+                )
                 self.Proc_data['model_Proc'] = None
                 time.sleep(8)
-            elif self.Proc_data['bot_info_dict'].platform['model'] in [
-                'gocqhttp_show_old'
-            ]:
-                self.log(2, OlivOS.L10NAPI.getTrans(
-                    'OlivOS libEXEModel server [{0}] will run under visiable mode',
-                    [self.Proc_name], modelName
-                ))
+            elif self.Proc_data['bot_info_dict'].platform['model'] in ['gocqhttp_show_old']:
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel server [{0}] will run under visiable mode', [self.Proc_name], modelName
+                    ),
+                )
                 tmp_env = dict(os.environ)
                 tmp_env['FORCE_TTY'] = ''
                 subprocess.call(
                     'start cmd /K "title GoCqHttp For OlivOS|..\\..\\..\\lib\\go-cqhttp.exe"',
                     shell=True,
                     cwd='.\\conf\\gocqhttp\\' + self.Proc_data['bot_info_dict'].hash,
-                    env=tmp_env
+                    env=tmp_env,
                 )
                 self.flag_run = False
 
     def on_terminate(self):
         self.flag_run = False
-        if (
-            'model_Proc' in self.Proc_data
-            and self.Proc_data['model_Proc'] is not None
-        ):
+        if 'model_Proc' in self.Proc_data and self.Proc_data['model_Proc'] is not None:
             OlivOS.bootAPI.killByPid(self.Proc_data['model_Proc'].pid)
 
     def getBotIDStr(self):
@@ -717,7 +709,7 @@ class server(OlivOS.API.Proc_templet):
         if self.Proc_data['bot_info_dict'].id is not None:
             tmp_self_data = '%s|%s' % (
                 self.Proc_data['bot_info_dict'].platform['platform'],
-                str(self.Proc_data['bot_info_dict'].id)
+                str(self.Proc_data['bot_info_dict'].id),
             )
         return tmp_self_data
 
@@ -737,44 +729,35 @@ class server(OlivOS.API.Proc_templet):
                             input_data = ('%s\r\n' % input_raw).encode('utf-8')
                             model_Proc.stdin.write(input_data)
                             model_Proc.stdin.flush()
-                            log_data = ('%s' % input_raw)
+                            log_data = '%s' % input_raw
                             self.send_log_event(log_data)
-                            self.log(2, log_data, [
-                                (self.getBotIDStr(), 'default'),
-                                ('gocqhttp', 'default'),
-                                ('onebot_send', 'default')
-                            ])
+                            self.log(
+                                2,
+                                log_data,
+                                [(self.getBotIDStr(), 'default'), ('gocqhttp', 'default'), ('onebot_send', 'default')],
+                            )
 
     def get_model_stdout(self, model_Proc: subprocess.Popen):
         for line in iter(model_Proc.stdout.readline, b''):
             try:
                 log_data = ('%s' % line.decode('utf-8', errors='replace')).rstrip('\n')
                 self.send_log_event(log_data)
-                self.log(1, log_data, [
-                    (self.getBotIDStr(), 'default'),
-                    ('gocqhttp', 'default'),
-                    ('onebot', 'default')
-                ])
+                self.log(1, log_data, [(self.getBotIDStr(), 'default'), ('gocqhttp', 'default'), ('onebot', 'default')])
             except Exception as e:
-                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libEXEModel failed: %s\n%s' % [
-                        str(e),
-                        traceback.format_exc()
-                    ],
-                    modelName
-                ))
+                self.log(
+                    4,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libEXEModel failed: %s\n%s' % [str(e), traceback.format_exc()], modelName
+                    ),
+                )
 
     def send_init_event(self):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'gocqhttp',
-                    'event': 'init',
-                    'hash': self.Proc_data['bot_info_dict'].hash
-                }
-            }
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
+                'data': {'action': 'gocqhttp', 'event': 'init', 'hash': self.Proc_data['bot_info_dict'].hash},
+            },
         )
 
     def clear_gocqhttp(self):
@@ -795,17 +778,16 @@ class server(OlivOS.API.Proc_templet):
 
     def send_QRCode_event(self, path: str):
         self.sendControlEventSend(
-            'send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'gocqhttp',
                     'event': 'qrcode',
                     'hash': self.Proc_data['bot_info_dict'].hash,
-                    'path': path
-                }
-            }
+                    'path': path,
+                },
+            },
         )
 
     def check_protocalEXE(self, delayS: int, interval: int):
@@ -830,28 +812,22 @@ class server(OlivOS.API.Proc_templet):
             time.sleep(2)
 
     def send_log_event(self, data):
-        self.sendControlEventSend('send', {
-            'target': {
-                'type': 'nativeWinUI'
+        self.sendControlEventSend(
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
+                'data': {
+                    'action': 'gocqhttp',
+                    'event': 'log',
+                    'hash': self.Proc_data['bot_info_dict'].hash,
+                    'data': data,
+                },
             },
-            'data': {
-                'action': 'gocqhttp',
-                'event': 'log',
-                'hash': self.Proc_data['bot_info_dict'].hash,
-                'data': data
-            }
-        }
-                                  )
+        )
 
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
-                    action,
-                    data
-                ),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
 
 class goTypeConfig(object):
@@ -863,7 +839,7 @@ class goTypeConfig(object):
         self.config_file_format = {}
 
     def setConfig(self):
-        self.config_file_str = '''
+        self.config_file_str = """
 account: # 账号相关
   uin: {uin} # QQ账号
   password: '{password}' # 密码为空时使用扫码登录
@@ -1024,31 +1000,27 @@ database: # 数据库相关设置
     # 关闭将无法使用 撤回 回复 get_msg 等上下文相关功能
     enable: false
     cachettl: 3600000000000 # 1h
-'''
+"""
 
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['password'] = self.bot_info_dict.password
         self.config_file_format['access-token'] = self.bot_info_dict.post_info.access_token
         tmp_host = self.bot_info_dict.post_info.host
-        for prefix in [
-            'http://',
-            'https://',
-            'ws://',
-            'wss://'
-        ]:
+        for prefix in ['http://', 'https://', 'ws://', 'wss://']:
             if len(tmp_host) > len(prefix):
-                if tmp_host[:len(prefix)] == prefix:
-                    tmp_host = tmp_host[len(prefix):]
+                if tmp_host[: len(prefix)] == prefix:
+                    tmp_host = tmp_host[len(prefix) :]
                     break
         self.config_file_format['servers-host'] = tmp_host
         self.config_file_format['servers-port'] = str(self.bot_info_dict.post_info.port)
-        self.config_file_format['servers-post-url'] = 'http://127.0.0.1:' + str(
-            self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
-        self.config_file_format['sign-servers-data'] = '''
+        self.config_file_format['servers-post-url'] = (
+            'http://127.0.0.1:' + str(self.target_proc['server']['port']) + '/OlivOSMsgApi/qq/onebot/gocqhttp'
+        )
+        self.config_file_format['sign-servers-data'] = """
     - url: '-'
       key: '-'
       authorization: '-'
-'''
+"""
         self.config_file_format['auto-register'] = 'false'
         if (
             'qsign-server' in self.bot_info_dict.extends
@@ -1057,27 +1029,23 @@ database: # 数据库相关设置
         ):
             self.config_file_format['sign-servers-data'] = ''
             for tmp_data_this in self.bot_info_dict.extends['qsign-server']:
-                if (
-                    type(tmp_data_this) is dict
-                    and 'addr' in tmp_data_this
-                    and 'key' in tmp_data_this
-                ):
-                    self.config_file_format['sign-servers-data'] += '''
+                if type(tmp_data_this) is dict and 'addr' in tmp_data_this and 'key' in tmp_data_this:
+                    self.config_file_format['sign-servers-data'] += """
     - url: '%s'
       key: '%s'
       authorization: '-'
-''' % (tmp_data_this['addr'], tmp_data_this['key'])
+""" % (tmp_data_this['addr'], tmp_data_this['key'])
 
         if (
             'qsign-server-protocal' in self.bot_info_dict.extends
             and type(self.bot_info_dict.extends['qsign-server-protocal']) is str
             and self.bot_info_dict.extends['qsign-server-protocal'] in gProtocalEXECheckList
         ):
-            self.config_file_format['sign-servers-data'] = '''
+            self.config_file_format['sign-servers-data'] = """
     - url: 'http://localhost:%s/'
       key: '%s'
       authorization: '-'
-''' % (str(self.sub_target_proc['server']['port']), str(self.sub_target_proc['server']['token']))
+""" % (str(self.sub_target_proc['server']['port']), str(self.sub_target_proc['server']['token']))
             self.config_file_format['auto-register'] = 'true'
 
         self.config_file_str = self.config_file_str.format(**self.config_file_format)
@@ -1094,12 +1062,13 @@ def accountFix(bot_info_dict, logger_proc):
         if (
             bot_info_dict[bot_hash].platform['sdk'] == 'onebot'
             and bot_info_dict[bot_hash].platform['platform'] == 'qq'
-            and bot_info_dict[bot_hash].platform['model'] in [
+            and bot_info_dict[bot_hash].platform['model']
+            in [
                 'gocqhttp_show_Android_Phone',
                 'gocqhttp_show_Android_Watch',
                 'gocqhttp_show_iMac',
                 'gocqhttp_show_iPad',
-                'gocqhttp_show_Android_Pad'
+                'gocqhttp_show_Android_Pad',
             ]
         ):
             releaseDir('./conf/gocqhttp/' + bot_hash)
@@ -1148,7 +1117,7 @@ def accountFix(bot_info_dict, logger_proc):
             ):
                 if bot_info_dict[bot_hash].platform['model'] in [
                     'gocqhttp_show_Android_Pad',
-                    'gocqhttp_show_Android_Phone'
+                    'gocqhttp_show_Android_Phone',
                 ]:
                     if bot_info_dict[bot_hash].platform['model'] in [
                         'gocqhttp_show_Android_Pad',
@@ -1158,9 +1127,7 @@ def accountFix(bot_info_dict, logger_proc):
                                 bot_info_dict[bot_hash].extends['qsign-server-protocal']
                             ]
                         protocal_num = 6
-                    elif bot_info_dict[bot_hash].platform['model'] in [
-                        'gocqhttp_show_Android_Phone'
-                    ]:
+                    elif bot_info_dict[bot_hash].platform['model'] in ['gocqhttp_show_Android_Phone']:
                         if bot_info_dict[bot_hash].extends['qsign-server-protocal'] in gProtocalInfo['android_phone']:
                             protocal_info = gProtocalInfo['android_phone'][
                                 bot_info_dict[bot_hash].extends['qsign-server-protocal']
@@ -1198,12 +1165,7 @@ def deviceInfoFix(deviceInfo: dict):
             'brand': 'mamoe',
             'bootloader': 'unknown',
             'base_band': '',
-            'version': {
-                'incremental': '5891938',
-                'release': '10',
-                'codename': 'REL',
-                'sdk': 29
-            },
+            'version': {'incremental': '5891938', 'release': '10', 'codename': 'REL', 'sdk': 29},
             'sim_info': 'T-Mobile',
             'os_type': 'android',
             'mac_address': '00:50:56:C0:00:08',
@@ -1213,7 +1175,7 @@ def deviceInfoFix(deviceInfo: dict):
             'android_id': 'MIRAI.123456.001',
             'apn': 'wifi',
             'vendor_name': 'MIUI',
-            'vendor_os_name': 'mirai'
+            'vendor_os_name': 'mirai',
         })
         deviceResPatch['android_id'] = 'MIRAI.%s.001' % getRandomStringOfInt(6)
         deviceResPatch['finger_print'] = (
@@ -1284,60 +1246,39 @@ def releaseDir(dir_path):
         os.makedirs(dir_path)
 
 
-def setGoCqhttpTokenSend(
-    control_queue,
-    hash,
-    token
-):
+def setGoCqhttpTokenSend(control_queue, hash, token):
     if control_queue is not None:
         control_queue.put(
-            OlivOS.API.Control.packet('send', {
-                    'target': {
-                        'type': 'nativeWinUI'
-                    },
+            OlivOS.API.Control.packet(
+                'send',
+                {
+                    'target': {'type': 'nativeWinUI'},
                     'data': {
                         'action': 'gocqhttp',
                         'event': 'token_get',
                         'token': token,
                         'hash': hash,
-                    }
-                }
+                    },
+                },
             ),
-            block=False
+            block=False,
         )
 
 
-def sendOpentxTuringTestPage(
-    control_queue,
-    name: str,
-    title: str,
-    url: str
-):
+def sendOpentxTuringTestPage(control_queue, name: str, title: str, url: str):
     if control_queue is not None:
         control_queue.put(
             OlivOS.API.Control.packet(
                 'init_type_open_tx_turingTest_webview_page',
-                {
-                    'target': {
-                        'action': 'init',
-                        'name': name
-                    },
-                    'data': {
-                        'title': title,
-                        'url': url
-                    }
-                }
+                {'target': {'action': 'init', 'name': name}, 'data': {'title': title, 'url': url}},
             ),
-            block=False
+            block=False,
         )
 
 
 def sendStopTxTuringTestPage(control_queue, Proc_name):
     if control_queue is not None:
-        control_queue.put(
-            OlivOS.API.Control.packet('stop', Proc_name),
-            block=False
-        )
+        control_queue.put(OlivOS.API.Control.packet('stop', Proc_name), block=False)
 
 
 def txTuringTest_evaluate_js(window):
@@ -1356,34 +1297,23 @@ class txTuringTestApi(object):
 
     def invoke(self, b, c):
         data = json.loads(c)
-        if (
-            type(data) is dict
-            and 'ticket' in data
-            and type(data['ticket']) is str
-        ):
-            setGoCqhttpTokenSend(
-                self.control_queue,
-                self.hash,
-                data['ticket']
-            )
-            sendStopTxTuringTestPage(
-                self.control_queue,
-                self.Proc_name
-            )
+        if type(data) is dict and 'ticket' in data and type(data['ticket']) is str:
+            setGoCqhttpTokenSend(self.control_queue, self.hash, data['ticket'])
+            sendStopTxTuringTestPage(self.control_queue, self.Proc_name)
 
 
 class txTuringTestPage(OlivOS.API.Proc_templet):
     def __init__(
-            self,
-            Proc_name='tx_turingTest_webview_page',
-            scan_interval=0.001,
-            dead_interval=1,
-            rx_queue=None,
-            tx_queue=None,
-            logger_proc=None,
-            control_queue=None,
-            title='OlivOS Turing Test Page',
-            url=None
+        self,
+        Proc_name='tx_turingTest_webview_page',
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        control_queue=None,
+        title='OlivOS Turing Test Page',
+        url=None,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -1394,14 +1324,10 @@ class txTuringTestPage(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             control_queue=control_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.UIObject = {}
-        self.UIData = {
-            'title': title,
-            'url': url,
-            'control_queue': control_queue
-        }
+        self.UIData = {'title': title, 'url': url, 'control_queue': control_queue}
 
     def run(self):
         releaseDir('./data')
@@ -1417,14 +1343,14 @@ class txTuringTestPage(OlivOS.API.Proc_templet):
                 title=self.UIData['title'],
                 url=self.UIData['url'],
                 background_color='#00A0EA',
-                js_api=txTuringTestApi_obj
+                js_api=txTuringTestApi_obj,
             )
             webview.start(
                 txTuringTest_evaluate_js,
                 window,
                 private_mode=False,
                 storage_path='./data/webview/%s' % self.Proc_name,
-                gui='edgechromium'
+                gui='edgechromium',
             )
 
         # 发送并等待结束

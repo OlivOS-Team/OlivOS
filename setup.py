@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -11,7 +11,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import setuptools
 
@@ -55,6 +55,6 @@ setuptools.setup(
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: GNU Affero General Public License v3',
-        'Programming Language :: Python :: 3'
+        'Programming Language :: Python :: 3',
     ],
 )

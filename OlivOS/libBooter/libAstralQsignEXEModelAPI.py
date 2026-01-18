@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import subprocess
 import time
@@ -29,10 +29,7 @@ modelName = 'libAstralQsignEXEModelAPI'
 
 resourceUrlPath = OlivOS.infoAPI.resourceUrlPath
 
-gCheckList = [
-    'gocqhttp_show_Android_Phone',
-    'gocqhttp_show_Android_Pad'
-]
+gCheckList = ['gocqhttp_show_Android_Phone', 'gocqhttp_show_Android_Pad']
 
 
 def startAstralQsignLibExeModel(
@@ -42,7 +39,7 @@ def startAstralQsignLibExeModel(
     Proc_dict,
     Proc_Proc_dict,
     basic_conf_models,
-    tmp_proc_mode
+    tmp_proc_mode,
 ):
     if platform.system() == 'Windows':
         flagActive = False
@@ -57,7 +54,7 @@ def startAstralQsignLibExeModel(
                 resouce_name='astral-qsign-20250316001',
                 filePath='./lib/astral-qsign.zip',
                 filePathUpdate='./lib/astral-qsign.zip.tmp',
-                filePathFORCESKIP='./lib/FORCESKIP'
+                filePathFORCESKIP='./lib/FORCESKIP',
             )
             tmp_Proc_name = basic_conf_models_this['name']
             Proc_dict[tmp_Proc_name] = OlivOS.libAstralQsignEXEModelAPI.server(
@@ -67,7 +64,7 @@ def startAstralQsignLibExeModel(
                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                 server_data=basic_conf_models_this['server'],
                 bot_info_dict=plugin_bot_info_dict,
-                debug_mode=False
+                debug_mode=False,
             )
             Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
 
@@ -84,7 +81,7 @@ class server(OlivOS.API.Proc_templet):
         logger_proc=None,
         server_data=None,
         bot_info_dict=None,
-        debug_mode=False
+        debug_mode=False,
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -95,7 +92,7 @@ class server(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             control_queue=control_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = {}
@@ -107,21 +104,20 @@ class server(OlivOS.API.Proc_templet):
     def run(self):
         while self.flag_run:
             self.sendLogSim(
-                2, 'OlivOS libAstralQsignEXEModel server [{0}] will run under visiable mode',
-                [self.Proc_name]
+                2, 'OlivOS libAstralQsignEXEModel server [{0}] will run under visiable mode', [self.Proc_name]
             )
             time.sleep(2)
-            releaseDir("./conf")
-            releaseDir("./conf/astral-qsign")
-            unzip('./lib/astral-qsign.zip', "./conf/astral-qsign")
+            releaseDir('./conf')
+            releaseDir('./conf/astral-qsign')
+            unzip('./lib/astral-qsign.zip', './conf/astral-qsign')
             time.sleep(1)
             tmp_env = dict(os.environ)
             tmp_env['FORCE_TTY'] = ''
             model_Proc = subprocess.Popen(
                 (
-                    f".\\uninstall.bat"
-                    f" \"localhost\" \"{self.server_data['port']}\""
-                    f" \"{getOTPPASSWORD()}\" \"{self.server_data['token']}\""
+                    f'.\\uninstall.bat'
+                    f' "localhost" "{self.server_data["port"]}"'
+                    f' "{getOTPPASSWORD()}" "{self.server_data["token"]}"'
                 ),
                 cwd='.\\conf\\astral-qsign',
                 shell=True,
@@ -129,20 +125,18 @@ class server(OlivOS.API.Proc_templet):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
-                env=tmp_env
+                env=tmp_env,
             )
             self.sendLog(
-                2, 'OlivOS libAstralQsignEXEModel server [{0}] is running',
-                [self.Proc_name, str(self.server_data['port'])]
+                2,
+                'OlivOS libAstralQsignEXEModel server [{0}] is running',
+                [self.Proc_name, str(self.server_data['port'])],
             )
             self.Proc_data['model_Proc'] = model_Proc
             self.setGoCqhttpModelEnableSendAll()
             self.get_model_stdout(model_Proc)
             # model_Proc.communicate(timeout = None)
-            self.sendLogSim(
-                3, 'OlivOS libAstralQsignEXEModel server [{0}] will retry in 10s...',
-                [self.Proc_name]
-            )
+            self.sendLogSim(3, 'OlivOS libAstralQsignEXEModel server [{0}] will retry in 10s...', [self.Proc_name])
             self.Proc_data['model_Proc'] = None
             time.sleep(8)
 
@@ -153,48 +147,35 @@ class server(OlivOS.API.Proc_templet):
                 log_data = re.sub(r'\033\[[\d;]*m?', '', log_data)
                 self.log(2, log_data, [('AstralQsign', 'default')])
             except Exception as e:
-                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libAstralQsignEXEModel failed: %s\n%s' % [
-                        str(e),
-                        traceback.format_exc()
-                    ],
-                    modelName
-                ))
+                self.log(
+                    4,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS libAstralQsignEXEModel failed: %s\n%s' % [str(e), traceback.format_exc()], modelName
+                    ),
+                )
 
     def send_log_event(self, data):
-        self.sendControlEventSend('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
+        self.sendControlEventSend(
+            'send',
+            {
+                'target': {'type': 'nativeWinUI'},
                 'data': {
                     'action': 'AstralQsign',
                     'event': 'log',
                     'hash': self.Proc_data['bot_info_dict'].hash,
-                    'data': data
-                }
-            }
+                    'data': data,
+                },
+            },
         )
 
     def setGoCqhttpModelEnableSend(self, hash):
-        self.sendControlEventSend('send', {
-                'target': {
-                    'type': 'gocqhttp_lib_exe_model',
-                    'hash': hash
-                },
-                'data': {
-                    'action': 'skipDelay'
-                }
-            }
+        self.sendControlEventSend(
+            'send', {'target': {'type': 'gocqhttp_lib_exe_model', 'hash': hash}, 'data': {'action': 'skipDelay'}}
         )
 
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
-            self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
-                    action,
-                    data
-                ),
-                block=False
-            )
+            self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, data), block=False)
 
     def setGoCqhttpModelEnableSendAll(self):
         for bot_info_key in self.Proc_data['bot_info_dict']:
@@ -203,25 +184,11 @@ class server(OlivOS.API.Proc_templet):
 
     def sendLog(self, log_level: int, log_message: str, log_message_list: list):
         self.log(
-            log_level,
-            OlivOS.L10NAPI.getTrans(
-                log_message,
-                log_message_list,
-                modelName
-            ),
-            [('AstralQsign', 'default')]
+            log_level, OlivOS.L10NAPI.getTrans(log_message, log_message_list, modelName), [('AstralQsign', 'default')]
         )
 
     def sendLogSim(self, log_level: int, log_message: str, log_message_list: list):
-        self.log(
-            log_level,
-            OlivOS.L10NAPI.getTrans(
-                log_message,
-                log_message_list,
-                modelName
-            ),
-            []
-        )
+        self.log(log_level, OlivOS.L10NAPI.getTrans(log_message, log_message_list, modelName), [])
 
 
 def isBotActive(plugin_bot_info_dict: dict):

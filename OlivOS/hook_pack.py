@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import platform
 
@@ -62,6 +62,7 @@ import sys
 # Are we running in a PyInstaller bundle
 # https://pyinstaller.org/en/stable/runtime-information.html#run-time-information
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+
     class NullOutput(object):
         def write(self, string):
             pass

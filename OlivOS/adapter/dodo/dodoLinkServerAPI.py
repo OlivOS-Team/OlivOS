@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -23,8 +23,17 @@ import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -33,7 +42,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -42,7 +51,7 @@ class server(OlivOS.API.Proc_templet):
             'pulse_interval': None,
             'last_s': None,
             'ws_obj': None,
-            'ws_item': None
+            'ws_item': None,
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
@@ -50,9 +59,7 @@ class server(OlivOS.API.Proc_templet):
         self.log(2, 'OlivOS dodo link server [' + self.Proc_name + '] is running')
         while True:
             api_obj = OlivOS.dodoLinkSDK.API.getGateway(
-                OlivOS.dodoLinkSDK.get_SDK_bot_info_from_Plugin_bot_info(
-                    self.Proc_data['bot_info_dict']
-                )
+                OlivOS.dodoLinkSDK.get_SDK_bot_info_from_Plugin_bot_info(self.Proc_data['bot_info_dict'])
             )
             if self.Proc_data['bot_info_dict'].platform['model'] == 'v1':
                 api_obj.host = OlivOS.dodoLinkSDK.sdkAPIHost['v1']
@@ -71,9 +78,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_message(self, ws, message):
         try:
-            tmp_data_rx_obj = OlivOS.dodoLinkSDK.PAYLOAD.rxPacket(
-                data=json.loads(message.decode('utf-8'))
-            )
+            tmp_data_rx_obj = OlivOS.dodoLinkSDK.PAYLOAD.rxPacket(data=json.loads(message.decode('utf-8')))
             if tmp_data_rx_obj.active:
                 if tmp_data_rx_obj.data.type == 0:
                     sdk_event = OlivOS.dodoLinkSDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
@@ -98,14 +103,11 @@ class server(OlivOS.API.Proc_templet):
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
-        ws.run_forever(
-            ping_interval=30,
-            ping_timeout=5
-        )
+        ws.run_forever(ping_interval=30, ping_timeout=5)
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
         self.Proc_data['extend_data']['ws_item'] = None

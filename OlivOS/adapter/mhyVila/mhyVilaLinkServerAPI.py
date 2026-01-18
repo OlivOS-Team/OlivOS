@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 @ _______________________    ________________
 @ __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 @ _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ r'''
 @License   :   AGPL3
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import threading
 import time
@@ -25,8 +25,17 @@ import OlivOS
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -35,7 +44,7 @@ class server(OlivOS.API.Proc_templet):
             dead_interval=dead_interval,
             rx_queue=rx_queue,
             tx_queue=tx_queue,
-            logger_proc=logger_proc
+            logger_proc=logger_proc,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -45,22 +54,14 @@ class server(OlivOS.API.Proc_templet):
             'last_s': None,
             'ws_obj': None,
             'ws_item': None,
-            'ws_PLogin': {
-                'uid': 0,
-                'token': '',
-                'platform': 3,
-                'app_id': 104,
-                'device_id': ''
-            }
+            'ws_PLogin': {'uid': 0, 'token': '', 'platform': 3, 'app_id': 104, 'device_id': ''},
         }
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
         self.log(2, 'OlivOS mhyVila link server [' + self.Proc_name + '] is running')
         while True:
-            sdk_bot_info = OlivOS.mhyVilaSDK.get_SDK_bot_info_from_Plugin_bot_info(
-                self.Proc_data['bot_info_dict']
-            )
+            sdk_bot_info = OlivOS.mhyVilaSDK.get_SDK_bot_info_from_Plugin_bot_info(self.Proc_data['bot_info_dict'])
             api_obj = OlivOS.mhyVilaSDK.API.getWebsocketInfo(sdk_bot_info)
             try:
                 api_obj.do_api('GET')
@@ -70,7 +71,7 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_data['extend_data']['ws_PLogin']['token'] = '%s.%s.%s' % (
                         str(sdk_bot_info.vila_id),
                         OlivOS.mhyVilaSDK.get_bot_secret(sdk_bot_info),
-                        str(sdk_bot_info.bot_id)
+                        str(sdk_bot_info.bot_id),
                     )
                     self.Proc_data['extend_data']['ws_PLogin']['platform'] = int(api_obj_json['data']['platform'])
                     self.Proc_data['extend_data']['ws_PLogin']['app_id'] = int(api_obj_json['data']['app_id'])
@@ -92,13 +93,9 @@ class server(OlivOS.API.Proc_templet):
         try:
             # print(message)
             messageObj = OlivOS.mhyVilaSDK.PAYLOAD.rxPacket(message)
-            if messageObj.dataHeader.BizType in [
-                OlivOS.mhyVilaSDK.protoEnum.Model_ROBOTEVENT.value
-            ]:
+            if messageObj.dataHeader.BizType in [OlivOS.mhyVilaSDK.protoEnum.Model_ROBOTEVENT.value]:
                 sdk_event = OlivOS.mhyVilaSDK.event(
-                    messageObj.dataHeader.BizType,
-                    messageObj.dataTable,
-                    self.Proc_data['bot_info_dict']
+                    messageObj.dataHeader.BizType, messageObj.dataTable, self.Proc_data['bot_info_dict']
                 )
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 self.Proc_info.tx_queue.put(tx_packet_data, block=False)
@@ -113,10 +110,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_open(self, ws: websocket.WebSocketApp):
         self.send_PLogin(ws)
-        threading.Thread(
-            target=self.run_pulse,
-            args=()
-        ).start()
+        threading.Thread(target=self.run_pulse, args=()).start()
         self.log(2, 'OlivOS mhyVila link server [' + self.Proc_name + '] websocket link start')
 
     def run_pulse(self):
@@ -161,7 +155,7 @@ class server(OlivOS.API.Proc_templet):
             on_message=self.on_message,
             on_data=self.on_data,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 from enum import IntEnum
 import json
@@ -23,36 +23,23 @@ import OlivOS
 
 
 class intents_T(IntEnum):
-    GUILDS = (1 << 0)  # 频道变更
-    GUILD_MEMBERS = (1 << 1)  # 频道成员变更
-    GUILD_MESSAGES = (1 << 9)  # 消息事件，仅 *私域* 机器人能够设置此 intents。
-    GUILD_MESSAGE_REACTIONS = (1 << 10)  # 戳表情
-    DIRECT_MESSAGE = (1 << 12)  # 私聊消息
-    INTERACTION = (1 << 26)  # 互动事件变更
-    MESSAGE_AUDIT = (1 << 27)  # 消息审核变更
-    FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
-    AUDIO_ACTION = (1 << 29)  # 语音消息
-    PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
+    GUILDS = 1 << 0  # 频道变更
+    GUILD_MEMBERS = 1 << 1  # 频道成员变更
+    GUILD_MESSAGES = 1 << 9  # 消息事件，仅 *私域* 机器人能够设置此 intents。
+    GUILD_MESSAGE_REACTIONS = 1 << 10  # 戳表情
+    DIRECT_MESSAGE = 1 << 12  # 私聊消息
+    INTERACTION = 1 << 26  # 互动事件变更
+    MESSAGE_AUDIT = 1 << 27  # 消息审核变更
+    FORUMS_EVENT = 1 << 28  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
+    AUDIO_ACTION = 1 << 29  # 语音消息
+    PUBLIC_GUILD_MESSAGES = 1 << 30  # 消息事件，此为公域的消息事件
 
 
-sdkAPIHost = {
-    'default': 'https://api.sgroup.qq.com',
-    'sandbox': 'https://sandbox.api.sgroup.qq.com'
-}
+sdkAPIHost = {'default': 'https://api.sgroup.qq.com', 'sandbox': 'https://sandbox.api.sgroup.qq.com'}
 
-sdkAPIRoute = {
-    'guilds': '/guilds',
-    'channels': '/channels',
-    'dms': '/dms',
-    'users': '/users',
-    'gateway': '/gateway'
-}
+sdkAPIRoute = {'guilds': '/guilds', 'channels': '/channels', 'dms': '/dms', 'users': '/users', 'gateway': '/gateway'}
 
-sdkAPIRouteTemp = {
-    'guild_id': '-1',
-    'channel_id': '-1',
-    'user_id': '-1'
-}
+sdkAPIRouteTemp = {'guild_id': '-1', 'channel_id': '-1', 'user_id': '-1'}
 
 sdkSubSelfInfo = {}
 
@@ -67,10 +54,7 @@ class bot_info_T(object):
 
 
 def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
-    res = bot_info_T(
-        plugin_bot_info.id,
-        plugin_bot_info.post_info.access_token
-    )
+    res = bot_info_T(plugin_bot_info.id, plugin_bot_info.post_info.access_token)
     res.debug_mode = plugin_bot_info.debug_mode
     if plugin_bot_info.platform['model'] == 'public':
         res.model = 'public'
@@ -97,9 +81,9 @@ class event(object):
             self.base_info['post_type'] = None
 
 
-'''
+"""
 对于WEBSOCKET接口的PAYLOAD实现
-'''
+"""
 
 
 class payload_template(object):
@@ -171,9 +155,7 @@ class PAYLOAD(object):
                     'token': 'Bot %s.%s' % (str(bot_info.id), bot_info.access_token),
                     'intents': tmp_intents,
                     'shard': [0, 1],
-                    'properties': {
-                        'os': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
+                    'properties': {'os': OlivOS.infoAPI.OlivOS_Header_UA},
                 }
             except Exception:
                 self.active = False
@@ -193,9 +175,9 @@ class PAYLOAD(object):
             return res
 
 
-'''
+"""
 对于POST接口的实现
-'''
+"""
 
 
 class api_templet(object):
@@ -225,14 +207,14 @@ class api_templet(object):
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token)
+                'Authorization': 'Bot %s.%s' % (str(self.bot_info.id), self.bot_info.access_token),
             }
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request('POST', send_url, headers=headers, data=payload)
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request('GET', send_url, headers=headers)
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
@@ -357,12 +339,11 @@ def get_Event_from_SDK(target_event):
         bot_id=target_event.base_info['self_id'],
         platform_sdk=target_event.platform['sdk'],
         platform_platform=target_event.platform['platform'],
-        platform_model=target_event.platform['model']
+        platform_model=target_event.platform['model'],
     )
     if plugin_event_bot_hash not in sdkSubSelfInfo:
         tmp_bot_info = bot_info_T(
-            target_event.sdk_event.base_info['self_id'],
-            target_event.sdk_event.base_info['token']
+            target_event.sdk_event.base_info['self_id'], target_event.sdk_event.base_info['token']
         )
         api_msg_obj = API.getMe(tmp_bot_info)
         try:
@@ -371,38 +352,26 @@ def get_Event_from_SDK(target_event):
             sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
         except Exception:
             pass
-    if target_event.sdk_event.payload.data.t in [
-        'MESSAGE_CREATE',
-        'AT_MESSAGE_CREATE'
-    ]:
+    if target_event.sdk_event.payload.data.t in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
         message_obj = None
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content']
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -416,7 +385,7 @@ def get_Event_from_SDK(target_event):
                 str(target_event.sdk_event.payload.data.d['channel_id']),
                 str(target_event.sdk_event.payload.data.d['author']['id']),
                 message_obj,
-                'group'
+                'group',
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = target_event.sdk_event.payload.data.d['id']
@@ -453,30 +422,21 @@ def get_Event_from_SDK(target_event):
         if 'content' in target_event.sdk_event.payload.data.d:
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content']
+                    'qqGuild_string', target_event.sdk_event.payload.data.d['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
             else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
+                message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
         if 'attachments' in target_event.sdk_event.payload.data.d:
             if type(target_event.sdk_event.payload.data.d['attachments']) is list:
                 for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
                     if 'content_type' in attachments_this:
                         if attachments_this['content_type'].startswith('image'):
                             message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
+                                OlivOS.messageAPI.PARA.image('https://%s' % attachments_this['url'])
                             )
         try:
             message_obj.init_data()
@@ -487,9 +447,7 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
-                str(target_event.sdk_event.payload.data.d['author']['id']),
-                message_obj,
-                'friend'
+                str(target_event.sdk_event.payload.data.d['author']['id']), message_obj, 'friend'
             )
             target_event.data.message_sdk = message_obj
             target_event.data.message_id = str(target_event.sdk_event.payload.data.d['id'])
@@ -536,10 +494,7 @@ class event_action(object):
                     res_list.append({
                         'name': res_this,
                     })
-            this_msg.data.embed = {
-                'prompt': res,
-                'fields': res_list
-            }
+            this_msg.data.embed = {'prompt': res, 'fields': res_list}
             this_msg.do_api()
 
     def get_login_info(target_event):

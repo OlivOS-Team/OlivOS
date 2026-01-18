@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import OlivOS
 
@@ -26,8 +26,18 @@ import traceback
 
 
 class server(OlivOS.API.Proc_templet):
-    def __init__(self, Proc_name, scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None, logger_proc=None,
-                 control_queue=None, debug_mode=False, bot_info_dict=None):
+    def __init__(
+        self,
+        Proc_name,
+        scan_interval=0.001,
+        dead_interval=1,
+        rx_queue=None,
+        tx_queue=None,
+        logger_proc=None,
+        control_queue=None,
+        debug_mode=False,
+        bot_info_dict=None,
+    ):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -37,7 +47,7 @@ class server(OlivOS.API.Proc_templet):
             rx_queue=rx_queue,
             tx_queue=tx_queue,
             logger_proc=logger_proc,
-            control_queue=control_queue
+            control_queue=control_queue,
         )
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
@@ -86,7 +96,7 @@ async def start(room: int, Proc: server):
                         OlivOS.biliLiveSDK.send_QRCode_event(
                             Proc.Proc_data['bot_info_dict'].hash,
                             os.path.abspath(conf_dir_path + '/qrcode.png'),
-                            Proc.Proc_info.control_queue
+                            Proc.Proc_info.control_queue,
                         )
                         while True:
                             await asyncio.sleep(5)
@@ -94,9 +104,7 @@ async def start(room: int, Proc: server):
                                 Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login out of time')
                                 break  # 登入失敗
                             res = await OlivOS.biliLiveSDK.aiohttpPost(
-                                session,
-                                OlivOS.biliLiveSDK.CHECK_LOGIN_RESULT,
-                                oauthKey=authKey
+                                session, OlivOS.biliLiveSDK.CHECK_LOGIN_RESULT, oauthKey=authKey
                             )
                             if res['status']:
                                 isLoop = False
@@ -111,13 +119,7 @@ async def start(room: int, Proc: server):
                     Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login error')
                     traceback.print_exc()
             Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] login succeed')
-        bot = OlivOS.biliLiveSDK.BiliLiveBot(
-            room_id=room,
-            uid=0,
-            session=session,
-            loop=session._loop,
-            Proc=Proc
-        )
+        bot = OlivOS.biliLiveSDK.BiliLiveBot(room_id=room, uid=0, session=session, loop=session._loop, Proc=Proc)
         await bot.init_room()
         bot.start()
         Proc.log(2, 'OlivOS biliLive Link server [' + Proc.Proc_name + '] link start')
@@ -153,13 +155,14 @@ async def start(room: int, Proc: server):
                                                     tmp_data['msg'] = tmp_msg
                                             flag_continue = False
                                             try:
-                                                await OlivOS.biliLiveSDK.aiohttpPost(session,
-                                                                                     OlivOS.biliLiveSDK.SEND_URL,
-                                                                                     rnd=time.time(),
-                                                                                     csrf=token,
-                                                                                     csrf_token=token,
-                                                                                     **tmp_data
-                                                                                     )
+                                                await OlivOS.biliLiveSDK.aiohttpPost(
+                                                    session,
+                                                    OlivOS.biliLiveSDK.SEND_URL,
+                                                    rnd=time.time(),
+                                                    csrf=token,
+                                                    csrf_token=token,
+                                                    **tmp_data,
+                                                )
                                             except Exception:
                                                 flag_continue = True
                                             if flag_msg_loop:

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-r'''
+r"""
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/
 _  / / /_  /  __  / __ | / /_  / / /____ \
@@ -12,7 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
-'''
+"""
 
 import time
 import json
@@ -40,7 +40,7 @@ def get_SDK_bot_info_from_Event(target_event):
         target_event.bot_info.id,
         target_event.bot_info.post_info.host,
         target_event.bot_info.post_info.port,
-        target_event.bot_info.post_info.access_token
+        target_event.bot_info.post_info.access_token,
     )
     res.debug_mode = target_event.bot_info.debug_mode
     return res
@@ -83,7 +83,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(Plugin_bot_info, platform_bot_info):
         id=Plugin_bot_info.id,
         host=platform_bot_info.host,
         port=platform_bot_info.port,
-        access_token=platform_bot_info.access_token
+        access_token=platform_bot_info.access_token,
     )
     res.debug_mode = Plugin_bot_info.debug_mode
     return res
@@ -128,14 +128,16 @@ def get_Event_from_SDK(target_event):
             target_event.sdk_event.json['FromChannel'],
             target_event.sdk_event.json['Uid'],
             target_event.sdk_event.json['Content'],
-            'group'
+            'group',
         )
-        target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('old_string',
-                                                                          target_event.sdk_event.json['Content'])
+        target_event.data.message_sdk = OlivOS.messageAPI.Message_templet(
+            'old_string', target_event.sdk_event.json['Content']
+        )
         target_event.data.message_id = target_event.sdk_event.json['Id']
         target_event.data.raw_message = target_event.sdk_event.json['OriginalContent']
-        target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('old_string', target_event.sdk_event.json[
-            'OriginalContent'])
+        target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet(
+            'old_string', target_event.sdk_event.json['OriginalContent']
+        )
         target_event.data.font = None
         target_event.data.sender['user_id'] = target_event.sdk_event.json['Uid']
         target_event.data.sender['nickname'] = target_event.sdk_event.json['NickName']
@@ -165,12 +167,9 @@ class api_templet(object):
             res.update({
                 'Type': 1,
                 'Context': self.data.text,
-                'Account': {
-                    "Uid": self.bot_info.id,
-                    "Token": self.bot_info.access_token
-                },
+                'Account': {'Uid': self.bot_info.id, 'Token': self.bot_info.access_token},
                 'Channel': self.data.chat_id,
-                'ReferencedMessageId': None
+                'ReferencedMessageId': None,
             })
         self.res = res
         return res
