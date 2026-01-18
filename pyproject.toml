@@ -138,7 +138,7 @@ select = [
 
 [tool.ruff.format]
 preview = true
-quote-style = "preserve"
+quote-style = "single"
 docstring-code-format = true
 indent-style = "space"
-skip-magic-trailing-comma = true
+skip-magic-trailing-comma = false
