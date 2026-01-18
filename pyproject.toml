@@ -93,6 +93,7 @@ extend = [
 # 开发工具
 dev = [
     "pytest",
+    "black",
     "flake8",
     "ruff"
 ]
