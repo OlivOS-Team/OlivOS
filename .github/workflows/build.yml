@@ -8,296 +8,185 @@ on:
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
+
 jobs:
-  build-win64-release:
+  build-windows:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          # Python 3.11.0 - x64 - Release
+          - python-version: '3.11.0'
+            architecture: x64
+            debug: false
+            job-name: build-win64-release
+            artifact-name: OlivOS-Win
+            extra-deps: '.[win,extend,build]'
+          
+          # Python 3.11.0 - x64 - Debug
+          - python-version: '3.11.0'
+            architecture: x64
+            debug: true
+            job-name: build-win64-debug
+            artifact-name: OlivOS-Win-64-debug
+            extra-deps: '.[win,extend,build]'
+          
+          # Python 3.14 - x64 - Release (disabled)
+          - python-version: '3.14'
+            architecture: x64
+            debug: false
+            job-name: build-win64-py314-release
+            artifact-name: OlivOS-Win
+            extra-deps: '.[win,extend,build]'
+            enabled: false
+            freethreaded: true
+          
+          # Python 3.14 - x64 - Debug (disabled)
+          - python-version: '3.14'
+            architecture: x64
+            debug: true
+            job-name: build-win64-py314-debug
+            artifact-name: OlivOS-Win-64-debug
+            extra-deps: '.[win,extend,build]'
+            enabled: false
+            freethreaded: true
+          
+          # Python 3.7.5 - x64 - Release
+          - python-version: '3.7.5'
+            architecture: x64
+            debug: false
+            job-name: build-win64-old-release
+            artifact-name: OlivOS-Win-64-old
+            extra-deps: '.[py37,win,extend,build]'
+          
+          # Python 3.7.5 - x64 - Debug
+          - python-version: '3.7.5'
+            architecture: x64
+            debug: true
+            job-name: build-win64-old-debug
+            artifact-name: OlivOS-Win-64-old-debug
+            extra-deps: '.[py37,win,extend,build]'
+          
+          # Python 3.7.5 - x86 - Release
+          - python-version: '3.7.5'
+            architecture: x86
+            debug: false
+            job-name: build-win32-old-release
+            artifact-name: OlivOS-Win-32-old
+            extra-deps: '.[py37,win,extend,build]'
+          
+          # Python 3.7.5 - x86 - Debug
+          - python-version: '3.7.5'
+            architecture: x86
+            debug: true
+            job-name: build-win32-old-debug
+            artifact-name: OlivOS-Win-32-old-debug
+            extra-deps: '.[py37,win,extend,build]'
     steps:
     - uses: actions/checkout@v3
-    - name: Setup Python
+    
+    - name: Setup Python ${{ matrix.python-version }} (${{ matrix.architecture }})
       uses: actions/setup-python@v6
       with:
-        python-version: 3.11.0
+        python-version: ${{ matrix.python-version }}
         cache: pip
-        architecture: x64
+        architecture: ${{ matrix.architecture }}
+        freethreaded: ${{ matrix.freethreaded || false }}
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install .[win,extend,build]
-    - name: Run packing
+        python -m pip install ${{ matrix.extra-deps }}
+    
+    - name: Run packing (${{ matrix.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        if (${{ matrix.debug }}) {
+          cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+          $env:OLIVOS_DEBUG = "1"
+        } else {
+          cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+        }
         pyinstaller ./OlivOS.spec
-    - name: Run artifact
+    
+    - name: Prepare artifact
       run: |
         mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS.exe
-    - name: Upload Artifact OlivOS
+        if (${{ matrix.debug }}) {
+          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
+        } else {
+          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS.exe
+        }
+    
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: OlivOS-Win
+        name: ${{ matrix.artifact-name }}
         path: ./OlivOS-Win
 
-  build-win64-debug:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.11.0
-        cache: pip
-        architecture: x64
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        $env:OLIVOS_DEBUG = "1"; pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS_debug.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-64-debug
-        path: ./OlivOS-Win
-
-  build-win64-py314-release:
-    if: false
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.14
-        cache: pip
-        architecture: x64
-        freethreaded: true
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win
-        path: ./OlivOS-Win
-
-  build-win64-py314-debug:
-    if: false
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.14
-        cache: pip
-        architecture: x64
-        freethreaded: true
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        $env:OLIVOS_DEBUG = "1"; pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS_debug.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-64-debug
-        path: ./OlivOS-Win
-
-  build-win64-old-release:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.7.5
-        cache: pip
-        architecture: x64
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[py37,win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-64-old
-        path: ./OlivOS-Win
-
-  build-win64-old-debug:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.7.5
-        cache: pip
-        architecture: x64
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[py37,win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        $env:OLIVOS_DEBUG = "1"; pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS_debug.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-64-old-debug
-        path: ./OlivOS-Win
-
-  build-win32-old-release:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.7.5
-        cache: pip
-        architecture: x86
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[py37,win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-32-old
-        path: ./OlivOS-Win
-
-  build-win32-old-debug:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: 3.7.5
-        cache: pip
-        architecture: x86
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[py37,win,extend,build]
-    - name: Run packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        $env:OLIVOS_DEBUG = "1"; pyinstaller ./OlivOS.spec
-    - name: Run artifact
-      run: |
-        mkdir OlivOS-Win
-        cp ./dist/OlivOS.exe ./OlivOS-win/OlivOS_debug.exe
-    - name: Upload Artifact OlivOS
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Win-32-old-debug
-        path: ./OlivOS-Win
-
-  build-linux-release:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Setup Python
+    
+    - name: Setup Python 3.10.8
       uses: actions/setup-python@v6
       with:
-        python-version: 3.10.8
+        python-version: '3.10.8'
         cache: pip
         architecture: x64
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
+    
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./OlivOS.spec
-    - name: Run artifact
+    
+    - name: Prepare artifact
       run: |
         mkdir OlivOS-PKG
         cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
-    - name: Upload Artifact OlivOS
+    
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OlivOS-Linux
         path: ./OlivOS-PKG
 
-  build-macos-release:
+  build-macos:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Setup Python
+    
+    - name: Setup Python 3.11.0
       uses: actions/setup-python@v6
       with:
-        python-version: 3.11.0
+        python-version: '3.11.0'
         cache: pip
         architecture: x64
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
+    
     - name: Run packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./OlivOS.spec
-    - name: Run artifact
+    
+    - name: Prepare artifact
       run: |
         mkdir OlivOS-PKG
         cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
-    - name: Upload Artifact OlivOS
+    
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OlivOS-MacOS
@@ -307,32 +196,37 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag'
     needs:
-      - build-win64-release
-      - build-linux-release
+      - build-windows
+      - build-linux
     permissions:
       contents: write
     steps:
-      - name: Download Artifact
+      - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
           name: OlivOS-Win
           path: OlivOS-Win/
-      - name: Download Artifact
+      
+      - name: Download Linux Artifact
         uses: actions/download-artifact@v4
         with:
           name: OlivOS-Linux
           path: OlivOS-Linux/
+      
       - name: Packing Release
         run: |
           cd ./OlivOS-Win
           zip -r ../OlivOS-Win.zip ./
           cd ../
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
+          
           cd ./OlivOS-Linux
           zip -r ../OlivOS-Linux.zip ./
           cd ../
           cp ./OlivOS-Linux.zip ./OlivOS-Linux-${{ github.ref_name }}.zip
+          
           ls -R
+      
       - name: Create Draft Release
         uses: ncipollo/release-action@v1
         with:
