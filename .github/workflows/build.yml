@@ -101,7 +101,7 @@ jobs:
     - name: Run packing (${{ matrix.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        if (${{ matrix.debug == true }}) {
+        if (${{ matrix.debug && '1' || '0' }}) {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
           $env:OLIVOS_DEBUG = "1"
         } else {
@@ -112,7 +112,7 @@ jobs:
     - name: Prepare artifact
       run: |
         mkdir OlivOS-Win
-        if (${{ matrix.debug == true }}) {
+        if (${{ matrix.debug && '1' || '0' }}) {
           cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
         } else {
           cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS.exe
