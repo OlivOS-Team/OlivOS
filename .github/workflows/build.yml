@@ -17,69 +17,69 @@ jobs:
       matrix:
         include:
           # Python 3.11.0 - x64 - Release
-          - python-version: '3.11.0'
+          - job-name: build-win64-release
+            python-version: '3.11.0'
             architecture: x64
             debug: false
-            job-name: build-win64-release
             artifact-name: OlivOS-Win
             extra-deps: '.[win,extend,build]'
           
           # Python 3.11.0 - x64 - Debug
-          - python-version: '3.11.0'
+          - artifact-name: OlivOS-Win-64-debug
+            python-version: '3.11.0'
             architecture: x64
             debug: true
             job-name: build-win64-debug
-            artifact-name: OlivOS-Win-64-debug
             extra-deps: '.[win,extend,build]'
           
-          # Python 3.14 - x64 - Release (disabled)
-          - python-version: '3.14'
-            architecture: x64
-            debug: false
-            job-name: build-win64-py314-release
-            artifact-name: OlivOS-Win
-            extra-deps: '.[win,extend,build]'
-            freethreaded: true
+          # # Python 3.14 - x64 - Release (disabled)
+          # - artifact-name: OlivOS-Win
+          #   python-version: '3.14'
+          #   architecture: x64
+          #   debug: false
+          #   job-name: build-win64-py314-release
+          #   extra-deps: '.[win,extend,build]'
+          #   freethreaded: true
           
-          # Python 3.14 - x64 - Debug (disabled)
-          - python-version: '3.14'
-            architecture: x64
-            debug: true
-            job-name: build-win64-py314-debug
-            artifact-name: OlivOS-Win-64-debug
-            extra-deps: '.[win,extend,build]'
-            freethreaded: true
+          # # Python 3.14 - x64 - Debug (disabled)
+          # - artifact-name: OlivOS-Win-64-debug
+          #   python-version: '3.14'
+          #   architecture: x64
+          #   debug: true
+          #   job-name: build-win64-py314-debug
+          #   extra-deps: '.[win,extend,build]'
+          #   freethreaded: true
           
           # Python 3.7.5 - x64 - Release
-          - python-version: '3.7.5'
+          - artifact-name: OlivOS-Win-64-old
+            python-version: '3.7.5'
             architecture: x64
             debug: false
             job-name: build-win64-old-release
-            artifact-name: OlivOS-Win-64-old
             extra-deps: '.[py37,win,extend,build]'
           
           # Python 3.7.5 - x64 - Debug
-          - python-version: '3.7.5'
+          - artifact-name: OlivOS-Win-64-old-debug
+            python-version: '3.7.5'
             architecture: x64
             debug: true
             job-name: build-win64-old-debug
-            artifact-name: OlivOS-Win-64-old-debug
             extra-deps: '.[py37,win,extend,build]'
           
           # Python 3.7.5 - x86 - Release
-          - python-version: '3.7.5'
+          - artifact-name: OlivOS-Win-32-old
+            python-version: '3.7.5'
             architecture: x86
             debug: false
             job-name: build-win32-old-release
-            artifact-name: OlivOS-Win-32-old
             extra-deps: '.[py37,win,extend,build]'
           
           # Python 3.7.5 - x86 - Debug
-          - python-version: '3.7.5'
+          - artifact-name: OlivOS-Win-32-old-debug
+            python-version: '3.7.5'
             architecture: x86
             debug: true
             job-name: build-win32-old-debug
-            artifact-name: OlivOS-Win-32-old-debug
             extra-deps: '.[py37,win,extend,build]'
 
     steps:
@@ -91,7 +91,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: pip
         architecture: ${{ matrix.architecture }}
-        freethreaded: ${{ matrix.freethreaded || false }}
+        # freethreaded: ${{ matrix.freethreaded || false }}
     
     - name: Install dependencies
       run: |
