@@ -20,67 +20,73 @@ jobs:
           - job-name: build-win64-release
             python-version: '3.11.0'
             architecture: x64
+            freethreaded: false
+            extra-deps: '.[win,extend,build]'
             debug: false
             artifact-name: OlivOS-Win
-            extra-deps: '.[win,extend,build]'
           
           # Python 3.11.0 - x64 - Debug
-          - artifact-name: OlivOS-Win-64-debug
+          - job-name: build-win64-debug
             python-version: '3.11.0'
             architecture: x64
-            debug: true
-            job-name: build-win64-debug
+            freethreaded: false
             extra-deps: '.[win,extend,build]'
+            debug: true
+            artifact-name: OlivOS-Win-64-debug
           
           # # Python 3.14 - x64 - Release (disabled)
-          # - artifact-name: OlivOS-Win
+          # - job-name: build-win64-py314-release
           #   python-version: '3.14'
           #   architecture: x64
-          #   debug: false
-          #   job-name: build-win64-py314-release
-          #   extra-deps: '.[win,extend,build]'
           #   freethreaded: true
+          #   extra-deps: '.[win,extend,build]'
+          #   debug: false
+          #   artifact-name: OlivOS-Win
           
           # # Python 3.14 - x64 - Debug (disabled)
-          # - artifact-name: OlivOS-Win-64-debug
+          # - job-name: build-win64-py314-debug
           #   python-version: '3.14'
           #   architecture: x64
-          #   debug: true
-          #   job-name: build-win64-py314-debug
-          #   extra-deps: '.[win,extend,build]'
           #   freethreaded: true
+          #   extra-deps: '.[win,extend,build]'
+          #   debug: true
+          #   artifact-name: OlivOS-Win-64-debug
           
           # Python 3.7.5 - x64 - Release
-          - artifact-name: OlivOS-Win-64-old
+          - job-name: build-win64-old-release
             python-version: '3.7.5'
             architecture: x64
-            debug: false
-            job-name: build-win64-old-release
+            freethreaded: false
             extra-deps: '.[py37,win,extend,build]'
+            debug: false
+            artifact-name: OlivOS-Win-64-old
           
           # Python 3.7.5 - x64 - Debug
-          - artifact-name: OlivOS-Win-64-old-debug
+          - job-name: build-win64-old-debug
             python-version: '3.7.5'
             architecture: x64
-            debug: true
-            job-name: build-win64-old-debug
+            freethreaded: false
             extra-deps: '.[py37,win,extend,build]'
+            debug: true
+            artifact-name: OlivOS-Win-64-old-debug
           
           # Python 3.7.5 - x86 - Release
-          - artifact-name: OlivOS-Win-32-old
+          - job-name: build-win32-old-release
             python-version: '3.7.5'
             architecture: x86
-            debug: false
-            job-name: build-win32-old-release
+            freethreaded: false
             extra-deps: '.[py37,win,extend,build]'
+            debug: false
+            artifact-name: OlivOS-Win-32-old
           
           # Python 3.7.5 - x86 - Debug
-          - artifact-name: OlivOS-Win-32-old-debug
+          - job-name: build-win32-old-debug
             python-version: '3.7.5'
             architecture: x86
-            debug: true
-            job-name: build-win32-old-debug
+            freethreaded: false
             extra-deps: '.[py37,win,extend,build]'
+            debug: true
+            artifact-name: OlivOS-Win-32-old-debug
 
     steps:
     - uses: actions/checkout@v3
@@ -91,14 +97,14 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: pip
         architecture: ${{ matrix.architecture }}
-        # freethreaded: ${{ matrix.freethreaded || false }}
+        freethreaded: ${{ matrix.freethreaded && true || false }}
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install ${{ matrix.extra-deps }}
     
-    - name: Run packing (${{ matrix.debug && 'Debug' || 'Release' }})
+    - name: Packing (${{ matrix.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ matrix.debug && '1' || '0' }}) {
@@ -138,14 +144,11 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
     
-    - name: Run packing
+    - name: Packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./OlivOS.spec
-    
-    - name: Prepare artifact
-      run: |
         mkdir OlivOS-PKG
         cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
     
@@ -172,14 +175,11 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
     
-    - name: Run packing
+    - name: Run Packing
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         pyinstaller ./OlivOS.spec
-    
-    - name: Prepare artifact
-      run: |
         mkdir OlivOS-PKG
         cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
     
