@@ -84,8 +84,10 @@ jobs:
             extra-deps: '.[py37,win,extend,build]'
     steps:
     - uses: actions/checkout@v3
+      if: matrix.enabled != false
     
     - name: Setup Python ${{ matrix.python-version }} (${{ matrix.architecture }})
+      if: matrix.enabled != false
       uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
@@ -94,11 +96,13 @@ jobs:
         freethreaded: ${{ matrix.freethreaded || false }}
     
     - name: Install dependencies
+      if: matrix.enabled != false
       run: |
         python -m pip install --upgrade pip
         python -m pip install ${{ matrix.extra-deps }}
     
     - name: Run packing (${{ matrix.debug && 'Debug' || 'Release' }})
+      if: matrix.enabled != false
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ matrix.debug }}) {
@@ -110,6 +114,7 @@ jobs:
         pyinstaller ./OlivOS.spec
     
     - name: Prepare artifact
+      if: matrix.enabled != false
       run: |
         mkdir OlivOS-Win
         if (${{ matrix.debug }}) {
@@ -119,6 +124,7 @@ jobs:
         }
     
     - name: Upload Artifact
+      if: matrix.enabled != false
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact-name }}
