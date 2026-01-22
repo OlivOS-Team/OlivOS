@@ -108,9 +108,6 @@ jobs:
           cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
         }
         pyinstaller ./OlivOS.spec
-    
-    - name: Prepare artifact
-      run: |
         mkdir OlivOS-Win
         if (${{ matrix.debug && '1' || '0' }}) {
           cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
