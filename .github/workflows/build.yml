@@ -52,23 +52,23 @@ jobs:
           #   debug: true
           #   artifact-name: OlivOS-Win-64-debug
 
-          # # Python 3.11.0 - x64 - Nuitka - Release
-          # - name: build-win64-nuitka-release
-          #   python-version: '3.11.0'
-          #   architecture: x64
-          #   freethreaded: false
-          #   build-type: nuitka
-          #   debug: false
-          #   artifact-name: OlivOS-Win-64-nuitka
+          # Python 3.11.0 - x64 - Nuitka - Release
+          - name: build-win64-nuitka-release
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+            artifact-name: OlivOS-Win-64-nuitka
           
-          # # Python 3.11.0 - x64 - Nuitka - Debug
-          # - name: build-win64-nuitka-debug
-          #   python-version: '3.11.0'
-          #   architecture: x64
-          #   freethreaded: false
-          #   build-type: nuitka
-          #   debug: true
-          #   artifact-name: OlivOS-Win-64-nuitka-debug
+          # Python 3.11.0 - x64 - Nuitka - Debug
+          - name: build-win64-nuitka-debug
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: true
+            artifact-name: OlivOS-Win-64-nuitka-debug
           
           # Python 3.7.5 - x64 - Release
           - name: build-win64-old-release
@@ -108,7 +108,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
+    - name: Install MSVC Build Tools
+      if: matrix.build-type == 'nuitka'
+      run: |
+        choco install visualstudio2022buildtools -y --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional"
+        echo "MSBUILD_PATH=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin" >> $env:GITHUB_ENV
+        echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
+
     - name: Setup Python ${{ matrix.python-version }} (${{ matrix.architecture }})
       uses: actions/setup-python@v6
       with:
@@ -117,12 +124,12 @@ jobs:
         architecture: ${{ matrix.architecture }}
         freethreaded: ${{ matrix.freethreaded && true || false }}
     
-    - name: Install dependencies
+    - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install .[${{ matrix.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ matrix.build-type == 'pyinstaller' && 'build' || matrix.build-type }}]
     
-    - name: Packing (${{ matrix.debug && 'Debug' || 'Release' }})
+    - name: Build (${{ matrix.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ matrix.build-type == 'pyinstaller' && '1' || '0' }}) {
