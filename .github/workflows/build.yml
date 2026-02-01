@@ -21,7 +21,7 @@ jobs:
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
-            extra-deps: '.[win,extend,build]'
+            build-type: pyinstaller
             debug: false
             artifact-name: OlivOS-Win
           
@@ -30,7 +30,7 @@ jobs:
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
-            extra-deps: '.[win,extend,build]'
+            build-type: pyinstaller
             debug: true
             artifact-name: OlivOS-Win-64-debug
           
@@ -39,7 +39,7 @@ jobs:
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
-          #   extra-deps: '.[win,extend,build]'
+          #   build-type: pyinstaller
           #   debug: false
           #   artifact-name: OlivOS-Win
           
@@ -48,16 +48,34 @@ jobs:
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
-          #   extra-deps: '.[win,extend,build]'
+          #   build-type: pyinstaller
           #   debug: true
           #   artifact-name: OlivOS-Win-64-debug
+          # Python 3.11.0 - x64 - Release
+
+          - job-name: build-win64-nuitka-release
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+            artifact-name: OlivOS-Win-64-nuitka
+          
+          # Python 3.11.0 - x64 - Debug
+          - job-name: build-win64-nuitka-debug
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: true
+            artifact-name: OlivOS-Win-64-nuitka-debug
           
           # Python 3.7.5 - x64 - Release
           - job-name: build-win64-old-release
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
-            extra-deps: '.[py37,win,extend,build]'
+            build-type: pyinstaller
             debug: false
             artifact-name: OlivOS-Win-64-old
           
@@ -66,7 +84,7 @@ jobs:
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
-            extra-deps: '.[py37,win,extend,build]'
+            build-type: pyinstaller
             debug: true
             artifact-name: OlivOS-Win-64-old-debug
           
@@ -75,7 +93,7 @@ jobs:
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
-            extra-deps: '.[py37,win,extend,build]'
+            build-type: pyinstaller
             debug: false
             artifact-name: OlivOS-Win-32-old
           
@@ -84,7 +102,7 @@ jobs:
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
-            extra-deps: '.[py37,win,extend,build]'
+            build-type: pyinstaller
             debug: true
             artifact-name: OlivOS-Win-32-old-debug
 
@@ -102,18 +120,31 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install ${{ matrix.extra-deps }}
+        python -m pip install .[${{ matrix.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ matrix.build-type == 'pyinstaller' && 'build' || matrix.build-type }}]
     
     - name: Packing (${{ matrix.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        if (${{ matrix.debug && '1' || '0' }}) {
-          cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-          $env:OLIVOS_DEBUG = "1"
+        if (${{ matrix.build-type == 'pyinstaller' && '1' || '0' }}) {
+          if (${{ matrix.debug && '1' || '0' }}) {
+            cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+            $env:OLIVOS_DEBUG = "1"
+          } else {
+            cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+          }
+          pyinstaller ./OlivOS.spec
         } else {
-          cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+          cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+          nuitka --standalone `
+                 --onefile `
+                 --output-dir=./dist `
+                 --output-filename=OlivOS `
+                 --follow-imports `
+                 --windows-icon-from-ico=./resource/favoricon.ico `
+                 --enable-plugin=tk-inter `
+                 --windows-console-mode=attach `
+                 main.py 
         }
-        pyinstaller ./OlivOS.spec
         mkdir OlivOS-Win
         if (${{ matrix.debug && '1' || '0' }}) {
           cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
