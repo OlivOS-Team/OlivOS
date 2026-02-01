@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           # Python 3.11.0 - x64 - Release
-          - job-name: build-win64-release
+          - name: build-win64-release
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
@@ -26,7 +26,7 @@ jobs:
             artifact-name: OlivOS-Win
           
           # Python 3.11.0 - x64 - Debug
-          - job-name: build-win64-debug
+          - name: build-win64-debug
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
@@ -35,7 +35,7 @@ jobs:
             artifact-name: OlivOS-Win-64-debug
           
           # # Python 3.14 - x64 - Release (disabled)
-          # - job-name: build-win64-py314-release
+          # - name: build-win64-py314-release
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
@@ -44,7 +44,7 @@ jobs:
           #   artifact-name: OlivOS-Win
           
           # # Python 3.14 - x64 - Debug (disabled)
-          # - job-name: build-win64-py314-debug
+          # - name: build-win64-py314-debug
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
@@ -53,7 +53,7 @@ jobs:
           #   artifact-name: OlivOS-Win-64-debug
 
           # # Python 3.11.0 - x64 - Nuitka - Release
-          # - job-name: build-win64-nuitka-release
+          # - name: build-win64-nuitka-release
           #   python-version: '3.11.0'
           #   architecture: x64
           #   freethreaded: false
@@ -62,7 +62,7 @@ jobs:
           #   artifact-name: OlivOS-Win-64-nuitka
           
           # # Python 3.11.0 - x64 - Nuitka - Debug
-          # - job-name: build-win64-nuitka-debug
+          # - name: build-win64-nuitka-debug
           #   python-version: '3.11.0'
           #   architecture: x64
           #   freethreaded: false
@@ -71,7 +71,7 @@ jobs:
           #   artifact-name: OlivOS-Win-64-nuitka-debug
           
           # Python 3.7.5 - x64 - Release
-          - job-name: build-win64-old-release
+          - name: build-win64-old-release
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
@@ -80,7 +80,7 @@ jobs:
             artifact-name: OlivOS-Win-64-old
           
           # Python 3.7.5 - x64 - Debug
-          - job-name: build-win64-old-debug
+          - name: build-win64-old-debug
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
@@ -89,7 +89,7 @@ jobs:
             artifact-name: OlivOS-Win-64-old-debug
           
           # Python 3.7.5 - x86 - Release
-          - job-name: build-win32-old-release
+          - name: build-win32-old-release
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
@@ -98,7 +98,7 @@ jobs:
             artifact-name: OlivOS-Win-32-old
           
           # Python 3.7.5 - x86 - Debug
-          - job-name: build-win32-old-debug
+          - name: build-win32-old-debug
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
