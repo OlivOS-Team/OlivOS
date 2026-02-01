@@ -51,24 +51,24 @@ jobs:
           #   build-type: pyinstaller
           #   debug: true
           #   artifact-name: OlivOS-Win-64-debug
-          # Python 3.11.0 - x64 - Release
 
-          - job-name: build-win64-nuitka-release
-            python-version: '3.11.0'
-            architecture: x64
-            freethreaded: false
-            build-type: nuitka
-            debug: false
-            artifact-name: OlivOS-Win-64-nuitka
+          # # Python 3.11.0 - x64 - Nuitka - Release
+          # - job-name: build-win64-nuitka-release
+          #   python-version: '3.11.0'
+          #   architecture: x64
+          #   freethreaded: false
+          #   build-type: nuitka
+          #   debug: false
+          #   artifact-name: OlivOS-Win-64-nuitka
           
-          # Python 3.11.0 - x64 - Debug
-          - job-name: build-win64-nuitka-debug
-            python-version: '3.11.0'
-            architecture: x64
-            freethreaded: false
-            build-type: nuitka
-            debug: true
-            artifact-name: OlivOS-Win-64-nuitka-debug
+          # # Python 3.11.0 - x64 - Nuitka - Debug
+          # - job-name: build-win64-nuitka-debug
+          #   python-version: '3.11.0'
+          #   architecture: x64
+          #   freethreaded: false
+          #   build-type: nuitka
+          #   debug: true
+          #   artifact-name: OlivOS-Win-64-nuitka-debug
           
           # Python 3.7.5 - x64 - Release
           - job-name: build-win64-old-release
