@@ -76,6 +76,12 @@ build = [
     "setuptools>=63.2.0",
 ]
 
+# nuitka打包工具
+nuitka = [
+    "nuitka",
+    "setuptools>=63.2.0",
+]
+
 # 插件生态所需依赖
 extend = [
     "lxml",
