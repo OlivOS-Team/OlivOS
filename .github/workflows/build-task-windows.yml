@@ -70,7 +70,7 @@ jobs:
                               --onefile `
                               --output-dir=./dist `
                               --output-filename=OlivOS `
-                              --follow-imports `
+                              --recurse-all `
                               --windows-icon-from-ico=./resource/favoricon.ico `
                               --enable-plugin=tk-inter `
                               --include-package=tkinter `
