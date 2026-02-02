@@ -69,14 +69,6 @@ jobs:
             build-type: nuitka
             debug: false
           
-          - name: OlivOS-Win64-nuitka-debug
-            runs-on: windows-latest
-            python-version: '3.11.0'
-            architecture: x64
-            freethreaded: false
-            build-type: nuitka
-            debug: true
-          
           - name: OlivOS-Win64-old-release
             runs-on: windows-latest
             python-version: '3.7.5'
