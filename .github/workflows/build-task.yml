@@ -5,6 +5,9 @@ on:
       name:
         required: true
         type: string
+      runs-on:
+        required: true
+        type: string
       python-version:
         required: true
         type: string
@@ -25,7 +28,8 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    if: inputs.runs-on == 'windows-latest'
+    runs-on: ${{ inputs.runs-on }}
     steps:
     - uses: actions/checkout@v3
 
@@ -91,7 +95,87 @@ jobs:
 
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
-      if: inputs.name == 'build-win64-release'
+      if: inputs.name == 'OlivOS-Win64-release'
       with:
         name: OlivOS-Win
         path: ./OlivOS-Win
+
+  build-linux:
+    if: inputs.runs-on == 'ubuntu-latest'
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        architecture: ${{ inputs.architecture }}
+        freethreaded: ${{ inputs.freethreaded && true || false }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .[extend,build]
+    
+    - name: Packing
+      run: |
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+        pyinstaller ./OlivOS.spec
+        mkdir OlivOS-PKG
+        cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ./OlivOS-PKG
+    
+    - name: Upload Publish Artifact
+      uses: actions/upload-artifact@v4
+      if: inputs.name == 'OlivOS-Linux64-release'
+      with:
+        name: OlivOS-Linux
+        path: ./OlivOS-PKG
+
+  build-macos:
+    if: inputs.runs-on == 'macos-latest'
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        architecture: ${{ inputs.architecture }}
+        freethreaded: ${{ inputs.freethreaded && true || false }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .[extend,build]
+    
+    - name: Packing
+      run: |
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+        pyinstaller ./OlivOS.spec
+        mkdir OlivOS-PKG
+        cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ./OlivOS-PKG
+    
+    - name: Upload Publish Artifact
+      uses: actions/upload-artifact@v4
+      if: inputs.name == 'OlivOS-MacOS64-release'
+      with:
+        name: OlivOS-MacOS
+        path: ./OlivOS-PKG

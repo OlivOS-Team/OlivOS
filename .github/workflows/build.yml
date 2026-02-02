@@ -11,13 +11,13 @@ on:
 
 jobs:
   build-windows-publish:
-    uses: ./.github/workflows/build-task-win.yml
+    uses: ./.github/workflows/build-task.yml
     strategy:
       fail-fast: false 
       matrix:
         include:
-          # Python 3.11.0 - x64 - Release
-          - name: build-win64-release
+          - name: OlivOS-Win64-release
+            runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
@@ -25,6 +25,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
       freethreaded: ${{ matrix.freethreaded }}
@@ -32,77 +33,77 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-windows:
-    uses: ./.github/workflows/build-task-win.yml
+    uses: ./.github/workflows/build-task.yml
     strategy:
       fail-fast: false 
       matrix:
         include:
-          # Python 3.11.0 - x64 - Debug
-          - name: build-win64-debug
+          - name: OlivOS-Win64-debug
+            runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
           
-          # # Python 3.14 - x64 - Release (disabled)
-          # - name: build-win64-py314-release
+          # - name: OlivOS-Win64-py314-release
+          #   runs-on: windows-latest
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
           #   build-type: pyinstaller
           #   debug: false
           
-          # # Python 3.14 - x64 - Debug (disabled)
-          # - name: build-win64-py314-debug
+          # - name: OlivOS-Win64-py314-debug
+          #   runs-on: windows-latest
           #   python-version: '3.14'
           #   architecture: x64
           #   freethreaded: true
           #   build-type: pyinstaller
           #   debug: true
 
-          # Python 3.11.0 - x64 - Nuitka - Release
-          - name: build-win64-nuitka-release
+          - name: OlivOS-Win64-nuitka-release
+            runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
             build-type: nuitka
             debug: false
           
-          # Python 3.11.0 - x64 - Nuitka - Debug
-          - name: build-win64-nuitka-debug
+          - name: OlivOS-Win64-nuitka-debug
+            runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
             freethreaded: false
             build-type: nuitka
             debug: true
           
-          # Python 3.7.5 - x64 - Release
-          - name: build-win64-old-release
+          - name: OlivOS-Win64-old-release
+            runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
           
-          # Python 3.7.5 - x64 - Debug
-          - name: build-win64-old-debug
+          - name: OlivOS-Win64-old-debug
+            runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
           
-          # Python 3.7.5 - x86 - Release
-          - name: build-win32-old-release
+          - name: OlivOS-Win32-old-release
+            runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
             build-type: pyinstaller
             debug: false
           
-          # Python 3.7.5 - x86 - Debug
-          - name: build-win32-old-debug
+          - name: OlivOS-Win32-old-debug
+            runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x86
             freethreaded: false
@@ -110,6 +111,7 @@ jobs:
             debug: true
     with:
       name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
       freethreaded: ${{ matrix.freethreaded }}
@@ -117,66 +119,48 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux-publish:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Python 3.10.8
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.10.8'
-        cache: pip
-        architecture: x64
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[extend,build]
-    
-    - name: Packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
-        mkdir OlivOS-PKG
-        cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
-    
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-Linux
-        path: ./OlivOS-PKG
+    uses: ./.github/workflows/build-task.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-Linux64-release
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            architecture: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
 
   build-macos-publish:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Python 3.11.0
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.11.0'
-        cache: pip
-        architecture: x64
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[extend,build]
-    
-    - name: Run Packing
-      run: |
-        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
-        cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
-        mkdir OlivOS-PKG
-        cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
-    
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: OlivOS-MacOS
-        path: ./OlivOS-PKG
+    uses: ./.github/workflows/build-task.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-MacOS64-release
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
 
   release-draft:
     runs-on: ubuntu-latest
