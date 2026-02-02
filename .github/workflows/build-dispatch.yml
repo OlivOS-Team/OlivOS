@@ -1,0 +1,76 @@
+name: Build Dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      runs-on:
+        required: true
+        type: choice
+        options:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+        default: windows-latest
+      python-version:
+        required: true
+        type: choice
+        options:
+          - '3.7.5'
+          - '3.10.8'
+          - '3.11.0'
+        default: '3.11.0'
+      architecture:
+        required: true
+        type: choice
+        options:
+          - x64
+          - x86
+        default: x64
+      freethreaded:
+        required: false
+        type: boolean
+        default: false
+      build-type:
+        required: true
+        type: choice
+        options:
+          - pyinstaller
+          - nuitka
+        default: pyinstaller
+      debug: 
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-windows:
+    uses: ./.github/workflows/build-task-windows.yml
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
+  build-linux:
+    uses: ./.github/workflows/build-task-linux.yml
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
+  build-macos:
+    uses: ./.github/workflows/build-task-macos.yml
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}

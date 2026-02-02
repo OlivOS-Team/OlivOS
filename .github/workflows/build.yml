@@ -7,11 +7,10 @@ on:
       - '*.*.*-*.*'
   pull_request:
     branches: [ main, dev ]
-  workflow_dispatch:
 
 jobs:
   build-windows-publish:
-    uses: ./.github/workflows/build-task.yml
+    uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
       matrix:
@@ -33,7 +32,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-windows:
-    uses: ./.github/workflows/build-task.yml
+    uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
       matrix:
@@ -119,7 +118,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux-publish:
-    uses: ./.github/workflows/build-task.yml
+    uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
       matrix:
@@ -141,7 +140,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos-publish:
-    uses: ./.github/workflows/build-task.yml
+    uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
       matrix:
