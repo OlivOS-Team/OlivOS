@@ -109,20 +109,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Pre-download and cache depends.exe
-      if: matrix.build-type == 'nuitka'
-      run: |
-        $cacheDir = "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\x86_64"
-        New-Item -ItemType Directory -Force -Path $cacheDir
-        $dependsUrl = "https://github.com/wwotz/depends/releases/download/2.2/depends.zip"
-        $zipPath = "$cacheDir\depends.zip"
-        Invoke-WebRequest -Uri $dependsUrl -OutFile $zipPath
-        Expand-Archive -Path $zipPath -DestinationPath $cacheDir -Force
-        Remove-Item $zipPath
-        if (Test-Path "$cacheDir\depends.exe") {
-            Write-Host "depends.exe 已成功预下载到缓存目录。"
-        }
-
     - name: Install MSVC Build Tools
       if: matrix.build-type == 'nuitka'
       run: |
@@ -156,19 +142,19 @@ jobs:
           pyinstaller ./OlivOS.spec
         } else {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-          nuitka --standalone `
-                 --onefile `
-                 --output-dir=./dist `
-                 --output-filename=OlivOS `
-                 --follow-imports `
-                 --windows-icon-from-ico=./resource/favoricon.ico `
-                 --enable-plugin=tk-inter `
-                 --windows-console-mode=attach `
-                 --low-memory `
-                 --jobs=2 `
-                 --show-progress `
-                 --show-scons `
-                 main.py
+          echo “Yes” | nuitka --standalone `
+                              --onefile `
+                              --output-dir=./dist `
+                              --output-filename=OlivOS `
+                              --follow-imports `
+                              --windows-icon-from-ico=./resource/favoricon.ico `
+                              --enable-plugin=tk-inter `
+                              --windows-console-mode=attach `
+                              --low-memory `
+                              --jobs=2 `
+                              --show-progress `
+                              --show-scons `
+                              main.py
         }
         mkdir OlivOS-Win
         if (${{ matrix.debug && '1' || '0' }}) {
