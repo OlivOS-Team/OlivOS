@@ -23,7 +23,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: false
-            artifact-name: OlivOS-Win
           
           # Python 3.11.0 - x64 - Debug
           - name: build-win64-debug
@@ -32,7 +31,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: true
-            artifact-name: OlivOS-Win-64-debug
           
           # # Python 3.14 - x64 - Release (disabled)
           # - name: build-win64-py314-release
@@ -41,7 +39,6 @@ jobs:
           #   freethreaded: true
           #   build-type: pyinstaller
           #   debug: false
-          #   artifact-name: OlivOS-Win
           
           # # Python 3.14 - x64 - Debug (disabled)
           # - name: build-win64-py314-debug
@@ -50,7 +47,6 @@ jobs:
           #   freethreaded: true
           #   build-type: pyinstaller
           #   debug: true
-          #   artifact-name: OlivOS-Win-64-debug
 
           # Python 3.11.0 - x64 - Nuitka - Release
           - name: build-win64-nuitka-release
@@ -59,7 +55,6 @@ jobs:
             freethreaded: false
             build-type: nuitka
             debug: false
-            artifact-name: OlivOS-Win-64-nuitka
           
           # Python 3.11.0 - x64 - Nuitka - Debug
           - name: build-win64-nuitka-debug
@@ -68,7 +63,6 @@ jobs:
             freethreaded: false
             build-type: nuitka
             debug: true
-            artifact-name: OlivOS-Win-64-nuitka-debug
           
           # Python 3.7.5 - x64 - Release
           - name: build-win64-old-release
@@ -77,7 +71,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: false
-            artifact-name: OlivOS-Win-64-old
           
           # Python 3.7.5 - x64 - Debug
           - name: build-win64-old-debug
@@ -86,7 +79,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: true
-            artifact-name: OlivOS-Win-64-old-debug
           
           # Python 3.7.5 - x86 - Release
           - name: build-win32-old-release
@@ -95,7 +87,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: false
-            artifact-name: OlivOS-Win-32-old
           
           # Python 3.7.5 - x86 - Debug
           - name: build-win32-old-debug
@@ -104,7 +95,6 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: true
-            artifact-name: OlivOS-Win-32-old-debug
 
     steps:
     - uses: actions/checkout@v3
@@ -166,7 +156,14 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.artifact-name }}
+        name: ${{ matrix.name }}
+        path: ./OlivOS-Win
+
+    - name: Upload Publish Artifact
+      uses: actions/upload-artifact@v4
+      if: matrix.name == 'build-win64-release'
+      with:
+        name: OlivOS-Win
         path: ./OlivOS-Win
 
   build-linux:
