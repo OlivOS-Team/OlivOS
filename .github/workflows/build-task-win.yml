@@ -1,0 +1,97 @@
+name: Build Task Win
+on:
+  workflow_call:
+    inputs:
+      name:
+        required: true
+        type: string
+      python-version:
+        required: true
+        type: string
+      architecture:
+        required: true
+        type: string
+      freethreaded:
+        required: false
+        type: boolean
+        default: false
+      build-type:
+        required: true
+        type: string
+      debug: 
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install MSVC Build Tools
+      if: inputs.build-type == 'nuitka'
+      run: |
+        choco install visualstudio2022buildtools -y --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional"
+        echo "MSBUILD_PATH=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin" >> $env:GITHUB_ENV
+        echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
+
+    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        architecture: ${{ inputs.architecture }}
+        freethreaded: ${{ inputs.freethreaded && true || false }}
+    
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type == 'pyinstaller' && 'build' || inputs.build-type }}]
+    
+    - name: Build (${{ inputs.debug && 'Debug' || 'Release' }})
+      run: |
+        cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
+        if (${{ inputs.build-type == 'pyinstaller' && '1' || '0' }}) {
+          if (${{ inputs.debug && '1' || '0' }}) {
+            cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+            $env:OLIVOS_DEBUG = "1"
+          } else {
+            cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
+          }
+          pyinstaller ./OlivOS.spec
+        } else {
+          cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+          echo “Yes” | nuitka --standalone `
+                              --onefile `
+                              --output-dir=./dist `
+                              --output-filename=OlivOS `
+                              --follow-imports `
+                              --windows-icon-from-ico=./resource/favoricon.ico `
+                              --enable-plugin=tk-inter `
+                              --include-package=tkinter `
+                              --windows-console-mode=attach `
+                              --low-memory `
+                              --jobs=2 `
+                              --show-progress `
+                              main.py
+        }
+        mkdir OlivOS-Win
+        if (${{ inputs.debug && '1' || '0' }}) {
+          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
+        } else {
+          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS.exe
+        }
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ./OlivOS-Win
+
+    - name: Upload Publish Artifact
+      uses: actions/upload-artifact@v4
+      if: inputs.name == 'build-win64-release'
+      with:
+        name: OlivOS-Win
+        path: ./OlivOS-Win
