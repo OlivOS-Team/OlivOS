@@ -149,11 +149,11 @@ jobs:
                               --follow-imports `
                               --windows-icon-from-ico=./resource/favoricon.ico `
                               --enable-plugin=tk-inter `
+                              --include-package=tkinter `
                               --windows-console-mode=attach `
                               --low-memory `
                               --jobs=2 `
                               --show-progress `
-                              --show-scons `
                               main.py
         }
         mkdir OlivOS-Win
