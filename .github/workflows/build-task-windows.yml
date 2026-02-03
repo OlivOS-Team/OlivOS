@@ -97,14 +97,14 @@ jobs:
             }
           }
           $includeArgs | Out-File -FilePath .\nuitka_args.txt -Encoding UTF8
-          echo “Yes” | nuitka --standalone `
+          echo "Yes" | nuitka --standalone `
                               --onefile `
                               --output-dir=./dist `
                               --output-filename=OlivOS `
                               --windows-icon-from-ico=./resource/favoricon.ico `
                               --windows-console-mode=attach `
                               --follow-imports `
-                              @nuitka_args.txt `
+                              '@nuitka_args.txt' `
                               --enable-plugin=tk-inter `
                               --include-package=tkinter `
                               --low-memory `
