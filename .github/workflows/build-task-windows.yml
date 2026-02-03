@@ -86,8 +86,6 @@ jobs:
                               --output-filename=OlivOS `
                               --windows-icon-from-ico=./resource/favoricon.ico `
                               --windows-console-mode=attach `
-                              --recurse-stdlib `
-                              --recurse-to-all `
                               --follow-imports `
                               $allPkgArgs `
                               --enable-plugin=tk-inter `
