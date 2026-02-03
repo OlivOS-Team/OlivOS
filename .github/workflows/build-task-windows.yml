@@ -94,7 +94,10 @@ jobs:
                               --enable-plugin=pywebview `
                               --low-memory `
                               --jobs=2 `
+                              --show-scons `
                               --show-progress `
+                              --show-memory  `
+                              --show-modules `
                               main.py
         }
         mkdir OlivOS-Win
