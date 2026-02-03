@@ -67,6 +67,7 @@ jobs:
         } else {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
           python .\script\nuitka_build.py
+        }
         mkdir OlivOS-Win
         if (${{ inputs.debug && '1' || '0' }}) {
           cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
