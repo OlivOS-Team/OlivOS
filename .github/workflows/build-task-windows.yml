@@ -67,18 +67,34 @@ jobs:
         } else {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
           $allPkgArgs = pip list --format=freeze | ForEach-Object {
-              Write-Host "Found: $_"
-              $pkg = $_.Split('==')[0]
-              $excludeList = @(
-                'pip',
-                'setuptools',
-                'wheel',
-                'nuitka',
-                'pyinstaller'
-              )
-              if ($pkg -and $excludeList -notcontains $pkg) {
-                  "--include-package=$pkg"
-              }
+            Write-Host "Found: $_"
+            $pkg = $_.Split('==')[0]
+            $excludeList = @(
+              'pip',
+              'setuptools',
+              'wheel',
+              'nuitka',
+              'pyinstaller'
+            )
+            if ($pkg -and $excludeList -notcontains $pkg) {
+              "--include-package=$pkg"
+            }
+          }
+          $allImports = python -c "
+        import pkgutil
+        import sys
+        exclude = {'pip', 'setuptools', 'pkg_resources', 'distutils', 'test', 'unittest', 'nuitka'}
+        for module in pkgutil.iter_modules():
+          name = module.name
+          if name not in exclude:
+            print(name)
+        "
+          $includeArgs = @()
+          foreach ($name in $allImports -split \"`r`n\") {
+            if ($name.Trim()) {
+              Write-Host "Found: $name"
+              $includeArgs += \"--include-package=$($name.Trim())\"
+            }
           }
           echo “Yes” | nuitka --standalone `
                               --onefile `
@@ -87,7 +103,7 @@ jobs:
                               --windows-icon-from-ico=./resource/favoricon.ico `
                               --windows-console-mode=attach `
                               --follow-imports `
-                              $allPkgArgs `
+                              $includeArgs `
                               --enable-plugin=tk-inter `
                               --include-package=tkinter `
                               --low-memory `
