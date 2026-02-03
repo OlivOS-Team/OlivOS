@@ -12,6 +12,10 @@ excludeList = [
     'webview'
 ]
 
+includeList = [
+    'tkinter'
+]
+
 
 def get_all_site_packages():
     packages = []
@@ -35,8 +39,10 @@ def get_all_site_packages():
 def build_with_site_packages():
     print("Scan site-packages Path...")
     print(f"Exclude List {excludeList}")
+    print(f"Include List {includeList}")
     packages: 'list[str]' = get_all_site_packages()
     print(f"Found {len(packages)} :")
+    packages.extend(includeList)
     cmd = [
         sys.executable,
         "-m",
