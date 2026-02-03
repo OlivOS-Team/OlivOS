@@ -70,11 +70,13 @@ jobs:
                               --onefile `
                               --output-dir=./dist `
                               --output-filename=OlivOS `
-                              --recurse-all `
                               --windows-icon-from-ico=./resource/favoricon.ico `
+                              --windows-console-mode=attach `
+                              --recurse-stdlib `
+                              --recurse-to-all ` 
+                              --follow-imports `
                               --enable-plugin=tk-inter `
                               --include-package=tkinter `
-                              --windows-console-mode=attach `
                               --low-memory `
                               --jobs=2 `
                               --show-progress `
