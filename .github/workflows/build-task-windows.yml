@@ -33,12 +33,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install MSVC Build Tools
-      if: inputs.build-type == 'nuitka'
-      run: |
-        choco install visualstudio2022buildtools -y --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional"
-        echo "MSBUILD_PATH=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin" >> $env:GITHUB_ENV
-        echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
+    # - name: Install MSVC Build Tools
+    #   if: inputs.build-type == 'nuitka'
+    #   run: |
+    #     choco install visualstudio2022buildtools -y --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional"
+    #     echo "MSBUILD_PATH=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin" >> $env:GITHUB_ENV
+    #     echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
 
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
       uses: actions/setup-python@v6
