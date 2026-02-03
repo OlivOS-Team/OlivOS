@@ -8,7 +8,8 @@ excludeList = [
     'setuptools',
     'wheel',
     'nuitka',
-    'pyinstaller'
+    'pyinstaller',
+    'webview'
 ]
 
 
@@ -48,6 +49,7 @@ def build_with_site_packages():
         "--output-filename=OlivOS",
         "--windows-icon-from-ico=./resource/favoricon.ico",
         "--windows-console-mode=attach",
+        "--assume-yes-for-downloads",
         "--follow-imports",
         "--enable-plugin=tk-inter",
         "--enable-plugin=pywebview",
