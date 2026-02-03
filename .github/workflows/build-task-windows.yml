@@ -91,6 +91,7 @@ jobs:
                               $includeArgs `
                               $nofollowArgs `
                               --enable-plugin=tk-inter `
+                              --enable-plugin=pywebview `
                               --low-memory `
                               --jobs=2 `
                               --show-progress `
