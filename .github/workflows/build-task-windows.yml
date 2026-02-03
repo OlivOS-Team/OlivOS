@@ -90,10 +90,10 @@ jobs:
             print(name)
         "
           $includeArgs = @()
-          foreach ($name in $allImports -split \"`r`n\") {
+          foreach ($name in $allImports -split "`r`n") {
             if ($name.Trim()) {
               Write-Host "Found: $name"
-              $includeArgs += \"--include-package=$($name.Trim())\"
+              $includeArgs += "--include-package=$($name.Trim())"
             }
           }
           echo “Yes” | nuitka --standalone `
