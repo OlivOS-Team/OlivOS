@@ -61,7 +61,7 @@ jobs:
           #   build-type: pyinstaller
           #   debug: true
 
-          - name: OlivOS-Win64-nuitka-release
+          - name: OlivOS-Win64-nuitka
             runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
