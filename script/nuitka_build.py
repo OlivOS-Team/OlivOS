@@ -57,6 +57,7 @@ def build_with_site_packages():
         "--windows-console-mode=attach",
         "--assume-yes-for-downloads",
         "--follow-imports",
+        "--follow-stdlib",
         "--enable-plugin=tk-inter",
         "--enable-plugin=pywebview",
         "--low-memory",
