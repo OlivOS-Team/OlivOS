@@ -96,7 +96,6 @@ jobs:
                               --jobs=2 `
                               --show-progress `
                               main.py
-          Remove-Item .\nuitka_args.txt
         }
         mkdir OlivOS-Win
         if (${{ inputs.debug && '1' || '0' }}) {
