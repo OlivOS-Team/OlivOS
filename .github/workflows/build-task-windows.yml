@@ -66,6 +66,20 @@ jobs:
           pyinstaller ./OlivOS.spec
         } else {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+          $allPkgArgs = pip list --format=freeze | ForEach-Object {
+              Write-Host "Found: $_"
+              $pkg = $_.Split('==')[0]
+              $excludeList = @(
+                'pip',
+                'setuptools',
+                'wheel',
+                'nuitka',
+                'pyinstaller'
+              )
+              if ($pkg -and $excludeList -notcontains $pkg) {
+                  "--include-package=$pkg"
+              }
+          }
           echo “Yes” | nuitka --standalone `
                               --onefile `
                               --output-dir=./dist `
@@ -75,6 +89,7 @@ jobs:
                               --recurse-stdlib `
                               --recurse-to-all ` 
                               --follow-imports `
+                              $allPkgArgs `
                               --enable-plugin=tk-inter `
                               --include-package=tkinter `
                               --low-memory `
