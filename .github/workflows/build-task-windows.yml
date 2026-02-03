@@ -79,7 +79,6 @@ jobs:
             'tkinter'
           )
           $includeArgs = Build-NuitkaArgument -ArgumentName '--include-package' -Items $itemsList
-          $nofollowArgs = Build-NuitkaArgument -ArgumentName '--nofollow-import-to' -Items $itemsList
           echo "Yes" | nuitka --standalone `
                               --onefile `
                               --output-dir=./dist `
@@ -88,7 +87,6 @@ jobs:
                               --windows-console-mode=attach `
                               --follow-imports `
                               $includeArgs `
-                              $nofollowArgs `
                               --enable-plugin=tk-inter `
                               --enable-plugin=pywebview `
                               --low-memory `
