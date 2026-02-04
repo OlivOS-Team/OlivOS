@@ -131,6 +131,28 @@ jobs:
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
 
+  build-linux:
+    uses: ./.github/workflows/build-task-linux.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-Linux64-nuitka
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
   build-macos-publish:
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
@@ -143,6 +165,28 @@ jobs:
             architecture: x64
             freethreaded: false
             build-type: pyinstaller
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      architecture: ${{ matrix.architecture }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
+  build-macos:
+    uses: ./.github/workflows/build-task-macos.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-MacOS64-nuitka
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            architecture: x64
+            freethreaded: false
+            build-type: nuitka
             debug: false
     with:
       name: ${{ matrix.name }}
