@@ -199,7 +199,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-MacOS64-nuitka
-            enable: true
+            enable: false
             runs-on: macos-latest
             python-version: '3.11.0'
             architecture: x64
