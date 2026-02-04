@@ -30,6 +30,9 @@ jobs:
   build:
     if: inputs.runs-on == 'ubuntu-latest'
     runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@v3
     
@@ -46,13 +49,17 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
     
-    - name: Build (${{ inputs.debug && 'Debug' || 'Release' }})
+    - name: Build by ${{ inputs.build-type == 'pyinstaller' }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-        pyinstaller ./OlivOS.spec
+        if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
+          pyinstaller ./OlivOS.spec
+        elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
+          python ./script/nuitka_build.py
+        fi
         mkdir OlivOS-PKG
-        cp ./dist/OlivOS ./OlivOS-PKG/OlivOS
+        cp ./dist/OlivOS* ./OlivOS-PKG/OlivOS*
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
