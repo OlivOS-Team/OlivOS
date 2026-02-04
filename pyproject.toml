@@ -73,6 +73,14 @@ win = [
 build = [
     "pyinstaller==5.6.2; python_version == '3.7'",
     "pyinstaller==6.9.0; python_version >= '3.10'",
+    "nuitka",
+    "setuptools>=63.2.0",
+]
+
+# pyinstaller打包工具
+pyinstaller = [
+    "pyinstaller==5.6.2; python_version == '3.7'",
+    "pyinstaller==6.9.0; python_version >= '3.10'",
     "setuptools>=63.2.0",
 ]
 
