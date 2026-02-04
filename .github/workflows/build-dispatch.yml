@@ -33,6 +33,7 @@ on:
         options:
           - x64
           - x86
+          - arm64
         default: x64
       freethreaded:
         required: false

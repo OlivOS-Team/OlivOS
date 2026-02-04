@@ -37,9 +37,9 @@ jobs:
   build:
     if: inputs.enable && inputs.runs-on == 'ubuntu-latest'
     runs-on: ${{ inputs.runs-on }}
-    container:
-      image: node:20-alpine
-      options: --platform linux/${{ inputs.arch }}
+    # container:
+    #   image: node:20-alpine
+    #   options: --platform linux/${{ inputs.arch }}
     defaults:
       run:
         shell: bash

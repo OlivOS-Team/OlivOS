@@ -174,21 +174,21 @@ jobs:
             debug: false
 
           - name: OlivOS-Linux64-ARM64-release
-            enable: true
+            enable: false
             runs-on: ubuntu-latest
             python-version: '3.10.8'
             arch: arm64
-            python-arch: x64
+            python-arch: arm64
             freethreaded: false
             build-type: pyinstaller
             debug: false
 
           - name: OlivOS-Linux64-ARM64-nuitka
-            enable: true
+            enable: false
             runs-on: ubuntu-latest
             python-version: '3.10.8'
             arch: arm64
-            python-arch: x64
+            python-arch: arm64
             freethreaded: false
             build-type: nuitka
             debug: false
