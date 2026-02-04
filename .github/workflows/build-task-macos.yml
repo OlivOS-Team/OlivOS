@@ -49,7 +49,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install .[extend,build]
     
-    - name: Build by ${{ inputs.build-type == 'pyinstaller' }} (${{ inputs.debug && 'Debug' || 'Release' }})
+    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
