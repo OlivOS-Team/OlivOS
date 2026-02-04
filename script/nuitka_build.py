@@ -9,7 +9,8 @@ excludeList = [
     'wheel',
     'nuitka',
     'pyinstaller',
-    'webview'
+    'webview',
+    'foundation'
 ]
 
 includeList = [
