@@ -17,13 +17,23 @@ on:
           - '3.7.5'
           - '3.10.8'
           - '3.11.0'
+          - '3.14'
         default: '3.11.0'
-      architecture:
+      arch:
+        required: true
+        type: choice
+        options:
+          - amd64
+          - '386'
+          - arm64
+        default: amd64
+      python-arch:
         required: true
         type: choice
         options:
           - x64
           - x86
+          - arm64
         default: x64
       freethreaded:
         required: false
@@ -46,9 +56,11 @@ jobs:
     uses: ./.github/workflows/build-task-windows.yml
     with:
       name: OlivOS-Win
+      enable: true
       runs-on: ${{ inputs.runs-on }}
       python-version: ${{ inputs.python-version }}
-      architecture: ${{ inputs.architecture }}
+      arch: ${{ inputs.arch }}
+      python-arch: ${{ inputs.python-arch }}
       freethreaded: ${{ inputs.freethreaded }}
       build-type: ${{ inputs.build-type }}
       debug: ${{ inputs.debug }}
@@ -57,9 +69,11 @@ jobs:
     uses: ./.github/workflows/build-task-linux.yml
     with:
       name: OlivOS-Linux
+      enable: true
       runs-on: ${{ inputs.runs-on }}
       python-version: ${{ inputs.python-version }}
-      architecture: ${{ inputs.architecture }}
+      arch: ${{ inputs.arch }}
+      python-arch: ${{ inputs.python-arch }}
       freethreaded: ${{ inputs.freethreaded }}
       build-type: ${{ inputs.build-type }}
       debug: ${{ inputs.debug }}
@@ -68,9 +82,11 @@ jobs:
     uses: ./.github/workflows/build-task-macos.yml
     with:
       name: OlivOS-MacOS
+      enable: true
       runs-on: ${{ inputs.runs-on }}
       python-version: ${{ inputs.python-version }}
-      architecture: ${{ inputs.architecture }}
+      arch: ${{ inputs.arch }}
+      python-arch: ${{ inputs.python-arch }}
       freethreaded: ${{ inputs.freethreaded }}
       build-type: ${{ inputs.build-type }}
       debug: ${{ inputs.debug }}

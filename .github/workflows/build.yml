@@ -16,17 +16,21 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Win64-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -38,73 +42,91 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Win64-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
           
-          # - name: OlivOS-Win64-py314-release
-          #   runs-on: windows-latest
-          #   python-version: '3.14'
-          #   architecture: x64
-          #   freethreaded: true
-          #   build-type: pyinstaller
-          #   debug: false
-          
-          # - name: OlivOS-Win64-py314-debug
-          #   runs-on: windows-latest
-          #   python-version: '3.14'
-          #   architecture: x64
-          #   freethreaded: true
-          #   build-type: pyinstaller
-          #   debug: true
+          - name: OlivOS-Win64-py314-release
+            enable: false
+            runs-on: windows-latest
+            python-version: '3.14'
+            arch: amd64
+            python-arch: x64
+            freethreaded: true
+            build-type: pyinstaller
+            debug: false
+
+          - name: OlivOS-Win64-py314-debug
+            enable: false
+            runs-on: windows-latest
+            python-version: '3.14'
+            arch: amd64
+            python-arch: x64
+            freethreaded: true
+            build-type: pyinstaller
+            debug: true
 
           - name: OlivOS-Win64-nuitka
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: nuitka
             debug: false
           
           - name: OlivOS-Win64-old-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
           
           - name: OlivOS-Win64-old-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
           
           - name: OlivOS-Win32-old-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x86
+            arch: '386'
+            python-arch: x86
             freethreaded: false
             build-type: pyinstaller
             debug: false
           
           - name: OlivOS-Win32-old-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x86
+            arch: '386'
+            python-arch: x86
             freethreaded: false
             build-type: pyinstaller
             debug: true
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -116,17 +138,67 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Linux64-release
+            enable: true
             runs-on: ubuntu-latest
             python-version: '3.10.8'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
+  build-linux:
+    uses: ./.github/workflows/build-task-linux.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-Linux64-nuitka
+            enable: true
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Linux64-ARM64-release
+            enable: false
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: arm64
+            python-arch: arm64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+
+          - name: OlivOS-Linux64-ARM64-nuitka
+            enable: false
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: arm64
+            python-arch: arm64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -138,17 +210,47 @@ jobs:
       matrix:
         include:
           - name: OlivOS-MacOS64-release
+            enable: true
             runs-on: macos-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
+      freethreaded: ${{ matrix.freethreaded }}
+      build-type: ${{ matrix.build-type }}
+      debug: ${{ matrix.debug }}
+
+  build-macos:
+    uses: ./.github/workflows/build-task-macos.yml
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - name: OlivOS-MacOS64-nuitka
+            enable: false
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+    with:
+      name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
+      runs-on: ${{ matrix.runs-on }}
+      python-version: ${{ matrix.python-version }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
