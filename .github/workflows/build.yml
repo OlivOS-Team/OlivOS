@@ -16,6 +16,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Win64-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
@@ -24,6 +25,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
@@ -38,6 +40,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Win64-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
@@ -45,23 +48,26 @@ jobs:
             build-type: pyinstaller
             debug: true
           
-          # - name: OlivOS-Win64-py314-release
-          #   runs-on: windows-latest
-          #   python-version: '3.14'
-          #   architecture: x64
-          #   freethreaded: true
-          #   build-type: pyinstaller
-          #   debug: false
-          
-          # - name: OlivOS-Win64-py314-debug
-          #   runs-on: windows-latest
-          #   python-version: '3.14'
-          #   architecture: x64
-          #   freethreaded: true
-          #   build-type: pyinstaller
-          #   debug: true
+          - name: OlivOS-Win64-py314-release
+            enable: false
+            runs-on: windows-latest
+            python-version: '3.14'
+            architecture: x64
+            freethreaded: true
+            build-type: pyinstaller
+            debug: false
+
+          - name: OlivOS-Win64-py314-debug
+            enable: false
+            runs-on: windows-latest
+            python-version: '3.14'
+            architecture: x64
+            freethreaded: true
+            build-type: pyinstaller
+            debug: true
 
           - name: OlivOS-Win64-nuitka
+            enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
             architecture: x64
@@ -70,6 +76,7 @@ jobs:
             debug: false
           
           - name: OlivOS-Win64-old-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x64
@@ -78,6 +85,7 @@ jobs:
             debug: false
           
           - name: OlivOS-Win64-old-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x64
@@ -86,6 +94,7 @@ jobs:
             debug: true
           
           - name: OlivOS-Win32-old-release
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x86
@@ -94,6 +103,7 @@ jobs:
             debug: false
           
           - name: OlivOS-Win32-old-debug
+            enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
             architecture: x86
@@ -102,6 +112,7 @@ jobs:
             debug: true
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
@@ -116,6 +127,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Linux64-release
+            enable: true
             runs-on: ubuntu-latest
             python-version: '3.10.8'
             architecture: x64
@@ -124,6 +136,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
@@ -138,6 +151,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-Linux64-nuitka
+            enable: true
             runs-on: ubuntu-latest
             python-version: '3.10.8'
             architecture: x64
@@ -146,6 +160,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
@@ -160,6 +175,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-MacOS64-release
+            enable: true
             runs-on: macos-latest
             python-version: '3.11.0'
             architecture: x64
@@ -168,6 +184,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
@@ -182,6 +199,7 @@ jobs:
       matrix:
         include:
           - name: OlivOS-MacOS64-nuitka
+            enable: true
             runs-on: macos-latest
             python-version: '3.11.0'
             architecture: x64
@@ -190,6 +208,7 @@ jobs:
             debug: false
     with:
       name: ${{ matrix.name }}
+      enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
       architecture: ${{ matrix.architecture }}
