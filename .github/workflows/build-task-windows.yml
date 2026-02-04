@@ -66,34 +66,7 @@ jobs:
           pyinstaller ./OlivOS.spec
         } else {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-          function Build-NuitkaArgument {
-            param(
-              [Parameter(Mandatory=$true)]
-              [string]$ArgumentName,
-              [Parameter(Mandatory=$true)]
-              [string[]]$Items
-            )
-            return $Items | ForEach-Object { "${ArgumentName}=$_" }
-          }
-          $itemsList = @(
-            'tkinter'
-          )
-          $includeArgs = Build-NuitkaArgument -ArgumentName '--include-package' -Items $itemsList
-          echo "Yes" | nuitka --standalone `
-                              --onefile `
-                              --output-dir=./dist `
-                              --output-filename=OlivOS `
-                              --windows-icon-from-ico=./resource/favoricon.ico `
-                              --windows-console-mode=attach `
-                              --follow-imports `
-                              $includeArgs `
-                              --enable-plugin=tk-inter `
-                              --enable-plugin=pywebview `
-                              --low-memory `
-                              --jobs=2 `
-                              --show-scons `
-                              --show-progress `
-                              main.py
+          python .\script\nuitka_build.py
         }
         mkdir OlivOS-Win
         if (${{ inputs.debug && '1' || '0' }}) {

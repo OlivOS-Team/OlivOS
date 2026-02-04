@@ -45,32 +45,32 @@ jobs:
   build-windows:
     uses: ./.github/workflows/build-task-windows.yml
     with:
-      name: ${{ matrix.name }}
-      runs-on: ${{ matrix.runs-on }}
-      python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
-      freethreaded: ${{ matrix.freethreaded }}
-      build-type: ${{ matrix.build-type }}
-      debug: ${{ matrix.debug }}
+      name: OlivOS-Win
+      runs-on: ${{ inputs.runs-on }}
+      python-version: ${{ inputs.python-version }}
+      architecture: ${{ inputs.architecture }}
+      freethreaded: ${{ inputs.freethreaded }}
+      build-type: ${{ inputs.build-type }}
+      debug: ${{ inputs.debug }}
 
   build-linux:
     uses: ./.github/workflows/build-task-linux.yml
     with:
-      name: ${{ matrix.name }}
-      runs-on: ${{ matrix.runs-on }}
-      python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
-      freethreaded: ${{ matrix.freethreaded }}
-      build-type: ${{ matrix.build-type }}
-      debug: ${{ matrix.debug }}
+      name: OlivOS-Linux
+      runs-on: ${{ inputs.runs-on }}
+      python-version: ${{ inputs.python-version }}
+      architecture: ${{ inputs.architecture }}
+      freethreaded: ${{ inputs.freethreaded }}
+      build-type: ${{ inputs.build-type }}
+      debug: ${{ inputs.debug }}
 
   build-macos:
     uses: ./.github/workflows/build-task-macos.yml
     with:
-      name: ${{ matrix.name }}
-      runs-on: ${{ matrix.runs-on }}
-      python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
-      freethreaded: ${{ matrix.freethreaded }}
-      build-type: ${{ matrix.build-type }}
-      debug: ${{ matrix.debug }}
+      name: OlivOS-MacOS
+      runs-on: ${{ inputs.runs-on }}
+      python-version: ${{ inputs.python-version }}
+      architecture: ${{ inputs.architecture }}
+      freethreaded: ${{ inputs.freethreaded }}
+      build-type: ${{ inputs.build-type }}
+      debug: ${{ inputs.debug }}
