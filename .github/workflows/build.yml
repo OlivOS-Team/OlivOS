@@ -19,7 +19,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -28,7 +29,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -43,7 +45,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
@@ -52,7 +55,8 @@ jobs:
             enable: false
             runs-on: windows-latest
             python-version: '3.14'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: true
             build-type: pyinstaller
             debug: false
@@ -61,7 +65,8 @@ jobs:
             enable: false
             runs-on: windows-latest
             python-version: '3.14'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: true
             build-type: pyinstaller
             debug: true
@@ -70,7 +75,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: nuitka
             debug: false
@@ -79,7 +85,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -88,7 +95,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: true
@@ -97,7 +105,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x86
+            arch: '386'
+            python-arch: x86
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -106,7 +115,8 @@ jobs:
             enable: true
             runs-on: windows-latest
             python-version: '3.7.5'
-            architecture: x86
+            arch: '386'
+            python-arch: x86
             freethreaded: false
             build-type: pyinstaller
             debug: true
@@ -115,7 +125,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -130,7 +141,8 @@ jobs:
             enable: true
             runs-on: ubuntu-latest
             python-version: '3.10.8'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -139,7 +151,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -154,7 +167,28 @@ jobs:
             enable: true
             runs-on: ubuntu-latest
             python-version: '3.10.8'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Linux64-ARM64-release
+            enable: true
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: arm64
+            python-arch: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+
+          - name: OlivOS-Linux64-ARM64-nuitka
+            enable: true
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: arm64
+            python-arch: x64
             freethreaded: false
             build-type: nuitka
             debug: false
@@ -163,7 +197,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -178,7 +213,8 @@ jobs:
             enable: true
             runs-on: macos-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -187,7 +223,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
@@ -202,7 +239,8 @@ jobs:
             enable: false
             runs-on: macos-latest
             python-version: '3.11.0'
-            architecture: x64
+            arch: amd64
+            python-arch: x64
             freethreaded: false
             build-type: nuitka
             debug: false
@@ -211,7 +249,8 @@ jobs:
       enable: ${{ matrix.enable }}
       runs-on: ${{ matrix.runs-on }}
       python-version: ${{ matrix.python-version }}
-      architecture: ${{ matrix.architecture }}
+      arch: ${{ matrix.arch }}
+      python-arch: ${{ matrix.python-arch }}
       freethreaded: ${{ matrix.freethreaded }}
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}

@@ -15,7 +15,10 @@ on:
       python-version:
         required: true
         type: string
-      architecture:
+      arch:
+        required: true
+        type: string
+      python-arch:
         required: true
         type: string
       freethreaded:
@@ -47,12 +50,12 @@ jobs:
         echo "MSBUILD_PATH=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin" >> $env:GITHUB_ENV
         echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
 
-    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
+    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
         cache: pip
-        architecture: ${{ inputs.architecture }}
+        architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
     - name: Install Dependencies

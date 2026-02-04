@@ -15,7 +15,10 @@ on:
       python-version:
         required: true
         type: string
-      architecture:
+      arch:
+        required: true
+        type: string
+      python-arch:
         required: true
         type: string
       freethreaded:
@@ -34,18 +37,21 @@ jobs:
   build:
     if: inputs.enable && inputs.runs-on == 'ubuntu-latest'
     runs-on: ${{ inputs.runs-on }}
+    container:
+      image: node:20-alpine
+      options: --platform linux/${{ inputs.arch }}
     defaults:
       run:
         shell: bash
     steps:
     - uses: actions/checkout@v3
     
-    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.architecture }})
+    - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
         cache: pip
-        architecture: ${{ inputs.architecture }}
+        architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
     - name: Install Dependencies
