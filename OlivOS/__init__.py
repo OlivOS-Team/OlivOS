@@ -18,25 +18,29 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import platform
 
+from . import hook
+from . import core
 from .core.info import infoAPI
 from .core.L10N import L10NAPI
 from .core.L10N import L10NDataAPI
 from .core.boot import bootAPI
 from .core.boot import bootDataAPI
 from .core.inlineData import data
-from . import hook
 from .core.core import contentAPI
 from .core.core import messageAPI
 from .core.core import metadataAPI
 from .core.core import API
-from . import thirdPartyModule
 from .core.core import accountAPI
 from .core.core import accountMetadataAPI
 from .core.core import diagnoseAPI
+from .core.core import pluginAPI
+from .core.web import updateAPI
+from .core.web import webTool
+from . import thirdPartyModule
+from . import adapter
 from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK
 from .adapter.onebotV12 import onebotV12LinkServerAPI
-from .core.core import pluginAPI
 from .adapter.onebotV11 import onebotSDK
 from .adapter.virtualTerminal import virtualTerminalSDK
 from .adapter.virtualTerminal import virtualTerminalLinkServerAPI
@@ -73,16 +77,16 @@ from .adapter.mhyVila import mhyVilaSDK
 from .adapter.mhyVila import mhyVilaLinkServerAPI
 from .adapter.biliLive import biliLiveSDK
 from .adapter.biliLive import biliLiveLinkServerAPI
-from .core.web import updateAPI
-from .core.web import webTool
 if platform.system() == 'Windows':
+    from . import nativeGUI
     from .nativeGUI import multiLoginUIAPI
+    from .nativeGUI import nativeWinUIAPI
+    from .nativeGUI import webviewUIAPI
+    from . import libBooter
     from .libBooter import libEXEModelAPI
     from .libBooter import libWQEXEModelAPI
     from .libBooter import libCWCBEXEModelAPI
     from .libBooter import libOPQBotEXEModelAPI
     from .libBooter import libNapCatEXEModelAPI
     from .libBooter import libAstralQsignEXEModelAPI
-    from .nativeGUI import nativeWinUIAPI
-    from .nativeGUI import webviewUIAPI
 from . import userModule
