@@ -16,5 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
-from . import blivedm
-from . import mhyVilaProto
+from . import (
+    blivedm,
+    mhyVilaProto,
+)
