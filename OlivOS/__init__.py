@@ -21,6 +21,7 @@ import platform
 
 from . import hook
 
+from . import core
 from .core.info import infoAPI
 from .core.L10N import L10NAPI
 from .core.L10N import L10NDataAPI
@@ -37,10 +38,10 @@ from .core.core import diagnoseAPI
 from .core.core import pluginAPI
 from .core.web import updateAPI
 from .core.web import webTool
-from . import core
 
 from . import thirdPartyModule
 
+from . import adapter
 from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK
 from .adapter.onebotV12 import onebotV12LinkServerAPI
@@ -80,20 +81,19 @@ from .adapter.mhyVila import mhyVilaSDK
 from .adapter.mhyVila import mhyVilaLinkServerAPI
 from .adapter.biliLive import biliLiveSDK
 from .adapter.biliLive import biliLiveLinkServerAPI
-from . import adapter
 
 if platform.system() == 'Windows':
+    from . import nativeGUI
     from .nativeGUI import multiLoginUIAPI
     from .nativeGUI import nativeWinUIAPI
     from .nativeGUI import webviewUIAPI
-    from . import nativeGUI
 
+    from . import libBooter
     from .libBooter import libEXEModelAPI
     from .libBooter import libWQEXEModelAPI
     from .libBooter import libCWCBEXEModelAPI
     from .libBooter import libOPQBotEXEModelAPI
     from .libBooter import libNapCatEXEModelAPI
     from .libBooter import libAstralQsignEXEModelAPI
-    from . import libBooter
 
 from . import userModule
