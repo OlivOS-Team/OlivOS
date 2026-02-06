@@ -27,7 +27,7 @@ import html
 from functools import wraps
 
 import OlivOS
-from ..info.infoAPI import OlivOS_Version  # noqa
+from OlivOS.core.info.infoAPI import OlivOS_Version  # noqa
 
 mod_global_name = sys.modules[__name__]
 

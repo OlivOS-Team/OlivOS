@@ -29,7 +29,7 @@ if platform.system() == 'Windows':
     import tkinter
 
 import OlivOS
-from . import API
+from OlivOS.core.core import API
 
 modelName = 'pluginAPI'
 

@@ -21,7 +21,7 @@ import datetime
 import os
 
 import OlivOS
-from . import API
+from OlivOS.core.core import API
 
 modelName = 'diagnoseAPI'
 

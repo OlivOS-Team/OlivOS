@@ -26,8 +26,8 @@ import zipfile
 import hashlib
 
 import OlivOS
-from ..core import diagnoseAPI
-from ..L10N import L10NAPI
+from OlivOS.core.core import diagnoseAPI
+from OlivOS.core.L10N import L10NAPI
 
 modelName = 'updateAPI'
 
