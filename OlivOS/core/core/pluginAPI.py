@@ -29,6 +29,7 @@ if platform.system() == 'Windows':
     import tkinter
 
 import OlivOS
+from . import API
 
 modelName = 'pluginAPI'
 
@@ -66,13 +67,21 @@ releaseDir('./lib/DLLs')
 sys.path.append('./lib/DLLs')
 
 
-class shallow(OlivOS.API.Proc_templet):
+class shallow(API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
                  treading_mode='full', restart_gate=10000, enable_auto_restart=False):
-        OlivOS.API.Proc_templet.__init__(self, Proc_name=Proc_name, Proc_type='plugin', scan_interval=scan_interval,
-                                         dead_interval=dead_interval, rx_queue=rx_queue, tx_queue=tx_queue,
-                                         control_queue=control_queue, logger_proc=logger_proc)
+        API.Proc_templet.__init__(
+            self,
+            Proc_name=Proc_name,
+            Proc_type='plugin',
+            scan_interval=scan_interval,
+            dead_interval=dead_interval,
+            rx_queue=rx_queue,
+            tx_queue=tx_queue,
+            control_queue=control_queue,
+            logger_proc=logger_proc
+        )
         if bot_info_dict is None:
             bot_info_dict = {}
         if plugin_func_dict is None:
@@ -146,12 +155,12 @@ class shallow(OlivOS.API.Proc_templet):
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)
                 except Exception:
                     continue
-                if type(rx_packet_data) is OlivOS.API.Control.packet:
+                if type(rx_packet_data) is API.Control.packet:
                     if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(
-                            OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
+                            API.Control.packet('restart_do', self.Proc_name), block=False)
                         self.log(2, OlivOS.L10NAPI.getTrans(
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
                         # 在运行过 save 指令后，将配置数据库关闭
@@ -159,7 +168,7 @@ class shallow(OlivOS.API.Proc_templet):
                     elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
-                        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'),
+                        self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_replace'),
                                                          block=False)
                         # 在运行过 save 指令后，将配置数据库关闭
                         self.database.stop()
@@ -178,7 +187,7 @@ class shallow(OlivOS.API.Proc_templet):
                         self.set_restart()
 
     def on_control_rx(self, packet):
-        if type(packet) is OlivOS.API.Control.packet:
+        if type(packet) is API.Control.packet:
             if 'send' == packet.action:
                 if (
                     type(packet.key) is dict
@@ -196,7 +205,7 @@ class shallow(OlivOS.API.Proc_templet):
             ],
             modelName
         ))
-        self.Proc_info.rx_queue.put(OlivOS.API.Control.packet('restart_do', self.Proc_name), block=False)
+        self.Proc_info.rx_queue.put(API.Control.packet('restart_do', self.Proc_name), block=False)
 
     def set_check_update(self):
         self.log(2, OlivOS.L10NAPI.getTrans(
@@ -205,7 +214,7 @@ class shallow(OlivOS.API.Proc_templet):
             ],
             modelName
         ))
-        self.Proc_info.control_queue.put(OlivOS.API.Control.packet('init_type', 'update_get'), block=False)
+        self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_get'), block=False)
 
     def get_plugin_list(self):
         return self.plugin_models_call_list
@@ -214,9 +223,9 @@ class shallow(OlivOS.API.Proc_templet):
         return self.Proc_data['main_tk']
 
     def run_plugin(self, sdk_event):
-        # plugin_event = OlivOS.API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
-        plugin_event = OlivOS.API.Event(sdk_event=sdk_event)
-        plugin_event_bot_hash = OlivOS.API.getBotHash(
+        # plugin_event = API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
+        plugin_event = API.Event(sdk_event=sdk_event)
+        plugin_event_bot_hash = API.getBotHash(
             bot_id=plugin_event.base_info['self_id'],
             platform_sdk=plugin_event.platform['sdk'],
             platform_platform=plugin_event.platform['platform'],
@@ -517,7 +526,7 @@ class shallow(OlivOS.API.Proc_templet):
     def sendControlEvent(self, action, data):
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
+                API.Control.packet(
                     action,
                     data
                 ),

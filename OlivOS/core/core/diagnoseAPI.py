@@ -21,6 +21,7 @@ import datetime
 import os
 
 import OlivOS
+from . import API
 
 modelName = 'diagnoseAPI'
 
@@ -62,7 +63,7 @@ def releaseDir(dir_path):
         os.makedirs(dir_path)
 
 
-class logger(OlivOS.API.Proc_templet):
+class logger(API.Proc_templet):
     def __init__(
             self,
             Proc_name='native_logger',
@@ -73,7 +74,7 @@ class logger(OlivOS.API.Proc_templet):
             logger_vis_level=None,
             control_queue=None
     ):
-        OlivOS.API.Proc_templet.__init__(
+        API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
             Proc_type='logger',
@@ -404,7 +405,7 @@ class logger(OlivOS.API.Proc_templet):
     def __sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
-                OlivOS.API.Control.packet(
+                API.Control.packet(
                     action,
                     data
                 ),
