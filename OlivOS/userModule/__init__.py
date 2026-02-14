@@ -16,6 +16,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # here put the import lib
 
-from . import JyunkoUserConf
-from . import IOStream
-from . import UserConfDB
+from . import (
+    JyunkoUserConf,
+    IOStream,
+    UserConfDB,
+)

@@ -26,6 +26,8 @@ import zipfile
 import hashlib
 
 import OlivOS
+from OlivOS.core.core import diagnoseAPI
+from OlivOS.core.L10N import L10NAPI
 
 modelName = 'updateAPI'
 
@@ -76,7 +78,7 @@ def OlivOSUpdateGet(
             down_dir_name = './tmp/tmp/'
             down_name = down_dir_name + exe_name
             target_name = './resource/' + exe_name
-            logger_proc.log(2, OlivOS.L10NAPI.getTrans('check OlivOS update ......', [], modelName))
+            logger_proc.log(2, L10NAPI.getTrans('check OlivOS update ......', [], modelName))
             down_url_obj = GETHttpJson2Dict('https://api.oliva.icu/olivosver/')
             down_url = None
             if down_url_obj is not None:
@@ -88,7 +90,7 @@ def OlivOSUpdateGet(
                         down_url = down_url_obj['version']['OlivOS'][architecture_num]['path']
                         if flagChackOnly:
                             logger_proc.log(
-                                3, OlivOS.L10NAPI.getTrans('OlivOS update found, please try update.', [], modelName)
+                                3, L10NAPI.getTrans('OlivOS update found, please try update.', [], modelName)
                             )
                             if control_queue is not None:
                                 control_queue.put(
@@ -105,14 +107,14 @@ def OlivOSUpdateGet(
                                     block=False
                                 )
                         else:
-                            logger_proc.log(3, OlivOS.L10NAPI.getTrans('OlivOS update found.', [], modelName))
+                            logger_proc.log(3, L10NAPI.getTrans('OlivOS update found.', [], modelName))
                     else:
                         down_url_obj = None
-                        logger_proc.log(2, OlivOS.L10NAPI.getTrans('OlivOS already latest.', [], modelName))
+                        logger_proc.log(2, L10NAPI.getTrans('OlivOS already latest.', [], modelName))
                 except Exception:
                     down_url = None
                     logger_proc.log(
-                        3, OlivOS.L10NAPI.getTrans('check OlivOS update api error, skip update replace.', [], modelName)
+                        3, L10NAPI.getTrans('check OlivOS update api error, skip update replace.', [], modelName)
                     )
             # flagChackOnly True时仅做检查，不进入后续流程
             if not flagChackOnly and down_url is not None:
@@ -125,13 +127,13 @@ def OlivOSUpdateGet(
                     if os.path.isfile(target_name):
                         res = True
                         logger_proc.log(
-                            2, OlivOS.L10NAPI.getTrans(
+                            2, L10NAPI.getTrans(
                                 'check OlivOS update file hit, will run update replace.', [], modelName
                             )
                         )
                     else:
                         logger_proc.log(
-                            3, OlivOS.L10NAPI.getTrans(
+                            3, L10NAPI.getTrans(
                                 'check OlivOS update file not hit, skip update replace.', [], modelName
                             )
                         )
@@ -139,7 +141,7 @@ def OlivOSUpdateGet(
                 removeDir(down_dir_name)
         else:
             logger_proc.log(
-                3, OlivOS.L10NAPI.getTrans(
+                3, L10NAPI.getTrans(
                     'OlivOS running in src mode, skip update replace.', [], modelName
                 )
             )
@@ -147,7 +149,7 @@ def OlivOSUpdateGet(
 
 
 def checkResouceFile(
-    logger_proc: OlivOS.diagnoseAPI.logger,
+    logger_proc: diagnoseAPI.logger,
     resouce_name: str,
     resouce_api: str,
     filePath: str,
@@ -158,7 +160,7 @@ def checkResouceFile(
     sleepTime = 2
     architecture_num = platform.architecture()[0]
 
-    logger(2, OlivOS.L10NAPI.getTrans('will check {0} lib after {1}s ...', [resouce_name, sleepTime], modelName))
+    logger(2, L10NAPI.getTrans('will check {0} lib after {1}s ...', [resouce_name, sleepTime], modelName))
     time.sleep(sleepTime)
 
     for i in range(1):
@@ -167,7 +169,7 @@ def checkResouceFile(
         flagFORCESKIP = False
         flagAlreadyLatest = False
         fMD5 = checkFileMD5(filePath)
-        logger(2, OlivOS.L10NAPI.getTrans(
+        logger(2, L10NAPI.getTrans(
             'check {0} lib patch [{1}] md5: [{2}]', [
                 resouce_name,
                 filePath,
@@ -191,18 +193,18 @@ def checkResouceFile(
                 and fMD5UpdateTarget is not None
                 and fMD5UpdateUrl is not None
             ):
-                logger(2, OlivOS.L10NAPI.getTrans(
+                logger(2, L10NAPI.getTrans(
                     'check {0} lib patch target md5: [{1}]', [
                         resouce_name,
                         str(fMD5UpdateTarget)
                     ], modelName
                 ))
                 if fMD5UpdateTarget != fMD5:
-                    logger(2, OlivOS.L10NAPI.getTrans('download new {0} lib ...', [resouce_name], modelName))
+                    logger(2, L10NAPI.getTrans('download new {0} lib ...', [resouce_name], modelName))
                     if OlivOS.updateAPI.GETHttpFile(fMD5UpdateUrl, filePathUpdate):
-                        logger(2, OlivOS.L10NAPI.getTrans('download new {0} lib done', [resouce_name], modelName))
+                        logger(2, L10NAPI.getTrans('download new {0} lib done', [resouce_name], modelName))
                         fMD5Update = checkFileMD5(filePathUpdate)
-                        logger(2, OlivOS.L10NAPI.getTrans(
+                        logger(2, L10NAPI.getTrans(
                             'check {0} lib patch [{1}] md5: [{2}]', [
                                 resouce_name,
                                 filePathUpdate,
@@ -212,7 +214,7 @@ def checkResouceFile(
                     else:
                         fMD5Update = None
                         logger(
-                            4, OlivOS.L10NAPI.getTrans(
+                            4, L10NAPI.getTrans(
                                 'download new {0} lib FAILED! md5 check FAILED!', [resouce_name], modelName
                             )
                         )
@@ -220,33 +222,33 @@ def checkResouceFile(
                     flagAlreadyLatest = True
             else:
                 logger(
-                    4, OlivOS.L10NAPI.getTrans(
+                    4, L10NAPI.getTrans(
                         'download {0} lib patch FAILED! try later please!', [resouce_name], modelName
                     )
                 )
                 fMD5Update = None
 
             if flagAlreadyLatest:
-                logger(2, OlivOS.L10NAPI.getTrans('{0} lib already latest!', [resouce_name], modelName))
+                logger(2, L10NAPI.getTrans('{0} lib already latest!', [resouce_name], modelName))
             elif fMD5UpdateTarget is not None and fMD5Update != fMD5UpdateTarget:
                 logger(
-                    4, OlivOS.L10NAPI.getTrans(
+                    4, L10NAPI.getTrans(
                         'download {0} lib patch FAILED! try later please!', [resouce_name], modelName
                     )
                 )
             elif fMD5Update is not None and fMD5 != fMD5Update:
                 logger(
-                    3, OlivOS.L10NAPI.getTrans(
+                    3, L10NAPI.getTrans(
                         'update {0} lib patch [{1}] -> [{2}]', [resouce_name, filePathUpdate, filePath], modelName
                     )
                 )
                 shutil.copyfile(src=filePathUpdate, dst=filePath)
                 os.remove(filePathUpdate)
-                logger(2, OlivOS.L10NAPI.getTrans('update {0} lib patch done!', [resouce_name], modelName))
+                logger(2, L10NAPI.getTrans('update {0} lib patch done!', [resouce_name], modelName))
             else:
-                logger(2, OlivOS.L10NAPI.getTrans('{0} lib already latest!', [resouce_name], modelName))
+                logger(2, L10NAPI.getTrans('{0} lib already latest!', [resouce_name], modelName))
         else:
-            logger(3, OlivOS.L10NAPI.getTrans('{0} lib update FORCESKIP!', [resouce_name], modelName))
+            logger(3, L10NAPI.getTrans('{0} lib update FORCESKIP!', [resouce_name], modelName))
         break
 
 
@@ -259,9 +261,9 @@ def checkFileMD5(filePath):
     return res
 
 
-def loggerGen(logger_proc: 'OlivOS.diagnoseAPI.logger|None'):
+def loggerGen(logger_proc: 'diagnoseAPI.logger|None'):
     def logF(log_level, log_message, log_segment=None):
-        if type(logger_proc) is OlivOS.diagnoseAPI.logger:
+        if type(logger_proc) is diagnoseAPI.logger:
             logger_proc.log(
                 log_level=log_level,
                 log_message=log_message,

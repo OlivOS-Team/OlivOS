@@ -9,3 +9,5 @@ per-file-ignores =
 exclude =
     OlivOS/thirdPartyModule/*
     build/*
+    dist/*
+    main.*build/*
