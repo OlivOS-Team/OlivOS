@@ -156,3 +156,6 @@ quote-style = "single"
 docstring-code-format = true
 indent-style = "space"
 skip-magic-trailing-comma = false
+
+[tool.uv]
+python-preference = "managed"
