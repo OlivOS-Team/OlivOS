@@ -59,10 +59,21 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
+    - name: Install Python
+      id: install-python
+      run: |
+        $PYTHON_EXE = "${{ steps.setup-python.outputs.python-path }}"
+        $PYTHON_ROOT = Split-Path -Parent $PYTHON_EXE
+        echo "Python root directory: ${PYTHON_ROOT}"
+        mkdir -p ./python
+        cp -r "${PYTHON_ROOT}"/* ./python/
+        $PYTHON = "${{ github.workspace }}/python/python.exe"
+        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
+    
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       id: build
       run: |
-        $PYTHON = "${{ steps.setup-python.outputs.python-path }}"
+        $PYTHON = "${{ steps.install-python.outputs.PYTHON }}"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         & $PYTHON -m pip install --upgrade pip
         & $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
@@ -82,6 +93,7 @@ jobs:
         mkdir OlivOS-PKG
         if (${{ inputs.build-type == 'pack' && '1' || '0' }}) {
           cp -r ./OlivOS ./OlivOS-PKG/
+          cp -r ./python ./OlivOS-PKG/
           cp ./main.py ./OlivOS-PKG/
         } else {
           if (${{ inputs.debug && '1' || '0' }}) {
