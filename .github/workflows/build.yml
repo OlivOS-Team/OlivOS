@@ -92,7 +92,7 @@ jobs:
             debug: false
 
           - name: OlivOS-Win64-pypy311-pack
-            enable: false
+            enable: true
             runs-on: windows-latest
             python-version: 'pypy3.11'
             arch: amd64
