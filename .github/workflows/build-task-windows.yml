@@ -60,14 +60,16 @@ jobs:
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
     - name: Install Dependencies
+      id: install-python
       run: |
         $PYTHON = "${{ steps.setup-python.outputs.python-path }}"
-        echo "PYTHON=${PYTHON}" >> $GITHUB_ENV
+        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         $PYTHON -m pip install --upgrade pip
         $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
+        $PYTHON = ${{ steps.install-python.outputs.PYTHON }}
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ inputs.build-type == 'pyinstaller' && '1' || '0' }}) {
           if (${{ inputs.debug && '1' || '0' }}) {
