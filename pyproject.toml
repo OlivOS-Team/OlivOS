@@ -90,6 +90,11 @@ nuitka = [
     "setuptools>=63.2.0",
 ]
 
+# pack打包工具
+pack = [
+    "setuptools>=63.2.0",
+]
+
 # 插件生态所需依赖
 extend = [
     "lxml",

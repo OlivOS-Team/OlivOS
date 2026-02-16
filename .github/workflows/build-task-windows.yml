@@ -79,22 +79,27 @@ jobs:
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
           & $PYTHON ./script/nuitka_build.py
         }
-        mkdir OlivOS-Win
-        if (${{ inputs.debug && '1' || '0' }}) {
-          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
+        mkdir OlivOS-PKG
+        if (${{ inputs.build-type == 'pack' && '1' || '0' }}) {
+          cp -r ./OlivOS ./OlivOS-PKG/
+          cp ./main.py ./OlivOS-PKG/
         } else {
-          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS.exe
+          if (${{ inputs.debug && '1' || '0' }}) {
+            cp ./dist/OlivOS.exe ./OlivOS-PKG/OlivOS_debug.exe
+          } else {
+            cp ./dist/OlivOS.exe ./OlivOS-PKG/OlivOS.exe
+          }
         }
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.name }}
-        path: ./OlivOS-Win
+        path: ./OlivOS-PKG
 
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
       if: inputs.name == 'OlivOS-Win64-release'
       with:
         name: OlivOS-Win
-        path: ./OlivOS-Win
+        path: ./OlivOS-PKG
