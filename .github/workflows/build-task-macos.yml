@@ -44,6 +44,7 @@ jobs:
     - uses: actions/checkout@v3
     
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
+      id: setup-python
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
@@ -53,7 +54,7 @@ jobs:
     
     - name: Install Dependencies
       run: |
-        PYTHON="python"
+        PYTHON="${{ steps.setup-python.outputs.python-path }}"
         $PYTHON -m pip install --upgrade pip
         $PYTHON -m pip install .[extend,${{ inputs.build-type }}]
     

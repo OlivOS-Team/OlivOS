@@ -51,6 +51,7 @@ jobs:
         echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
 
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
+      id: setup-python
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
@@ -60,7 +61,7 @@ jobs:
     
     - name: Install Dependencies
       run: |
-        PYTHON="python"
+        $PYTHON = "${{ steps.setup-python.outputs.python-path }}"
         $PYTHON -m pip install --upgrade pip
         $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
     
