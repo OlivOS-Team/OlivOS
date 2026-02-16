@@ -59,8 +59,8 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
-    - name: Install Python
-      id: install-python
+    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
+      id: build
       run: |
         $PYTHON_EXE = "${{ steps.setup-python.outputs.python-path }}"
         $PYTHON_ROOT = Split-Path -Parent $PYTHON_EXE
@@ -69,12 +69,6 @@ jobs:
         cp -r "${PYTHON_ROOT}/*" ./python/
         $PYTHON = "${{ github.workspace }}/python/python.exe"
         echo "PYTHON=$PYTHON" >> $GITHUB_OUTPUT
-    
-    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
-      id: build
-      run: |
-        $PYTHON = "${{ steps.install-python.outputs.PYTHON }}"
-        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         & $PYTHON -m pip install --upgrade pip
         & $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py

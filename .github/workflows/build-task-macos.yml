@@ -52,8 +52,8 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
-    - name: Install Python
-      id: install-python
+    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
+      id: build
       run: |
         PYTHON_EXE="${{ steps.setup-python.outputs.python-path }}"
         PYTHON_ROOT="$(dirname "$(dirname "$PYTHON_EXE")")"
@@ -62,12 +62,6 @@ jobs:
         cp -r "${PYTHON_ROOT}/" ./python/
         chmod +x ./python/bin/python*
         PYTHON="${{ github.workspace }}/python/bin/python"
-        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
-    
-    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
-      id: build
-      run: |
-        PYTHON="${{ steps.install-python.outputs.PYTHON }}"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         "${PYTHON}" -m pip install --upgrade pip
         "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}]
