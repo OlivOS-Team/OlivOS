@@ -89,6 +89,7 @@ jobs:
           cp -r ./OlivOS ./OlivOS-PKG/
           cp -r ./python ./OlivOS-PKG/
           cp ./main.py ./OlivOS-PKG/
+          cp ./script/run.bat ./OlivOS-PKG/
         } else {
           if (${{ inputs.debug && '1' || '0' }}) {
             cp ./dist/OlivOS.exe ./OlivOS-PKG/OlivOS_debug.exe
