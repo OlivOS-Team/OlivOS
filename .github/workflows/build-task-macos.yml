@@ -55,6 +55,7 @@ jobs:
     - name: Install Dependencies
       run: |
         PYTHON="${{ steps.setup-python.outputs.python-path }}"
+        echo "PYTHON=${PYTHON}" >> $GITHUB_ENV
         $PYTHON -m pip install --upgrade pip
         $PYTHON -m pip install .[extend,${{ inputs.build-type }}]
     

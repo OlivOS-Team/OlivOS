@@ -62,6 +62,7 @@ jobs:
     - name: Install Dependencies
       run: |
         $PYTHON = "${{ steps.setup-python.outputs.python-path }}"
+        echo "PYTHON=${PYTHON}" >> $GITHUB_ENV
         $PYTHON -m pip install --upgrade pip
         $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
     
