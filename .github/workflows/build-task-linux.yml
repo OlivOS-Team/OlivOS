@@ -55,17 +55,13 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
-    - name: Install Dependencies
-      id: install-python
+    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
+      id: build
       run: |
         PYTHON="${{ steps.setup-python.outputs.python-path }}"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         "${PYTHON}" -m pip install --upgrade pip
         "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}]
-    
-    - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
-      run: |
-        PYTHON="${{ steps.install-python.outputs.PYTHON }}"
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
