@@ -70,12 +70,12 @@ jobs:
           "${PYTHON}" ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
-        if (${{ inputs.build-type == 'pack' && '1' || '0' }}) {
+        if [[ ${{ inputs.build-type == 'pack' && '1' || '0' }} -eq 1 ]]; then
           cp -r ./OlivOS ./OlivOS-PKG/
           cp ./main.py ./OlivOS-PKG/
-        } else {
+        else; then
           cp ./dist/OlivOS* ./OlivOS-PKG/
-        }
+        fi
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
