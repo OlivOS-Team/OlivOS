@@ -60,18 +60,18 @@ jobs:
       run: |
         PYTHON="${{ steps.setup-python.outputs.python-path }}"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
-        $PYTHON -m pip install --upgrade pip
-        $PYTHON -m pip install .[extend,${{ inputs.build-type }}]
+        "${PYTHON}" -m pip install --upgrade pip
+        "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}]
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
-        $PYTHON = ${{ steps.install-python.outputs.PYTHON }}
+        PYTHON="${{ steps.install-python.outputs.PYTHON }}"
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
-          $PYTHON -m pyinstaller ./OlivOS.spec
+          "${PYTHON}" -m pyinstaller ./OlivOS.spec
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
-          $PYTHON ./script/nuitka_build.py
+          "${PYTHON}" ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
         cp ./dist/OlivOS* ./OlivOS-PKG/

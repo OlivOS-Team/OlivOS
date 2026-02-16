@@ -64,8 +64,8 @@ jobs:
       run: |
         $PYTHON = "${{ steps.setup-python.outputs.python-path }}"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
-        $PYTHON -m pip install --upgrade pip
-        $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
+        & "${PYTHON}" -m pip install --upgrade pip
+        & "${PYTHON}" -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
@@ -78,10 +78,10 @@ jobs:
           } else {
             cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
           }
-          $PYTHON -m pyinstaller ./OlivOS.spec
+          & "${PYTHON}" -m pyinstaller ./OlivOS.spec
         } elseif (${{ inputs.build-type == 'nuitka' && '1' || '0' }}) {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-          $PYTHON ./script/nuitka_build.py
+          & "${PYTHON}" ./script/nuitka_build.py
         }
         mkdir OlivOS-Win
         if (${{ inputs.debug && '1' || '0' }}) {
