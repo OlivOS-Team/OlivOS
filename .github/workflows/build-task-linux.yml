@@ -73,7 +73,7 @@ jobs:
         if [[ ${{ inputs.build-type == 'pack' && '1' || '0' }} -eq 1 ]]; then
           cp -r ./OlivOS ./OlivOS-PKG/
           cp ./main.py ./OlivOS-PKG/
-        else; then
+        else
           cp ./dist/OlivOS* ./OlivOS-PKG/
         fi
     
