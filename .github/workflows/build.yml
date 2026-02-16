@@ -90,6 +90,16 @@ jobs:
             freethreaded: false
             build-type: pack
             debug: false
+
+          - name: OlivOS-Win64-pypy311-pack
+            enable: true
+            runs-on: windows-latest
+            python-version: 'pypy3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
+            debug: false
           
           - name: OlivOS-Win64-old-release
             enable: true
