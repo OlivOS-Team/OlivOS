@@ -74,7 +74,7 @@ jobs:
           } else {
             cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
           }
-          & $PYTHON -m pyinstaller ./OlivOS.spec
+          & $PYTHON -m PyInstaller ./OlivOS.spec
         } elseif (${{ inputs.build-type == 'nuitka' && '1' || '0' }}) {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
           & $PYTHON ./script/nuitka_build.py
