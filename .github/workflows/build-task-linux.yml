@@ -62,7 +62,7 @@ jobs:
         PYTHON_ROOT="$(dirname "$(dirname "$PYTHON_EXE")")"
         echo "Python root directory: ${PYTHON_ROOT}"
         mkdir -p ./python
-        cp -r "${PYTHON_ROOT}/*" ./python/
+        cp -r "${PYTHON_ROOT}/" ./python/
         chmod +x ./python/bin/python*
         PYTHON="${{ github.workspace }}/python/bin/python"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT

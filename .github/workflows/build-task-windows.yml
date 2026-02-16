@@ -68,7 +68,7 @@ jobs:
         mkdir -p ./python
         cp -r "${PYTHON_ROOT}/*" ./python/
         $PYTHON = "${{ github.workspace }}/python/python.exe"
-        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
+        echo "PYTHON=$PYTHON" >> $GITHUB_OUTPUT
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       id: build
