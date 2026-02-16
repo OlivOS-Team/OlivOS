@@ -56,17 +56,18 @@ jobs:
     
     - name: Install Dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[extend,${{ inputs.build-type }}]
+        PYTHON="python"
+        $PYTHON -m pip install --upgrade pip
+        $PYTHON -m pip install .[extend,${{ inputs.build-type }}]
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       run: |
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
-          pyinstaller ./OlivOS.spec
+          $PYTHON -m pyinstaller ./OlivOS.spec
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
-          python ./script/nuitka_build.py
+          $PYTHON ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
         cp ./dist/OlivOS* ./OlivOS-PKG/
