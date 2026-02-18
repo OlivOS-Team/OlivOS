@@ -112,7 +112,7 @@ jobs:
             debug: false
 
           - name: OlivOS-Win64-cpy314-nuitka
-            enable: true
+            enable: false
             runs-on: windows-latest
             python-version: '3.14'
             arch: amd64
