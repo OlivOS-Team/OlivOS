@@ -336,7 +336,7 @@ jobs:
             debug: false
 
           - name: OlivOS-MacOS64-pack
-            enable: false
+            enable: true
             runs-on: macos-latest
             python-version: '3.11.0'
             arch: amd64
