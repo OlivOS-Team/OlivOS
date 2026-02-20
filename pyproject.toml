@@ -66,7 +66,10 @@ py37 = [
 
 # Windows特定依赖
 win = [
-    "pypiwin32",
+    "pywin32",
+]
+pypywin = [
+    "pywin32-ctypes",
 ]
 
 # 打包工具
@@ -87,6 +90,11 @@ pyinstaller = [
 # nuitka打包工具
 nuitka = [
     "nuitka==2.8.10",
+    "setuptools>=63.2.0",
+]
+
+# pack打包工具
+pack = [
     "setuptools>=63.2.0",
 ]
 

@@ -50,8 +50,28 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: true
+
+          - name: OlivOS-Win64-cpy311-release
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+
+          - name: OlivOS-Win64-cpy311-debug
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: true
           
-          - name: OlivOS-Win64-py314-release
+          - name: OlivOS-Win64-cpy314-release
             enable: false
             runs-on: windows-latest
             python-version: '3.14'
@@ -61,7 +81,7 @@ jobs:
             build-type: pyinstaller
             debug: false
 
-          - name: OlivOS-Win64-py314-debug
+          - name: OlivOS-Win64-cpy314-debug
             enable: false
             runs-on: windows-latest
             python-version: '3.14'
@@ -79,6 +99,56 @@ jobs:
             python-arch: x64
             freethreaded: false
             build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Win64-cpy311-nuitka
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Win64-cpy314-nuitka
+            enable: false
+            runs-on: windows-latest
+            python-version: '3.14'
+            arch: amd64
+            python-arch: x64
+            freethreaded: true
+            build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Win64-pack
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.11.0'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
+            debug: false
+
+          - name: OlivOS-Win64-cpy311-pack
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
+            debug: false
+
+          - name: OlivOS-Win64-pypy311-pack
+            enable: false
+            runs-on: windows-latest
+            python-version: 'pypy3.11'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
             debug: false
           
           - name: OlivOS-Win64-old-release
@@ -120,6 +190,16 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: true
+          
+          - name: OlivOS-Win32-old-pack
+            enable: true
+            runs-on: windows-latest
+            python-version: '3.7.5'
+            arch: '386'
+            python-arch: x86
+            freethreaded: false
+            build-type: pack
+            debug: false
     with:
       name: ${{ matrix.name }}
       enable: ${{ matrix.enable }}
@@ -171,6 +251,16 @@ jobs:
             python-arch: x64
             freethreaded: false
             build-type: nuitka
+            debug: false
+
+          - name: OlivOS-Linux64-pack
+            enable: true
+            runs-on: ubuntu-latest
+            python-version: '3.10.8'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
             debug: false
 
           - name: OlivOS-Linux64-ARM64-release
@@ -243,6 +333,16 @@ jobs:
             python-arch: x64
             freethreaded: false
             build-type: nuitka
+            debug: false
+
+          - name: OlivOS-MacOS64-pack
+            enable: true
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: amd64
+            python-arch: x64
+            freethreaded: false
+            build-type: pack
             debug: false
     with:
       name: ${{ matrix.name }}

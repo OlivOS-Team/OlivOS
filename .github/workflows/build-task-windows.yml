@@ -51,6 +51,7 @@ jobs:
         echo "PATH=$MSBUILD_PATH;$env:PATH" >> $env:GITHUB_ENV
 
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
+      id: setup-python
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
@@ -58,13 +59,18 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}win,extend,${{ inputs.build-type }}]
-    
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
+      id: build
       run: |
+        $PYTHON_EXE = "${{ steps.setup-python.outputs.python-path }}"
+        $PYTHON_ROOT = Split-Path -Parent $PYTHON_EXE
+        echo "Python root directory: ${PYTHON_ROOT}"
+        mkdir -p ./python
+        cp -r "${PYTHON_ROOT}/*" ./python/
+        $PYTHON = "${{ github.workspace }}/python/python.exe"
+        echo "PYTHON=$PYTHON" >> $GITHUB_OUTPUT
+        & $PYTHON -m pip install --upgrade pip
+        & $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}${{ inputs.python-version == 'pypy3.11' && 'pypywin' || 'win' }},extend,${{ inputs.build-type }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ inputs.build-type == 'pyinstaller' && '1' || '0' }}) {
           if (${{ inputs.debug && '1' || '0' }}) {
@@ -73,27 +79,34 @@ jobs:
           } else {
             cp ./OlivOS/hook_pack.py ./OlivOS/hook.py
           }
-          pyinstaller ./OlivOS.spec
+          & $PYTHON -m PyInstaller ./OlivOS.spec
         } elseif (${{ inputs.build-type == 'nuitka' && '1' || '0' }}) {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
-          python ./script/nuitka_build.py
+          & $PYTHON ./script/nuitka_build.py
         }
-        mkdir OlivOS-Win
-        if (${{ inputs.debug && '1' || '0' }}) {
-          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS_debug.exe
+        mkdir OlivOS-PKG
+        if (${{ inputs.build-type == 'pack' && '1' || '0' }}) {
+          cp -r ./OlivOS ./OlivOS-PKG/
+          cp -r ./python ./OlivOS-PKG/
+          cp ./main.py ./OlivOS-PKG/
+          cp ./script/run.bat ./OlivOS-PKG/
         } else {
-          cp ./dist/OlivOS.exe ./OlivOS-Win/OlivOS.exe
+          if (${{ inputs.debug && '1' || '0' }}) {
+            cp ./dist/OlivOS.exe ./OlivOS-PKG/OlivOS_debug.exe
+          } else {
+            cp ./dist/OlivOS.exe ./OlivOS-PKG/OlivOS.exe
+          }
         }
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.name }}
-        path: ./OlivOS-Win
+        path: ./OlivOS-PKG
 
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
       if: inputs.name == 'OlivOS-Win64-release'
       with:
         name: OlivOS-Win
-        path: ./OlivOS-Win
+        path: ./OlivOS-PKG

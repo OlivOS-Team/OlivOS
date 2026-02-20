@@ -44,6 +44,7 @@ jobs:
     - uses: actions/checkout@v3
     
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
+      id: setup-python
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
@@ -51,22 +52,35 @@ jobs:
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
     
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .[extend,${{ inputs.build-type }}]
-    
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
+      id: build
       run: |
+        PYTHON_EXE="${{ steps.setup-python.outputs.python-path }}"
+        PYTHON_ROOT="$(dirname "$(dirname "$PYTHON_EXE")")"
+        echo "Python root directory: ${PYTHON_ROOT}"
+        mkdir ./python
+        cp -r "${PYTHON_ROOT}"/* ./python/
+        chmod +x ./python/bin/python*
+        PYTHON="${{ github.workspace }}/python/bin/python"
+        echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
+        "${PYTHON}" -m pip install --upgrade pip
+        "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
-          pyinstaller ./OlivOS.spec
+          "${PYTHON}" -m PyInstaller ./OlivOS.spec
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
-          python ./script/nuitka_build.py
+          "${PYTHON}" ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
-        cp ./dist/OlivOS* ./OlivOS-PKG/
+        if [[ ${{ inputs.build-type == 'pack' && '1' || '0' }} -eq 1 ]]; then
+          cp -r ./OlivOS ./OlivOS-PKG/
+          cp -r ./python ./OlivOS-PKG/
+          cp ./main.py ./OlivOS-PKG/
+          cp ./script/run.sh ./OlivOS-PKG/
+        else
+          cp ./dist/OlivOS* ./OlivOS-PKG/
+        fi
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
