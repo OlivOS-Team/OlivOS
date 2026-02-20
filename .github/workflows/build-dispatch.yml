@@ -57,6 +57,7 @@ on:
         options:
           - pyinstaller
           - nuitka
+          - pack
         default: pyinstaller
       debug: 
         required: false
