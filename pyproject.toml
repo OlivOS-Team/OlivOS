@@ -64,6 +64,11 @@ py37 = [
     "protobuf==4.24.4",
 ]
 
+# Pypy
+pypy = [
+    "Pillow>=11.2.1",
+]
+
 # Windows特定依赖
 win = [
     "pywin32",
