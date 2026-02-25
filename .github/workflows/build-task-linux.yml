@@ -67,7 +67,7 @@ jobs:
         PYTHON="${{ github.workspace }}/python/bin/python"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         "${PYTHON}" -m pip install --upgrade pip
-        "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}]
+        "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}${{ inputs.python-version == 'pypy3.11' && ',pypy' || '' }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then

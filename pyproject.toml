@@ -25,7 +25,8 @@ dependencies = [
     "Flask",
     "Werkzeug==2.2.2",
     "gevent",
-    "Pillow==9.3.0",
+    "Pillow==9.3.0; platform_python_implementation != 'PyPy'",
+    "Pillow>=11.2.1; platform_python_implementation == 'PyPy'",
     "psutil",
     "pystray",
     "requests",
@@ -62,6 +63,11 @@ py37 = [
     "grpcio==1.51.3",
     "grpcio-tools==1.51.3",
     "protobuf==4.24.4",
+]
+
+# Pypy
+pypy = [
+    "Pillow>=11.2.1",
 ]
 
 # Windows特定依赖

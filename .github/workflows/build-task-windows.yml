@@ -70,7 +70,7 @@ jobs:
         $PYTHON = "${{ github.workspace }}/python/python.exe"
         echo "PYTHON=$PYTHON" >> $GITHUB_OUTPUT
         & $PYTHON -m pip install --upgrade pip
-        & $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}${{ inputs.python-version == 'pypy3.11' && 'pypywin' || 'win' }},extend,${{ inputs.build-type }}]
+        & $PYTHON -m pip install .[${{ inputs.python-version == '3.7.5' && 'py37,' || '' }}${{ inputs.python-version == 'pypy3.11' && 'pypy,pypywin' || 'win' }},extend,${{ inputs.build-type }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         if (${{ inputs.build-type == 'pyinstaller' && '1' || '0' }}) {
           if (${{ inputs.debug && '1' || '0' }}) {
