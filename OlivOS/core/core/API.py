@@ -668,24 +668,25 @@ class Event(object):
                 if flag_log and event_obj is not None:
                     if warppedRes is None:
                         callback_msg = 'done'
-                    elif warppedRes.__class__.__base__ is dict:
-                        if 'active' not in warppedRes:
-                            callback_msg = 'done'
-                        elif warppedRes['active'] is not True:
-                            callback_msg = 'failed'
-                        elif not (type(val_list) is list and 'data' in warppedRes):
-                            callback_msg = 'succeed'
-                        else:
-                            callback_msg_list = []
-                            for val_list_this in val_list:
-                                if val_list_this in warppedRes['data']:
-                                    callback_msg_list.append(
-                                        '%s(%s)' % (
-                                            val_list_this,
-                                            str(warppedRes['data'][val_list_this])
-                                        )
+                    elif not (warppedRes.__class__.__base__ is dict):
+                        pass
+                    elif not ('active' in warppedRes):
+                        callback_msg = 'done'
+                    elif not (warppedRes['active'] is True):
+                        callback_msg = 'failed'
+                    elif not (type(val_list) is list and 'data' in warppedRes):
+                        callback_msg = 'succeed'
+                    else:
+                        callback_msg_list = []
+                        for val_list_this in val_list:
+                            if val_list_this in warppedRes['data']:
+                                callback_msg_list.append(
+                                    '%s(%s)' % (
+                                        val_list_this,
+                                        str(warppedRes['data'][val_list_this])
                                     )
-                            callback_msg = ' '.join(callback_msg_list)
+                                )
+                        callback_msg = ' '.join(callback_msg_list)
                     if event_obj.log_func is not None:
                         event_obj.log_func(2, callback_msg, [
                             (event_obj.getBotIDStr(), 'default'),
