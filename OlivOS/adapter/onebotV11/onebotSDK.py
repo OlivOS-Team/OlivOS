@@ -340,7 +340,6 @@ def format_cq_code_msg(msg):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
-    global gFlagCheckList
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
@@ -690,7 +689,6 @@ class event_action(object):
         )
 
     def send_private_msg(target_event, user_id, message):
-        global paraMsgMap
         msgType = 'msg'
         control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
@@ -702,7 +700,6 @@ class event_action(object):
         this_msg.do_api(control_queue=control_queue)
 
     def send_group_msg(target_event, group_id, message):
-        global paraMsgMap
         msgType = 'msg'
         control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
