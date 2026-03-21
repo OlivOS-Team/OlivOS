@@ -93,7 +93,13 @@ class send_onebot_post_json_T(object):
         self.node_ext = ''
 
     def send_onebot_post_json(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.obj is None or self.node_ext == '':
+        if (
+            type(self.bot_info) is not bot_info_T
+            or self.bot_info.host == ''
+            or self.bot_info.port == -1
+            or self.obj is None
+            or self.node_ext == ''
+        ):
             return None
         else:
             try:
@@ -129,7 +135,7 @@ class send_onebot_post_json_T(object):
                         self.bot_info.debug_logger.log(0, self.node_ext + ' - sendding succeed: ' + msg_res.text)
 
                 return msg_res
-            except:
+            except Exception:
                 traceback.print_exc()
 
 
@@ -150,7 +156,7 @@ class api_templet(object):
             this_post_json.node_ext = self.node_ext
             try:
                 self.res = this_post_json.send_onebot_post_json()
-            except:
+            except Exception:
                 self.res = None
         elif type == "websocket":
             try:
@@ -161,7 +167,7 @@ class api_templet(object):
                     data=data,
                     control_queue=control_queue
                 )
-            except:
+            except Exception:
                 self.res = None
         elif type == "websocket_host":
             try:
@@ -172,7 +178,7 @@ class api_templet(object):
                     data=data,
                     control_queue=control_queue
                 )
-            except:
+            except Exception:
                 self.res = None
         return self.res
 
@@ -184,7 +190,7 @@ class api_templet(object):
             'action': self.node_ext,
             'params': {},
         }
-        if self.data != None:
+        if self.data is not None:
             for key_this in self.data.__dict__:
                 if self.data.__dict__[key_this] != -1:
                     res_obj['params'][key_this] = self.data.__dict__[key_this]
@@ -226,7 +232,7 @@ def send_ws_event(hash, data, control_queue):
         this_post_json.node_ext = self.node_ext + '_async'
         try:
             self.res = this_post_json.send_onebot_post_json()
-        except:
+        except Exception:
             self.res = None
         return self.res
 
@@ -237,12 +243,17 @@ def send_ws_event(hash, data, control_queue):
         this_post_json.node_ext = self.node_ext + '_rate_limited'
         try:
             self.res = this_post_json.send_onebot_post_json()
-        except:
+        except Exception:
             self.res = None
         return self.res
 
     def do_api_get(self):
-        if type(self.bot_info) is not bot_info_T or self.bot_info.host == '' or self.bot_info.port == -1 or self.node_ext == '':
+        if (
+            type(self.bot_info) is not bot_info_T
+            or self.bot_info.host == ''
+            or self.bot_info.port == -1
+            or self.node_ext == ''
+        ):
             return None
         try:
             tmp_host = self.bot_info.host
@@ -267,7 +278,7 @@ def send_ws_event(hash, data, control_queue):
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - GET succeed: ' + msg_res.text)
             self.res = msg_res
             return msg_res
-        except:
+        except Exception:
             traceback.print_exc()
             self.res = None
             return None
@@ -290,7 +301,7 @@ class event(object):
     def event_load(self, raw):
         try:
             res = json.loads(raw)
-        except:
+        except Exception:
             res = None
         return res
 
@@ -316,8 +327,14 @@ def format_cq_code_msg(msg):
                             cq_params.append(f"name={msg_this['data']['name']}")
                         res += f"[CQ:at,{','.join(cq_params)}]"
                 else:
-                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] +
-                                          [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]) + ']'
+                    res += (
+                        '['
+                        + ','.join(
+                            [f"CQ:{msg_this['type']}"]
+                            + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]
+                        )
+                        + ']'
+                    )
     return res
 
 
@@ -618,7 +635,7 @@ def formatMessage(data: str, msgType: str = 'para'):
     )
     for data_obj_this in data_obj.data:
         if type(data_obj_this) is OlivOS.messageAPI.PARA.image:
-            if data_obj_this.data['url'] != None:
+            if data_obj_this.data['url'] is not None:
                 data_obj_this.data['file'] = data_obj_this.data['url']
                 data_obj_this.data['url'] = None
             url_path = data_obj_this.data['file']
@@ -714,7 +731,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
@@ -740,7 +757,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['messages'] = init_api_do_mapping_for_dict(raw_obj, ['messages'], list)
         return res_data
@@ -894,7 +911,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -911,7 +928,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -926,7 +943,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -946,7 +963,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
@@ -964,7 +981,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
@@ -990,7 +1007,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -1017,7 +1034,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
@@ -1046,7 +1063,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -1060,7 +1077,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -1074,29 +1091,49 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['online'] = init_api_do_mapping_for_dict(raw_obj, ['online'], bool)
-                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                       'packet_received'],
-                                                                                             int)
-                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                         ['stat', 'packet_sent'], int)
-                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                         ['stat', 'packet_lost'], int)
-                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                        'message_received'],
-                                                                                              int)
-                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(raw_obj,
-                                                                                          ['stat', 'message_sent'], int)
-                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                        'disconnect_times'],
-                                                                                              int)
-                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(raw_obj, ['stat', 'lost_times'],
-                                                                                        int)
-                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(raw_obj, ['stat',
-                                                                                                         'last_message_time'],
-                                                                                               int)
+                res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'packet_received'],
+                    int
+                )
+                res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'packet_sent'],
+                    int
+                )
+                res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'packet_lost'],
+                    int
+                )
+                res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'message_received'],
+                    int
+                )
+                res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'message_sent'],
+                    int
+                )
+                res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'disconnect_times'],
+                    int
+                )
+                res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'lost_times'],
+                    int
+                )
+                res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(
+                    raw_obj,
+                    ['stat', 'last_message_time'],
+                    int
+                )
         return res_data
 
     def get_version_info(target_event):
@@ -1108,7 +1145,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['app_name'], str)
                 res_data['data']['version_full'] = init_api_do_mapping_for_dict(raw_obj, ['app_full_name'], str)
@@ -1138,7 +1175,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['tiny_id'], str))
@@ -1162,7 +1199,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 model = target_event.bot_info.platform['model']
                 for raw_obj_this in raw_obj:
@@ -1261,7 +1298,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['file_count'] = init_api_do_mapping_for_dict(raw_obj, ['file_count'], int)
                 res_data['data']['limit_count'] = init_api_do_mapping_for_dict(raw_obj, ['limit_count'], int)
@@ -1283,7 +1320,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1304,7 +1341,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1322,7 +1359,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['url'] = init_api_do_mapping_for_dict(raw_obj, ['url'], str)
         return res_data
@@ -1389,7 +1426,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1430,7 +1467,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1459,7 +1496,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1496,7 +1533,7 @@ class event_action(object):
         if this_msg.res is not None:
             raw_obj = init_api_json(this_msg.res.text)
         if raw_obj is not None:
-            if type(raw_obj) == dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 # 处理邀请加群申请
                 if 'invited_requests' in raw_obj or 'InvitedRequest' in raw_obj:
@@ -1586,37 +1623,36 @@ def init_api_json(raw_str):
     flag_is_active = False
     try:
         tmp_obj = json.loads(raw_str)
-    except:
+    except Exception:
         tmp_obj = None
-    if type(tmp_obj) == dict:
+    if isinstance(tmp_obj, dict):
         if 'status' in tmp_obj:
-            if type(tmp_obj['status']) == str:
+            if isinstance(tmp_obj['status'], str):
                 if tmp_obj['status'] == 'ok':
                     flag_is_active = True
         if 'retcode' in tmp_obj:
-            if type(tmp_obj['retcode']) == int:
+            if isinstance(tmp_obj['retcode'], int):
                 if tmp_obj['retcode'] == 0:
                     flag_is_active = True
     if flag_is_active:
         if 'data' in tmp_obj:
-            if type(tmp_obj['data']) == dict:
+            if isinstance(tmp_obj['data'], dict):
                 res_data = tmp_obj['data'].copy()
-            elif type(tmp_obj['data']) == list:
+            elif isinstance(tmp_obj['data'], list):
                 res_data = tmp_obj['data'].copy()
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) == src_type:
+    if isinstance(src_data, src_type):
         return src_data
 
 
 def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
-    flag_active = True
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) == dict:
+        if isinstance(tmp_src_data, dict):
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:

@@ -304,7 +304,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             continue
                         for bot_info_key in plugin_bot_info_dict:
                             if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in \
+                                        OlivOS.onebotV11HostServerAPI.gCheckList:
                                     tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                     tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                     multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
