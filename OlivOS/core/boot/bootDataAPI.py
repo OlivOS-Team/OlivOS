@@ -35,6 +35,7 @@ default_Conf = {
             "OlivOS_OPQBot_link",
             "OlivOS_qqRed_link",
             "OlivOS_dingtalk_link",
+            "OlivOS_onebotV11_link",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
@@ -84,6 +85,7 @@ default_Conf = {
                 "OlivOS_qqRed_link",
                 "OlivOS_dingtalk_link",
                 "OlivOS_virtual_terminal_link",
+                "OlivOS_onebotV11_link",
                 "OlivOS_flask_post_rx",
                 "OlivOS_onebotV12_link",
                 "OlivOS_qqGuild_link",
@@ -111,6 +113,7 @@ default_Conf = {
                 "qqRed_link",
                 "dingtalk_link",
                 "terminal_link",
+                "onebotV11_link",
                 "flask_post_rx",
                 "onebotV12_link",
                 "qqGuild_link",
@@ -144,7 +147,8 @@ default_Conf = {
         "OlivOS_hackChat_queue",
         "OlivOS_OPQBot_queue",
         "OlivOS_biliLive_queue",
-        "OlivOS_onebotv12_queue",
+        "OlivOS_onebotV11_queue",
+        "OlivOS_onebotV12_queue",
         "OlivOS_qqRed_queue",
         "OlivOS_dingtalk_queue"
     ],
@@ -287,6 +291,18 @@ default_Conf = {
                 "host": "127.0.0.1",
                 "port": 55001
             }
+        },
+        "OlivOS_onebotV11_link": {
+            "enable": True,
+            "name": "OlivOS_onebotV11_link",
+            "type": "onebotV11_link",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_onebotV11_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
         },
         "OlivOS_onebotV12_link": {
             "enable": True,

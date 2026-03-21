@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -42,6 +42,7 @@ from .core.web import webTool
 from . import thirdPartyModule
 
 from . import adapter
+from .adapter.onebotV11 import onebotV11HostServerAPI
 from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK
 from .adapter.onebotV12 import onebotV12LinkServerAPI

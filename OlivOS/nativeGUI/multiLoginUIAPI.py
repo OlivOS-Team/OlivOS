@@ -642,6 +642,12 @@ class TreeEditUI(object):
                 # 后半位于此处
                 'type_mapping_list': {},
                 'type_mapping_list_Entry_slot': {
+                    'onebotV11/反向WS': {
+                        '账号': 'edit_root_Entry_ID',
+                        '地址': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
                     'onebotV11/Http': {
                         '账号': 'edit_root_Entry_ID',
                         '地址': 'edit_root_Entry_Server_host',
@@ -946,6 +952,18 @@ class TreeEditUI(object):
                 self.UIData[edit_root_Entry_Extend_this + '_StringVar'].get()
                 for edit_root_Entry_Extend_this in self.UIData['edit_root_Entry_Extend_list']
             ]
+            if (
+                tmp_platform_platform == 'qq'
+                and tmp_platform_sdk == 'onebot'
+                and tmp_platform_model in OlivOS.onebotV11HostServerAPI.gCheckList
+                and tmp_server_auto == 'True'
+            ):
+                if tmp_host == '':
+                    tmp_host = 'ws://127.0.0.1'
+                if tmp_port == '':
+                    tmp_port = '58001'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
             if (
                 tmp_platform_platform == 'qq'
                 and tmp_platform_sdk == 'onebot'
@@ -1602,7 +1620,7 @@ class TreeEditUI(object):
                         obj_root='edit_root',
                         obj_name=self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][entry_this],
                         str_name=self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][
-                                     entry_this] + '_StringVar',
+                            entry_this] + '_StringVar',
                         x=100,
                         y=40 + count * (24 + 6),
                         width=200,

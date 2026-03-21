@@ -194,27 +194,27 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         Proc_dict[
                             basic_conf_models_this['name']
                         ] = OlivOS.diagnoseAPI.logger(
-                                Proc_name=basic_conf_models_this['name'],
-                                scan_interval=basic_conf_models_this['interval'],
-                                dead_interval=basic_conf_models_this['dead_interval'],
-                                logger_queue=multiprocessing_dict[basic_conf_models_this['rx_queue']],
-                                logger_mode=basic_conf_models_this['mode'],
-                                logger_vis_level=basic_conf_models_this['fliter'],
-                                control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']]
-                            )
+                            Proc_name=basic_conf_models_this['name'],
+                            scan_interval=basic_conf_models_this['interval'],
+                            dead_interval=basic_conf_models_this['dead_interval'],
+                            logger_queue=multiprocessing_dict[basic_conf_models_this['rx_queue']],
+                            logger_mode=basic_conf_models_this['mode'],
+                            logger_vis_level=basic_conf_models_this['fliter'],
+                            control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']]
+                        )
                         Proc_Proc_dict[
                             basic_conf_models_this['name']
                         ] = Proc_dict[
-                                basic_conf_models_this['name']
-                            ].start_unity(
-                                tmp_proc_mode
-                            )
+                            basic_conf_models_this['name']
+                        ].start_unity(
+                            tmp_proc_mode
+                        )
                         for this_bot_info in plugin_bot_info_dict:
                             plugin_bot_info_dict[
                                 this_bot_info
                             ].debug_logger = Proc_dict[
-                                    basic_conf_models_this['name']
-                                ]
+                                basic_conf_models_this['name']
+                            ]
                         gLoggerProc = Proc_dict[basic_conf_models_this['name']]
                     elif basic_conf_models_this['type'] == 'plugin':
                         proc_plugin_func_dict = {}
@@ -273,7 +273,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 if plugin_bot_info_dict[
                                     bot_info_key
                                 ].platform['model'] in OlivOS.flaskServerAPI.gCheckList:
-                                    flag_need_enable = True
+                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'post':
+                                        flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         Proc_dict[basic_conf_models_this['name']] = OlivOS.flaskServerAPI.server(
@@ -290,6 +291,35 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         )
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[
                             basic_conf_models_this['name']].start_unity(tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'onebotV11_link':
+                        flag_need_enable = False
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
+                                if plugin_bot_info_dict[
+                                    bot_info_key
+                                ].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket_host':
+                                        flag_need_enable = True
+                        if not flag_need_enable:
+                            continue
+                        for bot_info_key in plugin_bot_info_dict:
+                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
+                                if plugin_bot_info_dict[bot_info_key].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                                    tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                                    tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                                    multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                                    Proc_dict[tmp_Proc_name] = OlivOS.onebotV11HostServerAPI.server(
+                                        Proc_name=tmp_Proc_name,
+                                        scan_interval=basic_conf_models_this['interval'],
+                                        dead_interval=basic_conf_models_this['dead_interval'],
+                                        rx_queue=multiprocessing_dict[tmp_queue_name],
+                                        tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                        logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                        bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                                        debug_mode=False
+                                    )
+                                    Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
+                                        tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'onebotV12_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -1070,8 +1100,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             block=False
                         )
                         logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] type init', [
-                                tmp_Proc_name
-                            ],
+                            tmp_Proc_name
+                        ],
                             modelName
                         ))
             elif rx_packet_data.action == 'stop_type':
@@ -1086,8 +1116,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             Proc_Proc_dict[tmp_Proc_name].join()
                             list_stop.append(tmp_Proc_name)
                             logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
-                                    tmp_Proc_name
-                                ],
+                                tmp_Proc_name
+                            ],
                                 modelName
                             ))
                     except Exception:
@@ -1102,8 +1132,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         Proc_Proc_dict[tmp_Proc_name].terminate()
                         Proc_Proc_dict[tmp_Proc_name].join()
                         logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
-                                tmp_Proc_name
-                            ],
+                            tmp_Proc_name
+                        ],
                             modelName
                         ))
                         Proc_Proc_dict.pop(tmp_Proc_name)
@@ -1197,16 +1227,16 @@ def bootMonitor(varDict: dict):
                 if Proc_name not in varDict['Proc_dict']:
                     flagNeedRefresh = True
                     logG(2, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] stopped', [
-                            Proc_name
-                        ],
+                        Proc_name
+                    ],
                         modelName
                     ))
             for Proc_name in varDict['Proc_dict']:
                 if Proc_name not in gMonitorReg['Proc_dict']['keys']:
                     flagNeedRefresh = True
                     logG(2, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] init', [
-                            Proc_name
-                        ],
+                        Proc_name
+                    ],
                         modelName
                     ))
             if flagNeedRefresh:
