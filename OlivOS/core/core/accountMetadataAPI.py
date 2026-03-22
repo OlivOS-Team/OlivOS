@@ -36,6 +36,7 @@ accountTypeList = [
     'Hack.Chat',
     'Hack.Chat/私有',
     'onebotV12/正向WS',
+    'onebotV11/反向WS',
     'onebotV11/Http',
     'onebotV11/Http/NapCat',
     'onebotV11/Http/LLOneBot',
@@ -80,6 +81,7 @@ accountTypeMappingList = {
     'onebotV11/Http/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'post'],
     'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post'],
     'onebotV11/Http/消息段': ['qq', 'onebot', 'array_default', 'False', 'post'],
+    'onebotV11/反向WS': ['qq', 'onebot', 'default', 'False', 'websocket_host'],
     'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket'],
     'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket'],
     'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket'],
@@ -349,5 +351,6 @@ accountTypeDataList_server_auto = [
 
 accountTypeDataList_server_type = [
     'post',
-    'websocket'
+    'websocket',
+    'websocket_host'
 ]
