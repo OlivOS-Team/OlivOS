@@ -148,8 +148,8 @@ class api_templet(object):
         self.res = None
 
     def do_api(self, control_queue=None):
-        type = self.bot_info.server_type
-        if type == "post":
+        server_type = self.bot_info.server_type
+        if server_type == "post":
             this_post_json = send_onebot_post_json_T()
             this_post_json.bot_info = self.bot_info
             this_post_json.obj = self.data
@@ -158,7 +158,7 @@ class api_templet(object):
                 self.res = this_post_json.send_onebot_post_json()
             except Exception:
                 self.res = None
-        elif type == "websocket":
+        elif server_type == "websocket":
             try:
                 bot_hash = self.bot_info.hash
                 data = self.do_dump()
@@ -169,7 +169,7 @@ class api_templet(object):
                 )
             except Exception:
                 self.res = None
-        elif type == "websocket_host":
+        elif server_type == "websocket_host":
             try:
                 bot_hash = self.bot_info.hash
                 data = self.do_dump()
