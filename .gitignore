@@ -7,5 +7,6 @@ resource/tmp_*
 logfile/*
 flake8_output.log
 *.egg-info
+uv.lock
 build
 dist
