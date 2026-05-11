@@ -1,36 +1,3 @@
 {
-    "account": [
-        {
-            "id": 177416376,
-            "password": "",
-            "sdk_type": "onebot",
-            "platform_type": "qq",
-            "model_type": "default",
-            "server": {
-                "auto": false,
-                "type": "websocket_host",
-                "host": "127.0.0.1",
-                "port": 3002,
-                "access_token": "123"
-            },
-            "extends": {},
-            "debug": false
-        },
-        {
-            "id": 42767516990368493138776584305024125808,
-            "password": "NONEED",
-            "sdk_type": "kaiheila_link",
-            "platform_type": "kaiheila",
-            "model_type": "default",
-            "server": {
-                "auto": true,
-                "type": "websocket",
-                "host": "NONEED",
-                "port": 0,
-                "access_token": "123"
-            },
-            "extends": {},
-            "debug": false
-        }
-    ]
+    "account": []
 }
