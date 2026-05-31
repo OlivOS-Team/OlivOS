@@ -1990,12 +1990,12 @@ class VirtualTerminalUI(BaseTerminalUI):
         if user_conf is None:
             user_conf = data.get("user_conf", self.user_conf_data)
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
-        res_data = res_data.replace(' ', r'\ ').replace('\r\n', '\n')
+        res_data = res_data.replace('\r\n', '\n')
         if not user_conf['flag_group']:
             header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (用户: {user_conf['target_id']})"
         else:
             header = f"<{user_conf['user_name']}> ({user_conf['user_id']}) -> (群: {user_conf['target_id']})"
-        header = header.replace(' ', r'\ ').replace('\r\n', '\n')
+        header = header.replace('\r\n', '\n')
         full = f"{header}\n{res_data}\n{'-'*25}"
         for line in full.split('\n'):
             try:
