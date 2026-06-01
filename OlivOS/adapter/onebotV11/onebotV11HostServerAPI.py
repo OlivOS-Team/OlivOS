@@ -196,7 +196,8 @@ class server(OlivOS.API.Proc_templet):
             try:
                 extra_info = {
                     'id': self.bot_info.id,
-                    'type': self.conf.type,
+                    'token': self.conf.token,
+                    'type': 'websocket_host'
                 }
                 sdk_event = OlivOS.onebotSDK.event(raw_message, extra_info)
                 if not sdk_event.active:

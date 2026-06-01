@@ -317,6 +317,8 @@ class event(object):
                     self.base_info['self_id'] = extras['id']
                 if 'type' in extras:
                     self.base_info['server_type'] = extras['type']
+                if 'token' in extras:
+                    self.base_info['access_token'] = extras['token']
 
     def event_load(self, raw):
         try:
