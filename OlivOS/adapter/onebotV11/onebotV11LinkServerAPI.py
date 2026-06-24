@@ -19,6 +19,7 @@ import threading
 import traceback
 import websockets
 from dataclasses import dataclass
+from queue import Empty as QueueEmpty
 from urllib.parse import urlparse, parse_qs
 
 import OlivOS
@@ -164,6 +165,8 @@ class server(OlivOS.API.Proc_templet):
         self.conf: ServerConf = ServerConf.init_conf_from_post_info(self.bot_info.post_info)
         self.extra_conf: ExtraConf = ExtraConf.init_extra_conf_from_extends(self.bot_info.extends)
         self.debug_mode = debug_mode
+        self._running_event = threading.Event()
+        self._running_event.set()
 
     def start(self) -> threading.Thread:
         """启动入口
@@ -207,8 +210,7 @@ class server(OlivOS.API.Proc_templet):
         )
         bridge_thread.start()
 
-        while True:
-            done = []
+        while self._running_event.is_set():
             pending = []
             try:
                 await self.__link_to_server()
@@ -288,13 +290,15 @@ class server(OlivOS.API.Proc_templet):
             'Content-Type': 'application/json'
         }
         try:
-            connection = websockets.connect(url, additional_headers=headers)
-            self.ws_conn = await connection.__aenter__()
-        except TypeError:
-            connection = websockets.connect(url, extra_headers=headers)
-            self.ws_conn = await connection.__aenter__()
+            try:
+                self.ws_conn = await websockets.connect(url, additional_headers=headers)
+            except TypeError:
+                self.ws_conn = await websockets.connect(url, extra_headers=headers)
         except ConnectionRefusedError:
-            pass
+            self.ws_conn = None
+        except Exception as e:
+            self.on_error(e)
+            self.ws_conn = None
 
     def __bridge_queue(self, loop: asyncio.AbstractEventLoop) -> None:
         """队列桥接逻辑
@@ -305,13 +309,15 @@ class server(OlivOS.API.Proc_templet):
         Args:
             loop (asyncio.AbstractEventLoop): 异步事件循环
         """
-        while True:
+        while self._running_event.is_set():
             try:
-                rx_packet_data = self.Proc_info.rx_queue.get()
+                rx_packet_data = self.Proc_info.rx_queue.get(timeout=1.0)
                 loop.call_soon_threadsafe(
                     self.__safe_async_put,
                     rx_packet_data
                 )
+            except QueueEmpty:
+                continue
             except EOFError:
                 break
             except Exception as e:

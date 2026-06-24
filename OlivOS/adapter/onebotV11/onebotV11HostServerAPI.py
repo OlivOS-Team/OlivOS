@@ -21,6 +21,7 @@ import threading
 import traceback
 import websockets
 from websockets import Response, Headers
+from queue import Empty as QueueEmpty
 from dataclasses import dataclass
 import http
 
@@ -126,6 +127,8 @@ class server(OlivOS.API.Proc_templet):
         self.bot_info = bot_info_dict
         self.conf = ServerConf.init_conf_from_post_info(self.bot_info.post_info)
         self.async_rx_queue = None
+        self._running_event = threading.Event()
+        self._running_event.set()
 
     def start(self) -> threading.Thread:
         """启动入口
@@ -217,17 +220,26 @@ class server(OlivOS.API.Proc_templet):
             loop: 当前事件循环对象
             async_rx_queue: producer使用的异步队列,用于接收数据
         """
-        while True:
+        while self._running_event.is_set():
             try:
-                rx_packet_data = self.Proc_info.rx_queue.get()
-                asyncio.run_coroutine_threadsafe(
-                    self.async_rx_queue.put(rx_packet_data),
-                    loop
+                rx_packet_data = self.Proc_info.rx_queue.get(timeout=1.0)
+                loop.call_soon_threadsafe(
+                    self.__safe_async_put,
+                    rx_packet_data
                 )
+            except QueueEmpty:
+                continue
             except EOFError:
                 break
             except Exception as e:
                 self.on_error(e)
+
+    def __safe_async_put(self, data: OlivOS.API.Control.packet) -> None:
+        """安全的异步队列入队逻辑"""
+        try:
+            self.async_rx_queue.put_nowait(data)
+        except asyncio.QueueFull:
+            pass
 
     def auther(
             self,
@@ -312,16 +324,16 @@ class server(OlivOS.API.Proc_templet):
         )
         bridger_thread.start()
 
-        while True:
-            async with websockets.serve(
-                self.handler,
-                self.conf.host,
-                self.conf.port,
-                process_request=self.auther
-            ):
-                self.on_run()
-                await asyncio.Future()  # run forever
-            self.on_lost()
+        async with websockets.serve(
+            self.handler,
+            self.conf.host,
+            self.conf.port,
+            process_request=self.auther
+        ):
+            self.on_run()
+            while self._running_event.is_set():
+                await asyncio.sleep(1.0)  # run forever
+        self.on_lost()
 
     def on_run(self) -> None:
         """服务器启动时的处理"""
