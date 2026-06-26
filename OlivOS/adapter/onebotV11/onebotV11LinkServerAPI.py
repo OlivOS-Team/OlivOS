@@ -14,12 +14,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   OneBot11 WebSocket-Forward Server Implementation
 '''
 
+import json
+import queue
 import asyncio
 import threading
-import traceback
 import websockets
+import traceback
 from dataclasses import dataclass
-from queue import Empty as QueueEmpty
 from urllib.parse import urlparse, parse_qs
 
 import OlivOS
@@ -68,7 +69,13 @@ class ServerConf:
         host = parsed.hostname
         port = parsed.port
         route = parsed.path
-        url = f"{scheme}://{host}:{port}{route}"
+        query = parsed.query
+        if parsed.query:
+            route += '?' + query
+        if port is None:
+            url = f"{scheme}://{host}:55001{route}"
+        else:
+            url = f"{scheme}://{host}:{port}{route}"
         token = post_info.access_token
         if token is None:
             params = parse_qs(parsed.query)
@@ -81,15 +88,10 @@ class ExtraConf:
     """额外配置项
 
     Attributes:
-        queue_max_size (int): 最大队列大小
-        queue_timeout (float): 队列超时时间
         retry_interval (float): 重试间隔
-        retry_interval_to_link (float): 重试间隔，但是尝试连接时
     """
-    queue_max_size: int = 512
-    queue_timeout: float = 30
     retry_interval: float = 4
-    retry_interval_to_link: float = 1
+    queue_timeout: float = 0.5
 
     @classmethod
     def init_extra_conf_from_extends(cls, extends: dict):
@@ -99,10 +101,8 @@ class ExtraConf:
             extends (dict): 额外配置项，来自OlivOS.API.bot_info_T.extends
         """
         return cls(
-            queue_max_size=extends.get('queue_max_size', 512),
-            queue_timeout=extends.get('queue_timeout', 30),
             retry_interval=extends.get('retry_interval', 4),
-            retry_interval_to_link=extends.get('retry_interval_to_link', 1)
+            queue_timeout=extends.get('queue_timeout', 0.5)
         )
 
 
@@ -121,9 +121,10 @@ class server(OlivOS.API.Proc_templet):
         debug_mode (bool): 是否开启调试模式
         bot_info (OlivOS.API.bot_info_T): 机器人信息
         ws_conn (websockets.ClientConnection): WebSocket连接
-        async_rx_queue (asyncio.Queue): 异步接收队列
         conf (ServerConf): 服务器配置
         extra_conf (ExtraConf): 额外配置
+        extra_info (dict): 传递给SDK的额外参数
+        running_event (threading.Event): 兼容性服务器开关
     """
 
     def __init__(
@@ -161,12 +162,12 @@ class server(OlivOS.API.Proc_templet):
         )
         self.bot_info: OlivOS.API.bot_info_T = bot_info
         self.ws_conn: websockets.ClientConnection = None
-        self.async_rx_queue: asyncio.Queue = None
         self.conf: ServerConf = ServerConf.init_conf_from_post_info(self.bot_info.post_info)
         self.extra_conf: ExtraConf = ExtraConf.init_extra_conf_from_extends(self.bot_info.extends)
+        self.extra_info = {'id': self.bot_info.id, 'token': self.conf.token, 'type': 'websocket'}
         self.debug_mode = debug_mode
-        self._running_event = threading.Event()
-        self._running_event.set()
+        self.running_event = threading.Event()
+        self.running_event.set()
 
     def start(self) -> threading.Thread:
         """启动入口
@@ -176,11 +177,10 @@ class server(OlivOS.API.Proc_templet):
         """
         proc_this = threading.Thread(
             target=lambda: asyncio.run(self.run()),
-            name=self.Proc_name
+            name=self.Proc_name,
+            daemon=self.deamon  # I come being a demon!
         )
-        proc_this.daemon = self.deamon
         proc_this.start()
-        # self.Proc = proc_this
         return proc_this
 
     def start_unity(self, mode='threading') -> threading.Thread:
@@ -192,49 +192,19 @@ class server(OlivOS.API.Proc_templet):
         Returns:
             threading.Thread: 运行本服务器的线程
         """
-        proc_this = self.start()
-        return proc_this
+        return self.start()
 
     async def run(self) -> None:
-        """主运行循环
-
-        负责初始化并执行协调执行流程
-        """
-        self.async_rx_queue = asyncio.Queue(maxsize=self.extra_conf.queue_max_size)
-        loop = asyncio.get_event_loop()
-        bridge_thread = threading.Thread(
-            target=self.__bridge_queue,
-            name=f'{self.Proc_name}_bridge',
-            args=(loop,),
-            daemon=True
-        )
-        bridge_thread.start()
-
-        while self._running_event.is_set():
-            pending = []
+        """主运行循环"""
+        while self.running_event.is_set():
             try:
-                await self.__link_to_server()
-                if self.ws_conn is None:
-                    await asyncio.sleep(self.extra_conf.retry_interval_to_link)
-                    continue
-                self.on_open()
-                rx_task = asyncio.create_task(self.rx_link())
-                tx_task = asyncio.create_task(self.tx_link())
-                done, pending = await asyncio.wait(
-                    [rx_task, tx_task],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
+                await self.__session_lifecycle()
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 self.on_error(e)
-            finally:
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-                if self.ws_conn is not None:
-                    await self.ws_conn.close()
-                    self.on_close()
-                self.ws_conn = None
-
+            if self.running_event.is_set():
+                self.on_retry()
                 await asyncio.sleep(self.extra_conf.retry_interval)
 
     async def rx_link(self) -> None:
@@ -242,53 +212,69 @@ class server(OlivOS.API.Proc_templet):
         while True:
             try:
                 raw = await self.ws_conn.recv()
-                extra_info = {
-                    'id': self.bot_info.id,
-                    'token': self.conf.token,
-                    'type': 'websocket'
-                }
-                sdk_event = OlivOS.onebotSDK.event(raw, extra_info)
+                sdk_event = OlivOS.onebotSDK.event(raw, self.extra_info)
                 if not sdk_event.active:
                     continue
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                self.Proc_info.tx_queue.put(tx_packet_data)
-            except (websockets.ConnectionClosedOK, asyncio.CancelledError):
-                # 被动关闭/主动关闭
+                try:
+                    self.Proc_info.tx_queue.put_nowait(tx_packet_data)
+                except queue.Full:
+                    # 消费效率跟不上时直接丢弃
+                    pass
+                del raw, sdk_event
+            except asyncio.CancelledError:
+                # 主动关闭
+                raise
+            except websockets.ConnectionClosedOK:
+                # 被动关闭
                 break
             except websockets.ConnectionClosedError:
                 # 非预期关闭
-                self.on_lost()
+                self.on_lost()  # 仅rx打印lost即可
+                break
             except Exception as e:
                 self.on_error(e)
+                break
 
     async def tx_link(self) -> None:
         """WS发送逻辑"""
         while True:
-            rx_packet_data: OlivOS.API.Control.packet = await self.async_rx_queue.get()
             try:
+                rx_packet_data: OlivOS.API.Control.packet = await asyncio.to_thread(
+                    self.Proc_info.rx_queue.get,
+                    timeout=self.extra_conf.queue_timeout
+                )
                 data_part = rx_packet_data.key.get('data', {})
                 if data_part.get('action') == 'send':
                     payload = data_part.get('data')
-                    if payload is not None:
-                        await self.ws_conn.send(payload)
-            except (websockets.ConnectionClosedOK, asyncio.CancelledError):
-                # 被动关闭/主动关闭
+                    if payload is None:
+                        continue
+                    if isinstance(payload, (dict, list)):
+                        payload = json.dumps(payload)
+                    await self.ws_conn.send(payload)
+            except queue.Empty:
+                continue
+            except asyncio.CancelledError:
+                # 主动关闭
+                raise
+            except websockets.ConnectionClosedOK:
+                # 被动关闭
                 break
             except websockets.ConnectionClosedError:
                 # 非预期关闭
-                self.on_lost()
+                break
             except Exception as e:
                 self.on_error(e)
-            finally:
-                self.async_rx_queue.task_done()
+                break
 
     async def __link_to_server(self) -> None:
         """WS连接逻辑"""
         url = self.conf.url
         headers = {
-            'Authorization': f'Bearer {self.conf.token}',
             'Content-Type': 'application/json'
         }
+        if self.conf.token:
+            headers['Authorization'] = f'Bearer {self.conf.token}'
         try:
             try:
                 self.ws_conn = await websockets.connect(url, additional_headers=headers)
@@ -296,48 +282,46 @@ class server(OlivOS.API.Proc_templet):
                 self.ws_conn = await websockets.connect(url, extra_headers=headers)
         except ConnectionRefusedError:
             self.ws_conn = None
+        except asyncio.CancelledError:
+            self.ws_conn = None
+            raise
         except Exception as e:
             self.on_error(e)
             self.ws_conn = None
 
-    def __bridge_queue(self, loop: asyncio.AbstractEventLoop) -> None:
-        """队列桥接逻辑
-
-        接收队列rx_queue是multiprocessing.Queue, 而本模块基于异步协程, 需要进行队列桥接以优化性能
-        通常情况下, 在线程中运行本方法
-
-        Args:
-            loop (asyncio.AbstractEventLoop): 异步事件循环
-        """
-        while self._running_event.is_set():
-            try:
-                rx_packet_data = self.Proc_info.rx_queue.get(timeout=1.0)
-                loop.call_soon_threadsafe(
-                    self.__safe_async_put,
-                    rx_packet_data
-                )
-            except QueueEmpty:
-                continue
-            except EOFError:
-                break
-            except Exception as e:
-                self.on_error(e)
-
-    def __safe_async_put(self, data: OlivOS.API.Control.packet) -> None:
-        """异步队列入队逻辑
-
-        在连接启动时正常入队，在连接未启动时返回
-        在队列已满时不再入队
-
-        Args:
-            data (OlivOS.API.Control.packet): 数据包
-        """
-        if self.ws_conn is None:
-            return
+    async def __session_lifecycle(self) -> None:
+        """单次会话的生命周期管理逻辑"""
         try:
-            self.async_rx_queue.put_nowait(data)    # 过期消息不再塞入
-        except asyncio.QueueFull:
-            pass
+            # 开始连接
+            await self.__link_to_server()
+            if self.ws_conn is None:
+                return
+            self.on_open()
+            await self.__make_session()
+        finally:
+            # 各种情况下的连接关闭
+            if self.ws_conn is not None:
+                tmp_conn = self.ws_conn
+                self.ws_conn = None
+                try:
+                    await tmp_conn.close()
+                except (websockets.ConnectionClosed, OSError):
+                    pass
+                self.on_close()
+
+    async def __make_session(self) -> None:
+        """会话编排逻辑"""
+        rx_task = asyncio.create_task(self.rx_link())
+        tx_task = asyncio.create_task(self.tx_link())
+        pending = [rx_task, tx_task]
+
+        try:
+            await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
 
     def on_open(self) -> None:
         """连接建立时的处理"""
@@ -360,8 +344,10 @@ class server(OlivOS.API.Proc_templet):
                 modelName
             )
         )
+
+    def on_retry(self) -> None:
         self.log(
-            2,
+            3,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS onebotV11 link server [{0}] websocket link will retry in {1}s',
                 [self.Proc_name, self.extra_conf.retry_interval],

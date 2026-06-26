@@ -512,7 +512,7 @@ class shallow(API.Proc_templet):
                 }
             }
         }
-                              )
+        )
         self.sendControlEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
@@ -521,7 +521,7 @@ class shallow(API.Proc_templet):
                 'action': 'start_shallow'
             }
         }
-                              )
+        )
 
     def sendControlEvent(self, action, data):
         if self.Proc_info.control_queue is not None:

@@ -15,13 +15,14 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import queue
 import socket
 import asyncio
 import threading
 import traceback
 import websockets
 from websockets import Response, Headers
-from queue import Empty as QueueEmpty
+from urllib.parse import urlparse
 from dataclasses import dataclass
 import http
 
@@ -39,7 +40,7 @@ gCheckList = [
 
 DEFAULT_SCAN_INTERVAL = 0.001
 DEFAULT_DEAD_INTERVAL = 1
-QUEUE_TIMEOUT = 0.1
+QUEUE_TIMEOUT = 0.01
 
 
 @dataclass
@@ -47,7 +48,6 @@ class ServerConf:
     """服务器配置类
 
     Attributes:
-        url (str): 连接URL
         host (str): 连接HOST
         port (int): 连接PORT
         token (str): 连接TOKEN
@@ -65,7 +65,10 @@ class ServerConf:
         Args:
             post_info (OlivOS.API.bot_info_T.post_info_T): 通信相关的信息结构体
         """
-        host = post_info.host.strip('ws://').strip('wss://')
+        host = "127.0.0.1"
+        parsed = urlparse(post_info.host)
+        if parsed.hostname is not None:
+            host = parsed.hostname
         port = post_info.port
         token = post_info.access_token
         route = None
@@ -85,7 +88,7 @@ class server(OlivOS.API.Proc_templet):
         debug_mode (bool): 是否开启调试模式
         bot_info (OlivOS.API.bot_info_T): 机器人信息
         conf (ServerConf): 服务器配置
-        async_rx_queue (asyncio.Queue): 异步接收队列
+        running_event (threading.Event): 兼容性服务器开关
     """
 
     def __init__(
@@ -126,9 +129,9 @@ class server(OlivOS.API.Proc_templet):
         self.debug_mode = debug_mode
         self.bot_info = bot_info_dict
         self.conf = ServerConf.init_conf_from_post_info(self.bot_info.post_info)
-        self.async_rx_queue = None
-        self._running_event = threading.Event()
-        self._running_event.set()
+        self.extra_info = {'id': self.bot_info.id, 'token': self.conf.token, 'type': 'websocket_host'}
+        self.running_event = threading.Event()
+        self.running_event.set()
 
     def start(self) -> threading.Thread:
         """启动入口
@@ -140,11 +143,10 @@ class server(OlivOS.API.Proc_templet):
         """
         proc_this = threading.Thread(
             target=lambda: asyncio.run(self.run()),
-            name=self.Proc_name
+            name=self.Proc_name,
+            daemon=self.deamon  # 依旧仑质神秘小巧思
         )
-        proc_this.daemon = self.deamon  # 依旧仑质神秘小巧思
         proc_this.start()
-        # self.Proc = proc_this
         return proc_this
 
     def start_unity(self, mode: str = 'threading') -> threading.Thread:
@@ -159,97 +161,108 @@ class server(OlivOS.API.Proc_templet):
         Returns:
             threading.Thread: 运行事件循环的线程对象
         """
-        proc_this = self.start()
-        return proc_this
+        return self.start()
 
-    async def producer(self, websocket: websockets.ServerConnection) -> None:
-        """生产者
+    async def run(self) -> None:
+        """运行WebSocket服务器的主运行循环"""
+        if not is_free_port(self.conf.host, self.conf.port):
+            self.on_occupy()
+            self.conf.port = get_free_port(self.conf.host)
 
-        即发送逻辑的执行者
-
-        Args:
-            websocket: WebSocket连接对象, 用于发送消息
-        """
-        while True:
-            rx_packet_data: OlivOS.API.Control.packet = await self.async_rx_queue.get()
+        while self.running_event.is_set():
             try:
-                data_part: dict = rx_packet_data.key.get('data', {})
-                if data_part.get('action') == 'send':
-                    payload = data_part.get('data')
-                    if payload is not None:
-                        if isinstance(payload, (dict, list)):
-                            payload = json.dumps(payload)
-                        await websocket.send(payload)
-            except websockets.ConnectionClosed:
-                break
+                async with websockets.serve(
+                    self.session,
+                    self.conf.host,
+                    self.conf.port,
+                    process_request=self.auther
+                ):
+                    self.on_run()
+                    while self.running_event.is_set():
+                        await asyncio.sleep(1.0)
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 self.on_error(e)
-            finally:
-                self.async_rx_queue.task_done()
+            if self.running_event.is_set():
+                await asyncio.sleep(1.0)
+        self.on_lost()
 
-    async def consumer(self, websocket: websockets.ServerConnection) -> None:
-        """消费者
-
-        即接收逻辑的执行者
+    async def rx(self, ws_conn: websockets.ServerConnection) -> None:
+        """接收器，即接收逻辑的实现
 
         Args:
-            websocket: WebSocket连接对象, 用于接收消息
+            ws_conn: WebSocket连接对象, 用于接收消息
         """
-        async for raw_message in websocket:
+        while True:
             try:
-                extra_info = {
-                    'id': self.bot_info.id,
-                    'token': self.conf.token,
-                    'type': 'websocket_host'
-                }
-                sdk_event = OlivOS.onebotSDK.event(raw_message, extra_info)
+                raw = await ws_conn.recv()
+                sdk_event = OlivOS.onebotSDK.event(raw, self.extra_info)
                 if not sdk_event.active:
                     continue
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
-                self.Proc_info.tx_queue.put(tx_packet_data, block=False)
-            except Exception as e:
-                self.on_error(e)
-
-    def bridger(self, loop: asyncio.AbstractEventLoop) -> None:
-        """队列桥接者
-
-        单独开一个线程将rx_queue的数据搬运到异步队列,以此规避producer频繁调用to_thread带来的性能问题
-        这基于rx_queue是multiprocessing.Queue对象, 事实上也的确是
-
-        Args:
-            loop: 当前事件循环对象
-            async_rx_queue: producer使用的异步队列,用于接收数据
-        """
-        while self._running_event.is_set():
-            try:
-                rx_packet_data = self.Proc_info.rx_queue.get(timeout=1.0)
-                loop.call_soon_threadsafe(
-                    self.__safe_async_put,
-                    rx_packet_data
-                )
-            except QueueEmpty:
-                continue
-            except EOFError:
+                try:
+                    self.Proc_info.tx_queue.put_nowait(tx_packet_data)
+                except queue.Full:
+                    # 消费效率跟不上时直接丢弃
+                    pass
+            except asyncio.CancelledError:
+                # 主动关闭
+                raise
+            except websockets.ConnectionClosedOK:
+                # 被动关闭
+                break
+            except websockets.ConnectionClosedError:
+                # 非预期关闭
+                self.on_lost()  # 仅rx打印lost即可
                 break
             except Exception as e:
                 self.on_error(e)
+                break
 
-    def __safe_async_put(self, data: OlivOS.API.Control.packet) -> None:
-        """安全的异步队列入队逻辑"""
-        try:
-            self.async_rx_queue.put_nowait(data)
-        except asyncio.QueueFull:
-            pass
+    async def tx(self, ws_conn: websockets.ServerConnection) -> None:
+        """发送器，即发送逻辑的实现
+
+        Args:
+            ws_conn: WebSocket连接对象, 用于发送消息
+        """
+        while True:
+            try:
+                rx_packet_data: OlivOS.API.Control.packet = await asyncio.to_thread(
+                    self.Proc_info.rx_queue.get,
+                    timeout=QUEUE_TIMEOUT
+                )
+                data_part = rx_packet_data.key.get('data', {})
+                if data_part.get('action') == 'send':
+                    payload = data_part.get('data')
+                    if payload is None:
+                        continue
+                    if isinstance(payload, (dict, list)):
+                        payload = json.dumps(payload)
+                    await ws_conn.send(payload)
+            except queue.Empty:
+                continue
+            except asyncio.CancelledError:
+                # 主动关闭
+                raise
+            except websockets.ConnectionClosedOK:
+                # 被动关闭
+                break
+            except websockets.ConnectionClosedError:
+                # 非预期关闭
+                break
+            except Exception as e:
+                self.on_error(e)
+                break
 
     def auther(
-            self,
-            connection: websockets.ServerConnection,
-            request: websockets.Request
+        self,
+        connection: websockets.ServerConnection,
+        request: websockets.Request
     ) -> Response | None:
-        """验证者
+        """验证器，即鉴权逻辑的实现
 
-        即鉴权逻辑的执行者
-        为WebSocket服务器的process_request回调函数
+        WebSocket服务器的process_request回调函数
 
         Args:
             connection: WebSocket连接对象,未使用
@@ -273,67 +286,26 @@ class server(OlivOS.API.Proc_templet):
             )
         return None
 
-    async def handler(self, websocket: websockets.ServerConnection) -> None:
-        """处理WebSocket连接的协程
+    async def session(self, ws_conn: websockets.ServerConnection) -> None:
+        """会话管理器
 
         Args:
-            websocket: WebSocket连接对象, 用于传给consumer和producer接收和发送消息
+            ws_conn: WebSocket连接对象, 用于传给rx和tx接收和发送消息
         """
         self.on_open()
-
-        consumer_task = asyncio.create_task(self.consumer(websocket))
-        producer_task = asyncio.create_task(self.producer(websocket))
+        rx_task = asyncio.create_task(self.rx(ws_conn))
+        tx_task = asyncio.create_task(self.tx(ws_conn))
+        pending = [rx_task, tx_task]
         try:
-            done, pending = await asyncio.wait(
-                [consumer_task, producer_task],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            # 取消所有待处理的任务
+            await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        except asyncio.CancelledError:
+            raise
+        finally:
             for task in pending:
                 task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-                except Exception as e:
-                    self.on_error(e)
-        finally:
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
             self.on_close()
-
-    async def run(self) -> None:
-        """运行WebSocket服务器的主协程"""
-        if not is_free_port(self.conf.host, self.conf.port):
-            self.log(
-                3,
-                OlivOS.L10NAPI.getTrans(
-                    'OlivOS onebotV11 host server [{0}] websocket link port [{1}] is in use',
-                    [self.Proc_name, self.conf.port],
-                    modelName
-                )
-            )
-            self.on_lost()
-            return
-
-        loop = asyncio.get_running_loop()
-        self.async_rx_queue = asyncio.Queue(maxsize=512)
-        bridger_thread = threading.Thread(
-            target=self.bridger,
-            args=(loop,),
-            name=f'{self.Proc_name}-Bridger',
-            daemon=True
-        )
-        bridger_thread.start()
-
-        async with websockets.serve(
-            self.handler,
-            self.conf.host,
-            self.conf.port,
-            process_request=self.auther
-        ):
-            self.on_run()
-            while self._running_event.is_set():
-                await asyncio.sleep(1.0)  # run forever
-        self.on_lost()
 
     def on_run(self) -> None:
         """服务器启动时的处理"""
@@ -363,7 +335,7 @@ class server(OlivOS.API.Proc_templet):
     def on_close(self) -> None:
         """连接关闭时的处理"""
         self.log(
-            0,
+            2,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS onebotV11 host server [{0}] websocket link close',
                 [self.Proc_name],
@@ -374,7 +346,7 @@ class server(OlivOS.API.Proc_templet):
     def on_lost(self) -> None:
         """连接丢失时的处理"""
         self.log(
-            0,
+            3,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS onebotV11 host server [{0}] websocket link lost',
                 [self.Proc_name],
@@ -389,6 +361,16 @@ class server(OlivOS.API.Proc_templet):
             OlivOS.L10NAPI.getTrans(
                 'OlivOS onebotV11 host server [{0}] websocket link error: \n{1}',
                 [self.Proc_name, traceback.format_exc()],
+                modelName
+            )
+        )
+
+    def on_occupy(self) -> None:
+        self.log(
+            3,
+            OlivOS.L10NAPI.getTrans(
+                'OlivOS onebotV11 host server [{0}] websocket link port [{1}] is in use',
+                [self.Proc_name, self.conf.port],
                 modelName
             )
         )
