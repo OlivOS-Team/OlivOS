@@ -215,6 +215,8 @@ class Event(object):
             OlivOS.dingtalkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
             OlivOS.biliLiveSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.milkySDK.event:
+            OlivOS.milkySDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
             getMenuEvent(self)
 
@@ -1124,6 +1126,12 @@ class Event(object):
                     tx_queue_this.put(tx_packet_data, block=False)
         elif self.platform['sdk'] == 'dingtalk_link':
             OlivOS.dingtalkSDK.event_action.send_msg(self, flag_type, target_id, tmp_message)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.milkySDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    OlivOS.milkySDK.event_action.send_group_msg(self, target_id, tmp_message)
 
         if flag_log and self.log_func is not None:
             if tmp_message_obj.active:
@@ -1180,6 +1188,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_msg(self, message_id)
 
     def delete_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """撤回消息
@@ -1208,6 +1219,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_msg(self, message_id)
         return res_data
 
     def get_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -1245,6 +1259,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_forward_msg(self, message_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_forward_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_forward_msg(self, message_id)
         return res_data
 
     def get_forward_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -1279,6 +1296,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_group_forward_msg(self, group_id, messages)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_forward_msg(self, group_id, messages)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_forward_msg(self, group_id, messages)
 
     def send_group_forward_msg(self, group_id: 'str|int', messages, flag_log: bool = True, remote: bool = False):
         """发送群合并转发消息
@@ -1308,6 +1328,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_private_forward_msg(self, user_id, messages)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_private_forward_msg(self, user_id, messages)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_private_forward_msg(self, user_id, messages)
 
     def send_private_forward_msg(self, user_id: 'str|int', messages, flag_log: bool = True, remote: bool = False):
         """发送私聊合并转发消息
@@ -1337,6 +1360,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.set_essence_msg(self, message_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_essence_msg(self, message_id)
 
     def set_essence_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """设置精华消息
@@ -1365,6 +1391,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.delete_essence_msg(self, message_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_essence_msg(self, message_id)
 
     def delete_essence_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """移出精华消息
@@ -1395,6 +1424,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_like(self, user_id, times)
 
     def send_like(self, user_id: 'str|int', times: int = 1, flag_log: bool = True, remote: bool = False):
         """发送赞
@@ -1421,6 +1453,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_group_sign(self, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_sign(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_sign(self, group_id)
 
     def send_group_sign(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """群打卡
@@ -1450,6 +1485,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_essence_msg_list(self, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_essence_msg_list(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_essence_msg_list(self, group_id)
         return res_data
 
     def get_essence_msg_list(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -1496,6 +1534,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_ignore_add_request(self, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_ignore_add_request(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_ignore_add_request(self, group_id)
         return res_data
 
     def get_group_ignore_add_request(self, group_id: 'str|int' = None, flag_log: bool = True, remote: bool = False):
@@ -1538,6 +1579,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_doubt_friends_add_request(self, count)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_doubt_friends_add_request(self, count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_doubt_friends_add_request(self, count)
         return res_data
 
     def get_doubt_friends_add_request(self, count: int = 50, flag_log: bool = True, remote: bool = False):
@@ -1580,6 +1624,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_doubt_friends_add_request(self, flag, approve)
 
     def set_doubt_friends_add_request(
         self, flag: str,
@@ -1616,6 +1663,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_system_msg(self, count)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_system_msg(self, count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_system_msg(self, count)
         return res_data
 
     def get_group_system_msg(self, count: int = 50, flag_log: bool = True, remote: bool = False):
@@ -1654,6 +1704,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.group_poke(self, group_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.group_poke(self, group_id, user_id)
 
     def group_poke(self, group_id: 'str|int', user_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """群戳一戳
@@ -1684,6 +1737,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_notice(self, group_id)
         return res_data
 
     def get_group_notice(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -1724,6 +1780,11 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_notice(
+                    self, group_id, content, image, **kwargs
+                )
 
     def send_group_notice(
         self, group_id: 'str|int', content: str,
@@ -1798,6 +1859,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.friend_poke(self, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.friend_poke(self, user_id)
 
     def friend_poke(self, user_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """好友戳一戳
@@ -1816,20 +1880,20 @@ class Event(object):
             self.__friend_poke(user_id, flag_log=True)
 
     @callbackLogger('set_group_kick')
-    def __set_group_kick(self, group_id, user_id, host_id, rehect_add_request, flag_log=True):
+    def __set_group_kick(self, group_id, user_id, host_id, reject_add_request, flag_log=True):
         if self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotV12SDK.event_action.set_group_kick(self, group_id, user_id)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
-                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
             elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
                 if host_id is None:
-                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if host_id is None:
-                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id
@@ -1848,6 +1912,11 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_kick(self, tmp_host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_kick(
+                    self, group_id, user_id, reject_add_request
+                )
 
     def set_group_kick(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
                        rehect_add_request: bool = False, flag_log: bool = True, remote: bool = False):
@@ -1891,6 +1960,9 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_ban(self, tmp_host_id, user_id, duration)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_ban(self, group_id, user_id, duration)
 
     def set_group_ban(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
                       duration: int = 1800, flag_log: bool = True, remote: bool = False):
@@ -1953,6 +2025,9 @@ class Event(object):
                     OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_whole_ban(self, group_id, enable)
 
     def set_group_whole_ban(self, group_id: 'str|int', enable: bool, host_id: 'str|int|None' = None,
                             flag_log: bool = True, remote: bool = False):
@@ -1987,6 +2062,9 @@ class Event(object):
                     OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_admin(self, group_id, user_id, enable)
 
     def set_group_admin(self, group_id: 'str|int', user_id: 'str|int', enable: bool, host_id: 'str|int|None' = None,
                         flag_log: bool = True, remote: bool = False):
@@ -2061,6 +2139,9 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_card(self, tmp_host_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_card(self, group_id, user_id, card)
 
     def set_group_card(self, group_id: 'str|int', user_id: 'str|int', card, host_id: 'str|int|None' = None,
                        flag_log: bool = True, remote: bool = False):
@@ -2096,6 +2177,9 @@ class Event(object):
                     OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_name(self, group_id, group_name)
 
     def set_group_name(self, group_id: 'str|int', group_name: str, host_id: 'str|int|None' = None,
                        flag_log: bool = True, remote: bool = False):
@@ -2149,6 +2233,9 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_leave(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_leave(self, group_id, is_dismiss)
 
     def set_group_leave(self, group_id: 'str|int', host_id: 'str|int|None' = None, is_dismiss: bool = False,
                         flag_log: bool = True, remote: bool = False):
@@ -2188,6 +2275,11 @@ class Event(object):
                     )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_special_title(
+                    self, group_id, user_id, special_title, duration
+                )
 
     def set_group_special_title(self, group_id: 'str|int', user_id: 'str|int', special_title: str, duration: int,
                                 host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
@@ -2224,6 +2316,11 @@ class Event(object):
                 )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_friend_add_request(
+                    self, flag, approve, remark
+                )
 
     def set_friend_add_request(self, flag: str, approve: bool, remark: str, flag_log: bool = True,
                                remote: bool = False):
@@ -2258,6 +2355,11 @@ class Event(object):
                 )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_add_request(
+                    self, flag, sub_type, approve, reason
+                )
 
     def set_group_add_request(self, flag: str, sub_type: str, approve: bool, reason: str, flag_log: bool = True,
                               remote: bool = False):
@@ -2301,6 +2403,9 @@ class Event(object):
             res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'dodo_link':
             res_data = OlivOS.dodoLinkSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_login_info(self)
 
         if res_data is None:
             return None
@@ -2358,6 +2463,9 @@ class Event(object):
             pass
         elif self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_stranger_info(self, user_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_stranger_info(self, user_id)
         return res_data
 
     def get_stranger_info(self, user_id: 'str|int', no_cache: bool = False, flag_log: bool = True,
@@ -2393,6 +2501,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_friend_list(self)
         return res_data
 
     def get_friend_list(self, flag_log: bool = True, remote: bool = False):
@@ -2432,6 +2543,9 @@ class Event(object):
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_info(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_info(self, group_id)
         return res_data
 
     def get_group_info(self, group_id: 'str|int', host_id: 'str|int|None' = None, no_cache: bool = False,
@@ -2481,6 +2595,9 @@ class Event(object):
             res_data = OlivOS.xiaoheiheSDK.event_action.get_group_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_list(self)
         return res_data
 
     def get_group_list(self, flag_log: bool = True, remote: bool = False):
@@ -2532,6 +2649,9 @@ class Event(object):
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, tmp_host_id, user_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_member_info(self, group_id, user_id)
         return res_data
 
     def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
@@ -2669,6 +2789,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.can_send_image(self)
         return res_data
 
     def can_send_image(self, flag_log: bool = True, remote: bool = False):
@@ -2700,6 +2823,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.can_send_record(self)
         return res_data
 
     def can_send_record(self, flag_log: bool = True, remote: bool = False):
@@ -2731,6 +2857,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_status(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_status(self)
         return res_data
 
     def get_status(self, flag_log: bool = True, remote: bool = False):
@@ -2763,6 +2892,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_version_info(self)
         return res_data
 
     def get_version_info(self, flag_log: bool = True, remote: bool = False):
@@ -2771,8 +2903,8 @@ class Event(object):
         用于获取OneBot版本信息
 
         Returns:
-            app_name (str): 应用标识
-            app_version (str): 应用版本
+            name (str): 应用标识
+            version (str): 应用版本
             protocol_version (str): OneBot协议版本
         """
         res_data = None
@@ -2795,6 +2927,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
 
     def upload_group_file(self, group_id: 'str|int', file: str, name: str = '', folder_id: 'str|None' = None,
                           flag_log: bool = True, remote: bool = False):
@@ -2827,6 +2962,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.delete_group_file(self, group_id, file_id, name)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_group_file(self, group_id, file_id, name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_group_file(self, group_id, file_id, name)
 
     def delete_group_file(self, group_id: 'str|int', file_id: str, name: 'str|None' = None, flag_log: bool = True,
                           remote: bool = False):
@@ -2858,6 +2996,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
 
     def create_group_file_folder(self, group_id: 'str|int', name: str, parent_id: str = '/', flag_log: bool = True,
                                  remote: bool = False):
@@ -2889,6 +3030,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.delete_group_folder(self, group_id, folder_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_group_folder(self, group_id, folder_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_group_folder(self, group_id, folder_id)
 
     def delete_group_folder(self, group_id: 'str|int', folder_id: str, flag_log: bool = True, remote: bool = False):
         """删除群文件夹
@@ -2919,6 +3063,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_system_info(self, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_system_info(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_file_system_info(self, group_id)
         return res_data
 
     def get_group_file_system_info(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -2957,6 +3104,11 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_root_files(
+                    self, group_id, file_count
+                )
         return res_data
 
     def get_group_root_files(
@@ -3006,6 +3158,11 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(
                     self, group_id, folder_id, file_count
                 )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_files_by_folder(
+                    self, group_id, folder_id, file_count
+                )
         return res_data
 
     def get_group_files_by_folder(self, group_id: 'str|int', folder_id: str, file_count: 'int|None' = None,
@@ -3045,6 +3202,9 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_url(self, group_id, file_id, busid)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_url(self, group_id, file_id, busid)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_file_url(self, group_id, file_id)
         return res_data
 
     def get_group_file_url(self, group_id: 'str|int', file_id: str, busid: int, flag_log: bool = True,
@@ -3082,6 +3242,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.upload_private_file(self, user_id, file, name)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.upload_private_file(self, user_id, file, name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.upload_private_file(self, user_id, file, name)
 
     def upload_private_file(self, user_id: 'str|int', file: str, name: str, flag_log: bool = True,
                             remote: bool = False):
@@ -3113,6 +3276,9 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
 
     def rename_group_file_folder(
         self, group_id: 'str|int', folder_id: str, new_folder_name: str,
@@ -3153,6 +3319,11 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.rename_group_file(
                     self, group_id, file_id, current_parent_directory, new_name
                 )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.rename_group_file(
+                    self, group_id, file_id, current_parent_directory, new_name
+                )
 
     def rename_group_file(
         self, group_id: 'str|int', file_id: str, current_parent_directory: str, new_name: str,
@@ -3188,6 +3359,11 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.set_group_file_forever(self, group_id, file_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_group_file_forever(self, group_id, file_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_file_forever(
+                    self, group_id, file_id
+                )
 
     def set_group_file_forever(self, group_id: 'str|int', file_id: str, flag_log: bool = True, remote: bool = False):
         """群文件转永久
@@ -3217,6 +3393,11 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_msg_emoji_like(
+                    self, message_id, emoji_id, is_set, group_id
+                )
 
     def set_msg_emoji_like(
         self, message_id: 'str|int', emoji_id: 'str|int',

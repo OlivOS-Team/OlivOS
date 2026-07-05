@@ -51,6 +51,10 @@ accountTypeList = [
     'onebotV11/Http/LLOneBot',
     'onebotV11/Http/Lagrange',
     'onebotV11/Http/Shamrock',
+    'Milky/自动',
+    'Milky/自动/Yogurt',
+    'Milky/自动/LLOneBot',
+    'Milky/自动/Lagrange',
     'RED协议',
     '微信/ComWeChat',
     '米游社/大别野/公域',
@@ -100,6 +104,10 @@ accountTypeMappingList = {
     'onebotV11/Http/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'post'],
     'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post'],
     'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket'],
+    'Milky/自动': ['qq', 'milky', 'default', 'True', 'auto'],
+    'Milky/自动/Yogurt': ['qq', 'milky', 'yogurt_default', 'True', 'auto'],
+    'Milky/自动/LLOneBot': ['qq', 'milky', 'llonebot_default', 'True', 'auto'],
+    'Milky/自动/Lagrange': ['qq', 'milky', 'lagrange_default', 'True', 'auto'],
     'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket'],
     'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket'],
     'QQ/OPQ/默认': ['qq', 'onebot', 'opqbot_auto', 'True', 'websocket'],
@@ -151,7 +159,7 @@ accountTypeMappingList = {
     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket'],
     '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post'],
     'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post'],
-    "钉钉": ["dingtalk", "dingtalk_link", "default",  "True", "websocket"],
+    "钉钉": ["dingtalk", "dingtalk_link", "default", "True", "websocket"],
     # 这个自定义屁用没有，只是占位用的
     # 对应代码里这个作为缺省项使用，不走这个逻辑
     '自定义': ['qq', 'default', 'default', 'True', 'post']
@@ -179,7 +187,8 @@ accountTypeDataList_platform_sdk = {
         'onebot'
     ],
     'qq': [
-        'onebot'
+        'onebot',
+        'milky'
     ],
     'qqGuild': [
         'qqGuild_link',
@@ -264,6 +273,12 @@ accountTypeDataList_platform_sdk_model = {
             'napcat_show_new',
             'napcat_show_old',
             'napcat_default',
+            'llonebot_default',
+            'lagrange_default'
+        ],
+        'milky': [
+            'default',
+            'yogurt_default',
             'llonebot_default',
             'lagrange_default'
         ]
@@ -368,6 +383,7 @@ accountTypeDataList_server_auto = [
 
 accountTypeDataList_server_type = [
     'post',
+    "auto",
     'websocket',
     'websocket_host'
 ]

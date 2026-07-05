@@ -48,6 +48,9 @@ from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK
 from .adapter.onebotV12 import onebotV12LinkServerAPI
 from .adapter.onebotV11 import onebotSDK
+from .adapter.milky import milkySDK
+from .adapter.milky import milkyType
+from .adapter.milky import milkyAutoServerAPI
 from .adapter.virtualTerminal import virtualTerminalSDK
 from .adapter.virtualTerminal import virtualTerminalLinkServerAPI
 from .adapter.qqGuild import qqGuildSDK
