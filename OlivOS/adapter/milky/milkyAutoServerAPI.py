@@ -38,11 +38,11 @@ class ServerConf:
     """服务器配置类
 
     Attributes:
-        url (str): 连接URL
-        host (str): 连接HOST
-        port (int): 连接PORT
-        token (str): 连接TOKEN
-        route (str): 连接路由
+        ws_url (str): WS连接URL
+        post_url (str): POST上报地址
+        host (str): 主机
+        port (int): 端口
+        token (str): TOKEN
     """
     ws_url: str
     http_url: str
@@ -97,6 +97,25 @@ class ExtraConf:
 
 
 class server(OlivOS.API.Proc_templet):
+    """Milky 自动连接 服务器
+
+    实现 Milky 协议中的 POST请求上报 + WS事件推送 混合通信
+
+    Attributes:
+        Proc_name (str): 服务器线程名称
+        scan_interval (float): 抓奸间隔
+        dead_interval (float): 枪毙间隔
+        rx_queue (multiprocessing.Queue): 接收队列，从插件托盘接收控制请求
+        tx_queue (multiprocessing.Queue): 发送队列，向OlivOS发送SDK事件包
+        logger_proc (OlivOS.API.Proc_templet): 日志记录器
+        debug_mode (bool): 是否开启调试模式
+        bot_info (OlivOS.API.bot_info_T): 机器人信息
+        session (aiohttp.ClientSession): 单次会话对象
+        running_event (threading.Event): 事件锁
+        conf (ServerConf): 服务器配置
+        extra_conf (ExtraConf): 额外配置
+    """
+
     def __init__(
         self,
         Proc_name: str,
@@ -111,7 +130,7 @@ class server(OlivOS.API.Proc_templet):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
-            Proc_type='milky_univ',
+            Proc_type='milky_auto',
             scan_interval=scan_interval,
             dead_interval=dead_interval,
             rx_queue=rx_queue,
@@ -136,6 +155,7 @@ class server(OlivOS.API.Proc_templet):
         return proc_this
 
     def start_unity(self, mode='threading') -> threading.Thread:
+        """由于协程设计机制，强制以线程方式运行事件循环"""
         return self.start()
 
     async def run(self) -> None:
@@ -159,23 +179,35 @@ class server(OlivOS.API.Proc_templet):
 
     async def rx(self) -> None:
         """WS接收逻辑"""
-        is_open = False
-        try:
-            async with self.session.ws_connect(self.conf.ws_url) as ws_conn:
-                self.on_open()
-                is_open = True
-                async for msg in ws_conn:
-                    if msg.type != aiohttp.WSMsgType.TEXT:
-                        continue
-                    raw = msg.json()
-                    self.__tx_send(raw)
-        except aiohttp.ClientConnectionError:
-            if is_open:
-                self.on_lost()
-            raise
-        finally:
-            if is_open:
-                self.on_close()
+        while True:
+            is_open = False
+            try:
+                async with self.session.ws_connect(
+                    self.conf.ws_url,
+                    heartbeat=self.extra_conf.retry_interval
+                ) as ws_conn:
+                    self.on_open()
+                    is_open = True
+                    async for msg in ws_conn:
+                        if msg.type != aiohttp.WSMsgType.TEXT:
+                            continue
+                        raw = msg.json()
+                        self.__tx_send(raw)
+            except asyncio.CancelledError:
+                if is_open:
+                    self.on_close()
+                raise
+            except aiohttp.ClientConnectionError:
+                if is_open:
+                    self.on_lost()
+                    self.on_close()
+            except Exception:
+                if is_open:
+                    self.on_lost()
+                    self.on_close()
+                self.on_error(Exception(traceback.format_exc()))
+            finally:
+                await asyncio.sleep(self.extra_conf.retry_interval)
 
     async def tx(self) -> None:
         """POST发送逻辑"""
@@ -216,6 +248,7 @@ class server(OlivOS.API.Proc_templet):
     async def __session_lifecycle(self) -> None:
         """单次会话生命周期
 
+        主要用于统筹rx建立连接与tx上报数据，其中rx独立实现自动重连，tx则在出错时触发本方法的session重建
         由于self.tx执行串行post逻辑，当post长时未响应时会卡住rx_queue数据提取，故需要并发tx协程，即tx_tasks而非tx_task
         """
         rx_task = asyncio.create_task(self.rx())
@@ -230,7 +263,7 @@ class server(OlivOS.API.Proc_templet):
         finally:
             for task in pending:
                 task.cancel()
-            await asyncio.gather(*tx_tasks, return_exceptions=True)
+            await asyncio.gather(*pending, return_exceptions=True)
 
     def __tx_send(self, raw):
         sdk_event = OlivOS.milkySDK.event(raw)
@@ -262,6 +295,7 @@ class server(OlivOS.API.Proc_templet):
         )
 
     def on_retry(self) -> None:
+        """连接重试时的处理"""
         self.log(
             3,
             OlivOS.L10NAPI.getTrans(

@@ -969,6 +969,12 @@ class Event(object):
                     OlivOS.OPQBotSDK.event_action.send_msg(
                         self, 'group', target_id, tmp_message, self.plugin_info['control_queue']
                     )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.milkySDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    OlivOS.milkySDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
                 if (
@@ -1126,12 +1132,6 @@ class Event(object):
                     tx_queue_this.put(tx_packet_data, block=False)
         elif self.platform['sdk'] == 'dingtalk_link':
             OlivOS.dingtalkSDK.event_action.send_msg(self, flag_type, target_id, tmp_message)
-        elif self.platform['sdk'] == 'milky':
-            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
-                if flag_type == 'private':
-                    OlivOS.milkySDK.event_action.send_private_msg(self, target_id, tmp_message)
-                elif flag_type == 'group':
-                    OlivOS.milkySDK.event_action.send_group_msg(self, target_id, tmp_message)
 
         if flag_log and self.log_func is not None:
             if tmp_message_obj.active:
@@ -2691,6 +2691,9 @@ class Event(object):
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if host_id is None:
                     res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 获取服务器成员列表需要使用 host_id（guild_id）

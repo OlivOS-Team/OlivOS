@@ -15,14 +15,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
+import os
 import time
-import json
 import uuid
 import threading
 from . import milkyType
 from dataclasses import dataclass
+import inspect
+from functools import wraps
+from urllib import parse
+from pathlib import Path
 from typing import TypeAlias
-
 
 """
 
@@ -99,7 +102,7 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info: OlivOS.API.bot_info_T
     return res
 
 
-def get_SDK_bot_info_from_Event(target_event):
+def get_SDK_bot_info_from_Event(target_event: OlivOS.API.Event):
     return get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
 
 
@@ -110,7 +113,7 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
-    target_event.plugin_info['message_mode_rx'] = 'milky_para'
+    target_event.plugin_info['message_mode_rx'] = 'milky_para_tx'
 
     if target_event.base_info['type'] == 'response':
         target_event.active = False
@@ -144,14 +147,14 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
                 new_msg,
                 'friend'
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.message_id = msgID(
                 target_event.sdk_event.json['data']['message_scene'],
                 target_event.sdk_event.json['data']['peer_id'],
                 target_event.sdk_event.json['data']['message_seq']
             )
             target_event.data.raw_message = new_msg
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.sender.update(target_event.sdk_event.json['data']['friend'])
             if 'sender_id' in target_event.sdk_event.json['data']:
                 target_event.data.sender['id'] = str(target_event.sdk_event.json['data']['sender_id'])
@@ -169,14 +172,14 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
                 new_msg,
                 'group'
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.message_id = msgID(
                 target_event.sdk_event.json['data']['message_scene'],
                 target_event.sdk_event.json['data']['peer_id'],
                 target_event.sdk_event.json['data']['message_seq']
             )
             target_event.data.raw_message = new_msg
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.sender.update(target_event.sdk_event.json['data']['group_member'])
             if 'sender_id' in target_event.sdk_event.json['data']:
                 target_event.data.sender['id'] = str(target_event.sdk_event.json['data']['sender_id'])
@@ -193,14 +196,14 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
                 new_msg,
                 'temp'
             )
-            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.message_id = msgID(
                 target_event.sdk_event.json['data']['message_scene'],
                 target_event.sdk_event.json['data']['peer_id'],
                 target_event.sdk_event.json['data']['message_seq']
             )
             target_event.data.raw_message = new_msg
-            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para', new_msg)
+            target_event.data.raw_message_sdk = OlivOS.messageAPI.Message_templet('milky_para_rx', new_msg)
             target_event.data.sender.update(target_event.sdk_event.json['data']['group_member'])
             if 'sender_id' in target_event.sdk_event.json['data']:
                 target_event.data.sender['id'] = str(target_event.sdk_event.json['data']['sender_id'])
@@ -245,9 +248,11 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
     elif target_event.base_info['type'] == 'friend_request':
         target_event.active = True
         target_event.plugin_info['func_type'] = 'friend_add_request'
+        initiator_id = str(target_event.sdk_event.json['data']['initiator_id'])
+        comment = target_event.sdk_event.json['data'].get('comment', '')
         target_event.data = target_event.friend_add_request(
-            str(target_event.sdk_event.json['data']['initiator_id']),
-            target_event.sdk_event.json['data']['comment']
+            user_id=initiator_id,
+            comment=comment
         )
         target_event.data.flag = f"False|{target_event.sdk_event.json['data']['initiator_uid']}"
     elif target_event.base_info['type'] == 'group_join_request':
@@ -256,10 +261,11 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
         group_id = str(target_event.sdk_event.json['data']['group_id'])
         initiator_id = str(target_event.sdk_event.json['data']['initiator_id'])
         notification_seq = int(target_event.sdk_event.json['data']['notification_seq'])
+        comment = target_event.sdk_event.json['data'].get('comment', '')
         target_event.data = target_event.group_add_request(
             group_id=group_id,
             user_id=initiator_id,
-            comment=target_event.sdk_event.json['data']['comment']
+            comment=comment
         )
         target_event.data.flag = f'join_request|{group_id}|False|{notification_seq}'
     elif target_event.base_info['type'] == 'group_invited_join_request':
@@ -268,10 +274,11 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
         group_id = str(target_event.sdk_event.json['data']['group_id'])
         initiator_id = str(target_event.sdk_event.json['data']['initiator_id'])
         notification_seq = int(target_event.sdk_event.json['data']['notification_seq'])
+        comment = target_event.sdk_event.json['data'].get('comment', '')
         target_event.data = target_event.group_add_request(
             group_id=group_id,
             user_id=initiator_id,
-            comment=target_event.sdk_event.json['data']['comment']
+            comment=comment
         )
         target_event.data.flag = f'invited_join_request|{group_id}|False|{notification_seq}'
     elif target_event.base_info['type'] == 'group_invitation':
@@ -280,10 +287,11 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
         group_id = str(target_event.sdk_event.json['data']['group_id'])
         initiator_id = str(target_event.sdk_event.json['data']['initiator_id'])
         invitation_seq = int(target_event.sdk_event.json['data']['invitation_seq'])
+        comment = target_event.sdk_event.json['data'].get('comment', '')
         target_event.data = target_event.group_invite_request(
             group_id=group_id,
             user_id=initiator_id,
-            comment=target_event.sdk_event.json['data']['comment']
+            comment=comment
         )
         target_event.data.flag = f'{group_id}|{invitation_seq}'
     elif target_event.base_info['type'] == 'friend_nudge':
@@ -409,7 +417,7 @@ def get_Event_from_SDK(target_event: OlivOS.API.Event):
         target_event.data.file.update(file_obj)
 
 
-def send_event(action, data, control_queue):
+def send_event(action, data, control_queue) -> None:
     if control_queue is not None:
         control_queue.put(
             OlivOS.API.Control.packet(
@@ -420,12 +428,12 @@ def send_event(action, data, control_queue):
         )
 
 
-def send_ws_event(hash, data, control_queue):
+def send_ws_event(hash, data, control_queue) -> None:
     send_event(
         'send',
         {
             'target' : {
-                'type': 'milky_univ',
+                'type': 'milky_auto',
                 'hash': hash
             },
             'data': {
@@ -437,12 +445,12 @@ def send_ws_event(hash, data, control_queue):
     )
 
 
-def send_post_event(hash, data, control_queue):
+def send_post_event(hash, data, control_queue) -> None:
     send_event(
         'send',
         {
             'target' : {
-                'type': 'milky_univ',
+                'type': 'milky_auto',
                 'hash': hash
             },
             'data': {
@@ -456,10 +464,10 @@ def send_post_event(hash, data, control_queue):
 
 @dataclass
 class API_template:
-    def call(self, bot_hash, control_queue):
+    def call(self, bot_hash, control_queue) -> dict:
         try:
             post_id = self.post_id
-            data = self.dump(post_id)
+            data = self.gen_data(post_id)
             ready_for_res(post_id)
             send_post_event(
                 hash=bot_hash,
@@ -470,16 +478,15 @@ class API_template:
         except Exception:
             return None
 
-    def dump(self, post_id: str):
-        res_obj = {
+    def gen_data(self, post_id: str) -> dict:
+        res = {
             'action': self.action,
             'params': {},
             'post_id': post_id
         }
         for k_cur, v_cur in self.__dict__.items():
             if v_cur is not None:
-                res_obj['params'][k_cur] = v_cur
-        res = json.dumps(res_obj, ensure_ascii=False)
+                res['params'][k_cur] = v_cur
         return res
 
     @property
@@ -844,6 +851,26 @@ class API(object):
         folder_id: str
 
 
+def MilkyMessage(param_name: str):
+    def decorator(func):
+        sig = inspect.signature(func)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            bound_args = sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+
+            if param_name in bound_args.arguments:
+                target_value = bound_args.arguments[param_name]
+                if isinstance(target_value, list):
+                    target_value = combine_forward_nodes(target_value)
+                    target_value = URI_format(target_value)
+                    bound_args.arguments[param_name] = target_value
+            return func(*bound_args.args, **bound_args.kwargs)
+        return wrapper
+    return decorator
+
+
 class event(object):
     def __init__(self, raw):
         self.raw = raw
@@ -862,48 +889,46 @@ class event(object):
                 self.base_info['type'] = 'response'
 
     def event_load(self, raw):
-        try:
-            res = json.loads(raw)
-        except Exception:
-            res = None
-        return res
+        if raw is None:
+            return None
+        if not isinstance(raw, (dict, list)):
+            return None
+        return raw
 
 
 class event_action(object):
     """支持OlivOS API调用的方法实现"""
 
     @staticmethod
+    @MilkyMessage('message')
     def send_private_msg(target_event: OlivOS.API.Event, user_id: ID, message: MSG) -> None:
         if not isinstance(message, (list, dict)):
             return
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
-        new_message = message
-        if isinstance(message, list):
-            new_message = combine_forward_nodes(message)
         Action = API.send_private_message(
             user_id=user_id,
-            message=new_message,
+            message=message,
         )
         Action.call(bot_hash, control_queue)
 
     @staticmethod
+    @MilkyMessage('message')
     def send_group_msg(target_event: OlivOS.API.Event, group_id: ID, message: MSG) -> None:
         if not isinstance(message, (list, dict)):
             return
         group_id = int(group_id)
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
-        new_message = combine_forward_nodes(message)
         Action = API.send_group_message(
             group_id=group_id,
-            message=new_message,
+            message=message,
         )
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def delete_msg(target_event, message_id: ID) -> None:
+    def delete_msg(target_event: OlivOS.API.Event, message_id: ID) -> None:
         scene, peer_id, seq = message_id.split('|')
         peer_id = int(peer_id)
         seq = int(seq)
@@ -924,7 +949,7 @@ class event_action(object):
             Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def get_msg(target_event, message_id: ID) -> RES[MSG]:
+    def get_msg(target_event: OlivOS.API.Event, message_id: ID) -> RES[MSG]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_msg()
         raw_obj = None
         scene, peer_id, seq = message_id.split('|')
@@ -944,7 +969,7 @@ class event_action(object):
             if not isinstance(raw_obj, dict):
                 return res_data
             res_data['active'] = True
-            if raw_obj['message_scene'] == 'friend':
+            if raw_obj['message']['message_scene'] == 'friend':
                 mlk_obj = milkyType.IncomingMessage.friend.from_json(raw_obj['message'])
                 res_data['data']['message_id'] = msgID(mlk_obj.message_scene, mlk_obj.peer_id, mlk_obj.message_seq)
                 res_data['data']['id'] = mlk_obj.message_seq
@@ -954,7 +979,7 @@ class event_action(object):
                 res_data['data']['time'] = mlk_obj.time
                 res_data['data']['message'] = mlk_obj.segments
                 res_data['data']['raw_message'] = mlk_obj.segments
-            elif raw_obj['message_scene'] == 'group':
+            elif raw_obj['message']['message_scene'] == 'group':
                 mlk_obj = milkyType.IncomingMessage.group.from_json(raw_obj['message'])
                 res_data['data']['message_id'] = msgID(mlk_obj.message_scene, mlk_obj.peer_id, mlk_obj.message_seq)
                 res_data['data']['id'] = mlk_obj.message_seq
@@ -1014,7 +1039,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_whole_ban(target_event, group_id: ID, enable: bool) -> None:
+    def set_group_whole_ban(target_event: OlivOS.API.Event, group_id: ID, enable: bool) -> None:
         group_id = int(group_id)
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
@@ -1025,7 +1050,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_admin(target_event, group_id: ID, user_id: ID, enable: bool) -> None:
+    def set_group_admin(target_event: OlivOS.API.Event, group_id: ID, user_id: ID, enable: bool) -> None:
         group_id = int(group_id)
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1038,7 +1063,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_card(target_event, group_id: ID, user_id: ID, card: str) -> None:
+    def set_group_card(target_event: OlivOS.API.Event, group_id: ID, user_id: ID, card: str) -> None:
         group_id = int(group_id)
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1051,7 +1076,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_name(target_event, group_id: ID, group_name: str) -> None:
+    def set_group_name(target_event: OlivOS.API.Event, group_id: ID, group_name: str) -> None:
         group_id = int(group_id)
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
@@ -1062,7 +1087,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_leave(target_event, group_id: ID, is_dismiss: bool = False) -> None:
+    def set_group_leave(target_event: OlivOS.API.Event, group_id: ID, is_dismiss: bool = False) -> None:
         group_id = int(group_id)
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
@@ -1070,7 +1095,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_special_title(target_event, group_id: ID, user_id: ID, special_title: str, duration) -> None:
+    def set_group_special_title(target_event: OlivOS.API.Event, group_id: ID,
+                                user_id: ID, special_title: str, duration) -> None:
         group_id = int(group_id)
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1083,7 +1109,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_friend_add_request(target_event, flag: ID, approve: bool, remark: str = None) -> None:
+    def set_friend_add_request(target_event: OlivOS.API.Event, flag: ID, approve: bool, remark: str = None) -> None:
         # 这里将flag定义为"<is_filtered>|<initiator_uid>"，在好友添加请求事件中同理
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
@@ -1104,7 +1130,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_add_request(target_event, flag: ID, sub_type: str, approve: bool, reason: str = None) -> None:
+    def set_group_add_request(target_event: OlivOS.API.Event, flag: ID, sub_type: str,
+                              approve: bool, reason: str = None) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         if sub_type == 'add':
@@ -1147,7 +1174,7 @@ class event_action(object):
             Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def get_login_info(target_event) -> RES[USER]:
+    def get_login_info(target_event: OlivOS.API.Event) -> RES[USER]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1165,7 +1192,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_stranger_info(target_event, user_id: ID) -> RES[USER]:
+    def get_stranger_info(target_event: OlivOS.API.Event, user_id: ID) -> RES[USER]:
         user_id = int(user_id)
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
@@ -1188,7 +1215,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_friend_list(target_event) -> RES[list[USER]]:
+    def get_friend_list(target_event: OlivOS.API.Event) -> RES[list[USER]]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_friend_list()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1213,7 +1240,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_group_info(target_event, group_id: ID) -> RES[GROUP]:
+    def get_group_info(target_event: OlivOS.API.Event, group_id: ID) -> RES[GROUP]:
         group_id = int(group_id)
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
@@ -1239,7 +1266,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_group_list(target_event) -> RES[list[GROUP]]:
+    def get_group_list(target_event: OlivOS.API.Event) -> RES[list[GROUP]]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1251,10 +1278,11 @@ class event_action(object):
         if raw_obj is not None:
             if not isinstance(raw_obj, dict):
                 return res_data
+            res_data['active'] = True
             raw_groups = raw_obj['groups']
             for raw_group in raw_groups:
                 res_data_data_this = {}
-                res_data_data_this['id'] = raw_group['group_id']
+                res_data_data_this['id'] = str(raw_group['group_id'])
                 res_data_data_this['name'] = raw_group['group_name']
                 res_data_data_this['memo'] = raw_group['description']
                 res_data_data_this['max_member_count'] = raw_group['max_member_count']
@@ -1266,7 +1294,36 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_group_member_info(target_event, group_id: ID, user_id: ID) -> RES[GROUP_USER]:
+    def get_group_member_list(target_event: OlivOS.API.Event, group_id: ID) -> RES[list[GROUP_USER]]:
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
+        bot_hash = target_event.bot_info.hash
+        group_id = int(group_id)
+        Action = API.get_group_member_list(group_id)
+        raw = Action.call(bot_hash, control_queue)
+        if raw is not None:
+            raw_obj = init_api(raw)
+        if raw_obj is not None:
+            if not isinstance(raw_obj, dict):
+                return res_data
+            res_data['active'] = True
+            raw_members = raw_obj['members']
+            for raw_member in raw_members:
+                res_data_data_this = {}
+                res_data_data_this['id'] = str(raw_member['user_id'])
+                res_data_data_this['name'] = raw_member['nickname']
+                res_data_data_this['group_id'] = str(raw_member['group_id'])
+                res_data_data_this['title'] = raw_member['title']
+                res_data_data_this['sex'] = raw_member['sex']
+                res_data_data_this['role'] = raw_member['role']
+                res_data_data_this['level'] = raw_member['level']
+                res_data_data_this['join_time'] = raw_member['join_time']
+                res_data['data'].append(res_data_data_this)
+        return res_data
+
+    @staticmethod
+    def get_group_member_info(target_event: OlivOS.API.Event, group_id: ID, user_id: ID) -> RES[GROUP_USER]:
         group_id = int(group_id)
         user_id = int(user_id)
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
@@ -1284,9 +1341,10 @@ class event_action(object):
             if not isinstance(raw_obj, dict):
                 return res_data
             mlk_obj = milkyType.GroupMemberEntity.from_json(raw_obj['member'])
+            res_data['active'] = True
             res_data['data']['name'] = mlk_obj.nickname
-            res_data['data']['id'] = mlk_obj.user_id
-            res_data['data']['group_id'] = mlk_obj.group_id
+            res_data['data']['id'] = str(mlk_obj.user_id)
+            res_data['data']['group_id'] = str(mlk_obj.group_id)
             res_data['data']['card'] = mlk_obj.card
             res_data['data']['title'] = mlk_obj.title
             res_data['data']['sex'] = mlk_obj.sex
@@ -1296,7 +1354,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def can_send_image(target_event) -> RES[bool]:
+    def can_send_image(target_event: OlivOS.API.Event) -> RES[bool]:
         # 作为非频道QQ特化协议的Milky当然可以发图片
         res_data = OlivOS.contentAPI.api_result_data_template.can_send_image()
         res_data['active'] = True
@@ -1304,7 +1362,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def can_send_record(target_event) -> RES[bool]:
+    def can_send_record(target_event: OlivOS.API.Event) -> RES[bool]:
         # 作为非频道QQ特化协议的Milky当然可以发语音
         res_data = OlivOS.contentAPI.api_result_data_template.can_send_record()
         res_data['active'] = True
@@ -1312,13 +1370,13 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_status(target_event):
+    def get_status(target_event: OlivOS.API.Event) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_status()
         res_data['active'] = False
         return res_data
 
     @staticmethod
-    def get_version_info(target_event):
+    def get_version_info(target_event: OlivOS.API.Event) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_version_info()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1338,7 +1396,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_forward_msg(target_event, message_id: ID) -> RES[list[MSG]]:
+    def get_forward_msg(target_event: OlivOS.API.Event, message_id: ID) -> RES[list[MSG]]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_forward_msg()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1355,7 +1413,8 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def send_group_forward_msg(target_event, group_id: ID, messages: list[MSG]):
+    @MilkyMessage('messages')
+    def send_group_forward_msg(target_event: OlivOS.API.Event, group_id: ID, messages: list[MSG]) -> None:
         """暂时由插件作者自行组装消息段数组"""
         group_id = int(group_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1373,7 +1432,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def send_private_forward_msg(target_event, user_id: ID, messages: list[MSG]):
+    @MilkyMessage('messages')
+    def send_private_forward_msg(target_event: OlivOS.API.Event, user_id: ID, messages: list[MSG]) -> None:
         """暂时由插件作者自行组装消息段数组"""
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1391,7 +1451,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def get_essence_msg_list(target_event, group_id: ID) -> list:
+    def get_essence_msg_list(target_event: OlivOS.API.Event, group_id: ID) -> RES[list]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
         raw_obj = None
         group_id = int(group_id)
@@ -1425,7 +1485,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def set_essence_msg(target_event, message_id: ID):
+    def set_essence_msg(target_event: OlivOS.API.Event, message_id: ID) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id, message_seq = message_id.split('|')[1:]
@@ -1439,7 +1499,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def delete_essence_msg(target_event, message_id: ID):
+    def delete_essence_msg(target_event: OlivOS.API.Event, message_id: ID) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id, message_seq = message_id.split('|')[1:]
@@ -1453,7 +1513,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_msg_emoji_like(target_event, message_id: ID, emoji_id: ID, is_set: bool = True, group_id: ID = None):
+    def set_msg_emoji_like(target_event: OlivOS.API.Event, message_id: ID, emoji_id: ID,
+                           is_set: bool = True, group_id: ID = None) -> None:
         if group_id is None:
             return
         control_queue = target_event.plugin_info['control_queue']
@@ -1473,7 +1534,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def group_poke(target_event, group_id: ID, user_id: ID):
+    def group_poke(target_event: OlivOS.API.Event, group_id: ID, user_id: ID) -> None:
         group_id = int(group_id)
         user_id = int(user_id)
         control_queue = target_event.plugin_info['control_queue']
@@ -1485,7 +1546,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def friend_poke(target_event: OlivOS.API.Event, user_id: ID):
+    def friend_poke(target_event: OlivOS.API.Event, user_id: ID) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         user_id = int(user_id)
@@ -1499,12 +1560,12 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def send_group_sign(target_event, group_id: ID):
+    def send_group_sign(target_event: OlivOS.API.Event, group_id: ID) -> None:
         # 目前的Milky暂未提供该API
         pass
 
     @staticmethod
-    def get_group_notice(target_event, group_id: ID):
+    def get_group_notice(target_event: OlivOS.API.Event, group_id: ID) -> RES[list]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_notice()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1533,7 +1594,8 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def send_group_notice(target_event, group_id: ID, content: str, image: str = None, **kwargs):
+    def send_group_notice(target_event: OlivOS.API.Event, group_id: ID,
+                          content: str, image: str = None, **kwargs) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1545,7 +1607,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def upload_group_file(target_event, group_id: ID, file: str, name: str = '', folder_id: str = None):
+    def upload_group_file(target_event: OlivOS.API.Event, group_id: ID, file: str,
+                          name: str = '', folder_id: str = None) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1559,7 +1622,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def delete_group_file(target_event, group_id: ID, file_id: str, name: str = None):
+    def delete_group_file(target_event: OlivOS.API.Event, group_id: ID, file_id: str, name: str = None) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1570,7 +1633,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def create_group_file_folder(target_event, group_id: ID, name: str, parent_id: str = '/'):
+    def create_group_file_folder(target_event: OlivOS.API.Event, group_id: ID, name: str, parent_id: str = '/') -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1581,7 +1644,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def delete_group_folder(target_event, group_id: ID, folder_id: str = None):
+    def delete_group_folder(target_event: OlivOS.API.Event, group_id: ID, folder_id: str = None) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1593,13 +1656,14 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def get_group_file_system_info(target_event, group_id: ID):
+    def get_group_file_system_info(target_event: OlivOS.API.Event, group_id: ID) -> RES:
         # 目前Milky暂未提供该API
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_system_info()
+        res_data['active'] = False
         return res_data
 
     @staticmethod
-    def get_group_root_files(target_event, group_id: ID, file_count: int = None):
+    def get_group_root_files(target_event: OlivOS.API.Event, group_id: ID, file_count: int = None) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_root_files()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1634,7 +1698,8 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_group_files_by_folder(target_event, group_id: ID, folder_id: str, file_count: int = None):
+    def get_group_files_by_folder(target_event: OlivOS.API.Event, group_id: ID,
+                                  folder_id: str, file_count: int = None) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_files_by_folder()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1669,7 +1734,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_group_file_url(target_event, group_id: ID, file_id: str):
+    def get_group_file_url(target_event: OlivOS.API.Event, group_id: ID, file_id: str) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_url()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1690,7 +1755,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def upload_private_file(target_event, user_id: ID, file: str, name: str):
+    def upload_private_file(target_event: OlivOS.API.Event, user_id: ID, file: str, name: str) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         user_id = int(user_id)
@@ -1702,7 +1767,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def rename_group_file_folder(target_event, group_id: ID, folder_id: str, new_folder_name: str):
+    def rename_group_file_folder(target_event: OlivOS.API.Event, group_id: ID,
+                                 folder_id: str, new_folder_name: str) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1714,7 +1780,8 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def rename_group_file(target_event, group_id: ID, file_id: str, current_parent_directory: str, new_name: str):
+    def rename_group_file(target_event: OlivOS.API.Event, group_id: ID, file_id: str,
+                          current_parent_directory: str, new_name: str) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         group_id = int(group_id)
@@ -1727,12 +1794,12 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def set_group_file_forever(target_event, group_id: ID, file_id: str):
+    def set_group_file_forever(target_event: OlivOS.API.Event, group_id: ID, file_id: str) -> None:
         # 目前Milky暂未提供该API
         pass
 
     @staticmethod
-    def get_group_ignore_add_request(target_event, group_id: ID = None):
+    def get_group_ignore_add_request(target_event: OlivOS.API.Event, group_id: ID = None) -> RES[list]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_ignore_add_request()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1767,7 +1834,7 @@ class event_action(object):
         return res_data
 
     @staticmethod
-    def get_doubt_friends_add_request(target_event, count: int = 50):
+    def get_doubt_friends_add_request(target_event: OlivOS.API.Event, count: int = 50) -> RES[list]:
         res_data = OlivOS.contentAPI.api_result_data_template.get_doubt_friends_add_request()
         raw_obj = None
         control_queue = target_event.plugin_info['control_queue']
@@ -1788,14 +1855,14 @@ class event_action(object):
                 res_data_data_this['uin'] = str(raw_request['initiator_id'])
                 res_data_data_this['nick'] = '-1'
                 res_data_data_this['source'] = raw_request['via']
-                res_data_data_this['msg'] = raw_request['comment']
+                res_data_data_this['msg'] = raw_request.get('comment', '')
                 res_data_data_this['time'] = raw_request['time']
                 res_data_data_this['state'] = raw_request['state']
                 res_data['data'].append(res_data_data_this)
         return res_data
 
     @staticmethod
-    def set_doubt_friends_add_request(target_event, flag: str, approve: bool = True):
+    def set_doubt_friends_add_request(target_event: OlivOS.API.Event, flag: str, approve: bool = True) -> None:
         control_queue = target_event.plugin_info['control_queue']
         bot_hash = target_event.bot_info.hash
         is_filtered_s, initiator_uid = flag.split('|')
@@ -1812,7 +1879,7 @@ class event_action(object):
         Action.call(bot_hash, control_queue)
 
     @staticmethod
-    def get_group_system_msg(target_event, count: int = 50):
+    def get_group_system_msg(target_event: OlivOS.API.Event, count: int = 50) -> RES:
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_system_msg()
         res_data['active'] = False
         return res_data
@@ -1858,6 +1925,41 @@ def combine_forward_nodes(msg_list):
         else:
             res.append(msg_this)
     return res
+
+
+def URI_format(msg_list: list):
+    for msg_this in msg_list:
+        if not isinstance(msg_this, dict):
+            continue
+        paraType = msg_this.get('type')
+        paraData = msg_this.get('data')
+        if paraType is None or paraData is None:
+            continue
+        if paraType not in ['image', 'video', 'record', 'file']:
+            continue
+        uri = paraData.get('uri')
+        if uri is None:
+            continue
+        if (len(uri) > 1 and uri[1] == ':') or uri.startswith('/'):
+            # Windows文件系统特判
+            file_path = uri
+        else:
+            uri_parsed = parse.urlparse(uri)
+            if uri_parsed.scheme.lower() not in ['http', 'https', 'file', 'base64']:
+                file_path = uri_parsed.path
+                if not os.path.isabs(file_path):
+                    folder_name = 'files'
+                    if paraType == 'image':
+                        folder_name = 'images'
+                    elif paraType == 'video':
+                        folder_name = 'videos'
+                    elif paraType == 'record':
+                        folder_name = 'audios'
+                    file_path = OlivOS.contentAPI.resourcePathTransform(folder_name, file_path)
+        abs_path = Path(file_path).absolute()
+        if abs_path.exists():
+            msg_this['data']['uri'] = abs_path.as_uri()
+    return msg_list
 
 
 def msgID(scene: str, peer_id: str | int, seq: int):
