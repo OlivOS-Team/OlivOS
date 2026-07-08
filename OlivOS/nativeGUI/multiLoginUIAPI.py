@@ -260,8 +260,8 @@ class HostUI(object):
             font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_first_root_label_note_new'].place(
-            x=int(518/2 - 518/2),
-            y=int(400/2/2 + 20 - 200/2),
+            x=int(518 / 2 - 518 / 2),
+            y=int(400 / 2 / 2 + 20 - 200 / 2),
             width=518,
             height=200
         )
@@ -270,8 +270,8 @@ class HostUI(object):
             name='root_frame_first_root_Button_FIRST_NEW',
             text='创建一个账号',
             command=lambda: self.tree_edit('create'),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_first_root'
@@ -344,8 +344,8 @@ class HostUI(object):
             font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_skip_root_label_note_commit'].place(
-            x=int(518/2 - 518/2),
-            y=int(400/2/2 - 200/2),
+            x=int(518 / 2 - 518 / 2),
+            y=int(400 / 2 / 2 - 200 / 2),
             width=518,
             height=200
         )
@@ -354,8 +354,8 @@ class HostUI(object):
             name='root_frame_skip_root_Button_FIRST_COMMIT',
             text='是的，我要直接启动',
             command=lambda: self.account_data_commit(),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_skip_root'
@@ -366,8 +366,8 @@ class HostUI(object):
             name='root_frame_skip_root_Button_FIRST_COMMIT_BACK',
             text='我点错了，让我回去',
             command=lambda: self.frame_hide('root_frame_skip_root'),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 + 48 * 1 + 15 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 + 48 * 1 + 15 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_skip_root'
@@ -733,6 +733,30 @@ class TreeEditUI(object):
                         '端口': 'edit_root_Entry_Server_port',
                         'TOKEN': 'edit_root_Entry_Server_access_token',
                     },
+                    'Milky/自动': {
+                        '账号': 'edit_root_Entry_ID',
+                        '主机': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'Milky/自动/Yogurt': {
+                        '账号': 'edit_root_Entry_ID',
+                        '主机': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'Milky/自动/LLOneBot': {
+                        '账号': 'edit_root_Entry_ID',
+                        '主机': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
+                    'Milky/自动/Lagrange': {
+                        '账号': 'edit_root_Entry_ID',
+                        '主机': 'edit_root_Entry_Server_host',
+                        '端口': 'edit_root_Entry_Server_port',
+                        'TOKEN': 'edit_root_Entry_Server_access_token',
+                    },
                     'RED协议': {
                         '账号': 'edit_root_Entry_ID',
                         'WS地址': 'edit_root_Entry_Server_host',
@@ -1039,6 +1063,18 @@ class TreeEditUI(object):
             ):
                 if tmp_host == '':
                     tmp_host = 'ws://127.0.0.1'
+                if tmp_port == '':
+                    tmp_port = '58001'
+                if tmp_access_token == '':
+                    tmp_access_token = 'NONEED'
+            if (
+                tmp_platform_platform == 'qq'
+                and tmp_platform_sdk == 'milky'
+                and tmp_platform_model in OlivOS.milkyAutoServerAPI.gCheckList
+                and tmp_server_auto == 'True'
+            ):
+                if tmp_host == '':
+                    tmp_host = '127.0.0.1'
                 if tmp_port == '':
                     tmp_port = '58001'
                 if tmp_access_token == '':
