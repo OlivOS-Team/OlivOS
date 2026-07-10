@@ -1191,6 +1191,8 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 OlivOS.milkySDK.event_action.delete_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            OlivOS.qqGuildv2SDK.event_action.delete_msg(self, message_id)
 
     def delete_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """撤回消息
