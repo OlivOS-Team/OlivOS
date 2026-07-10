@@ -312,6 +312,45 @@ class api_templet(object):
             return None
 
 
+def _send_channel_multipart(bot_info, metadata, data, host, port, route, req_type='POST'):
+    try:
+        if bot_info.model in ['sandbox', 'sandbox_intents']:
+            if host == sdkAPIHost['default']:
+                host = sdkAPIHost['sandbox']
+        tmp_payload_dict = {}
+        tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+        if metadata is not None:
+            tmp_sdkAPIRouteTemp.update(metadata.__dict__)
+        if data is not None:
+            for data_this in data.__dict__:
+                if data_this != 'file_image' and data.__dict__[data_this] is not None:
+                    data_value = data.__dict__[data_this]
+                    if type(data_value) in [dict, list]:
+                        data_value = json.dumps(obj=data_value)
+                    elif type(data_value) is bool:
+                        data_value = str(data_value).lower()
+                    else:
+                        data_value = str(data_value)
+                    tmp_payload_dict[data_this] = data_value
+        tmp_payload_dict['file_image'] = data.file_image
+        payload = MultipartEncoder(fields=tmp_payload_dict)
+        send_url_temp = host + ':' + str(port) + route
+        send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+        headers = {
+            'Content-Type': payload.content_type,
+            'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+            'Authorization': 'QQBot %s' % (getTokenNow(bot_info)),
+            'X-Union-Appid': str(bot_info.id)
+        }
+        msg_res = None
+        if req_type == 'POST':
+            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+        return msg_res.text
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
 def getTokenNow(bot_info: bot_info_T):
     access_token = None
     plugin_event_bot_hash = OlivOS.API.getBotHash(
@@ -422,41 +461,11 @@ class API(object):
         def do_api(self, req_type='POST'):
             if self.data.file_image is None:
                 return api_templet.do_api(self, req_type)
-            try:
-                if self.bot_info.model in ['sandbox', 'sandbox_intents']:
-                    if self.host == sdkAPIHost['default']:
-                        self.host = sdkAPIHost['sandbox']
-                tmp_payload_dict = {}
-                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-                tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
-                for data_this in self.data.__dict__:
-                    if data_this != 'file_image' and self.data.__dict__[data_this] is not None:
-                        data_value = self.data.__dict__[data_this]
-                        if type(data_value) in [dict, list]:
-                            data_value = json.dumps(obj=data_value)
-                        elif type(data_value) is bool:
-                            data_value = str(data_value).lower()
-                        else:
-                            data_value = str(data_value)
-                        tmp_payload_dict[data_this] = data_value
-                tmp_payload_dict['file_image'] = self.data.file_image
-                payload = MultipartEncoder(fields=tmp_payload_dict)
-                send_url_temp = self.host + ':' + str(self.port) + self.route
-                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-                headers = {
-                    'Content-Type': payload.content_type,
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
-                    'X-Union-Appid': str(self.bot_info.id)
-                }
-                msg_res = None
-                if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
-                self.res = msg_res.text
-                return msg_res.text
-            except Exception:
-                traceback.print_exc()
-                return None
+            self.res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            return self.res
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -488,41 +497,11 @@ class API(object):
         def do_api(self, req_type='POST'):
             if self.data.file_image is None:
                 return api_templet.do_api(self, req_type)
-            try:
-                if self.bot_info.model in ['sandbox', 'sandbox_intents']:
-                    if self.host == sdkAPIHost['default']:
-                        self.host = sdkAPIHost['sandbox']
-                tmp_payload_dict = {}
-                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-                tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
-                for data_this in self.data.__dict__:
-                    if data_this != 'file_image' and self.data.__dict__[data_this] is not None:
-                        data_value = self.data.__dict__[data_this]
-                        if type(data_value) in [dict, list]:
-                            data_value = json.dumps(obj=data_value)
-                        elif type(data_value) is bool:
-                            data_value = str(data_value).lower()
-                        else:
-                            data_value = str(data_value)
-                        tmp_payload_dict[data_this] = data_value
-                tmp_payload_dict['file_image'] = self.data.file_image
-                payload = MultipartEncoder(fields=tmp_payload_dict)
-                send_url_temp = self.host + ':' + str(self.port) + self.route
-                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-                headers = {
-                    'Content-Type': payload.content_type,
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
-                    'X-Union-Appid': str(self.bot_info.id)
-                }
-                msg_res = None
-                if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
-                self.res = msg_res.text
-                return msg_res.text
-            except Exception:
-                traceback.print_exc()
-                return None
+            self.res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            return self.res
 
     class sendQQMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -1312,7 +1291,10 @@ class event_action(object):
             this_msg.metadata.group_openid = str(target_data.group_id)
         elif flag_from_direct:
             this_msg = API.deleteDirectMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.guild_id = str(extend_data['host_group_id'])
+            guild_id = extend_data.get('host_group_id')
+            if guild_id is None:
+                guild_id = target_data.group_id
+            this_msg.metadata.guild_id = str(guild_id)
         else:
             this_msg = API.deleteMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.channel_id = str(target_data.group_id)
