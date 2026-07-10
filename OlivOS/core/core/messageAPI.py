@@ -417,6 +417,14 @@ class Message_templet(object):
                 elif paraType == 'mention_all':
                     tmp_para = PARA.at(id='all')
                     tmp_data.append(tmp_para)
+                elif paraType == 'face':
+                    face_id = paraData['face_id']
+                    tmp_para = PARA.face(id=face_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'reply':
+                    message_seq = paraData['message_seq']
+                    tmp_para = PARA.reply(id=message_seq)
+                    tmp_data.append(tmp_para)
                 elif paraType == 'image':
                     resource_id = paraData['resource_id']
                     temp_url = paraData['temp_url']
@@ -477,6 +485,14 @@ class Message_templet(object):
                     tmp_data.append(tmp_para)
                 elif paraType == 'mention_all':
                     tmp_para = PARA.at(id='all')
+                    tmp_data.append(tmp_para)
+                elif paraType == 'face':
+                    face_id = paraData['face_id']
+                    tmp_para = PARA.face(id=face_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'reply':
+                    message_seq = paraData['message_seq']
+                    tmp_para = PARA.reply(id=message_seq)
                     tmp_data.append(tmp_para)
                 elif paraType == 'image':
                     uri = paraData['uri']
