@@ -29,7 +29,7 @@ from typing import TypeAlias
 
 """
 
-# `message_seq` 与 `message_id`
+# `message_seq` 与 `message_id` （来自Milky官方）
 
 > 省流：message_scene + peer_id + message_seq = 完整版 message_id。
 >
@@ -68,9 +68,6 @@ ID: TypeAlias = str | int
 USER: TypeAlias = dict
 GROUP: TypeAlias = dict
 GROUP_USER: TypeAlias = dict
-
-
-# 使用Milky定义的结构体
 
 
 # 全局变量区
@@ -1956,6 +1953,8 @@ def URI_format(msg_list: list):
                     elif paraType == 'record':
                         folder_name = 'audios'
                     file_path = OlivOS.contentAPI.resourcePathTransform(folder_name, file_path)
+            else:
+                continue
         abs_path = Path(file_path).absolute()
         if abs_path.exists():
             msg_this['data']['uri'] = abs_path.as_uri()
