@@ -404,12 +404,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 ].platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                                     if plugin_bot_info_dict[bot_info_key].post_info.type == 'auto':
                                         tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
-                                        tmp_Proc_name_simple = basic_conf_models_this['name'] + '=' + bot_info_key[:6]
                                         tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
                                         multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
                                         Proc_dict[tmp_Proc_name] = OlivOS.milkyAutoServerAPI.server(
                                             Proc_name=tmp_Proc_name,
-                                            Proc_name_simple=tmp_Proc_name_simple,
                                             scan_interval=basic_conf_models_this['interval'],
                                             dead_interval=basic_conf_models_this['dead_interval'],
                                             rx_queue=multiprocessing_dict[tmp_queue_name],
