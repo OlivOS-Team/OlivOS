@@ -26,10 +26,10 @@ from dataclasses import dataclass
 modelName = 'milkyAutoServerAPI'
 
 gCheckList = [
-    'default',
-    'llonebot_default',
-    'lagrange_default',
-    'yogurt_default'
+    'milky_default',
+    'llonebot_milky',
+    'lagrange_milky',
+    'yogurt_milky'
 ]
 
 
@@ -127,7 +127,6 @@ class server(OlivOS.API.Proc_templet):
         logger_proc: OlivOS.API.Proc_templet = None,
         bot_info: OlivOS.API.bot_info_T = None,
         debug_mode: bool = False,
-        Proc_name_short: str = None
     ) -> None:
         OlivOS.API.Proc_templet.__init__(
             self,

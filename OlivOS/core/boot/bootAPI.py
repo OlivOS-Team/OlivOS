@@ -292,69 +292,67 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[
                             basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'onebotV11_host':
-                        flag_need_enable = False
+                        enbale_bot_info_keys = []
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[
+                            if (
+                                plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot'
+                                and plugin_bot_info_dict[
                                     bot_info_key
-                                ].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket_host':
-                                        flag_need_enable = True
-                        if not flag_need_enable:
+                                ].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList
+                                and plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket_host'
+                            ):
+                                enbale_bot_info_keys.append(bot_info_key)
+
+                        if not enbale_bot_info_keys:
                             continue
-                        for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[
-                                    bot_info_key
-                                ].platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket_host':
-                                        tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
-                                        tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
-                                        multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
-                                        Proc_dict[tmp_Proc_name] = OlivOS.onebotV11HostServerAPI.server(
-                                            Proc_name=tmp_Proc_name,
-                                            scan_interval=basic_conf_models_this['interval'],
-                                            dead_interval=basic_conf_models_this['dead_interval'],
-                                            rx_queue=multiprocessing_dict[tmp_queue_name],
-                                            tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
-                                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                                            bot_info_dict=plugin_bot_info_dict[bot_info_key],
-                                            debug_mode=False
-                                        )
-                                        Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
-                                            tmp_proc_mode)
+                        for bot_info_key in enbale_bot_info_keys:
+                            tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                            tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                            multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                            Proc_dict[tmp_Proc_name] = OlivOS.onebotV11HostServerAPI.server(
+                                Proc_name=tmp_Proc_name,
+                                scan_interval=basic_conf_models_this['interval'],
+                                dead_interval=basic_conf_models_this['dead_interval'],
+                                rx_queue=multiprocessing_dict[tmp_queue_name],
+                                tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                bot_info_dict=plugin_bot_info_dict[bot_info_key],
+                                debug_mode=False
+                            )
+                            Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
+                                tmp_proc_mode
+                            )
                     elif basic_conf_models_this['type'] == 'onebotV11_link':
-                        flag_need_enable = False
+                        enbale_bot_info_keys = []
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[
+                            if (
+                                plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot'
+                                and plugin_bot_info_dict[
                                     bot_info_key
-                                ].platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket':
-                                        flag_need_enable = True
-                        if not flag_need_enable:
+                                ].platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList
+                                and plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket'
+                            ):
+                                enbale_bot_info_keys.append(bot_info_key)
+
+                        if not enbale_bot_info_keys:
                             continue
-                        for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot':
-                                if plugin_bot_info_dict[
-                                    bot_info_key
-                                ].platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'websocket':
-                                        tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
-                                        tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
-                                        multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
-                                        Proc_dict[tmp_Proc_name] = OlivOS.onebotV11LinkServerAPI.server(
-                                            Proc_name=tmp_Proc_name,
-                                            scan_interval=basic_conf_models_this['interval'],
-                                            dead_interval=basic_conf_models_this['dead_interval'],
-                                            rx_queue=multiprocessing_dict[tmp_queue_name],
-                                            tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
-                                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                                            bot_info=plugin_bot_info_dict[bot_info_key],
-                                            debug_mode=False
-                                        )
-                                        Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
-                                            tmp_proc_mode)
+                        for bot_info_key in enbale_bot_info_keys:
+                            tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                            tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                            multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                            Proc_dict[tmp_Proc_name] = OlivOS.onebotV11LinkServerAPI.server(
+                                Proc_name=tmp_Proc_name,
+                                scan_interval=basic_conf_models_this['interval'],
+                                dead_interval=basic_conf_models_this['dead_interval'],
+                                rx_queue=multiprocessing_dict[tmp_queue_name],
+                                tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                bot_info=plugin_bot_info_dict[bot_info_key],
+                                debug_mode=False
+                            )
+                            Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
+                                tmp_proc_mode
+                            )
                     elif basic_conf_models_this['type'] == 'onebotV12_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
@@ -387,38 +385,36 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         tmp_proc_mode
                                     )
                     elif basic_conf_models_this['type'] == 'milky_auto':
-                        flag_need_enable = False
+                        enbale_bot_info_keys = []
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'milky':
-                                if plugin_bot_info_dict[
+                            if (
+                                plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'onebot'
+                                and plugin_bot_info_dict[
                                     bot_info_key
-                                ].platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'auto':
-                                        flag_need_enable = True
-                        if not flag_need_enable:
+                                ].platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList
+                                and plugin_bot_info_dict[bot_info_key].post_info.type == 'auto'
+                            ):
+                                enbale_bot_info_keys.append(bot_info_key)
+
+                        if not enbale_bot_info_keys:
                             continue
-                        for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'milky':
-                                if plugin_bot_info_dict[
-                                    bot_info_key
-                                ].platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
-                                    if plugin_bot_info_dict[bot_info_key].post_info.type == 'auto':
-                                        tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
-                                        tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
-                                        multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
-                                        Proc_dict[tmp_Proc_name] = OlivOS.milkyAutoServerAPI.server(
-                                            Proc_name=tmp_Proc_name,
-                                            scan_interval=basic_conf_models_this['interval'],
-                                            dead_interval=basic_conf_models_this['dead_interval'],
-                                            rx_queue=multiprocessing_dict[tmp_queue_name],
-                                            tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
-                                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                                            bot_info=plugin_bot_info_dict[bot_info_key],
-                                            debug_mode=False
-                                        )
-                                        Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
-                                            tmp_proc_mode
-                                        )
+                        for bot_info_key in enbale_bot_info_keys:
+                            tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
+                            tmp_queue_name = basic_conf_models_this['rx_queue'] + '=' + bot_info_key
+                            multiprocessing_dict[tmp_queue_name] = multiprocessing.Queue()
+                            Proc_dict[tmp_Proc_name] = OlivOS.milkyAutoServerAPI.server(
+                                Proc_name=tmp_Proc_name,
+                                scan_interval=basic_conf_models_this['interval'],
+                                dead_interval=basic_conf_models_this['dead_interval'],
+                                rx_queue=multiprocessing_dict[tmp_queue_name],
+                                tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                bot_info=plugin_bot_info_dict[bot_info_key],
+                                debug_mode=False
+                            )
+                            Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
+                                tmp_proc_mode
+                            )
                     elif basic_conf_models_this['type'] == 'qqRed_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:

@@ -62,13 +62,17 @@ dictMessageType = {
             'napcat_show_old': 'old_string',
             'napcat_default': 'old_string',
             'llonebot_default': 'old_string',
-            'lagrange_default': 'old_string'
+            'lagrange_default': 'old_string',
+            'milky_default': 'milky_para_tx',
+            'llonebot_milky': 'milky_para_tx',
+            'lagrange_milky': 'milky_para_tx',
+            'yogurt_milky': 'milky_para_tx'
         },
         'milky': {
             'default': 'milky_para_tx',
+            'yogurt_default': 'milky_para_tx',
             'llonebot_default': 'milky_para_tx',
-            'lagrange_default': 'milky_para_tx',
-            'yogurt_default': 'milky_para_tx'
+            'lagrange_default': 'milky_para_tx'
         }
     },
     'qqGuild': {

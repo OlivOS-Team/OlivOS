@@ -872,7 +872,7 @@ class event(object):
     def __init__(self, raw):
         self.raw = raw
         self.json = self.event_load(raw)
-        self.platform = {'sdk': 'milky', 'platform': 'qq', 'model': 'default'}
+        self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'milky_default'}
         self.base_info = {}
         self.active = False
         if self.json is not None:

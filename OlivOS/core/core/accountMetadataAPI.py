@@ -104,10 +104,10 @@ accountTypeMappingList = {
     'onebotV11/Http/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'post'],
     'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post'],
     'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket'],
-    'Milky/自动': ['qq', 'milky', 'default', 'True', 'auto'],
-    'Milky/自动/Yogurt': ['qq', 'milky', 'yogurt_default', 'True', 'auto'],
-    'Milky/自动/LLOneBot': ['qq', 'milky', 'llonebot_default', 'True', 'auto'],
-    'Milky/自动/Lagrange': ['qq', 'milky', 'lagrange_default', 'True', 'auto'],
+    'Milky/自动': ['qq', 'onebot', 'milky_default', 'True', 'auto'],
+    'Milky/自动/Yogurt': ['qq', 'onebot', 'yogurt_milky', 'True', 'auto'],
+    'Milky/自动/LLOneBot': ['qq', 'onebot', 'llonebot_milky', 'True', 'auto'],
+    'Milky/自动/Lagrange': ['qq', 'onebot', 'lagrange_milky', 'True', 'auto'],
     'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket'],
     'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket'],
     'QQ/OPQ/默认': ['qq', 'onebot', 'opqbot_auto', 'True', 'websocket'],
@@ -275,6 +275,10 @@ accountTypeDataList_platform_sdk_model = {
             'napcat_default',
             'llonebot_default',
             'lagrange_default'
+            'milky_default',
+            'yogurt_milky',
+            'llonebot_milky',
+            'lagrange_milky'
         ],
         'milky': [
             'default',

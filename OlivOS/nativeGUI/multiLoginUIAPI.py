@@ -1069,7 +1069,7 @@ class TreeEditUI(object):
                     tmp_access_token = 'NONEED'
             if (
                 tmp_platform_platform == 'qq'
-                and tmp_platform_sdk == 'milky'
+                and tmp_platform_sdk == 'onebot'
                 and tmp_platform_model in OlivOS.milkyAutoServerAPI.gCheckList
                 and tmp_server_auto == 'True'
             ):
