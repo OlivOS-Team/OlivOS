@@ -16,6 +16,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 from enum import IntEnum
 import json
+import mimetypes
+import os
 import requests as req
 import time
 from datetime import datetime, timezone
@@ -65,7 +67,10 @@ sdkAPIRoute = {
 sdkAPIRouteTemp = {
     'guild_id': '-1',
     'channel_id': '-1',
-    'user_id': '-1'
+    'user_id': '-1',
+    'openid': '-1',
+    'group_openid': '-1',
+    'message_id': '-1'
 }
 
 sdkSubSelfInfo = {}
@@ -296,6 +301,8 @@ class api_templet(object):
                 msg_res = req.request("POST", send_url, headers=headers, data=payload)
             elif req_type == 'GET':
                 msg_res = req.request("GET", send_url, headers=headers)
+            elif req_type == 'DELETE':
+                msg_res = req.request("DELETE", send_url, headers=headers)
 
             self.res = msg_res.text
             # print(self.res)
@@ -303,6 +310,45 @@ class api_templet(object):
         except Exception:
             traceback.print_exc()
             return None
+
+
+def _send_channel_multipart(bot_info, metadata, data, host, port, route, req_type='POST'):
+    try:
+        if bot_info.model in ['sandbox', 'sandbox_intents']:
+            if host == sdkAPIHost['default']:
+                host = sdkAPIHost['sandbox']
+        tmp_payload_dict = {}
+        tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
+        if metadata is not None:
+            tmp_sdkAPIRouteTemp.update(metadata.__dict__)
+        if data is not None:
+            for data_this in data.__dict__:
+                if data_this != 'file_image' and data.__dict__[data_this] is not None:
+                    data_value = data.__dict__[data_this]
+                    if type(data_value) in [dict, list]:
+                        data_value = json.dumps(obj=data_value)
+                    elif type(data_value) is bool:
+                        data_value = str(data_value).lower()
+                    else:
+                        data_value = str(data_value)
+                    tmp_payload_dict[data_this] = data_value
+        tmp_payload_dict['file_image'] = data.file_image
+        payload = MultipartEncoder(fields=tmp_payload_dict)
+        send_url_temp = host + ':' + str(port) + route
+        send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
+        headers = {
+            'Content-Type': payload.content_type,
+            'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
+            'Authorization': 'QQBot %s' % (getTokenNow(bot_info)),
+            'X-Union-Appid': str(bot_info.id)
+        }
+        msg_res = None
+        if req_type == 'POST':
+            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+        return msg_res.text
+    except Exception:
+        traceback.print_exc()
+        return None
 
 
 def getTokenNow(bot_info: bot_info_T):
@@ -401,12 +447,25 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None  # str
-                self.embed = None  # str
-                self.ark = None  # str
+                self.embed = None  # object
+                self.ark = None  # object
+                self.message_reference = None  # object
                 self.image = None  # str
+                self.file_image = None  # multipart file
                 self.msg_id = None  # str
-                # self.msg_type = 0
-                # self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.event_id = None  # str
+                self.markdown = None  # object
+                self.keyboard = None  # object
+
+        # 频道本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
+        def do_api(self, req_type='POST'):
+            if self.data.file_image is None:
+                return api_templet.do_api(self, req_type)
+            self.res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            return self.res
 
     class sendDirectMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -424,12 +483,25 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None     # str
-                self.embed = None       # str
-                self.ark = None         # str
+                self.embed = None       # object
+                self.ark = None         # object
+                self.message_reference = None  # object
                 self.image = None       # str
+                self.file_image = None  # multipart file
                 self.msg_id = None      # str
-                # self.msg_type = 0
-                # self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.event_id = None    # str
+                self.markdown = None    # object
+                self.keyboard = None    # object
+
+        # 频道私信本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
+        def do_api(self, req_type='POST'):
+            if self.data.file_image is None:
+                return api_templet.do_api(self, req_type)
+            self.res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            return self.res
 
     class sendQQMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -447,13 +519,15 @@ class API(object):
         class data_T(object):
             def __init__(self):
                 self.content = None     # str
-                self.media = None       # str
+                self.media = None       # object
                 self.msg_type = 0       # int
-                self.embed = None       # str
-                self.ark = None         # str
-                self.image = None       # str
+                self.markdown = None    # object
+                self.keyboard = None    # object
+                self.ark = None         # object
+                self.embed = None       # object
+                self.message_reference = None  # object
+                self.event_id = None    # str
                 self.msg_id = None      # str
-                self.timestamp = int(datetime.now(timezone.utc).timestamp())
                 self.msg_seq = None
 
     class sendQQDirectMessage(api_templet):
@@ -471,16 +545,20 @@ class API(object):
 
         class data_T(object):
             def __init__(self):
-                self.content = None  # str
-                self.msg_type = 0
-                self.embed = None  # str
-                self.ark = None  # str
-                self.image = None  # str
-                self.msg_id = None  # str
-                self.timestamp = int(datetime.now(timezone.utc).timestamp())
+                self.content = None     # str
+                self.msg_type = 0       # int
+                self.markdown = None    # object
+                self.keyboard = None    # object
+                self.ark = None         # object
+                self.embed = None       # object
+                self.media = None       # object
+                self.message_reference = None  # object
+                self.event_id = None    # str
+                self.msg_id = None      # str
                 self.msg_seq = None
+                self.is_wakeup = None   # bool
 
-    # 资源文件上传
+    # QQ 单聊/群聊富媒体上传。名称保留以兼容已有内部引用，实际支持图片、视频、语音和文件。
     class setResourcePictureUpload(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -489,46 +567,78 @@ class API(object):
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['qq_groups'] + '/{openid}/files'
+            self.resource_type = 'qq_groups'
 
         class data_T(object):
             def __init__(self):
-                self.file = None
-                self.type = 'qq_groups'
+                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
+                self.url = None        # 远程资源 URL
+                self.file_data = None  # 本地资源的 base64 数据
 
         class metadata_T(object):
             def __init__(self):
                 self.openid = '-1'
 
-        def do_api(self, req_type='POST', file_type: str = ['.png', 'image/png']):
-            try:
-                tmp_payload_dict = {'file': (str(uuid.uuid4()) + file_type[0], self.data.file, file_type[1])}
-                payload = MultipartEncoder(
-                    fields=tmp_payload_dict
-                )
+        def do_api(self, req_type='POST'):
+            # 官方富媒体接口使用 JSON：远程资源传 url，本地资源传 base64 file_data。
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/files'
+            return api_templet.do_api(self, req_type)
 
-                tmp_sdkAPIRouteTemp = sdkAPIRouteTemp.copy()
-                if self.metadata is not None:
-                    tmp_sdkAPIRouteTemp.update(self.metadata.__dict__)
-                self.route = sdkAPIRoute[self.data.type] + '/{openid}/files'
-                send_url_temp = self.host + ':' + str(self.port) + self.route
-                send_url = send_url_temp.format(**tmp_sdkAPIRouteTemp)
-                headers = {
-                    'Content-Type': payload.content_type,
-                    'Content-Length': str(len(self.data.file)),
-                    'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA,
-                    'Authorization': 'QQBot %s' % (getTokenNow(self.bot_info)),
-                    'X-Union-Appid': str(self.bot_info.id)
-                }
+    class deleteMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}'
 
-                msg_res = None
-                if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
 
-                self.res = msg_res.text
-                return msg_res.text
-            except Exception:
-                traceback.print_exc()
-                return None
+    class deleteDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.message_id = '-1'
+
+    class deleteQQMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+                self.message_id = '-1'
+
+    class deleteQQDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+                self.message_id = '-1'
 
 
 def checkInDictSafe(var_key, var_dict, var_path=None):
@@ -568,6 +678,56 @@ def checkByListAnd(check_list):
             flag_res = False
             return flag_res
     return flag_res
+
+
+# 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
+def _get_attachment_url(attachment):
+    attachment_url = attachment.get('url', None)
+    if type(attachment_url) is not str or attachment_url == '':
+        attachment_url = attachment.get('voice_wav_url', None)
+    if type(attachment_url) is not str or attachment_url == '':
+        return None
+    if attachment_url.startswith('http://') or attachment_url.startswith('https://'):
+        return attachment_url
+    if attachment_url.startswith('//'):
+        return 'https:' + attachment_url
+    return 'https://' + attachment_url.lstrip('/')
+
+
+# 按事件文档把图片、视频、语音和文件附件转换为统一消息段
+def _get_message_attachments(attachments):
+    message_list = []
+    if type(attachments) is not list:
+        return message_list
+    for attachment_this in attachments:
+        if type(attachment_this) is not dict:
+            continue
+        attachment_url = _get_attachment_url(attachment_this)
+        if attachment_url is None:
+            continue
+        content_type = str(attachment_this.get('content_type', '')).lower()
+        if content_type.startswith('image'):
+            message_list.append(
+                OlivOS.messageAPI.PARA.image(file=attachment_url, url=attachment_url)
+            )
+        elif content_type.startswith('video'):
+            message_list.append(
+                OlivOS.messageAPI.PARA.video(file=attachment_url, url=attachment_url)
+            )
+        elif content_type == 'voice' or content_type.startswith('audio'):
+            message_list.append(
+                OlivOS.messageAPI.PARA.record(file=attachment_url, url=attachment_url)
+            )
+        else:
+            message_list.append(
+                OlivOS.messageAPI.PARA.file(
+                    file=attachment_url,
+                    url=attachment_url,
+                    name=attachment_this.get('filename', None),
+                    size=attachment_this.get('size', None)
+                )
+            )
+    return message_list
 
 
 def get_Event_from_SDK(target_event):
@@ -634,27 +794,31 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
-                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
-                    if 'content_type' in attachments_this:
-                        if attachments_this['content_type'].startswith('image'):
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
-                            )
+        message_obj.data_raw.extend(
+            _get_message_attachments(
+                target_event.sdk_event.payload.data.d.get('attachments', None)
+            )
+        )
         try:
             message_obj.init_data()
         except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
+            # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
+            group_openid = target_event.sdk_event.payload.data.d.get(
+                'group_openid',
+                target_event.sdk_event.payload.data.d.get('group_id', None)
+            )
+            member_openid = target_event.sdk_event.payload.data.d['author'].get(
+                'member_openid',
+                target_event.sdk_event.payload.data.d['author'].get('id', None)
+            )
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
             target_event.data = target_event.group_message(
-                str(target_event.sdk_event.payload.data.d['group_id']),
-                str(target_event.sdk_event.payload.data.d['author']['id']),
+                str(group_openid),
+                str(member_openid),
                 message_obj,
                 'group'
             )
@@ -663,7 +827,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message = message_obj
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
-            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['user_id'] = str(member_openid)
             target_event.data.sender['nickname'] = '用户'
             target_event.data.sender['id'] = target_event.data.sender['user_id']
             target_event.data.sender['name'] = target_event.data.sender['nickname']
@@ -671,7 +835,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.sender['age'] = 0
             target_event.data.sender['role'] = 'member'
             target_event.data.host_id = None
-            target_event.data.extend['group_id'] = str(target_event.sdk_event.payload.data.d['group_id'])
+            target_event.data.extend['group_id'] = str(group_openid)
             target_event.data.extend['host_group_id'] = None
             target_event.data.extend['flag_from_direct'] = False
             target_event.data.extend['flag_from_qq'] = True
@@ -687,6 +851,11 @@ def get_Event_from_SDK(target_event):
                         target_event.data.sender['role'] = 'admin'
                     elif '1' in tmp_role_now:
                         target_event.data.sender['role'] = 'member'
+            member_role = target_event.sdk_event.payload.data.d['author'].get('member_role', None)
+            if member_role == 'owner':
+                target_event.data.sender['role'] = 'owner'
+            elif member_role == 'admin':
+                target_event.data.sender['role'] = 'admin'
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
@@ -709,26 +878,26 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
-                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
-                    if 'content_type' in attachments_this:
-                        if attachments_this['content_type'].startswith('image'):
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
-                            )
+        message_obj.data_raw.extend(
+            _get_message_attachments(
+                target_event.sdk_event.payload.data.d.get('attachments', None)
+            )
+        )
         try:
             message_obj.init_data()
         except Exception:
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
+            # C2C 新版事件的用户标识为 author.user_openid。
+            user_openid = target_event.sdk_event.payload.data.d['author'].get(
+                'user_openid',
+                target_event.sdk_event.payload.data.d['author'].get('id', None)
+            )
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             target_event.data = target_event.private_message(
-                str(target_event.sdk_event.payload.data.d['author']['id']),
+                str(user_openid),
                 message_obj,
                 'friend'
             )
@@ -737,7 +906,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message = message_obj
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
-            target_event.data.sender['user_id'] = str(target_event.sdk_event.payload.data.d['author']['id'])
+            target_event.data.sender['user_id'] = str(user_openid)
             target_event.data.sender['nickname'] = '用户'
             target_event.data.sender['id'] = target_event.data.sender['user_id']
             target_event.data.sender['name'] = target_event.data.sender['nickname']
@@ -777,16 +946,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
-                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
-                    if 'content_type' in attachments_this:
-                        if attachments_this['content_type'].startswith('image'):
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
-                            )
+        message_obj.data_raw.extend(
+            _get_message_attachments(
+                target_event.sdk_event.payload.data.d.get('attachments', None)
+            )
+        )
         try:
             message_obj.init_data()
         except Exception:
@@ -851,16 +1015,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if 'attachments' in target_event.sdk_event.payload.data.d:
-            if type(target_event.sdk_event.payload.data.d['attachments']) is list:
-                for attachments_this in target_event.sdk_event.payload.data.d['attachments']:
-                    if 'content_type' in attachments_this:
-                        if attachments_this['content_type'].startswith('image'):
-                            message_obj.data_raw.append(
-                                OlivOS.messageAPI.PARA.image(
-                                    'https://%s' % attachments_this['url']
-                                )
-                            )
+        message_obj.data_raw.extend(
+            _get_message_attachments(
+                target_event.sdk_event.payload.data.d.get('attachments', None)
+            )
+        )
         try:
             message_obj.init_data()
         except Exception:
@@ -895,78 +1054,196 @@ def get_Event_from_SDK(target_event):
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
+    # 按首个有效消息段确定图文方向，并将每个富媒体与相邻文字分组
+    def _get_message_send_chunks(message, media_types):
+        message_items = []
+        for message_this in message.data:
+            if type(message_this) is OlivOS.messageAPI.PARA.text:
+                text_content = message_this.OP()
+                # 空文字段不应改变整条消息按图片开头还是按文字开头分组。
+                if text_content != '':
+                    message_items.append(('text', text_content))
+            elif type(message_this) in media_types:
+                message_items.append(('media', message_this))
+
+        if len(message_items) == 0:
+            return []
+
+        message_chunks = []
+        text_buffer = ''
+        media_buffer = None
+        if message_items[0][0] == 'media':
+            # 图片开头时，后续文字归属前一张图片：图片1-文字1-图片2-文字2。
+            for item_type, item_data in message_items:
+                if item_type == 'text':
+                    text_buffer += item_data
+                else:
+                    if media_buffer is not None:
+                        message_chunks.append((text_buffer, media_buffer))
+                        text_buffer = ''
+                    media_buffer = item_data
+            if media_buffer is not None:
+                message_chunks.append((text_buffer, media_buffer))
+        else:
+            # 文字开头时，前置文字归属后一张图片：文字1-图片1-文字2-图片2。
+            for item_type, item_data in message_items:
+                if item_type == 'text':
+                    text_buffer += item_data
+                else:
+                    message_chunks.append((text_buffer, item_data))
+                    text_buffer = ''
+            if text_buffer != '':
+                message_chunks.append((text_buffer, None))
+        return message_chunks
+
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
-        this_msg = None
-        msg_id = None
+        msg_id = reply_msg_id
+        if msg_id is None and type(target_event.sdk_event) is event:
+            msg_id = target_event.sdk_event.payload.data.d.get('id', None)
+
+        media_types = [
+            OlivOS.messageAPI.PARA.image,
+            OlivOS.messageAPI.PARA.video,
+            OlivOS.messageAPI.PARA.record,
+            OlivOS.messageAPI.PARA.file
+        ]
+        failed_text_buffer = ''
+        for text_content, message_this in event_action._get_message_send_chunks(message, media_types):
+            text_content = failed_text_buffer + text_content
+            if message_this is None:
+                event_action._send_qq_payload(
+                    target_event,
+                    chat_id,
+                    text_content,
+                    msg_id,
+                    flag_direct=flag_direct
+                )
+                failed_text_buffer = ''
+                continue
+            if type(message_this) is OlivOS.messageAPI.PARA.image:
+                type_path = 'images'
+            elif type(message_this) is OlivOS.messageAPI.PARA.video:
+                type_path = 'videos'
+            elif type(message_this) is OlivOS.messageAPI.PARA.record:
+                type_path = 'audios'
+            elif type(message_this) is OlivOS.messageAPI.PARA.file:
+                type_path = 'files'
+            else:
+                continue
+            resource_url = event_action._get_message_resource(message_this)
+            if resource_url is None:
+                failed_text_buffer = text_content
+                continue
+            file_info = event_action.setResourceUploadFast(
+                target_event,
+                resource_url,
+                chat_id,
+                type_path=type_path,
+                type_chat='qq_users' if flag_direct else 'qq_groups'
+            )
+            if file_info is None:
+                # 上传失败时保留对应文字，合并到下一条成功发送的图文消息。
+                failed_text_buffer = text_content
+                continue
+            event_action._send_qq_payload(
+                target_event,
+                chat_id,
+                text_content,
+                msg_id,
+                flag_direct=flag_direct,
+                file_info=file_info
+            )
+            failed_text_buffer = ''
+
+        # 最后一项媒体上传失败时，仍发送已经积累的文字，避免内容静默丢失。
+        if failed_text_buffer != '':
+            event_action._send_qq_payload(
+                target_event,
+                chat_id,
+                failed_text_buffer,
+                msg_id,
+                flag_direct=flag_direct
+            )
+
+    def _send_qq_payload(target_event, chat_id, content, msg_id, flag_direct=False, file_info=None):
         if flag_direct:
             this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.openid = str(chat_id)
-            if type(target_event.sdk_event) is event:
-                msg_id = target_event.sdk_event.payload.data.d.get('id', None)
         else:
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.group_openid = str(chat_id)
-            if type(target_event.sdk_event) is event:
-                msg_id = target_event.sdk_event.payload.data.d.get('id', None)
-        if this_msg is None:
-            return
+        this_msg.data.content = content
         this_msg.data.msg_id = msg_id
-        # this_msg.data.msg_id = reply_msg_id
-        flag_now_type = 'string'
-        flag_now_type_last = flag_now_type
-        res = ''
-        count_data = 0
-        size_data = len(message.data)
-        for message_this in message.data:
-            count_data += 1
-            flag_now_type_last = flag_now_type
-            if type(message_this) is OlivOS.messageAPI.PARA.image:
-                # this_msg.data.media = event_action.setResourceUploadFast(
-                #     target_event, message_this.data['file'], 'images'
-                # )
-                # this_msg.data.msg_type = 7
-                # this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
-                # this_msg.do_api()
-                # flag_now_type = 'image'
-                pass
-            elif type(message_this) is OlivOS.messageAPI.PARA.text:
-                res += message_this.OP()
-                flag_now_type = 'string'
-            if (
-                size_data == count_data
-                or (
-                    flag_now_type_last != flag_now_type
-                    and flag_now_type_last == 'string'
-                    and len(res) > 0
-                )
-            ):
-                this_msg.data.content = res
-                this_msg.data.msg_type = 0
-                this_msg.data.msg_seq = get_msgid(str(this_msg.data.msg_id))
-                this_msg.do_api()
-                res = ''
+        if file_info is None:
+            this_msg.data.msg_type = 0
+        else:
+            # 上传接口返回的 file_info 必须包装到 media 对象中，再调用消息发送接口。
+            this_msg.data.msg_type = 7
+            this_msg.data.media = {'file_info': file_info}
+        if msg_id is not None:
+            this_msg.data.msg_seq = get_msgid(str(msg_id))
+        return this_msg.do_api()
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
-        this_msg = None
+        # 频道图片沿用 QQ 图文的双向分组规则。
+        failed_text_buffer = ''
+        for text_content, message_this in event_action._get_message_send_chunks(
+            message,
+            [OlivOS.messageAPI.PARA.image]
+        ):
+            text_content = failed_text_buffer + text_content
+            if message_this is None:
+                event_action._send_channel_payload(
+                    target_event,
+                    chat_id,
+                    text_content,
+                    reply_msg_id,
+                    flag_direct=flag_direct
+                )
+                failed_text_buffer = ''
+                continue
+            resource_url = event_action._get_message_resource(message_this)
+            if resource_url is None:
+                failed_text_buffer = text_content
+                continue
+            image_data = event_action._get_channel_image_data(resource_url)
+            if image_data is None:
+                failed_text_buffer = text_content
+                continue
+            event_action._send_channel_payload(
+                target_event,
+                chat_id,
+                text_content,
+                reply_msg_id,
+                flag_direct=flag_direct,
+                image_data=image_data
+            )
+            failed_text_buffer = ''
+
+        if failed_text_buffer != '':
+            event_action._send_channel_payload(
+                target_event,
+                chat_id,
+                failed_text_buffer,
+                reply_msg_id,
+                flag_direct=flag_direct
+            )
+
+    def _send_channel_payload(target_event, chat_id, content, msg_id, flag_direct=False, image_data=None):
         if flag_direct:
             this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.guild_id = int(chat_id)
+            this_msg.metadata.guild_id = str(chat_id)
         else:
             this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
-            this_msg.metadata.channel_id = int(chat_id)
-        if this_msg is None:
-            return
-        this_msg.data.msg_id = reply_msg_id
-        res = ''
-        for message_this in message.data:
-            if type(message_this) is OlivOS.messageAPI.PARA.image:
-                pass
-            elif type(message_this) is OlivOS.messageAPI.PARA.text:
-                res += message_this.OP()
-        if res != '':
-            this_msg.data.content = res
-            # this_msg.data.msg_type = 0
-            this_msg.do_api()
+            this_msg.metadata.channel_id = str(chat_id)
+        this_msg.data.content = content
+        this_msg.data.msg_id = msg_id
+        if type(image_data) is dict:
+            if image_data.get('image', None) is not None:
+                this_msg.data.image = image_data['image']
+            elif image_data.get('file_image', None) is not None:
+                this_msg.data.file_image = image_data['file_image']
+        return this_msg.do_api()
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
@@ -998,50 +1275,123 @@ class event_action(object):
                 res_data['active'] = False
         return res_data
 
-    # 现场上传的就地实现
-    def setResourceUploadFast(target_event, url: str, type_path: str = 'images', type_chat: str = 'qq_groups'):
-        res = None
-        check_list = {
-            'images': ['.png', 'image/png'],
-            'videos': ['.mp4', 'video/mp4'],
-            'audios': ['.mp3', 'audio/mp3']
-        }
-        check_list.setdefault(type_path, ['', 'file/*'])
-        try:
-            pic_file = None
-            if url.startswith("base64://"):
-                data = url[9:]
-                pic_file = base64.decodebytes(data.encode("utf-8"))
-            else:
-                url_parsed = parse.urlparse(url)
-                if url_parsed.scheme in ["http", "https"]:
-                    send_url = url
-                    headers = {
-                        'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
-                    }
-                    msg_res = None
-                    msg_res = req.request("GET", send_url, headers=headers)
-                    pic_file = msg_res.content
-                else:
-                    file_path = url_parsed.path
-                    file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
-                    with open(file_path, "rb") as f:
-                        pic_file = f.read()
+    # 通过 OlivOS 既有 delete_msg 接口自动选择 QQ/频道撤回路由
+    def delete_msg(target_event, message_id):
+        target_data = target_event.data
+        extend_data = target_data.extend
+        flag_from_qq = extend_data.get('flag_from_qq', False)
+        flag_from_direct = extend_data.get('flag_from_direct', False)
+        this_msg = None
 
+        if flag_from_qq and flag_from_direct:
+            this_msg = API.deleteQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.openid = str(target_data.user_id)
+        elif flag_from_qq:
+            this_msg = API.deleteQQMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.group_openid = str(target_data.group_id)
+        elif flag_from_direct:
+            this_msg = API.deleteDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            guild_id = extend_data.get('host_group_id')
+            if guild_id is None:
+                guild_id = target_data.group_id
+            this_msg.metadata.guild_id = str(guild_id)
+        else:
+            this_msg = API.deleteMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.channel_id = str(target_data.group_id)
+        this_msg.metadata.message_id = str(message_id)
+        return this_msg.do_api('DELETE')
+
+    # 优先使用消息段中的 URL，其次使用本地 path/file
+    def _get_message_resource(message_para):
+        if message_para.data is None:
+            return None
+        for data_key in ['url', 'path', 'file']:
+            data_value = message_para.data.get(data_key, None)
+            if data_value is not None and str(data_value) != '':
+                return str(data_value)
+        return None
+
+    # 读取 OlivOS 支持的 base64、data URI、file URI 或本地资源
+    def _get_local_resource_data(url: str, type_path: str = 'images'):
+        if url.startswith('base64://'):
+            return base64.b64decode(url[9:].encode('utf-8'))
+        if url.startswith('data:') and ',' in url:
+            data_meta, data_raw = url.split(',', 1)
+            if data_meta.endswith(';base64'):
+                return base64.b64decode(data_raw.encode('utf-8'))
+            return parse.unquote_to_bytes(data_raw)
+
+        url_parsed = parse.urlparse(url)
+        if url_parsed.scheme == 'file':
+            file_path = parse.unquote(url_parsed.path)
+            if url_parsed.netloc != '':
+                file_path = '//' + url_parsed.netloc + file_path
+            if re.match(r'^/[a-zA-Z]:/', file_path):
+                file_path = file_path[1:]
+        else:
+            file_path = url
+        file_path = OlivOS.contentAPI.resourcePathTransform(type_path, file_path)
+        with open(file_path, 'rb') as file_obj:
+            return file_obj.read()
+
+    # 频道远程图片走 image，本地/二进制图片走 file_image 表单字段
+    def _get_channel_image_data(url: str):
+        url_parsed = parse.urlparse(url)
+        if url_parsed.scheme in ['http', 'https']:
+            return {'image': url}
+        try:
+            file_data = event_action._get_local_resource_data(url, 'images')
+            file_name = os.path.basename(parse.unquote(url_parsed.path))
+            if file_name == '' or '.' not in file_name:
+                file_name = str(uuid.uuid4()) + '.png'
+            file_mime = mimetypes.guess_type(file_name)[0]
+            if file_mime is None or not file_mime.startswith('image/'):
+                file_mime = 'image/png'
+            return {'file_image': (file_name, file_data, file_mime)}
+        except Exception:
+            traceback.print_exc()
+            return None
+
+    # QQ 富媒体必须先上传获取 file_info，再由 send_qq_msg 调用消息发送接口。
+    def setResourceUploadFast(
+        target_event,
+        url: str,
+        chat_id,
+        type_path: str = 'images',
+        type_chat: str = 'qq_groups'
+    ):
+        res = None
+        file_type_map = {
+            'images': 1,
+            'videos': 2,
+            'audios': 3,
+            'files': 4
+        }
+        file_type = file_type_map.get(type_path, 4)
+        try:
             msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
-            msg_upload_api.data.file = pic_file
-            msg_upload_api.data.type = type_chat
-            msg_upload_api.do_api('POST', check_list[type_path])
-            # print(msg_upload_api.res)
+            msg_upload_api.resource_type = type_chat
+            msg_upload_api.metadata.openid = str(chat_id)
+            msg_upload_api.data.file_type = file_type
+
+            url_parsed = parse.urlparse(url)
+            if url_parsed.scheme in ['http', 'https']:
+                # 远程资源直接交给 QQ 平台拉取，避免 OlivOS 额外下载和重复编码。
+                msg_upload_api.data.url = url
+            else:
+                file_data = event_action._get_local_resource_data(url, type_path)
+                msg_upload_api.data.file_data = base64.b64encode(file_data).decode('ascii')
+
+            msg_upload_api.do_api('POST')
             if msg_upload_api.res is not None:
-                msg_upload_api_obj = json.loads(msg_upload_api.res)
-                if (
-                    'code' in msg_upload_api_obj
-                    and 0 == msg_upload_api_obj['code']
-                    and 'data' in msg_upload_api_obj
-                    and 'url' in msg_upload_api_obj['data']
-                ):
-                    res = msg_upload_api_obj['data']['url']
+                msg_upload_api_obj = init_api_json(msg_upload_api.res)
+                if type(msg_upload_api_obj) is dict:
+                    if msg_upload_api_obj.get('code', 0) != 0:
+                        return None
+                    # 当前接口成功时直接返回媒体对象；兼容部分环境的 data 包装格式。
+                    msg_upload_api_data = msg_upload_api_obj.get('data', msg_upload_api_obj)
+                    if type(msg_upload_api_data) is dict:
+                        res = msg_upload_api_data.get('file_info', None)
         except Exception:
             traceback.print_exc()
             res = None
