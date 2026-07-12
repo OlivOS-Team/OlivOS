@@ -26,10 +26,10 @@ from dataclasses import dataclass
 modelName = 'milkyAutoServerAPI'
 
 gCheckList = [
-    'default',
-    'llonebot_default',
-    'lagrange_default',
-    'yogurt_default'
+    'milky_default',
+    'llonebot_milky',
+    'lagrange_milky',
+    'yogurt_milky'
 ]
 
 
@@ -103,6 +103,7 @@ class server(OlivOS.API.Proc_templet):
 
     Attributes:
         Proc_name (str): 服务器线程名称
+        Proc_name_short (str): 将标识Hash进行简化的服务器线程名称
         scan_interval (float): 抓奸间隔
         dead_interval (float): 枪毙间隔
         rx_queue (multiprocessing.Queue): 接收队列，从插件托盘接收控制请求
@@ -125,7 +126,7 @@ class server(OlivOS.API.Proc_templet):
         tx_queue=None,
         logger_proc: OlivOS.API.Proc_templet = None,
         bot_info: OlivOS.API.bot_info_T = None,
-        debug_mode: bool = False
+        debug_mode: bool = False,
     ) -> None:
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -144,6 +145,7 @@ class server(OlivOS.API.Proc_templet):
         self.running_event = threading.Event()
         self.running_event.set()
         self.debug_mode = debug_mode
+        self.Proc_name_short = f"OlivOS_milky_auto={self.bot_info.hash[:6]}"
 
     def start(self) -> threading.Thread:
         proc_this = threading.Thread(
@@ -278,7 +280,7 @@ class server(OlivOS.API.Proc_templet):
             2,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS milky auto server [{0}] websocket link start',
-                [self.Proc_name],
+                [self.Proc_name_short],
                 modelName
             )
         )
@@ -289,7 +291,7 @@ class server(OlivOS.API.Proc_templet):
             2,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS milky auto server [{0}] websocket link close',
-                [self.Proc_name],
+                [self.Proc_name_short],
                 modelName
             )
         )
@@ -300,7 +302,7 @@ class server(OlivOS.API.Proc_templet):
             3,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS milky auto server [{0}] websocket link will retry in {1}s',
-                [self.Proc_name, self.extra_conf.retry_interval],
+                [self.Proc_name_short, self.extra_conf.retry_interval],
                 modelName
             )
         )
@@ -311,7 +313,7 @@ class server(OlivOS.API.Proc_templet):
             3,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS milky auto server [{0}] websocket link lost',
-                [self.Proc_name],
+                [self.Proc_name_short],
                 modelName
             )
         )
@@ -322,7 +324,7 @@ class server(OlivOS.API.Proc_templet):
             4,
             OlivOS.L10NAPI.getTrans(
                 'OlivOS milky auto server [{0}] websocket link error: \n{1}',
-                [self.Proc_name, traceback.format_exc()],
+                [self.Proc_name_short, traceback.format_exc()],
                 modelName
             )
         )

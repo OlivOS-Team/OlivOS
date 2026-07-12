@@ -10,6 +10,8 @@ from typing import (
 MilkyT = TypeVar('T', bound='MilkyStruct')
 
 
+# 使用Milky定义的结构体
+
 @dataclass
 class MilkyStruct:
     @classmethod
