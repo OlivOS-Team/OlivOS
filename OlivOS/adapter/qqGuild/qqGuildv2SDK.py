@@ -45,6 +45,7 @@ class intents_T(IntEnum):
     AUDIO_ACTION = (1 << 29)  # 语音消息
     PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
     PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
+    PUBLIC_QQ_GROUP_MEMBERS = (1 << 24)  # QQ 群成员进退群事件
 
 
 sdkAPIHost = {
@@ -189,6 +190,7 @@ class PAYLOAD(object):
             elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
+                tmp_intents |= int(intents_T.PUBLIC_QQ_GROUP_MEMBERS)
             elif bot_info.model in ['public_guild_only']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
@@ -730,6 +732,16 @@ def _get_message_attachments(attachments):
     return message_list
 
 
+# 将 QQ 新文本链的 @ 标签转换为 OlivOS 现有的统一消息段解析格式。
+def _normalize_qq_text_chain(content):
+    content = re.sub(
+        r'<qqbot-at-user\s+id=["\']([^"\']+)["\']\s*/>',
+        lambda match: '<@!' + match.group(1) + '>',
+        content
+    )
+    return re.sub(r'<qqbot-at-everyone\s*/>', '<@&all>', content)
+
+
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
@@ -772,6 +784,62 @@ def get_Event_from_SDK(target_event):
         ):
             sdkSelfInfo[plugin_event_bot_hash] = target_event.sdk_event.payload.data.d['user']
     elif target_event.sdk_event.payload.data.t in [
+        'GROUP_ADD_ROBOT',
+        'GROUP_DEL_ROBOT'
+    ]:
+        event_data = target_event.sdk_event.payload.data.d
+        group_openid = str(event_data.get('group_openid', ''))
+        operator_openid = str(event_data.get('op_member_openid', ''))
+        target_event.active = True
+        if target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT':
+            target_event.plugin_info['func_type'] = 'group_member_increase'
+            target_event.data = target_event.group_member_increase(
+                group_openid,
+                operator_openid,
+                target_event.base_info['self_id'],
+                action='invite'
+            )
+        else:
+            target_event.plugin_info['func_type'] = 'group_member_decrease'
+            target_event.data = target_event.group_member_decrease(
+                group_openid,
+                operator_openid,
+                target_event.base_info['self_id'],
+                action='kick_me'
+            )
+        target_event.data.extend = {
+            'flag_from_qq': True,
+            'timestamp': event_data.get('timestamp', None)
+        }
+    elif target_event.sdk_event.payload.data.t in [
+        'GROUP_MEMBER_ADD',
+        'GROUP_MEMBER_REMOVE'
+    ]:
+        event_data = target_event.sdk_event.payload.data.d
+        group_openid = str(event_data.get('group_openid', ''))
+        member_openid = str(event_data.get('member_openid', ''))
+        target_event.active = True
+        if target_event.sdk_event.payload.data.t == 'GROUP_MEMBER_ADD':
+            target_event.plugin_info['func_type'] = 'group_member_increase'
+            target_event.data = target_event.group_member_increase(
+                group_openid,
+                member_openid,
+                member_openid,
+                action='approve'
+            )
+        else:
+            target_event.plugin_info['func_type'] = 'group_member_decrease'
+            target_event.data = target_event.group_member_decrease(
+                group_openid,
+                member_openid,
+                member_openid,
+                action='leave'
+            )
+        target_event.data.extend = {
+            'flag_from_qq': True,
+            'timestamp': event_data.get('timestamp', None)
+        }
+    elif target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
     ]:
@@ -780,7 +848,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -864,7 +934,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -932,7 +1004,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1001,7 +1075,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1064,6 +1140,15 @@ class event_action(object):
                 # 空文字段不应改变整条消息按图片开头还是按文字开头分组。
                 if text_content != '':
                     message_items.append(('text', text_content))
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.at):
+                at_id = str(message_this.data.get('id', ''))
+                if at_id == 'all':
+                    message_items.append(('text', '<qqbot-at-everyone />'))
+                elif at_id != '':
+                    message_items.append((
+                        'text',
+                        '<qqbot-at-user id="' + at_id + '" />'
+                    ))
             elif isinstance(message_this, media_types):
                 message_items.append(('media', message_this))
 
@@ -1128,6 +1213,7 @@ class event_action(object):
         for message_this in message.data:
             if isinstance(message_this, (
                 OlivOS.messageAPI.PARA.text,
+                OlivOS.messageAPI.PARA.at,
                 OlivOS.messageAPI.PARA.image
             )):
                 image_message_buffer.append(message_this)

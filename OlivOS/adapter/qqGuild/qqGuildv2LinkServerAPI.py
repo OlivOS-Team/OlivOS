@@ -80,6 +80,10 @@ class server(OlivOS.API.Proc_templet):
                     'GROUP_AT_MESSAGE_CREATE',
                     'GROUP_MESSAGE_CREATE',
                     'C2C_MESSAGE_CREATE',
+                    'GROUP_ADD_ROBOT',
+                    'GROUP_DEL_ROBOT',
+                    'GROUP_MEMBER_ADD',
+                    'GROUP_MEMBER_REMOVE',
                     'READY'
                 ]:
                     sdk_event = OlivOS.qqGuildv2SDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
