@@ -32,6 +32,11 @@ import OlivOS
 
 modelName = 'qqGuildv2SDK'
 
+qqTextChainAtUserReg = re.compile(
+    r'<qqbot-at-user\s+id=["\']([^"\']+)["\']\s*/>'
+)
+qqTextChainAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
+
 
 class intents_T(IntEnum):
     GUILDS = (1 << 0)  # 频道变更
@@ -734,12 +739,42 @@ def _get_message_attachments(attachments):
 
 # 将 QQ 新文本链的 @ 标签转换为 OlivOS 现有的统一消息段解析格式。
 def _normalize_qq_text_chain(content):
-    content = re.sub(
-        r'<qqbot-at-user\s+id=["\']([^"\']+)["\']\s*/>',
+    content = qqTextChainAtUserReg.sub(
         lambda match: '<@!' + match.group(1) + '>',
         content
     )
-    return re.sub(r'<qqbot-at-everyone\s*/>', '<@&all>', content)
+    return qqTextChainAtEveryoneReg.sub('<@&all>', content)
+
+
+def _set_qq_group_member_event(
+    target_event,
+    event_data,
+    flag_increase,
+    operator_id,
+    user_id,
+    action
+):
+    target_event.active = True
+    if flag_increase:
+        target_event.plugin_info['func_type'] = 'group_member_increase'
+        target_event.data = target_event.group_member_increase(
+            str(event_data.get('group_openid', '')),
+            str(operator_id),
+            str(user_id),
+            action=action
+        )
+    else:
+        target_event.plugin_info['func_type'] = 'group_member_decrease'
+        target_event.data = target_event.group_member_decrease(
+            str(event_data.get('group_openid', '')),
+            str(operator_id),
+            str(user_id),
+            action=action
+        )
+    target_event.data.extend = {
+        'flag_from_qq': True,
+        'timestamp': event_data.get('timestamp', None)
+    }
 
 
 def get_Event_from_SDK(target_event):
@@ -788,57 +823,31 @@ def get_Event_from_SDK(target_event):
         'GROUP_DEL_ROBOT'
     ]:
         event_data = target_event.sdk_event.payload.data.d
-        group_openid = str(event_data.get('group_openid', ''))
         operator_openid = str(event_data.get('op_member_openid', ''))
-        target_event.active = True
-        if target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT':
-            target_event.plugin_info['func_type'] = 'group_member_increase'
-            target_event.data = target_event.group_member_increase(
-                group_openid,
-                operator_openid,
-                target_event.base_info['self_id'],
-                action='invite'
-            )
-        else:
-            target_event.plugin_info['func_type'] = 'group_member_decrease'
-            target_event.data = target_event.group_member_decrease(
-                group_openid,
-                operator_openid,
-                target_event.base_info['self_id'],
-                action='kick_me'
-            )
-        target_event.data.extend = {
-            'flag_from_qq': True,
-            'timestamp': event_data.get('timestamp', None)
-        }
+        flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT'
+        _set_qq_group_member_event(
+            target_event,
+            event_data,
+            flag_increase,
+            operator_openid,
+            target_event.base_info['self_id'],
+            'invite' if flag_increase else 'kick_me'
+        )
     elif target_event.sdk_event.payload.data.t in [
         'GROUP_MEMBER_ADD',
         'GROUP_MEMBER_REMOVE'
     ]:
         event_data = target_event.sdk_event.payload.data.d
-        group_openid = str(event_data.get('group_openid', ''))
         member_openid = str(event_data.get('member_openid', ''))
-        target_event.active = True
-        if target_event.sdk_event.payload.data.t == 'GROUP_MEMBER_ADD':
-            target_event.plugin_info['func_type'] = 'group_member_increase'
-            target_event.data = target_event.group_member_increase(
-                group_openid,
-                member_openid,
-                member_openid,
-                action='approve'
-            )
-        else:
-            target_event.plugin_info['func_type'] = 'group_member_decrease'
-            target_event.data = target_event.group_member_decrease(
-                group_openid,
-                member_openid,
-                member_openid,
-                action='leave'
-            )
-        target_event.data.extend = {
-            'flag_from_qq': True,
-            'timestamp': event_data.get('timestamp', None)
-        }
+        flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_MEMBER_ADD'
+        _set_qq_group_member_event(
+            target_event,
+            event_data,
+            flag_increase,
+            member_openid,
+            member_openid,
+            'approve' if flag_increase else 'leave'
+        )
     elif target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
@@ -1182,16 +1191,17 @@ class event_action(object):
                 message_chunks.append((text_buffer, None))
         return message_chunks
 
-    def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
-        msg_id = reply_msg_id
-        if msg_id is None and type(target_event.sdk_event) is event:
-            msg_id = target_event.sdk_event.payload.data.d.get('id', None)
-
+    def _get_qq_message_send_chunks(message):
         media_types = (
             OlivOS.messageAPI.PARA.image,
             OlivOS.messageAPI.PARA.video,
             OlivOS.messageAPI.PARA.record,
             OlivOS.messageAPI.PARA.file
+        )
+        bindable_types = (
+            OlivOS.messageAPI.PARA.text,
+            OlivOS.messageAPI.PARA.at,
+            OlivOS.messageAPI.PARA.image
         )
         message_chunks = []
         image_message_buffer = []
@@ -1209,21 +1219,22 @@ class event_action(object):
             ))
             image_message_buffer.clear()
 
-        # 图片可与相邻文字组成图文消息；视频、语音和文件得保持原顺序单独发送。
         for message_this in message.data:
-            if isinstance(message_this, (
-                OlivOS.messageAPI.PARA.text,
-                OlivOS.messageAPI.PARA.at,
-                OlivOS.messageAPI.PARA.image
-            )):
+            if isinstance(message_this, bindable_types):
                 image_message_buffer.append(message_this)
             elif isinstance(message_this, media_types):
                 flush_image_message_buffer()
                 message_chunks.append(('', message_this))
         flush_image_message_buffer()
+        return message_chunks
+
+    def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
+        msg_id = reply_msg_id
+        if msg_id is None and type(target_event.sdk_event) is event:
+            msg_id = target_event.sdk_event.payload.data.d.get('id', None)
 
         failed_text_buffer = ''
-        for text_content, message_this in message_chunks:
+        for text_content, message_this in event_action._get_qq_message_send_chunks(message):
             text_content = failed_text_buffer + text_content
             if message_this is None:
                 event_action._send_qq_payload(
