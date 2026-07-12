@@ -1107,8 +1107,36 @@ class event_action(object):
             OlivOS.messageAPI.PARA.record,
             OlivOS.messageAPI.PARA.file
         ]
+        message_chunks = []
+        image_message_buffer = []
+
+        def flush_image_message_buffer():
+            if len(image_message_buffer) == 0:
+                return
+            image_message = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                image_message_buffer.copy()
+            )
+            message_chunks.extend(event_action._get_message_send_chunks(
+                image_message,
+                [OlivOS.messageAPI.PARA.image]
+            ))
+            image_message_buffer.clear()
+
+        # 图片可与相邻文字组成图文消息；视频、语音和文件得保持原顺序单独发送。
+        for message_this in message.data:
+            if type(message_this) in [
+                OlivOS.messageAPI.PARA.text,
+                OlivOS.messageAPI.PARA.image
+            ]:
+                image_message_buffer.append(message_this)
+            elif type(message_this) in media_types:
+                flush_image_message_buffer()
+                message_chunks.append(('', message_this))
+        flush_image_message_buffer()
+
         failed_text_buffer = ''
-        for text_content, message_this in event_action._get_message_send_chunks(message, media_types):
+        for text_content, message_this in message_chunks:
             text_content = failed_text_buffer + text_content
             if message_this is None:
                 event_action._send_qq_payload(
@@ -1130,6 +1158,17 @@ class event_action(object):
                 type_path = 'files'
             else:
                 continue
+            bind_content = type(message_this) is OlivOS.messageAPI.PARA.image
+            if not bind_content and text_content != '':
+                event_action._send_qq_payload(
+                    target_event,
+                    chat_id,
+                    text_content,
+                    msg_id,
+                    flag_direct=flag_direct
+                )
+                text_content = ''
+                failed_text_buffer = ''
             resource_url = event_action._get_message_resource(message_this)
             if resource_url is None:
                 failed_text_buffer = text_content
@@ -1151,7 +1190,8 @@ class event_action(object):
                 text_content,
                 msg_id,
                 flag_direct=flag_direct,
-                file_info=file_info
+                file_info=file_info,
+                bind_content=bind_content
             )
             failed_text_buffer = ''
 
@@ -1165,14 +1205,22 @@ class event_action(object):
                 flag_direct=flag_direct
             )
 
-    def _send_qq_payload(target_event, chat_id, content, msg_id, flag_direct=False, file_info=None):
+    def _send_qq_payload(
+        target_event,
+        chat_id,
+        content,
+        msg_id,
+        flag_direct=False,
+        file_info=None,
+        bind_content=True
+    ):
         if flag_direct:
             this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.openid = str(chat_id)
         else:
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.group_openid = str(chat_id)
-        this_msg.data.content = content
+        this_msg.data.content = content if file_info is None or bind_content else None
         this_msg.data.msg_id = msg_id
         if file_info is None:
             this_msg.data.msg_type = 0
