@@ -1056,14 +1056,15 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     # 按首个有效消息段确定图文方向，并将每个富媒体与相邻文字分组
     def _get_message_send_chunks(message, media_types):
+        media_types = tuple(media_types)
         message_items = []
         for message_this in message.data:
-            if type(message_this) is OlivOS.messageAPI.PARA.text:
+            if isinstance(message_this, OlivOS.messageAPI.PARA.text):
                 text_content = message_this.OP()
                 # 空文字段不应改变整条消息按图片开头还是按文字开头分组。
                 if text_content != '':
                     message_items.append(('text', text_content))
-            elif type(message_this) in media_types:
+            elif isinstance(message_this, media_types):
                 message_items.append(('media', message_this))
 
         if len(message_items) == 0:
@@ -1101,12 +1102,12 @@ class event_action(object):
         if msg_id is None and type(target_event.sdk_event) is event:
             msg_id = target_event.sdk_event.payload.data.d.get('id', None)
 
-        media_types = [
+        media_types = (
             OlivOS.messageAPI.PARA.image,
             OlivOS.messageAPI.PARA.video,
             OlivOS.messageAPI.PARA.record,
             OlivOS.messageAPI.PARA.file
-        ]
+        )
         message_chunks = []
         image_message_buffer = []
 
@@ -1125,12 +1126,12 @@ class event_action(object):
 
         # 图片可与相邻文字组成图文消息；视频、语音和文件得保持原顺序单独发送。
         for message_this in message.data:
-            if type(message_this) in [
+            if isinstance(message_this, (
                 OlivOS.messageAPI.PARA.text,
                 OlivOS.messageAPI.PARA.image
-            ]:
+            )):
                 image_message_buffer.append(message_this)
-            elif type(message_this) in media_types:
+            elif isinstance(message_this, media_types):
                 flush_image_message_buffer()
                 message_chunks.append(('', message_this))
         flush_image_message_buffer()
@@ -1148,17 +1149,17 @@ class event_action(object):
                 )
                 failed_text_buffer = ''
                 continue
-            if type(message_this) is OlivOS.messageAPI.PARA.image:
+            if isinstance(message_this, OlivOS.messageAPI.PARA.image):
                 type_path = 'images'
-            elif type(message_this) is OlivOS.messageAPI.PARA.video:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.video):
                 type_path = 'videos'
-            elif type(message_this) is OlivOS.messageAPI.PARA.record:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.record):
                 type_path = 'audios'
-            elif type(message_this) is OlivOS.messageAPI.PARA.file:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.file):
                 type_path = 'files'
             else:
                 continue
-            bind_content = type(message_this) is OlivOS.messageAPI.PARA.image
+            bind_content = isinstance(message_this, OlivOS.messageAPI.PARA.image)
             if not bind_content and text_content != '':
                 event_action._send_qq_payload(
                     target_event,
