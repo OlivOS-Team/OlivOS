@@ -32,6 +32,11 @@ import OlivOS
 
 modelName = 'qqGuildv2SDK'
 
+qqTextChainAtUserReg = re.compile(
+    r'<qqbot-at-user\s+id=["\']([^"\']+)["\']\s*/>'
+)
+qqTextChainAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
+
 
 class intents_T(IntEnum):
     GUILDS = (1 << 0)  # 频道变更
@@ -45,6 +50,7 @@ class intents_T(IntEnum):
     AUDIO_ACTION = (1 << 29)  # 语音消息
     PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
     PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
+    PUBLIC_QQ_GROUP_MEMBERS = (1 << 24)  # QQ 群成员进退群事件
 
 
 sdkAPIHost = {
@@ -189,6 +195,7 @@ class PAYLOAD(object):
             elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
                 tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
+                tmp_intents |= int(intents_T.PUBLIC_QQ_GROUP_MEMBERS)
             elif bot_info.model in ['public_guild_only']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
@@ -730,6 +737,46 @@ def _get_message_attachments(attachments):
     return message_list
 
 
+# 将 QQ 新文本链的 @ 标签转换为 OlivOS 现有的统一消息段解析格式。
+def _normalize_qq_text_chain(content):
+    content = qqTextChainAtUserReg.sub(
+        lambda match: '<@!' + match.group(1) + '>',
+        content
+    )
+    return qqTextChainAtEveryoneReg.sub('<@&all>', content)
+
+
+def _set_qq_group_member_event(
+    target_event,
+    event_data,
+    flag_increase,
+    operator_id,
+    user_id,
+    action
+):
+    target_event.active = True
+    if flag_increase:
+        target_event.plugin_info['func_type'] = 'group_member_increase'
+        target_event.data = target_event.group_member_increase(
+            str(event_data.get('group_openid', '')),
+            str(operator_id),
+            str(user_id),
+            action=action
+        )
+    else:
+        target_event.plugin_info['func_type'] = 'group_member_decrease'
+        target_event.data = target_event.group_member_decrease(
+            str(event_data.get('group_openid', '')),
+            str(operator_id),
+            str(user_id),
+            action=action
+        )
+    target_event.data.extend = {
+        'flag_from_qq': True,
+        'timestamp': event_data.get('timestamp', None)
+    }
+
+
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
@@ -772,6 +819,36 @@ def get_Event_from_SDK(target_event):
         ):
             sdkSelfInfo[plugin_event_bot_hash] = target_event.sdk_event.payload.data.d['user']
     elif target_event.sdk_event.payload.data.t in [
+        'GROUP_ADD_ROBOT',
+        'GROUP_DEL_ROBOT'
+    ]:
+        event_data = target_event.sdk_event.payload.data.d
+        operator_openid = str(event_data.get('op_member_openid', ''))
+        flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT'
+        _set_qq_group_member_event(
+            target_event,
+            event_data,
+            flag_increase,
+            operator_openid,
+            target_event.base_info['self_id'],
+            'invite' if flag_increase else 'kick_me'
+        )
+    elif target_event.sdk_event.payload.data.t in [
+        'GROUP_MEMBER_ADD',
+        'GROUP_MEMBER_REMOVE'
+    ]:
+        event_data = target_event.sdk_event.payload.data.d
+        member_openid = str(event_data.get('member_openid', ''))
+        flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_MEMBER_ADD'
+        _set_qq_group_member_event(
+            target_event,
+            event_data,
+            flag_increase,
+            member_openid,
+            member_openid,
+            'approve' if flag_increase else 'leave'
+        )
+    elif target_event.sdk_event.payload.data.t in [
         'GROUP_AT_MESSAGE_CREATE',
         'GROUP_MESSAGE_CREATE'
     ]:
@@ -780,7 +857,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -864,7 +943,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -932,7 +1013,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1001,7 +1084,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.payload.data.d['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    target_event.sdk_event.payload.data.d['content'].lstrip(' ')
+                    _normalize_qq_text_chain(
+                        target_event.sdk_event.payload.data.d['content']
+                    ).lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1056,14 +1141,24 @@ def get_Event_from_SDK(target_event):
 class event_action(object):
     # 按首个有效消息段确定图文方向，并将每个富媒体与相邻文字分组
     def _get_message_send_chunks(message, media_types):
+        media_types = tuple(media_types)
         message_items = []
         for message_this in message.data:
-            if type(message_this) is OlivOS.messageAPI.PARA.text:
+            if isinstance(message_this, OlivOS.messageAPI.PARA.text):
                 text_content = message_this.OP()
                 # 空文字段不应改变整条消息按图片开头还是按文字开头分组。
                 if text_content != '':
                     message_items.append(('text', text_content))
-            elif type(message_this) in media_types:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.at):
+                at_id = str(message_this.data.get('id', ''))
+                if at_id == 'all':
+                    message_items.append(('text', '<qqbot-at-everyone />'))
+                elif at_id != '':
+                    message_items.append((
+                        'text',
+                        '<qqbot-at-user id="' + at_id + '" />'
+                    ))
+            elif isinstance(message_this, media_types):
                 message_items.append(('media', message_this))
 
         if len(message_items) == 0:
@@ -1096,19 +1191,50 @@ class event_action(object):
                 message_chunks.append((text_buffer, None))
         return message_chunks
 
+    def _get_qq_message_send_chunks(message):
+        media_types = (
+            OlivOS.messageAPI.PARA.image,
+            OlivOS.messageAPI.PARA.video,
+            OlivOS.messageAPI.PARA.record,
+            OlivOS.messageAPI.PARA.file
+        )
+        bindable_types = (
+            OlivOS.messageAPI.PARA.text,
+            OlivOS.messageAPI.PARA.at,
+            OlivOS.messageAPI.PARA.image
+        )
+        message_chunks = []
+        image_message_buffer = []
+
+        def flush_image_message_buffer():
+            if len(image_message_buffer) == 0:
+                return
+            image_message = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                image_message_buffer.copy()
+            )
+            message_chunks.extend(event_action._get_message_send_chunks(
+                image_message,
+                [OlivOS.messageAPI.PARA.image]
+            ))
+            image_message_buffer.clear()
+
+        for message_this in message.data:
+            if isinstance(message_this, bindable_types):
+                image_message_buffer.append(message_this)
+            elif isinstance(message_this, media_types):
+                flush_image_message_buffer()
+                message_chunks.append(('', message_this))
+        flush_image_message_buffer()
+        return message_chunks
+
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         msg_id = reply_msg_id
         if msg_id is None and type(target_event.sdk_event) is event:
             msg_id = target_event.sdk_event.payload.data.d.get('id', None)
 
-        media_types = [
-            OlivOS.messageAPI.PARA.image,
-            OlivOS.messageAPI.PARA.video,
-            OlivOS.messageAPI.PARA.record,
-            OlivOS.messageAPI.PARA.file
-        ]
         failed_text_buffer = ''
-        for text_content, message_this in event_action._get_message_send_chunks(message, media_types):
+        for text_content, message_this in event_action._get_qq_message_send_chunks(message):
             text_content = failed_text_buffer + text_content
             if message_this is None:
                 event_action._send_qq_payload(
@@ -1120,16 +1246,27 @@ class event_action(object):
                 )
                 failed_text_buffer = ''
                 continue
-            if type(message_this) is OlivOS.messageAPI.PARA.image:
+            if isinstance(message_this, OlivOS.messageAPI.PARA.image):
                 type_path = 'images'
-            elif type(message_this) is OlivOS.messageAPI.PARA.video:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.video):
                 type_path = 'videos'
-            elif type(message_this) is OlivOS.messageAPI.PARA.record:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.record):
                 type_path = 'audios'
-            elif type(message_this) is OlivOS.messageAPI.PARA.file:
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.file):
                 type_path = 'files'
             else:
                 continue
+            bind_content = isinstance(message_this, OlivOS.messageAPI.PARA.image)
+            if not bind_content and text_content != '':
+                event_action._send_qq_payload(
+                    target_event,
+                    chat_id,
+                    text_content,
+                    msg_id,
+                    flag_direct=flag_direct
+                )
+                text_content = ''
+                failed_text_buffer = ''
             resource_url = event_action._get_message_resource(message_this)
             if resource_url is None:
                 failed_text_buffer = text_content
@@ -1151,7 +1288,8 @@ class event_action(object):
                 text_content,
                 msg_id,
                 flag_direct=flag_direct,
-                file_info=file_info
+                file_info=file_info,
+                bind_content=bind_content
             )
             failed_text_buffer = ''
 
@@ -1165,14 +1303,22 @@ class event_action(object):
                 flag_direct=flag_direct
             )
 
-    def _send_qq_payload(target_event, chat_id, content, msg_id, flag_direct=False, file_info=None):
+    def _send_qq_payload(
+        target_event,
+        chat_id,
+        content,
+        msg_id,
+        flag_direct=False,
+        file_info=None,
+        bind_content=True
+    ):
         if flag_direct:
             this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.openid = str(chat_id)
         else:
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.group_openid = str(chat_id)
-        this_msg.data.content = content
+        this_msg.data.content = content if file_info is None or bind_content else None
         this_msg.data.msg_id = msg_id
         if file_info is None:
             this_msg.data.msg_type = 0
