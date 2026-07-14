@@ -1356,12 +1356,13 @@ class event_action(object):
         res_text = str(api_obj.res) if api_obj.res is not None else 'no response'
         if len(res_text) > 1000:
             res_text = res_text[:1000] + '...'
+        res_code_text = 'n/a' if api_obj.res_code is None else str(api_obj.res_code)
         target_event.log_func(
             2 if flag_success else 3,
             'OlivOS qqGuildv2SDK QQ %s %s message response: HTTP %s %s' % (
                 chat_type,
                 send_mode,
-                str(api_obj.res_code),
+                res_code_text,
                 res_text
             ),
             [
