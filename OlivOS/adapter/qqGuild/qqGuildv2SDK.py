@@ -243,6 +243,7 @@ class api_templet(object):
         self.port = 443
         self.route = None
         self.res = None
+        self.res_code = None
 
     def __switch_host(self):
         if self.bot_info.model in ['sandbox', 'sandbox_intents']:
@@ -276,6 +277,7 @@ class api_templet(object):
                 msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
+            self.res_code = msg_res.status_code
             return msg_res.text
         except Exception:
             return None
@@ -312,6 +314,7 @@ class api_templet(object):
                 msg_res = req.request("DELETE", send_url, headers=headers)
 
             self.res = msg_res.text
+            self.res_code = msg_res.status_code
             # print(self.res)
             return msg_res.text
         except Exception:
@@ -1230,8 +1233,6 @@ class event_action(object):
 
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         msg_id = reply_msg_id
-        if msg_id is None and type(target_event.sdk_event) is event:
-            msg_id = target_event.sdk_event.payload.data.d.get('id', None)
 
         failed_text_buffer = ''
         for text_content, message_this in event_action._get_qq_message_send_chunks(message):
@@ -1328,7 +1329,47 @@ class event_action(object):
             this_msg.data.media = {'file_info': file_info}
         if msg_id is not None:
             this_msg.data.msg_seq = get_msgid(str(msg_id))
-        return this_msg.do_api()
+        api_res = this_msg.do_api()
+        event_action._log_qq_send_result(
+            target_event,
+            this_msg,
+            msg_id,
+            flag_direct=flag_direct
+        )
+        return api_res
+
+    def _log_qq_send_result(target_event, api_obj, msg_id, flag_direct=False):
+        if target_event.log_func is None:
+            return
+        res_obj = init_api_json(api_obj.res)
+        api_code = res_obj.get('code', None) if type(res_obj) is dict else None
+        flag_success = (
+            api_obj.res_code is not None
+            and 200 <= api_obj.res_code < 300
+            and api_code in [None, 0]
+        )
+        # 被动回复沿用现有简洁日志；主动消息额外记录平台结果，便于排查权限和审核问题。
+        if flag_success and msg_id is not None:
+            return
+        send_mode = 'active' if msg_id is None else 'reply'
+        chat_type = 'direct' if flag_direct else 'group'
+        res_text = str(api_obj.res) if api_obj.res is not None else 'no response'
+        if len(res_text) > 1000:
+            res_text = res_text[:1000] + '...'
+        target_event.log_func(
+            2 if flag_success else 3,
+            'OlivOS qqGuildv2SDK QQ %s %s message response: HTTP %s %s' % (
+                chat_type,
+                send_mode,
+                str(api_obj.res_code),
+                res_text
+            ),
+            [
+                (target_event.getBotIDStr(), 'default'),
+                (modelName, 'default'),
+                ('send_qq_msg', 'callback')
+            ]
+        )
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         # 频道图片沿用 QQ 图文的双向分组规则。
