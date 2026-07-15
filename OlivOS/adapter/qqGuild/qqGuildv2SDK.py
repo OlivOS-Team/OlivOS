@@ -251,6 +251,8 @@ class api_templet(object):
                 self.host = sdkAPIHost['sandbox']
 
     def do_api_plant(self, req_type='POST'):
+        self.res = None
+        self.res_code = None
         try:
             self.__switch_host()
             tmp_payload_dict = {}
@@ -283,6 +285,8 @@ class api_templet(object):
             return None
 
     def do_api(self, req_type='POST'):
+        self.res = None
+        self.res_code = None
         try:
             self.__switch_host()
             tmp_payload_dict = {}
