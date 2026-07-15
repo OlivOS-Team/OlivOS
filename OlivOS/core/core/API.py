@@ -23,8 +23,10 @@ import traceback
 import inspect
 import ctypes
 import html
+import os
 
 from functools import wraps
+from urllib import parse
 
 import OlivOS
 from OlivOS.core.info.infoAPI import OlivOS_Version  # noqa
@@ -754,6 +756,99 @@ class Event(object):
             tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
         return [tmp_message, tmp_message_obj]
 
+    def __support_file_segment_upload(self, send_type, host_id=None):
+        if send_type not in ['private', 'group']:
+            return False
+        if host_id is not None:
+            return False
+        if self.platform['sdk'] == 'milky':
+            return self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList
+        if self.platform['sdk'] != 'onebot':
+            return False
+        return (
+            self.platform['model'] in OlivOS.flaskServerAPI.gCheckList
+            or self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList
+            or self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList
+        )
+
+    def __get_file_segment_data(self, message_para):
+        file_data = message_para.data
+        if not isinstance(file_data, dict):
+            return None, None
+        file_resource = None
+        for data_key in ['path', 'url', 'file']:
+            data_value = file_data.get(data_key)
+            if data_value is None:
+                continue
+            data_value = str(data_value)
+            if data_value not in ['', 'None']:
+                file_resource = data_value
+                break
+        if file_resource is None:
+            return None, None
+
+        resource_parsed = parse.urlparse(file_resource)
+        if resource_parsed.scheme == '' and not os.path.isabs(file_resource):
+            file_resource = OlivOS.contentAPI.resourcePathTransform('files', file_resource)
+
+        file_name = file_data.get('name')
+        if file_name is not None and str(file_name) not in ['', 'None']:
+            return file_resource, str(file_name)
+        resource_parsed = parse.urlparse(file_resource)
+        if resource_parsed.scheme in ['base64', 'data']:
+            return file_resource, 'file'
+        resource_path = parse.unquote(resource_parsed.path)
+        file_name = resource_path.replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
+        if file_name == '':
+            file_name = 'file'
+        return file_resource, file_name
+
+    def __send_file_segments(self, send_type, target_id, message_obj, host_id=None, flag_log=True):
+        if not self.__support_file_segment_upload(send_type, host_id):
+            return False
+        if not any(isinstance(para, OlivOS.messageAPI.PARA.file) for para in message_obj.data):
+            return False
+
+        message_buffer = []
+
+        def flush_message_buffer():
+            if len(message_buffer) == 0:
+                return
+            message_chunk = OlivOS.messageAPI.Message_templet('olivos_para', message_buffer.copy())
+            self.__send(
+                send_type,
+                target_id,
+                message_chunk,
+                host_id=host_id,
+                flag_log=flag_log
+            )
+            message_buffer.clear()
+
+        for message_para in message_obj.data:
+            if not isinstance(message_para, OlivOS.messageAPI.PARA.file):
+                message_buffer.append(message_para)
+                continue
+            flush_message_buffer()
+            file_resource, file_name = self.__get_file_segment_data(message_para)
+            if file_resource is None:
+                continue
+            if send_type == 'group':
+                self.__upload_group_file(
+                    target_id,
+                    file_resource,
+                    name=file_name,
+                    flag_log=flag_log
+                )
+            else:
+                self.__upload_private_file(
+                    target_id,
+                    file_resource,
+                    file_name,
+                    flag_log=flag_log
+                )
+        flush_message_buffer()
+        return True
+
     def __reply(self, message, flag_log=True):
         flag_type = None
         tmp_message = None
@@ -881,6 +976,14 @@ class Event(object):
         tmp_message_log = None
         [tmp_message, tmp_message_obj] = self.__message_router(message)
         if tmp_message is None:
+            return
+        if self.__send_file_segments(
+            flag_type,
+            target_id,
+            tmp_message_obj,
+            host_id=host_id,
+            flag_log=flag_log
+        ):
             return
         if self.platform['sdk'] == 'terminal_link':
             OlivOS.virtualTerminalSDK.event_action.send_msg(

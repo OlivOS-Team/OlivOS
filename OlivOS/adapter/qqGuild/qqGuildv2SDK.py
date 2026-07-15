@@ -1199,6 +1199,7 @@ class event_action(object):
             OlivOS.messageAPI.PARA.image,
             OlivOS.messageAPI.PARA.video,
             OlivOS.messageAPI.PARA.record,
+            OlivOS.messageAPI.PARA.music,
             OlivOS.messageAPI.PARA.file
         )
         bindable_types = (
@@ -1252,6 +1253,8 @@ class event_action(object):
             elif isinstance(message_this, OlivOS.messageAPI.PARA.video):
                 type_path = 'videos'
             elif isinstance(message_this, OlivOS.messageAPI.PARA.record):
+                type_path = 'audios'
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.music):
                 type_path = 'audios'
             elif isinstance(message_this, OlivOS.messageAPI.PARA.file):
                 type_path = 'files'
@@ -1489,14 +1492,21 @@ class event_action(object):
         this_msg.metadata.message_id = str(message_id)
         return this_msg.do_api('DELETE')
 
-    # 优先使用消息段中的 URL，其次使用本地 path/file
+    # 富媒体优先使用 URL；自定义音乐使用 audio 字段中的实际音频资源。
     def _get_message_resource(message_para):
         if message_para.data is None:
             return None
-        for data_key in ['url', 'path', 'file']:
+        if isinstance(message_para, OlivOS.messageAPI.PARA.music):
+            resource_keys = ['audio']
+        else:
+            resource_keys = ['path', 'url', 'file']
+        for data_key in resource_keys:
             data_value = message_para.data.get(data_key, None)
-            if data_value is not None and str(data_value) != '':
-                return str(data_value)
+            if data_value is None:
+                continue
+            data_value = str(data_value)
+            if data_value not in ['', 'None']:
+                return data_value
         return None
 
     # 读取 OlivOS 支持的 base64、data URI、file URI 或本地资源
@@ -1545,8 +1555,8 @@ class event_action(object):
         target_event,
         url: str,
         chat_id,
-        type_path: str = 'images',
-        type_chat: str = 'qq_groups'
+        type_path: str,
+        type_chat: str
     ):
         res = None
         file_type_map = {

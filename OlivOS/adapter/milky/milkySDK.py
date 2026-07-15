@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import OlivOS
 
+import base64
 import os
 import time
 import uuid
@@ -893,6 +894,32 @@ class event(object):
         return raw
 
 
+def _format_file_uri(file: str) -> str:
+    if not isinstance(file, str):
+        return file
+    file_parsed = parse.urlparse(file)
+    if file_parsed.scheme.lower() in ['file', 'http', 'https', 'base64']:
+        return file
+    if file_parsed.scheme.lower() == 'data' and ',' in file:
+        data_meta, data_raw = file.split(',', 1)
+        if data_meta.endswith(';base64'):
+            return 'base64://' + data_raw
+        return 'base64://' + base64.b64encode(
+            parse.unquote_to_bytes(data_raw)
+        ).decode('ascii')
+    flag_local_absolute = (
+        os.path.isabs(file)
+        or (len(file) > 1 and file[1] == ':')
+        or file.startswith('\\\\')
+    )
+    if not flag_local_absolute and file_parsed.scheme != '':
+        return file
+    file_path = file
+    if not flag_local_absolute:
+        file_path = OlivOS.contentAPI.resourcePathTransform('files', file_path)
+    return Path(file_path).absolute().as_uri()
+
+
 class event_action(object):
     """支持OlivOS API调用的方法实现"""
 
@@ -1612,7 +1639,7 @@ class event_action(object):
         folder_id = folder_id if folder_id else '/'
         Action = API.upload_group_file(
             group_id=group_id,
-            file_uri=file,
+            file_uri=_format_file_uri(file),
             file_name=name,
             parent_folder_id=folder_id,
         )
@@ -1758,7 +1785,7 @@ class event_action(object):
         user_id = int(user_id)
         Action = API.upload_private_file(
             user_id=user_id,
-            file_uri=file,
+            file_uri=_format_file_uri(file),
             file_name=name,
         )
         Action.call(bot_hash, control_queue)

@@ -593,7 +593,10 @@ class Message_templet(object):
                     elif tmp_data_type_key == 'file':
                         tmp_para_this = PARA.file(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], None))
+                            path=self.get_from_dict(tmp_code_data_dict, ['path'], None),
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], None)),
+                            name=self.get_from_dict(tmp_code_data_dict, ['name'], None),
+                            size=self.get_from_dict(tmp_code_data_dict, ['size'], None)
                         )
                     elif tmp_data_type_key == 'rps':
                         tmp_para_this = PARA.rps()
