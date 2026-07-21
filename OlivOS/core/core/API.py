@@ -173,6 +173,8 @@ class Event(object):
         self.indeAPI = inde_interface_T(self, self.platform['platform'])
         if self.platform['sdk'] == 'kaiheila_link':
             self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
+        if self.platform['sdk'] == 'qqGuildv2_link':
+            self.indeAPI = OlivOS.qqGuildv2SDK.inde_interface(self, self.platform['platform'])
         if self.platform['sdk'] == 'mhyVila_link':
             self.indeAPI = OlivOS.mhyVilaSDK.inde_interface(self, self.platform['platform'])
 

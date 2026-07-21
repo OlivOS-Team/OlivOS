@@ -139,6 +139,7 @@ class payload_template(object):
 
     class data_T(object):
         def __init__(self):
+            self.id = None
             self.op = None
             self.d = None
             self.s = None
@@ -155,6 +156,11 @@ class payload_template(object):
     def load(self, data, is_rx):
         if data is not None:
             if type(data) is dict:
+                if 'id' in data:
+                    if type(data['id']) is str:
+                        self.data.id = data['id']
+                    else:
+                        self.active = False
                 if 'op' in data:
                     if type(data['op']) is int:
                         self.data.op = data['op']
@@ -1143,6 +1149,15 @@ def get_Event_from_SDK(target_event):
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
+    event_id = target_event.sdk_event.payload.data.id
+    if (
+        target_event.active
+        and event_id is not None
+        and hasattr(target_event.data, 'extend')
+        and type(target_event.data.extend) is dict
+    ):
+        target_event.data.extend['event_id'] = str(event_id)
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
@@ -1310,6 +1325,108 @@ class event_action(object):
                 msg_id,
                 flag_direct=flag_direct
             )
+
+    def create_markdown_message(
+        target_event,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None
+    ):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data']['chat_type'] = str(chat_type)
+        res_data['data']['chat_id'] = None if chat_id is None else str(chat_id)
+
+        if chat_type not in ['qq_group', 'qq_private', 'guild_channel', 'guild_private']:
+            res_data['data']['error'] = 'unsupported chat_type'
+            return res_data
+        if chat_id is None or str(chat_id) == '':
+            res_data['data']['error'] = 'chat_id is required'
+            return res_data
+        if type(markdown) is not dict or len(markdown) == 0:
+            res_data['data']['error'] = 'markdown must be a non-empty dict'
+            return res_data
+
+        flag_content = (
+            type(markdown.get('content', None)) is str
+            and markdown.get('content', '') != ''
+        )
+        flag_template = (
+            type(markdown.get('custom_template_id', None)) is str
+            and markdown.get('custom_template_id', '') != ''
+        )
+        if flag_content == flag_template:
+            res_data['data']['error'] = 'markdown requires either content or custom_template_id'
+            return res_data
+        if 'params' in markdown and type(markdown['params']) is not list:
+            res_data['data']['error'] = 'markdown params must be a list'
+            return res_data
+        if keyboard is not None and type(keyboard) is not dict:
+            res_data['data']['error'] = 'keyboard must be a dict'
+            return res_data
+        if msg_id is not None and event_id is not None:
+            res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
+            return res_data
+
+        this_msg = None
+        if chat_type == 'qq_group':
+            this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.group_openid = str(chat_id)
+            this_msg.data.msg_type = 2
+        elif chat_type == 'qq_private':
+            this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.openid = str(chat_id)
+            this_msg.data.msg_type = 2
+        elif chat_type == 'guild_channel':
+            this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.channel_id = str(chat_id)
+        elif chat_type == 'guild_private':
+            this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.guild_id = str(chat_id)
+
+        this_msg.data.markdown = markdown
+        this_msg.data.keyboard = keyboard
+        this_msg.data.msg_id = None if msg_id is None else str(msg_id)
+        this_msg.data.event_id = None if event_id is None else str(event_id)
+        if msg_id is not None and chat_type in ['qq_group', 'qq_private']:
+            this_msg.data.msg_seq = get_msgid(str(msg_id))
+
+        api_res = this_msg.do_api()
+        raw_obj = init_api_json(api_res)
+        api_code = raw_obj.get('code', None) if type(raw_obj) is dict else None
+        res_data['active'] = (
+            this_msg.res_code is not None
+            and 200 <= this_msg.res_code < 300
+            and api_code in [None, 0]
+        )
+        res_data['data']['response'] = raw_obj if raw_obj is not None else api_res
+        if type(raw_obj) is dict:
+            message_id = raw_obj.get('id', None)
+            if message_id is None and type(raw_obj.get('data', None)) is dict:
+                message_id = raw_obj['data'].get('id', None)
+            if message_id is not None:
+                res_data['data']['message_id'] = str(message_id)
+
+        if not res_data['active'] and target_event.log_func is not None:
+            response_text = str(api_res) if api_res is not None else 'no response'
+            if len(response_text) > 1000:
+                response_text = response_text[:1000] + '...'
+            response_code = 'n/a' if this_msg.res_code is None else str(this_msg.res_code)
+            target_event.log_func(
+                3,
+                (
+                    'OlivOS qqGuildv2SDK Markdown message response: '
+                    f'HTTP {response_code} {response_text}'
+                ),
+                [
+                    (target_event.getBotIDStr(), 'default'),
+                    (modelName, 'default'),
+                    ('create_markdown_message', 'callback')
+                ]
+            )
+        return res_data
 
     def _send_qq_payload(
         target_event,
@@ -1598,6 +1715,59 @@ class event_action(object):
             traceback.print_exc()
             res = None
         return res
+
+
+class inde_interface(OlivOS.API.inde_interface_T):
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:create_markdown_message',
+        ['chat_type', 'chat_id', 'message_id']
+    )
+    def __create_markdown_message(
+        target_event,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        flag_log=True
+    ):
+        return OlivOS.qqGuildv2SDK.event_action.create_markdown_message(
+            target_event=target_event,
+            chat_type=chat_type,
+            chat_id=chat_id,
+            markdown=markdown,
+            msg_id=msg_id,
+            event_id=event_id,
+            keyboard=keyboard
+        )
+
+    def create_markdown_message(
+        self,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        flag_log=True,
+        remote=False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__create_markdown_message(
+                self.event,
+                chat_type,
+                chat_id,
+                markdown,
+                msg_id=msg_id,
+                event_id=event_id,
+                keyboard=keyboard,
+                flag_log=flag_log
+            )
+        return res_data
 
 
 def get_msgid(key: str):
