@@ -1770,6 +1770,21 @@ class inde_interface(OlivOS.API.inde_interface_T):
         return res_data
 
 
+class markdown_tag:
+    def at_user(user_id):
+        return '<qqbot-at-user id="%s" />' % str(user_id)
+
+    def cmd_enter(text):
+        return '<qqbot-cmd-enter text="%s" />' % parse.quote(str(text), safe='')
+
+    def cmd_input(text, show=None, reference=False):
+        res = '<qqbot-cmd-input text="%s"' % parse.quote(str(text), safe='')
+        if show is not None:
+            res += ' show="%s"' % parse.quote(str(show), safe='')
+        res += ' reference="%s" />' % ('true' if reference else 'false')
+        return res
+
+
 def get_msgid(key: str):
     res = sdkMsgidinfo.get(key, 0)
     if type(res) is int:
