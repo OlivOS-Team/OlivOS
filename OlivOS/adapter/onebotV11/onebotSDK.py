@@ -1293,6 +1293,8 @@ class event_action(object):
             this_msg.data.name = name
         if folder_id is not None:
             this_msg.data.folder_id = folder_id
+        elif hasattr(this_msg.data, 'folder_id'):
+            del this_msg.data.folder_id
         this_msg.do_api(control_queue=control_queue)
 
     def delete_group_file(target_event, group_id, file_id, name=None):

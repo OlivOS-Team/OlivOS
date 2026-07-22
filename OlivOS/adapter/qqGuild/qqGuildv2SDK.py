@@ -139,6 +139,7 @@ class payload_template(object):
 
     class data_T(object):
         def __init__(self):
+            self.id = None
             self.op = None
             self.d = None
             self.s = None
@@ -155,6 +156,11 @@ class payload_template(object):
     def load(self, data, is_rx):
         if data is not None:
             if type(data) is dict:
+                if 'id' in data:
+                    if type(data['id']) is str:
+                        self.data.id = data['id']
+                    else:
+                        self.active = False
                 if 'op' in data:
                     if type(data['op']) is int:
                         self.data.op = data['op']
@@ -243,6 +249,7 @@ class api_templet(object):
         self.port = 443
         self.route = None
         self.res = None
+        self.res_code = None
 
     def __switch_host(self):
         if self.bot_info.model in ['sandbox', 'sandbox_intents']:
@@ -250,6 +257,8 @@ class api_templet(object):
                 self.host = sdkAPIHost['sandbox']
 
     def do_api_plant(self, req_type='POST'):
+        self.res = None
+        self.res_code = None
         try:
             self.__switch_host()
             tmp_payload_dict = {}
@@ -276,11 +285,14 @@ class api_templet(object):
                 msg_res = req.request("GET", send_url, headers=headers)
 
             self.res = msg_res.text
+            self.res_code = msg_res.status_code
             return msg_res.text
         except Exception:
             return None
 
     def do_api(self, req_type='POST'):
+        self.res = None
+        self.res_code = None
         try:
             self.__switch_host()
             tmp_payload_dict = {}
@@ -312,6 +324,7 @@ class api_templet(object):
                 msg_res = req.request("DELETE", send_url, headers=headers)
 
             self.res = msg_res.text
+            self.res_code = msg_res.status_code
             # print(self.res)
             return msg_res.text
         except Exception:
@@ -1136,6 +1149,15 @@ def get_Event_from_SDK(target_event):
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
+    event_id = target_event.sdk_event.payload.data.id
+    if (
+        target_event.active
+        and event_id is not None
+        and hasattr(target_event.data, 'extend')
+        and type(target_event.data.extend) is dict
+    ):
+        target_event.data.extend['event_id'] = str(event_id)
+
 
 # 支持OlivOS API调用的方法实现
 class event_action(object):
@@ -1196,6 +1218,7 @@ class event_action(object):
             OlivOS.messageAPI.PARA.image,
             OlivOS.messageAPI.PARA.video,
             OlivOS.messageAPI.PARA.record,
+            OlivOS.messageAPI.PARA.music,
             OlivOS.messageAPI.PARA.file
         )
         bindable_types = (
@@ -1230,8 +1253,6 @@ class event_action(object):
 
     def send_qq_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         msg_id = reply_msg_id
-        if msg_id is None and type(target_event.sdk_event) is event:
-            msg_id = target_event.sdk_event.payload.data.d.get('id', None)
 
         failed_text_buffer = ''
         for text_content, message_this in event_action._get_qq_message_send_chunks(message):
@@ -1251,6 +1272,8 @@ class event_action(object):
             elif isinstance(message_this, OlivOS.messageAPI.PARA.video):
                 type_path = 'videos'
             elif isinstance(message_this, OlivOS.messageAPI.PARA.record):
+                type_path = 'audios'
+            elif isinstance(message_this, OlivOS.messageAPI.PARA.music):
                 type_path = 'audios'
             elif isinstance(message_this, OlivOS.messageAPI.PARA.file):
                 type_path = 'files'
@@ -1303,6 +1326,108 @@ class event_action(object):
                 flag_direct=flag_direct
             )
 
+    def create_markdown_message(
+        target_event,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None
+    ):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data']['chat_type'] = str(chat_type)
+        res_data['data']['chat_id'] = None if chat_id is None else str(chat_id)
+
+        if chat_type not in ['qq_group', 'qq_private', 'guild_channel', 'guild_private']:
+            res_data['data']['error'] = 'unsupported chat_type'
+            return res_data
+        if chat_id is None or str(chat_id) == '':
+            res_data['data']['error'] = 'chat_id is required'
+            return res_data
+        if type(markdown) is not dict or len(markdown) == 0:
+            res_data['data']['error'] = 'markdown must be a non-empty dict'
+            return res_data
+
+        flag_content = (
+            type(markdown.get('content', None)) is str
+            and markdown.get('content', '') != ''
+        )
+        flag_template = (
+            type(markdown.get('custom_template_id', None)) is str
+            and markdown.get('custom_template_id', '') != ''
+        )
+        if flag_content == flag_template:
+            res_data['data']['error'] = 'markdown requires either content or custom_template_id'
+            return res_data
+        if 'params' in markdown and type(markdown['params']) is not list:
+            res_data['data']['error'] = 'markdown params must be a list'
+            return res_data
+        if keyboard is not None and type(keyboard) is not dict:
+            res_data['data']['error'] = 'keyboard must be a dict'
+            return res_data
+        if msg_id is not None and event_id is not None:
+            res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
+            return res_data
+
+        this_msg = None
+        if chat_type == 'qq_group':
+            this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.group_openid = str(chat_id)
+            this_msg.data.msg_type = 2
+        elif chat_type == 'qq_private':
+            this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.openid = str(chat_id)
+            this_msg.data.msg_type = 2
+        elif chat_type == 'guild_channel':
+            this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.channel_id = str(chat_id)
+        elif chat_type == 'guild_private':
+            this_msg = API.sendDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.guild_id = str(chat_id)
+
+        this_msg.data.markdown = markdown
+        this_msg.data.keyboard = keyboard
+        this_msg.data.msg_id = None if msg_id is None else str(msg_id)
+        this_msg.data.event_id = None if event_id is None else str(event_id)
+        if msg_id is not None and chat_type in ['qq_group', 'qq_private']:
+            this_msg.data.msg_seq = get_msgid(str(msg_id))
+
+        api_res = this_msg.do_api()
+        raw_obj = init_api_json(api_res)
+        api_code = raw_obj.get('code', None) if type(raw_obj) is dict else None
+        res_data['active'] = (
+            this_msg.res_code is not None
+            and 200 <= this_msg.res_code < 300
+            and api_code in [None, 0]
+        )
+        res_data['data']['response'] = raw_obj if raw_obj is not None else api_res
+        if type(raw_obj) is dict:
+            message_id = raw_obj.get('id', None)
+            if message_id is None and type(raw_obj.get('data', None)) is dict:
+                message_id = raw_obj['data'].get('id', None)
+            if message_id is not None:
+                res_data['data']['message_id'] = str(message_id)
+
+        if not res_data['active'] and target_event.log_func is not None:
+            response_text = str(api_res) if api_res is not None else 'no response'
+            if len(response_text) > 1000:
+                response_text = response_text[:1000] + '...'
+            response_code = 'n/a' if this_msg.res_code is None else str(this_msg.res_code)
+            target_event.log_func(
+                3,
+                (
+                    'OlivOS qqGuildv2SDK Markdown message response: '
+                    f'HTTP {response_code} {response_text}'
+                ),
+                [
+                    (target_event.getBotIDStr(), 'default'),
+                    (modelName, 'default'),
+                    ('create_markdown_message', 'callback')
+                ]
+            )
+        return res_data
+
     def _send_qq_payload(
         target_event,
         chat_id,
@@ -1328,7 +1453,48 @@ class event_action(object):
             this_msg.data.media = {'file_info': file_info}
         if msg_id is not None:
             this_msg.data.msg_seq = get_msgid(str(msg_id))
-        return this_msg.do_api()
+        api_res = this_msg.do_api()
+        event_action._log_qq_send_result(
+            target_event,
+            this_msg,
+            msg_id,
+            flag_direct=flag_direct
+        )
+        return api_res
+
+    def _log_qq_send_result(target_event, api_obj, msg_id, flag_direct=False):
+        if target_event.log_func is None:
+            return
+        res_obj = init_api_json(api_obj.res)
+        api_code = res_obj.get('code', None) if type(res_obj) is dict else None
+        flag_success = (
+            api_obj.res_code is not None
+            and 200 <= api_obj.res_code < 300
+            and api_code in [None, 0]
+        )
+        # 被动回复沿用现有简洁日志；主动消息额外记录平台结果，便于排查权限和审核问题。
+        if flag_success and msg_id is not None:
+            return
+        send_mode = 'active' if msg_id is None else 'reply'
+        chat_type = 'direct' if flag_direct else 'group'
+        res_text = str(api_obj.res) if api_obj.res is not None else 'no response'
+        if len(res_text) > 1000:
+            res_text = res_text[:1000] + '...'
+        res_code_text = 'n/a' if api_obj.res_code is None else str(api_obj.res_code)
+        target_event.log_func(
+            2 if flag_success else 3,
+            'OlivOS qqGuildv2SDK QQ %s %s message response: HTTP %s %s' % (
+                chat_type,
+                send_mode,
+                res_code_text,
+                res_text
+            ),
+            [
+                (target_event.getBotIDStr(), 'default'),
+                (modelName, 'default'),
+                ('send_qq_msg', 'callback')
+            ]
+        )
 
     def send_msg(target_event, chat_id, message, reply_msg_id=None, flag_direct=False):
         # 频道图片沿用 QQ 图文的双向分组规则。
@@ -1447,14 +1613,21 @@ class event_action(object):
         this_msg.metadata.message_id = str(message_id)
         return this_msg.do_api('DELETE')
 
-    # 优先使用消息段中的 URL，其次使用本地 path/file
+    # 富媒体优先使用 URL；自定义音乐使用 audio 字段中的实际音频资源。
     def _get_message_resource(message_para):
         if message_para.data is None:
             return None
-        for data_key in ['url', 'path', 'file']:
+        if isinstance(message_para, OlivOS.messageAPI.PARA.music):
+            resource_keys = ['audio']
+        else:
+            resource_keys = ['path', 'url', 'file']
+        for data_key in resource_keys:
             data_value = message_para.data.get(data_key, None)
-            if data_value is not None and str(data_value) != '':
-                return str(data_value)
+            if data_value is None:
+                continue
+            data_value = str(data_value)
+            if data_value not in ['', 'None']:
+                return data_value
         return None
 
     # 读取 OlivOS 支持的 base64、data URI、file URI 或本地资源
@@ -1503,8 +1676,8 @@ class event_action(object):
         target_event,
         url: str,
         chat_id,
-        type_path: str = 'images',
-        type_chat: str = 'qq_groups'
+        type_path: str,
+        type_chat: str
     ):
         res = None
         file_type_map = {
@@ -1541,6 +1714,74 @@ class event_action(object):
         except Exception:
             traceback.print_exc()
             res = None
+        return res
+
+
+class inde_interface(OlivOS.API.inde_interface_T):
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:create_markdown_message',
+        ['chat_type', 'chat_id', 'message_id']
+    )
+    def __create_markdown_message(
+        target_event,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        flag_log=True
+    ):
+        return OlivOS.qqGuildv2SDK.event_action.create_markdown_message(
+            target_event=target_event,
+            chat_type=chat_type,
+            chat_id=chat_id,
+            markdown=markdown,
+            msg_id=msg_id,
+            event_id=event_id,
+            keyboard=keyboard
+        )
+
+    def create_markdown_message(
+        self,
+        chat_type,
+        chat_id,
+        markdown,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        flag_log=True,
+        remote=False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__create_markdown_message(
+                self.event,
+                chat_type,
+                chat_id,
+                markdown,
+                msg_id=msg_id,
+                event_id=event_id,
+                keyboard=keyboard,
+                flag_log=flag_log
+            )
+        return res_data
+
+
+class markdown_tag:
+    def at_user(user_id):
+        return '<qqbot-at-user id="%s" />' % str(user_id)
+
+    def cmd_enter(text):
+        return '<qqbot-cmd-enter text="%s" />' % parse.quote(str(text), safe='')
+
+    def cmd_input(text, show=None, reference=False):
+        res = '<qqbot-cmd-input text="%s"' % parse.quote(str(text), safe='')
+        if show is not None:
+            res += ' show="%s"' % parse.quote(str(show), safe='')
+        res += ' reference="%s" />' % ('true' if reference else 'false')
         return res
 
 
