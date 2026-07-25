@@ -47,8 +47,9 @@ class intents_T(IntEnum):
     FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
     AUDIO_ACTION = (1 << 29)  # 语音消息
     PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
-    PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
-    PUBLIC_QQ_GROUP_MEMBERS = (1 << 24)  # QQ 群成员进退群事件
+    GROUP_AND_C2C_EVENT = (1 << 25)  # QQ 群与单聊事件
+    PUBLIC_QQ_MESSAGES = GROUP_AND_C2C_EVENT  # 兼容旧名称
+    PUBLIC_QQ_GROUP_MEMBERS = GROUP_AND_C2C_EVENT  # 兼容旧名称
 
 
 sdkAPIHost = {
@@ -113,6 +114,14 @@ qqMessageEventTypes = {
 qqAtBotEventTypes = {
     'AT_MESSAGE_CREATE',
     'GROUP_AT_MESSAGE_CREATE'
+}
+qqDispatchEventTypes = qqMessageEventTypes | {
+    'FRIEND_ADD',
+    'GROUP_ADD_ROBOT',
+    'GROUP_DEL_ROBOT',
+    'GROUP_MEMBER_ADD',
+    'GROUP_MEMBER_REMOVE',
+    'READY'
 }
 qqEventReplyTypes = {
     'qq_group': {
@@ -237,7 +246,7 @@ class payload_template(object):
                         self.data.t = data['t']
                     else:
                         self.active = False
-                elif is_rx:
+                elif is_rx and self.data.op == 0:
                     self.active = False
             else:
                 self.active = False
@@ -254,11 +263,9 @@ class PAYLOAD(object):
             tmp_intents = intents
             if bot_info.model in ['private']:
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
-                # tmp_intents |= int(intents_T.QQ_MESSAGES)
             elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
-                tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
-                tmp_intents |= int(intents_T.PUBLIC_QQ_GROUP_MEMBERS)
+                tmp_intents |= int(intents_T.GROUP_AND_C2C_EVENT)
             elif bot_info.model in ['public_guild_only']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
@@ -281,12 +288,12 @@ class PAYLOAD(object):
         def __init__(self, last_s=None):
             payload_template.__init__(self)
             self.data.op = 1
-            self.data.s = last_s
+            self.data.d = last_s
 
         def dump(self):
             res_obj = {}
             for data_this in self.data.__dict__:
-                if self.data.__dict__[data_this] is not None or data_this == 's':
+                if self.data.__dict__[data_this] is not None or data_this == 'd':
                     res_obj[data_this] = self.data.__dict__[data_this]
             res = json.dumps(obj=res_obj)
             return res
@@ -741,45 +748,6 @@ class API(object):
             def __init__(self):
                 self.openid = '-1'
                 self.message_id = '-1'
-
-
-def checkInDictSafe(var_key, var_dict, var_path=None):
-    if var_path is None:
-        var_path = []
-    var_dict_this = var_dict
-    for var_key_this in var_path:
-        if var_key_this in var_dict_this:
-            var_dict_this = var_dict_this[var_key_this]
-        else:
-            return False
-    if var_key in var_dict_this:
-        return True
-    else:
-        return False
-
-
-def checkEquelInDictSafe(var_it, var_dict, var_path=None):
-    if var_path is None:
-        var_path = []
-    var_dict_this = var_dict
-    for var_key_this in var_path:
-        if var_key_this in var_dict_this:
-            var_dict_this = var_dict_this[var_key_this]
-        else:
-            return False
-    if var_it == var_dict_this:
-        return True
-    else:
-        return False
-
-
-def checkByListAnd(check_list):
-    flag_res = True
-    for check_list_this in check_list:
-        if not check_list_this:
-            flag_res = False
-            return flag_res
-    return flag_res
 
 
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
@@ -1520,9 +1488,6 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_direct'] = False
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
-            target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
-            )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
@@ -1583,9 +1548,6 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_direct'] = True
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
-            target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
-            )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 
@@ -2067,7 +2029,8 @@ class event_action(object):
     def _get_message_send_chunks(
         message,
         media_types,
-        allow_at_all=True
+        allow_at_all=True,
+        flag_qq=True
     ):
         media_types = tuple(media_types)
         message_items = []
@@ -2080,7 +2043,8 @@ class event_action(object):
             elif isinstance(message_this, OlivOS.messageAPI.PARA.at):
                 at_content = markdown_tag.at_para(
                     message_this,
-                    allow_at_all=allow_at_all
+                    allow_at_all=allow_at_all,
+                    flag_qq=flag_qq
                 )
                 if at_content != '':
                     message_items.append(('text', at_content))
@@ -2155,6 +2119,26 @@ class event_action(object):
                 message_chunks.append(('', message_this))
         flush_image_message_buffer()
         return message_chunks
+
+    def _normalize_guild_markdown(markdown, allow_at_all=True):
+        markdown_obj = copy.deepcopy(markdown)
+        if isinstance(markdown_obj.get('content', None), str):
+            markdown_obj['content'] = markdown_tag.normalize_guild_text(
+                markdown_obj['content'],
+                allow_at_all=allow_at_all
+            )
+        params = markdown_obj.get('params', None)
+        if isinstance(params, list):
+            for param in params:
+                if not isinstance(param, dict) or not isinstance(param.get('values', None), list):
+                    continue
+                param['values'] = [
+                    markdown_tag.normalize_guild_text(value, allow_at_all=allow_at_all)
+                    if isinstance(value, str)
+                    else value
+                    for value in param['values']
+                ]
+        return markdown_obj
 
     def send_qq_msg(
         target_event,
@@ -2344,6 +2328,11 @@ class event_action(object):
         if msg_id is not None and event_id is not None:
             res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
             return res_data
+        if chat_type in ['guild_channel', 'guild_private']:
+            markdown = event_action._normalize_guild_markdown(
+                markdown,
+                allow_at_all=chat_type == 'guild_channel'
+            )
 
         allow_active_fallback = msg_id is None and event_id is None
         if chat_type in ['qq_group', 'qq_private']:
@@ -2544,7 +2533,8 @@ class event_action(object):
         for text_content, message_this in event_action._get_message_send_chunks(
             message,
             [OlivOS.messageAPI.PARA.image],
-            allow_at_all=not flag_direct
+            allow_at_all=not flag_direct,
+            flag_qq=False
         ):
             if message_this is None:
                 result = send_payload(text_content)
@@ -2645,7 +2635,8 @@ class event_action(object):
                 if raw_obj is not None:
                     if (
                         type(raw_obj) is dict
-                        and 0 == init_api_do_mapping_for_dict(raw_obj, ['code'], int)
+                        and init_api_do_mapping_for_dict(raw_obj, ['id'], str) is not None
+                        and init_api_do_mapping_for_dict(raw_obj, ['username'], str) is not None
                     ):
                         res_data['active'] = True
                         res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['username'], str)
@@ -3130,20 +3121,37 @@ class inde_interface(OlivOS.API.inde_interface_T):
 
 
 class markdown_tag:
-    def at_para(message_para, allow_at_all=True):
+    qqAtUserReg = re.compile(
+        r'<qqbot-at-user\s+id=(["\'])([^"\']+)\1\s*/>'
+    )
+    qqAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
+
+    def at_para(message_para, allow_at_all=True, flag_qq=True):
         if not isinstance(message_para, OlivOS.messageAPI.PARA.at):
             return ''
         user_id = str(message_para.data.get('id', ''))
         if user_id == 'all':
             if allow_at_all:
-                return '<qqbot-at-everyone />'
+                return '<qqbot-at-everyone />' if flag_qq else '@everyone'
             return ''
         if user_id == '':
             return ''
-        return markdown_tag.at_user(user_id)
+        return markdown_tag.at_user(user_id, flag_qq=flag_qq)
 
-    def at_user(user_id):
-        return '<qqbot-at-user id="%s" />' % str(user_id)
+    def at_user(user_id, flag_qq=True):
+        if flag_qq:
+            return '<qqbot-at-user id="%s" />' % str(user_id)
+        return '<@!%s>' % str(user_id)
+
+    def normalize_guild_text(text, allow_at_all=True):
+        text = markdown_tag.qqAtUserReg.sub(
+            lambda match: markdown_tag.at_user(match.group(2), flag_qq=False),
+            str(text)
+        )
+        return markdown_tag.qqAtEveryoneReg.sub(
+            '@everyone' if allow_at_all else '',
+            text
+        )
 
     def cmd_enter(text):
         return '<qqbot-cmd-enter text="%s" />' % parse.quote(str(text), safe='')

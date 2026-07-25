@@ -88,6 +88,7 @@ dictMessageType = {
             'private': 'olivos_para',
             'private_intents': 'olivos_para',
             'public': 'olivos_para',
+            'public_guild_only': 'olivos_para',
             'public_intents': 'olivos_para'
         }
     },
@@ -765,33 +766,24 @@ class Message_templet(object):
         self.data = tmp_data
 
     def init_from_qq_guild_code_string(self):
-        tmp_data_raw = str(self.data_raw)
-        tmp_data = []
-        last_index = 0
-        for match in re.finditer(r'<@!?([^<>&]+)>|@everyone(?!\w)', tmp_data_raw):
-            if match.start() > last_index:
-                tmp_data.append(PARA.text(tmp_data_raw[last_index:match.start()]))
-            user_id = match.group(1)
-            if user_id is None or str(user_id).lower() == 'everyone':
-                tmp_data.append(PARA.at(id='all'))
-            else:
-                tmp_data.append(PARA.at(id=str(user_id)))
-            last_index = match.end()
-        if last_index < len(tmp_data_raw):
-            tmp_data.append(PARA.text(tmp_data_raw[last_index:]))
-        self.data = tmp_data
+        self.init_from_qq_code_string()
 
     def init_from_qq_guild_v2_code_string(self):
+        self.init_from_qq_code_string()
+
+    def init_from_qq_code_string(self):
         tmp_data_raw = str(self.data_raw)
         tmp_data = []
         last_index = 0
         at_tag_pattern = re.compile(
-            r'<qqbot-at-user\s+id="([^"]+)"\s*/>|<qqbot-at-everyone\s*/>'
+            r'<qqbot-at-user\s+id=(?P<quote>["\'])(?P<qq_user>[^"\']+)'
+            r'(?P=quote)\s*/>|<qqbot-at-everyone\s*/>'
+            r'|<@!?(?P<guild_user>[^<>&]+)>|@everyone(?!\w)'
         )
         for match in at_tag_pattern.finditer(tmp_data_raw):
             if match.start() > last_index:
                 tmp_data.append(PARA.text(tmp_data_raw[last_index:match.start()]))
-            user_id = match.group(1)
+            user_id = match.group('qq_user') or match.group('guild_user')
             if user_id is None:
                 tmp_data.append(PARA.at(id='all'))
             else:
