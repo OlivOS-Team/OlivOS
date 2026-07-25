@@ -35,12 +35,6 @@ import OlivOS
 
 modelName = 'qqGuildv2SDK'
 
-qqTextChainAtUserReg = re.compile(
-    r'<qqbot-at-user\s+id=["\']([^"\']+)["\']\s*/>'
-)
-qqTextChainAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
-
-
 class intents_T(IntEnum):
     GUILDS = (1 << 0)  # 频道变更
     GUILD_MEMBERS = (1 << 1)  # 频道成员变更
@@ -83,6 +77,14 @@ sdkAPIRouteTemp = {
 }
 
 sdkSubSelfInfo = {}
+sdkSubSelfOpenInfo = {}
+sdkSubSelfOpenInfoLock = threading.Lock()
+sdkSubSelfOpenInfoRetryAt = {}
+sdkSubSelfOpenInfoRequestHistory = {}
+sdkSubSelfOpenInfoDisabled = set()
+sdkSubSelfOpenInfoRetryCooldown = 60.0
+sdkSubSelfOpenInfoRateWindow = 60.0
+sdkSubSelfOpenInfoRateLimit = 60
 sdkTokenInfo = {}
 sdkMsgidinfo = {}
 sdkMsgidinfoLock = threading.Lock()
@@ -505,6 +507,19 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['users'] + '/@me'
 
+    class getQQGroupBotState(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/bot_state'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
     class sendMessage(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -816,15 +831,6 @@ def _get_message_attachments(attachments):
     return message_list
 
 
-# 将 QQ 新文本链的 @ 标签转换为 OlivOS 现有的统一消息段解析格式。
-def _normalize_qq_text_chain(content):
-    content = qqTextChainAtUserReg.sub(
-        lambda match: '<@!' + match.group(1) + '>',
-        content
-    )
-    return qqTextChainAtEveryoneReg.sub('<@&all>', content)
-
-
 def _get_qq_author_name(author):
     if not isinstance(author, dict):
         return '用户'
@@ -943,7 +949,7 @@ def _get_qq_message_event_extend(event_type, event_data):
     return result
 
 
-def _get_qq_mention_name_map(mentions):
+def _get_qq_mention_map(mentions):
     result = {}
     if not isinstance(mentions, list):
         return result
@@ -952,7 +958,7 @@ def _get_qq_mention_name_map(mentions):
             continue
         username = mention.get('username', None)
         if not isinstance(username, str) or username.strip() == '':
-            continue
+            username = None
         for id_key in ['id', 'user_openid', 'member_openid']:
             user_id = mention.get(id_key, None)
             if user_id is not None and str(user_id) != '':
@@ -960,21 +966,163 @@ def _get_qq_mention_name_map(mentions):
     return result
 
 
-def _set_qq_message_at_names(message_obj, mentions):
-    mention_name_map = _get_qq_mention_name_map(mentions)
-    if not mention_name_map or not isinstance(message_obj.data, list):
+def _get_qq_group_self_open_id(bot_hash, group_openid, bot_info, now=None):
+    if group_openid is None or str(group_openid) == '':
+        return None
+    group_openid = str(group_openid)
+    cache_key = (bot_hash, group_openid)
+    if now is None:
+        now = time.monotonic()
+    with sdkSubSelfOpenInfoLock:
+        bot_cache = sdkSubSelfOpenInfo.get(bot_hash, {})
+        if group_openid in bot_cache:
+            return bot_cache[group_openid]
+        if bot_hash in sdkSubSelfOpenInfoDisabled:
+            return None
+        if sdkSubSelfOpenInfoRetryAt.get(cache_key, 0.0) > now:
+            return None
+        request_history = sdkSubSelfOpenInfoRequestHistory.setdefault(
+            bot_hash,
+            deque()
+        )
+        request_window_start = now - sdkSubSelfOpenInfoRateWindow
+        while request_history and request_history[0] <= request_window_start:
+            request_history.popleft()
+        if len(request_history) >= sdkSubSelfOpenInfoRateLimit:
+            sdkSubSelfOpenInfoRetryAt[cache_key] = (
+                request_history[0] + sdkSubSelfOpenInfoRateWindow
+            )
+            return None
+        # 先占用请求窗口，避免并发事件为同一群重复发起请求。
+        sdkSubSelfOpenInfoRetryAt[cache_key] = now + sdkSubSelfOpenInfoRetryCooldown
+        request_history.append(now)
+
+    api_msg_obj = API.getQQGroupBotState(bot_info)
+    api_msg_obj.metadata.group_openid = group_openid
+    api_msg_obj.do_api('GET')
+    try:
+        api_res_json = json.loads(api_msg_obj.res)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(api_res_json, dict):
+        return None
+
+    error_code = api_res_json.get('code', None)
+    try:
+        error_code = int(error_code)
+    except (TypeError, ValueError):
+        error_code = None
+    if error_code == 11253:
+        with sdkSubSelfOpenInfoLock:
+            sdkSubSelfOpenInfoDisabled.add(bot_hash)
+            sdkSubSelfOpenInfoRetryAt.pop(cache_key, None)
+        return None
+
+    member_openid = api_res_json.get('member_openid', None)
+    if (
+        api_msg_obj.res_code is None
+        or not 200 <= api_msg_obj.res_code < 300
+        or member_openid is None
+        or str(member_openid) == ''
+    ):
+        return None
+    member_openid = str(member_openid)
+    with sdkSubSelfOpenInfoLock:
+        sdkSubSelfOpenInfo.setdefault(bot_hash, {})[group_openid] = member_openid
+        sdkSubSelfOpenInfoRetryAt.pop(cache_key, None)
+    return member_openid
+
+
+def _get_qq_group_self_open_id_from_mentions(bot_hash, group_openid, mentions):
+    if group_openid is None or str(group_openid) == '':
+        return None
+    self_info = sdkSelfInfo.get(bot_hash, None)
+    if not isinstance(self_info, dict):
+        return None
+    self_username = self_info.get('username', None)
+    if not isinstance(self_username, str) or self_username == '':
+        return None
+    if not isinstance(mentions, list):
+        return None
+
+    candidates = []
+    for mention in mentions:
+        if not isinstance(mention, dict):
+            continue
+        if mention.get('bot', False) is not True:
+            continue
+        if mention.get('username', None) != self_username:
+            continue
+        open_id = mention.get(
+            'member_openid',
+            mention.get('id', mention.get('user_openid', None))
+        )
+        if open_id is not None and str(open_id) != '':
+            candidates.append(str(open_id))
+    candidates = list(dict.fromkeys(candidates))
+    if len(candidates) != 1:
+        return None
+
+    group_openid = str(group_openid)
+    with sdkSubSelfOpenInfoLock:
+        sdkSubSelfOpenInfo.setdefault(bot_hash, {})[group_openid] = candidates[0]
+        sdkSubSelfOpenInfoRetryAt.pop((bot_hash, group_openid), None)
+    return candidates[0]
+
+
+def _apply_qq_message_mentions(message_obj, mentions):
+    mention_map = _get_qq_mention_map(mentions)
+    if not mention_map or not isinstance(message_obj.data, list):
         return
     flag_updated = False
+    message_data = []
     for message_item in message_obj.data:
-        if not isinstance(message_item, OlivOS.messageAPI.PARA.at):
+        if isinstance(message_item, OlivOS.messageAPI.PARA.at):
+            user_id = str(message_item.data.get('id', ''))
+            username = mention_map.get(user_id, None)
+            if message_item.data.get('name', None) is None and username is not None:
+                message_item.data['name'] = username
+                flag_updated = True
+            message_data.append(message_item)
             continue
-        user_id = str(message_item.data.get('id', ''))
-        if message_item.data.get('name', None) is None and user_id in mention_name_map:
-            message_item.data['name'] = mention_name_map[user_id]
+        if not isinstance(message_item, OlivOS.messageAPI.PARA.text):
+            message_data.append(message_item)
+            continue
+        text_content = message_item.data.get('text', '')
+        if not isinstance(text_content, str):
+            message_data.append(message_item)
+            continue
+        last_index = 0
+        flag_text_updated = False
+        for match in re.finditer(r'<@([^<>]+)>', text_content):
+            user_id = str(match.group(1))
+            if user_id not in mention_map:
+                continue
+            if match.start() > last_index:
+                message_data.append(
+                    OlivOS.messageAPI.PARA.text(text_content[last_index:match.start()])
+                )
+            message_data.append(
+                OlivOS.messageAPI.PARA.at(
+                    id=user_id,
+                    name=mention_map[user_id]
+                )
+            )
+            last_index = match.end()
+            flag_text_updated = True
+        if flag_text_updated:
+            if last_index < len(text_content):
+                message_data.append(
+                    OlivOS.messageAPI.PARA.text(text_content[last_index:])
+                )
             flag_updated = True
-    if flag_updated and isinstance(message_obj.data_raw, list):
-        # 兼容层会处理 data_raw，避免其浅拷贝误删 message_sdk.data 中的 name。
-        message_obj.data_raw = copy.deepcopy(message_obj.data)
+        else:
+            message_data.append(message_item)
+    if flag_updated:
+        message_obj.data = message_data
+        if isinstance(message_obj.data_raw, list):
+            # 兼容层会处理 data_raw，避免其浅拷贝误删 message_sdk.data 中的 name。
+            message_obj.data_raw = copy.deepcopy(message_obj.data)
 
 
 def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
@@ -984,16 +1132,9 @@ def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
     if message_id is None or str(message_id) == '':
         return None
     scene_ext = _parse_qq_message_scene_ext(event_data.get('message_scene', None))
-    # 全量群消息和 AT 群消息可能是同一条消息的两种投递形态。
-    # 对它们归一化后按官方建议的 id + msg_idx 跨事件类型去重。
-    dedupe_event_type = (
-        'QQ_GROUP_MESSAGE'
-        if event_type in {'GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE'}
-        else str(event_type)
-    )
     return (
         str(bot_id),
-        dedupe_event_type,
+        str(event_type),
         str(message_id),
         str(scene_ext.get('msg_idx', ''))
     )
@@ -1163,8 +1304,8 @@ def get_Event_from_SDK(target_event):
         if 'content' in event_data:
             if event_data['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    _normalize_qq_text_chain(event_data['content'])
+                    'qqGuildv2_string',
+                    event_data['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1189,12 +1330,27 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _set_qq_message_at_names(message_obj, event_data.get('mentions', None))
+            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
             group_openid = event_data.get(
                 'group_openid',
                 event_data.get('group_id', None)
             )
+            sub_self_open_id = _get_qq_group_self_open_id(
+                plugin_event_bot_hash,
+                group_openid,
+                bot_info_T(
+                    id=target_event.sdk_event.base_info['self_id'],
+                    access_token=target_event.sdk_event.base_info['token'],
+                    model=target_event.platform.get('model', 'default')
+                )
+            )
+            if sub_self_open_id is None:
+                sub_self_open_id = _get_qq_group_self_open_id_from_mentions(
+                    plugin_event_bot_hash,
+                    group_openid,
+                    event_data.get('mentions', None)
+                )
             member_openid = author.get(
                 'member_openid',
                 author.get('id', None)
@@ -1230,14 +1386,16 @@ def get_Event_from_SDK(target_event):
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
+            if sub_self_open_id is not None:
+                target_event.data.extend['sub_self_open_id'] = sub_self_open_id
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
         if 'content' in event_data:
             if event_data['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    _normalize_qq_text_chain(event_data['content'])
+                    'qqGuildv2_string',
+                    event_data['content']
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1262,7 +1420,7 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _set_qq_message_at_names(message_obj, event_data.get('mentions', None))
+            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             # C2C 新版事件的用户标识为 author.user_openid。
             user_openid = author.get(
                 'user_openid',
@@ -1303,16 +1461,10 @@ def get_Event_from_SDK(target_event):
         message_content = event_data.get('content', None)
         message_obj = None
         if message_content is not None:
-            if event_type == 'AT_MESSAGE_CREATE':
-                # 针对某些无法调用 /users/@me 接口的机器人的临时解决方案
-                message_content = re.sub(
-                    r'^<@!\d+>', r'',
-                    message_content
-                )
             if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    _normalize_qq_text_chain(message_content).lstrip(' ')
+                    message_content.lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1337,7 +1489,7 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _set_qq_message_at_names(message_obj, event_data.get('mentions', None))
+            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             author_id = author.get('id', None)
             target_event.active = True
             target_event.plugin_info['func_type'] = 'group_message'
@@ -1379,7 +1531,7 @@ def get_Event_from_SDK(target_event):
             if event_data['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    _normalize_qq_text_chain(event_data['content']).lstrip(' ')
+                    event_data['content'].lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -1404,7 +1556,7 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _set_qq_message_at_names(message_obj, event_data.get('mentions', None))
+            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             author_id = author.get('id', None)
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
@@ -1914,7 +2066,6 @@ class event_action(object):
     def _get_message_send_chunks(
         message,
         media_types,
-        allow_at_user=True,
         allow_at_all=True
     ):
         media_types = tuple(media_types)
@@ -1926,21 +2077,11 @@ class event_action(object):
                 if text_content != '':
                     message_items.append(('text', text_content))
             elif isinstance(message_this, OlivOS.messageAPI.PARA.at):
-                at_id = str(message_this.data.get('id', ''))
-                if at_id == 'all':
-                    if allow_at_all:
-                        at_content = '<qqbot-at-everyone />'
-                    else:
-                        at_content = '@全体成员'
-                    message_items.append(('text', at_content))
-                elif at_id != '':
-                    if allow_at_user:
-                        at_content = '<qqbot-at-user id="' + at_id + '" />'
-                    else:
-                        at_name = message_this.data.get('name', None)
-                        if at_name is None or str(at_name) == '':
-                            at_name = '用户'
-                        at_content = '@' + str(at_name).lstrip('@')
+                at_content = markdown_tag.at_para(
+                    message_this,
+                    allow_at_all=allow_at_all
+                )
+                if at_content != '':
                     message_items.append(('text', at_content))
             elif isinstance(message_this, media_types):
                 message_items.append(('media', message_this))
@@ -2001,7 +2142,6 @@ class event_action(object):
             message_chunks.extend(event_action._get_message_send_chunks(
                 image_message,
                 [OlivOS.messageAPI.PARA.image],
-                allow_at_user=not flag_direct,
                 allow_at_all=False
             ))
             image_message_buffer.clear()
@@ -2403,7 +2543,6 @@ class event_action(object):
         for text_content, message_this in event_action._get_message_send_chunks(
             message,
             [OlivOS.messageAPI.PARA.image],
-            allow_at_user=not flag_direct,
             allow_at_all=not flag_direct
         ):
             if message_this is None:
@@ -2990,6 +3129,18 @@ class inde_interface(OlivOS.API.inde_interface_T):
 
 
 class markdown_tag:
+    def at_para(message_para, allow_at_all=True):
+        if not isinstance(message_para, OlivOS.messageAPI.PARA.at):
+            return ''
+        user_id = str(message_para.data.get('id', ''))
+        if user_id == 'all':
+            if allow_at_all:
+                return '<qqbot-at-everyone />'
+            return ''
+        if user_id == '':
+            return ''
+        return markdown_tag.at_user(user_id)
+
     def at_user(user_id):
         return '<qqbot-at-user id="%s" />' % str(user_id)
 
