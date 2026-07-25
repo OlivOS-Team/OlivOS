@@ -694,11 +694,15 @@ class Event(object):
                                 )
                         callback_msg = ' '.join(callback_msg_list)
                     if event_obj.log_func is not None:
-                        event_obj.log_func(2, callback_msg, [
-                            (event_obj.getBotIDStr(), 'default'),
-                            (event_obj.plugin_info['name'], 'default'),
-                            (func_name, 'callback')
-                        ])
+                        try:
+                            event_obj.log_func(2, callback_msg, [
+                                (event_obj.getBotIDStr(), 'default'),
+                                (event_obj.plugin_info['name'], 'default'),
+                                (func_name, 'callback')
+                            ])
+                        except Exception:
+                            # 回调日志失败不能改变已经完成的发送/撤回结果。
+                            traceback.print_exc()
                 return warppedRes
 
             return funcWarpped
@@ -853,6 +857,7 @@ class Event(object):
 
     def __reply(self, message, flag_log=True):
         flag_type = None
+        res_data = None
         tmp_message = None
         tmp_message_obj = None
         tmp_message_log = None
@@ -874,10 +879,15 @@ class Event(object):
                 hasattr(self.data, 'extend')
                 and 'host_group_id' in self.data.extend
             ):
-                self.__send('private', self.data.user_id, tmp_message, host_id=self.data.extend['host_group_id'],
-                            flag_log=False)
+                res_data = self.__send(
+                    'private',
+                    self.data.user_id,
+                    tmp_message,
+                    host_id=self.data.extend['host_group_id'],
+                    flag_log=False
+                )
             else:
-                self.__send('private', self.data.user_id, tmp_message, flag_log=False)
+                res_data = self.__send('private', self.data.user_id, tmp_message, flag_log=False)
             flag_type = 'private'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -886,7 +896,13 @@ class Event(object):
                     'group_message'
                 ]
         ):
-            self.__send('group', self.data.group_id, tmp_message, host_id=self.data.host_id, flag_log=False)
+            res_data = self.__send(
+                'group',
+                self.data.group_id,
+                tmp_message,
+                host_id=self.data.host_id,
+                flag_log=False
+            )
             flag_type = 'group'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -903,7 +919,7 @@ class Event(object):
                     'group_invite_request'
                 ]
         ):
-            self.__send('group', self.data.group_id, tmp_message, flag_log=False)
+            res_data = self.__send('group', self.data.group_id, tmp_message, flag_log=False)
             flag_type = 'group'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -912,10 +928,10 @@ class Event(object):
                 ]
         ):
             if self.data.group_id in [-1, '-1', None]:
-                self.__send('private', self.data.user_id, tmp_message, flag_log=False)
+                res_data = self.__send('private', self.data.user_id, tmp_message, flag_log=False)
                 flag_type = 'private'
             else:
-                self.__send('group', self.data.group_id, tmp_message, flag_log=False)
+                res_data = self.__send('group', self.data.group_id, tmp_message, flag_log=False)
                 flag_type = 'group'
 
         if flag_log and self.log_func is not None:
@@ -944,7 +960,7 @@ class Event(object):
                             (self.plugin_info['name'], 'default'),
                             ('reply', 'callback')
                         ])
-                        return
+                        return res_data
                     else:
                         self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
                             (self.getBotIDStr(), 'default'),
@@ -957,6 +973,7 @@ class Event(object):
                         (self.plugin_info['name'], 'default'),
                         ('reply', 'callback')
                     ])
+        return res_data
 
     def reply(self, message, flag_log: bool = True, remote: bool = False):
         """回复消息
@@ -967,12 +984,12 @@ class Event(object):
             message: 所需要发送的消息
         """
         if remote:
-            pass
-        else:
-            self.__reply(message, flag_log=True)
+            return None
+        return self.__reply(message, flag_log=flag_log)
 
     def __send(self, send_type, target_id, message, host_id=None, flag_log=True):
         flag_type = send_type
+        res_data = None
         tmp_message = None
         tmp_message_obj = None
         tmp_message_log = None
@@ -1122,23 +1139,18 @@ class Event(object):
                 and self.data.extend.get('flag_from_qq', False)
             ):
                 if flag_type == 'group':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and 'reply_msg_id' in self.data.extend
-                    ):
-                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
-                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
-                        )
-                    else:
-                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
+                    res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
                     if (
                         hasattr(self.data, 'extend')
                         and 'flag_from_direct' in self.data.extend
                     ):
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
-                                self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                            res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                                self,
+                                target_id,
+                                tmp_message,
+                                flag_direct=True
                             )
                         else:
                             # 主动私聊待实现
@@ -1152,18 +1164,22 @@ class Event(object):
                         hasattr(self.data, 'extend')
                         and 'reply_msg_id' in self.data.extend
                     ):
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
                             self, target_id, tmp_message, self.data.extend['reply_msg_id']
                         )
                     else:
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
                 elif flag_type == 'private':
                     if (
                         hasattr(self.data, 'extend')
                         and host_id is not None
                     ):
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(
-                            self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self,
+                            host_id,
+                            tmp_message,
+                            self.data.extend.get('reply_msg_id'),
+                            flag_direct=True
                         )
                     elif (
                         hasattr(self.data, 'extend')
@@ -1171,7 +1187,7 @@ class Event(object):
                         and 'reply_msg_id' in self.data.extend
                     ):
                         if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
                                 self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
                             )
                         else:
@@ -1262,6 +1278,7 @@ class Event(object):
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
+        return res_data
 
     def send(self, send_type: str, target_id: 'str|int', message, host_id: 'str|int|None' = None, flag_log: bool = True,
              remote: bool = False):
@@ -1276,12 +1293,12 @@ class Event(object):
             host_id: 发送目标的所属HOST ID (default: None)
         """
         if remote:
-            pass
-        else:
-            self.__send(send_type, target_id, message, host_id=host_id, flag_log=True)
+            return None
+        return self.__send(send_type, target_id, message, host_id=host_id, flag_log=flag_log)
 
     @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log=True):
+        res_data = None
         if self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 OlivOS.onebotV12SDK.event_action.delete_msg(self, message_id)
@@ -1297,20 +1314,20 @@ class Event(object):
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 OlivOS.milkySDK.event_action.delete_msg(self, message_id)
         elif self.platform['sdk'] == 'qqGuildv2_link':
-            OlivOS.qqGuildv2SDK.event_action.delete_msg(self, message_id)
+            res_data = OlivOS.qqGuildv2SDK.event_action.delete_msg(self, message_id)
+        return res_data
 
     def delete_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
         """撤回消息
 
-        用于撤回指定消息（以管理员权限）
+        用于撤回当前会话中由机器人发送的指定消息
 
         Args:
             message_id: 需要撤回的消息ID
         """
         if remote:
-            pass
-        else:
-            self.__delete_msg(message_id, flag_log=True)
+            return None
+        return self.__delete_msg(message_id, flag_log=flag_log)
 
     @callbackLogger('get_msg')
     def __get_msg(self, message_id, flag_log=True):

@@ -29,7 +29,7 @@ class server(OlivOS.API.Proc_templet):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
-            Proc_type='qqGuild_link',
+            Proc_type='qqGuildv2_link',
             scan_interval=scan_interval,
             dead_interval=dead_interval,
             rx_queue=rx_queue,
@@ -80,6 +80,7 @@ class server(OlivOS.API.Proc_templet):
                     'GROUP_AT_MESSAGE_CREATE',
                     'GROUP_MESSAGE_CREATE',
                     'C2C_MESSAGE_CREATE',
+                    'FRIEND_ADD',
                     'GROUP_ADD_ROBOT',
                     'GROUP_DEL_ROBOT',
                     'GROUP_MEMBER_ADD',

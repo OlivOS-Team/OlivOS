@@ -354,6 +354,8 @@ class shallow(API.Proc_templet):
                     plugin_model.main.Event.group_lucky_king(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_honor':
                     plugin_model.main.Event.group_honor(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'friend_add':
+                    plugin_model.main.Event.friend_add(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'friend_add_request':
                     plugin_model.main.Event.friend_add_request(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_add_request':
