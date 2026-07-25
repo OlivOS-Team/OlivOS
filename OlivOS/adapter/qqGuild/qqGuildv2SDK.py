@@ -35,6 +35,7 @@ import OlivOS
 
 modelName = 'qqGuildv2SDK'
 
+
 class intents_T(IntEnum):
     GUILDS = (1 << 0)  # 频道变更
     GUILD_MEMBERS = (1 << 1)  # 频道成员变更
