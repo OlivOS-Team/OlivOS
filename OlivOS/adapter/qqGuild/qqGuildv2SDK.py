@@ -47,9 +47,8 @@ class intents_T(IntEnum):
     FORUMS_EVENT = (1 << 28)  # 论坛事件，仅 *私域* 机器人能够设置此 intents。
     AUDIO_ACTION = (1 << 29)  # 语音消息
     PUBLIC_GUILD_MESSAGES = (1 << 30)  # 消息事件，此为公域的消息事件
-    GROUP_AND_C2C_EVENT = (1 << 25)  # QQ 群与单聊事件
-    PUBLIC_QQ_MESSAGES = GROUP_AND_C2C_EVENT  # 兼容旧名称
-    PUBLIC_QQ_GROUP_MEMBERS = GROUP_AND_C2C_EVENT  # 兼容旧名称
+    PUBLIC_QQ_MESSAGES = (1 << 25)  # 消息事件，此为公域的普通QQ消息事件
+    PUBLIC_QQ_GROUP_MEMBERS = (1 << 24)  # QQ 群成员进退群事件
 
 
 sdkAPIHost = {
@@ -114,14 +113,6 @@ qqMessageEventTypes = {
 qqAtBotEventTypes = {
     'AT_MESSAGE_CREATE',
     'GROUP_AT_MESSAGE_CREATE'
-}
-qqDispatchEventTypes = qqMessageEventTypes | {
-    'FRIEND_ADD',
-    'GROUP_ADD_ROBOT',
-    'GROUP_DEL_ROBOT',
-    'GROUP_MEMBER_ADD',
-    'GROUP_MEMBER_REMOVE',
-    'READY'
 }
 qqEventReplyTypes = {
     'qq_group': {
@@ -246,7 +237,7 @@ class payload_template(object):
                         self.data.t = data['t']
                     else:
                         self.active = False
-                elif is_rx and self.data.op == 0:
+                elif is_rx:
                     self.active = False
             else:
                 self.active = False
@@ -263,9 +254,11 @@ class PAYLOAD(object):
             tmp_intents = intents
             if bot_info.model in ['private']:
                 tmp_intents |= int(intents_T.GUILD_MESSAGES)
+                # tmp_intents |= int(intents_T.QQ_MESSAGES)
             elif bot_info.model in ['public', 'sandbox']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
-                tmp_intents |= int(intents_T.GROUP_AND_C2C_EVENT)
+                tmp_intents |= int(intents_T.PUBLIC_QQ_MESSAGES)
+                tmp_intents |= int(intents_T.PUBLIC_QQ_GROUP_MEMBERS)
             elif bot_info.model in ['public_guild_only']:
                 tmp_intents |= int(intents_T.PUBLIC_GUILD_MESSAGES)
             elif bot_info.model in ['private_intents', 'public_intents', 'sandbox_intents']:
@@ -288,12 +281,12 @@ class PAYLOAD(object):
         def __init__(self, last_s=None):
             payload_template.__init__(self)
             self.data.op = 1
-            self.data.d = last_s
+            self.data.s = last_s
 
         def dump(self):
             res_obj = {}
             for data_this in self.data.__dict__:
-                if self.data.__dict__[data_this] is not None or data_this == 'd':
+                if self.data.__dict__[data_this] is not None or data_this == 's':
                     res_obj[data_this] = self.data.__dict__[data_this]
             res = json.dumps(obj=res_obj)
             return res
@@ -1488,6 +1481,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_direct'] = False
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
+            target_event.data.extend.update(
+                _get_qq_message_event_extend(event_type, event_data)
+            )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
@@ -1548,6 +1544,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_direct'] = True
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
+            target_event.data.extend.update(
+                _get_qq_message_event_extend(event_type, event_data)
+            )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
 

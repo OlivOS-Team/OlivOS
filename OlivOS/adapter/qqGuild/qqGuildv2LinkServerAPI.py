@@ -71,29 +71,27 @@ class server(OlivOS.API.Proc_templet):
             tmp_data_rx_obj = OlivOS.qqGuildv2SDK.PAYLOAD.rxPacket(
                 data=json.loads(message)
             )
-            if not tmp_data_rx_obj.active:
-                raise ValueError('invalid gateway payload')
-            if tmp_data_rx_obj.data.s is not None:
-                self.Proc_data['extend_data']['last_s'] = tmp_data_rx_obj.data.s
+            self.Proc_data['extend_data']['last_s'] = tmp_data_rx_obj.data.s
             if tmp_data_rx_obj.data.op == 0:
-                if tmp_data_rx_obj.data.t in OlivOS.qqGuildv2SDK.qqDispatchEventTypes:
+                if tmp_data_rx_obj.data.t in [
+                    'MESSAGE_CREATE',
+                    'DIRECT_MESSAGE_CREATE',
+                    'AT_MESSAGE_CREATE',
+                    'GROUP_AT_MESSAGE_CREATE',
+                    'GROUP_MESSAGE_CREATE',
+                    'C2C_MESSAGE_CREATE',
+                    'FRIEND_ADD',
+                    'GROUP_ADD_ROBOT',
+                    'GROUP_DEL_ROBOT',
+                    'GROUP_MEMBER_ADD',
+                    'GROUP_MEMBER_REMOVE',
+                    'READY'
+                ]:
                     sdk_event = OlivOS.qqGuildv2SDK.event(tmp_data_rx_obj, self.Proc_data['bot_info_dict'])
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                 if tmp_data_rx_obj.data.t == 'READY':
                     self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify ACK')
-            elif tmp_data_rx_obj.data.op == 1:
-                tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendHeartbeat(
-                    self.Proc_data['extend_data']['last_s']
-                ).dump()
-                ws.send(tmp_data)
-                self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse send')
-            elif tmp_data_rx_obj.data.op == 7:
-                self.log(1, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket reconnect requested')
-                ws.close()
-            elif tmp_data_rx_obj.data.op == 9:
-                self.log(3, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket invalid session')
-                ws.close()
             elif tmp_data_rx_obj.data.op == 10:
                 self.Proc_data['extend_data']['pulse_interval'] = tmp_data_rx_obj.data.d['heartbeat_interval'] / 1000
                 tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendIdentify(
@@ -109,25 +107,11 @@ class server(OlivOS.API.Proc_templet):
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
             elif tmp_data_rx_obj.data.op == 11:
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse ACK')
-        except Exception as error:
-            self.log(
-                3,
-                'OlivOS qqGuild link server [%s] websocket payload error [%s: %s]' % (
-                    self.Proc_name,
-                    type(error).__name__,
-                    str(error)
-                )
-            )
+        except Exception:
+            pass
 
     def on_error(self, ws, error):
-        self.log(
-            3,
-            'OlivOS qqGuild link server [%s] websocket link error [%s: %s]' % (
-                self.Proc_name,
-                type(error).__name__,
-                str(error)
-            )
-        )
+        self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link error')
 
     def on_close(self, ws, close_status_code, close_msg):
         self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link close')
