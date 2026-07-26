@@ -1309,7 +1309,10 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
 
         class metadata_T(object):
             def __init__(self):
@@ -1326,7 +1329,10 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
 
         class metadata_T(object):
             def __init__(self):
@@ -1343,7 +1349,10 @@ class API(object):
             self.data = None
             self.metadata = self.metadata_T()
             self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
 
         class metadata_T(object):
             def __init__(self):
