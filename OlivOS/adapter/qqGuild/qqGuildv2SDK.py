@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 from enum import IntEnum
+import hashlib
 import json
 import mimetypes
 import os
@@ -30,6 +31,7 @@ from urllib import parse
 import copy
 import threading
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 import OlivOS
 
@@ -88,6 +90,7 @@ sdkSubSelfOpenInfoRetryCooldown = 60.0
 sdkSubSelfOpenInfoRateWindow = 60.0
 sdkSubSelfOpenInfoRateLimit = 60
 sdkTokenInfo = {}
+sdkTokenRefreshAhead = 60.0  # token 提前刷新窗口(秒),文档:过期前 60s 内可换新,旧 token 仍有效
 sdkMsgidinfo = {}
 sdkMsgidinfoLock = threading.Lock()
 sdkMsgidinfoTTL = 300.0
@@ -102,6 +105,18 @@ sdkSentMessageInfoMaxSize = 20000
 sdkDeleteRateInfo = {}
 sdkDeleteRateInfoLock = threading.Lock()
 sdkSelfInfo = {}
+# 富媒体上传 file_info 缓存:同一资源在平台返回的 ttl 内重发时免重复上传。
+sdkResourceUploadInfo = {}
+sdkResourceUploadInfoLock = threading.Lock()
+sdkResourceUploadInfoMaxSize = 2000
+sdkResourceUploadTTLMargin = 30.0  # 缓存留出的安全余量,避免拿到临期 file_info
+sdkResourceUploadTTLLongTerm = 6 * 86400.0  # 平台 ttl 为 0(长期有效)时的本地缓存时长
+sdkResourceUploadDirectMaxSize = 4 * 1024 * 1024  # 本地文件 base64 直传上限,超过走文档的分片上传
+sdkResourceUploadMd5_10mSize = 10002432  # 文档规定 md5_10m 校验的字节数(约 10MB)
+sdkResourceUploadBlockSize = 5 * 1024 * 1024  # 预上传未返回分块大小时的默认值(文档默认 5MB)
+sdkResourceUploadPartTimeout = 120.0  # 单个分片 PUT 的请求超时
+sdkResourceUploadPartRetryMax = 3  # 单个分片的最大尝试次数
+sdkResourceUploadPartMaxConcurrency = 8  # 分片并发上限,防御平台下发异常并发数
 
 qqMessageEventTypes = {
     'MESSAGE_CREATE',
@@ -292,6 +307,20 @@ class PAYLOAD(object):
             except Exception:
                 self.active = False
 
+    class sendResume(payload_template):
+        # 恢复登录态:重连后凭 session_id + 已收到的最新 seq 续传断线期间的事件。
+        def __init__(self, bot_info: bot_info_T, session_id, last_s):
+            payload_template.__init__(self)
+            self.data.op = 6
+            try:
+                self.data.d = {
+                    'token': 'QQBot %s' % (getTokenNow(bot_info)),
+                    'session_id': session_id,
+                    'seq': last_s
+                }
+            except Exception:
+                self.active = False
+
     class sendHeartbeat(payload_template):
         def __init__(self, last_s=None):
             payload_template.__init__(self)
@@ -455,21 +484,32 @@ def getTokenNow(bot_info: bot_info_T):
     tmpTime = int(datetime.now(timezone.utc).timestamp())
     if (
         tmpInfo[0] is not None
-        and tmpInfo[1] > tmpTime
+        and tmpInfo[1] > tmpTime + sdkTokenRefreshAhead
     ):
-        access_token = sdkTokenInfo[plugin_event_bot_hash][0]
+        # 距过期还早,直接用缓存 token
+        access_token = tmpInfo[0]
     else:
-        msg_this = API.getAppAccessToken(bot_info)
-        msg_this.data.clientSecret = bot_info.access_token
-        msg_this.data.appId = str(bot_info.id)
-        msg_this.do_api_plant()
-        if msg_this.res is not None:
-            raw_obj = init_api_json(msg_this.res)
-            sdkTokenInfo[plugin_event_bot_hash] = [
-                raw_obj.get('access_token', None),
-                tmpTime + int(raw_obj.get('expires_in', -1))
-            ]
-            access_token = sdkTokenInfo[plugin_event_bot_hash][0]
+        # 文档建议在过期前 60s 内换取新 token,旧 token 在此期间仍然有效
+        tmp_new_token = None
+        tmp_new_expire_at = -1
+        try:
+            msg_this = API.getAppAccessToken(bot_info)
+            msg_this.data.clientSecret = bot_info.access_token
+            msg_this.data.appId = str(bot_info.id)
+            msg_this.do_api_plant()
+            if msg_this.res is not None:
+                raw_obj = init_api_json(msg_this.res)
+                if (
+                    type(raw_obj) is dict
+                    and raw_obj.get('access_token', None) is not None
+                ):
+                    tmp_new_token = raw_obj['access_token']
+                    tmp_new_expire_at = tmpTime + int(raw_obj.get('expires_in', 7200))
+        except Exception:
+            tmp_new_token = None
+        if tmp_new_token is not None:
+            sdkTokenInfo[plugin_event_bot_hash] = [tmp_new_token, tmp_new_expire_at]
+            access_token = tmp_new_token
             try:
                 tmp_Proc = None
                 if OlivOS.bootAPI.gLoggerProc is not None:
@@ -487,6 +527,12 @@ def getTokenNow(bot_info: bot_info_T):
                     )
             except Exception:
                 traceback.print_exc()
+        elif (
+            tmpInfo[0] is not None
+            and tmpInfo[1] > tmpTime
+        ):
+            # 刷新失败但旧 token 尚未真正过期,先兜底沿用,避免覆盖成 None
+            access_token = tmpInfo[0]
     return access_token
 
 
@@ -676,6 +722,7 @@ class API(object):
                 self.is_wakeup = None   # bool
 
     # QQ 单聊/群聊富媒体上传。名称保留以兼容已有内部引用，实际支持图片、视频、语音和文件。
+    # 直传时携带 url 或 file_data；分片上传完成后携带 upload_id 请求合并，两者均返回 file_info。
     class setResourcePictureUpload(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
@@ -690,6 +737,9 @@ class API(object):
             def __init__(self):
                 self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
                 self.url = None        # 远程资源 URL
+                self.srv_send_msg = None  # bool，False 时仅返回 file_info，不由平台直接发消息
+                self.file_name = None  # 文件名
+                self.upload_id = None  # 分片上传任务 ID，合并分片时携带
                 self.file_data = None  # 本地资源的 base64 数据
 
         class metadata_T(object):
@@ -699,6 +749,60 @@ class API(object):
         def do_api(self, req_type='POST'):
             # 官方富媒体接口使用 JSON：远程资源传 url，本地资源传 base64 file_data。
             self.route = sdkAPIRoute[self.resource_type] + '/{openid}/files'
+            return api_templet.do_api(self, req_type)
+
+    # QQ 单聊/群聊富媒体预上传：按文件校验值换取 upload_id 与各分片的预签名 URL。
+    class uploadPrepare(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_prepare'
+            self.resource_type = 'qq_groups'
+
+        class data_T(object):
+            def __init__(self):
+                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
+                self.file_size = None  # str，文件总字节数
+                self.file_name = None  # 文件名
+                self.md5 = None        # 整个文件的 MD5
+                self.sha1 = None       # 整个文件的 SHA1
+                self.md5_10m = None    # 文件前 10002432 字节的 MD5
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST'):
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_prepare'
+            return api_templet.do_api(self, req_type)
+
+    # QQ 单聊/群聊分片上传完成确认：每个分片 PUT 成功后通知平台。
+    class uploadPartFinish(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_part_finish'
+            self.resource_type = 'qq_groups'
+
+        class data_T(object):
+            def __init__(self):
+                self.upload_id = None   # 分片上传任务 ID
+                self.part_index = None  # int，分片序号，从 0 开始
+                self.block_size = None  # str，该分片的字节数
+                self.md5 = None         # 该分片数据的 MD5
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST'):
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_part_finish'
             return api_templet.do_api(self, req_type)
 
     class deleteMessage(api_templet):
@@ -2272,12 +2376,19 @@ class event_action(object):
                     chat_id,
                     send_results
                 )
+            file_name = None
+            if (
+                isinstance(message_this, OlivOS.messageAPI.PARA.file)
+                and message_this.data is not None
+            ):
+                file_name = message_this.data.get('name', None)
             file_info = event_action.setResourceUploadFast(
                 target_event,
                 resource_url,
                 chat_id,
                 type_path=type_path,
-                type_chat='qq_users' if flag_direct else 'qq_groups'
+                type_chat='qq_users' if flag_direct else 'qq_groups',
+                file_name=file_name
             )
             if file_info is None:
                 send_results.append(event_action._make_local_result(
@@ -2857,14 +2968,16 @@ class event_action(object):
             return None
 
     # QQ 富媒体必须先上传获取 file_info，再由 send_qq_msg 调用消息发送接口。
+    # 远程资源交平台拉取；本地小文件 base64 直传，直传失败或超限时走文档的分片上传；
+    # 成功结果按平台返回的 ttl 缓存，同一资源有效期内重发免重复上传。
     def setResourceUploadFast(
         target_event,
         url: str,
         chat_id,
         type_path: str,
-        type_chat: str
+        type_chat: str,
+        file_name=None
     ):
-        res = None
         file_type_map = {
             'images': 1,
             'videos': 2,
@@ -2873,33 +2986,394 @@ class event_action(object):
         }
         file_type = file_type_map.get(type_path, 4)
         try:
-            msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
-            msg_upload_api.resource_type = type_chat
-            msg_upload_api.metadata.openid = str(chat_id)
-            msg_upload_api.data.file_type = file_type
-
             url_parsed = parse.urlparse(url)
-            if url_parsed.scheme in ['http', 'https']:
-                # 远程资源直接交给 QQ 平台拉取，避免 OlivOS 额外下载和重复编码。
-                msg_upload_api.data.url = url
+            flag_remote = url_parsed.scheme in ['http', 'https']
+            file_data = None
+            if flag_remote:
+                resource_key = 'url:%s' % url
             else:
                 file_data = event_action._get_local_resource_data(url, type_path)
-                msg_upload_api.data.file_data = base64.b64encode(file_data).decode('ascii')
+                resource_key = 'md5:%s:%d' % (
+                    hashlib.md5(file_data).hexdigest(),
+                    len(file_data)
+                )
+            cache_key = (
+                str(target_event.bot_info.hash),
+                str(type_chat),
+                str(chat_id),
+                str(file_type),
+                resource_key
+            )
+            file_info = _get_cached_resource_upload(cache_key)
+            if file_info is not None:
+                return file_info
 
-            msg_upload_api.do_api('POST')
-            if msg_upload_api.res is not None:
-                msg_upload_api_obj = init_api_json(msg_upload_api.res)
-                if type(msg_upload_api_obj) is dict:
-                    if msg_upload_api_obj.get('code', 0) != 0:
-                        return None
-                    # 当前接口成功时直接返回媒体对象；兼容部分环境的 data 包装格式。
-                    msg_upload_api_data = msg_upload_api_obj.get('data', msg_upload_api_obj)
-                    if type(msg_upload_api_data) is dict:
-                        res = msg_upload_api_data.get('file_info', None)
+            ttl = None
+            if flag_remote:
+                # 远程资源直接交给 QQ 平台拉取，避免 OlivOS 额外下载和重复编码。
+                file_info, ttl = event_action._upload_resource_direct(
+                    target_event,
+                    chat_id,
+                    type_chat,
+                    file_type,
+                    url=url
+                )
+            else:
+                file_name = event_action._get_resource_file_name(
+                    url,
+                    type_path=type_path,
+                    file_name=file_name
+                )
+                if len(file_data) <= sdkResourceUploadDirectMaxSize:
+                    file_info, ttl = event_action._upload_resource_direct(
+                        target_event,
+                        chat_id,
+                        type_chat,
+                        file_type,
+                        file_data=file_data,
+                        file_name=file_name
+                    )
+                    if file_info is None:
+                        # file_data 直传失败时回退到文档的分片上传流程。
+                        file_info, ttl = event_action._upload_resource_chunked(
+                            target_event,
+                            chat_id,
+                            type_chat,
+                            file_type,
+                            file_data,
+                            file_name
+                        )
+                else:
+                    # 大文件按文档走分片上传，避免超长 base64 请求体。
+                    file_info, ttl = event_action._upload_resource_chunked(
+                        target_event,
+                        chat_id,
+                        type_chat,
+                        file_type,
+                        file_data,
+                        file_name
+                    )
+            if file_info is not None:
+                _cache_resource_upload(cache_key, file_info, ttl)
+            return file_info
         except Exception:
             traceback.print_exc()
-            res = None
-        return res
+            return None
+
+    # 富媒体直传：远程资源传 url，本地资源传 base64 file_data；
+    # srv_send_msg 固定为 False，消息统一由 send_qq_msg 走消息接口发送以支持被动回复。
+    def _upload_resource_direct(
+        target_event,
+        chat_id,
+        type_chat,
+        file_type,
+        url=None,
+        file_data=None,
+        file_name=None
+    ):
+        msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
+        msg_upload_api.resource_type = type_chat
+        msg_upload_api.metadata.openid = str(chat_id)
+        msg_upload_api.data.file_type = file_type
+        msg_upload_api.data.file_name = file_name
+        msg_upload_api.data.srv_send_msg = False
+        if url is not None:
+            msg_upload_api.data.url = url
+        elif file_data is not None:
+            msg_upload_api.data.file_data = base64.b64encode(file_data).decode('ascii')
+        msg_upload_api.do_api('POST')
+        file_info, ttl = event_action._parse_resource_upload_result(msg_upload_api)
+        if file_info is None:
+            event_action._log_qq_upload(target_event, 'files', api_obj=msg_upload_api)
+        return file_info, ttl
+
+    # 按文档的分片上传流程处理本地文件：预上传换取 upload_id 与分片预签名 URL，
+    # 逐片 PUT 并确认，最后携带 upload_id 调用上传接口合并取 file_info。
+    def _upload_resource_chunked(
+        target_event,
+        chat_id,
+        type_chat,
+        file_type,
+        file_data,
+        file_name
+    ):
+        sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
+        prepare_api = API.uploadPrepare(sdk_bot_info)
+        prepare_api.resource_type = type_chat
+        prepare_api.metadata.openid = str(chat_id)
+        prepare_api.data.file_type = file_type
+        prepare_api.data.file_size = str(len(file_data))
+        prepare_api.data.file_name = file_name
+        prepare_api.data.md5 = hashlib.md5(file_data).hexdigest()
+        prepare_api.data.sha1 = hashlib.sha1(file_data).hexdigest()
+        prepare_api.data.md5_10m = hashlib.md5(
+            file_data[:sdkResourceUploadMd5_10mSize]
+        ).hexdigest()
+        prepare_api.do_api('POST')
+        prepare_obj = init_api_json(prepare_api.res)
+        flag_prepare_ok = (
+            prepare_api.res_code is not None
+            and 200 <= prepare_api.res_code < 300
+            and type(prepare_obj) is dict
+            and event_action._get_api_error_code(prepare_obj) in [None, 0]
+        )
+        upload_id = None
+        if flag_prepare_ok:
+            upload_id = prepare_obj.get('upload_id', None)
+        if upload_id is None or str(upload_id) == '':
+            event_action._log_qq_upload(target_event, 'upload_prepare', api_obj=prepare_api)
+            return None, None
+        upload_id = str(upload_id)
+
+        upload_parts = event_action._get_resource_upload_parts(prepare_obj, len(file_data))
+        if upload_parts is None:
+            event_action._log_qq_upload(
+                target_event,
+                'upload_prepare',
+                detail='invalid parts in response'
+            )
+            return None, None
+
+        upload_config = prepare_obj.get('upload_config', None)
+        if type(upload_config) is not dict:
+            upload_config = {}
+        concurrency = event_action._get_upload_int(upload_config.get('concurrency', None), 1)
+        concurrency = max(1, min(
+            concurrency,
+            sdkResourceUploadPartMaxConcurrency,
+            len(upload_parts)
+        ))
+        retry_timeout = event_action._get_upload_float(upload_config.get('retry_timeout', None), 300.0)
+        retry_delay = event_action._get_upload_float(upload_config.get('retry_delay', None), 1.0)
+
+        def upload_part_this(upload_part):
+            return event_action._upload_resource_part(
+                sdk_bot_info,
+                chat_id,
+                type_chat,
+                upload_id,
+                upload_part,
+                file_data,
+                retry_timeout,
+                retry_delay
+            )
+
+        if concurrency > 1:
+            # 并发数由预上传响应的 upload_config 下发，官方默认为 1。
+            with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                part_results = list(executor.map(upload_part_this, upload_parts))
+        else:
+            part_results = []
+            for upload_part in upload_parts:
+                part_result = upload_part_this(upload_part)
+                part_results.append(part_result)
+                if not part_result:
+                    break
+        if len(part_results) != len(upload_parts) or not all(part_results):
+            event_action._log_qq_upload(
+                target_event,
+                'upload_part',
+                detail='chunk upload failed (%d/%d parts done)' % (
+                    sum(1 for part_result in part_results if part_result),
+                    len(upload_parts)
+                )
+            )
+            return None, None
+
+        merge_api = API.setResourcePictureUpload(sdk_bot_info)
+        merge_api.resource_type = type_chat
+        merge_api.metadata.openid = str(chat_id)
+        merge_api.data.file_type = file_type
+        merge_api.data.file_name = file_name
+        merge_api.data.upload_id = upload_id
+        merge_api.data.srv_send_msg = False
+        merge_api.do_api('POST')
+        file_info, ttl = event_action._parse_resource_upload_result(merge_api)
+        if file_info is None:
+            event_action._log_qq_upload(target_event, 'chunk merge', api_obj=merge_api)
+        return file_info, ttl
+
+    # 上传单个分片：PUT 预签名 URL 成功后调用 upload_part_finish 确认，
+    # 失败时按平台下发的 retry_delay/retry_timeout 重试。
+    def _upload_resource_part(
+        sdk_bot_info,
+        chat_id,
+        type_chat,
+        upload_id,
+        upload_part,
+        file_data,
+        retry_timeout,
+        retry_delay
+    ):
+        part_data = file_data[upload_part['offset']:upload_part['offset'] + upload_part['size']]
+        part_md5 = hashlib.md5(part_data).hexdigest()
+        retry_deadline = time.monotonic() + retry_timeout
+        attempt_count = 0
+        while True:
+            attempt_count += 1
+            flag_put_ok = False
+            try:
+                # 预签名 URL 已含鉴权，不能附加额外头部，避免破坏签名校验。
+                put_res = req.request(
+                    'PUT',
+                    upload_part['presigned_url'],
+                    data=part_data,
+                    timeout=sdkResourceUploadPartTimeout
+                )
+                flag_put_ok = 200 <= put_res.status_code < 300
+            except Exception:
+                traceback.print_exc()
+            if flag_put_ok:
+                finish_api = API.uploadPartFinish(sdk_bot_info)
+                finish_api.resource_type = type_chat
+                finish_api.metadata.openid = str(chat_id)
+                finish_api.data.upload_id = upload_id
+                finish_api.data.part_index = upload_part['index']
+                finish_api.data.block_size = str(upload_part['size'])
+                finish_api.data.md5 = part_md5
+                finish_api.do_api('POST')
+                finish_obj = init_api_json(finish_api.res)
+                if (
+                    finish_api.res_code is not None
+                    and 200 <= finish_api.res_code < 300
+                    and (
+                        type(finish_obj) is not dict
+                        or event_action._get_api_error_code(finish_obj) in [None, 0]
+                    )
+                ):
+                    return True
+            if (
+                attempt_count >= sdkResourceUploadPartRetryMax
+                or time.monotonic() + retry_delay >= retry_deadline
+            ):
+                return False
+            time.sleep(retry_delay)
+
+    # 解析预上传返回的分片列表并换算每片的数据范围；结构非法时返回 None。
+    def _get_resource_upload_parts(prepare_obj, file_size):
+        parts_raw = prepare_obj.get('parts', None)
+        if type(parts_raw) is not list or len(parts_raw) == 0:
+            return None
+        block_size_default = event_action._get_upload_int(
+            prepare_obj.get('block_size', None),
+            sdkResourceUploadBlockSize
+        )
+        if block_size_default <= 0:
+            block_size_default = sdkResourceUploadBlockSize
+        parts_sorted = []
+        for part_this in parts_raw:
+            if type(part_this) is not dict:
+                return None
+            part_index = event_action._get_upload_int(part_this.get('index', None), -1)
+            presigned_url = part_this.get('presigned_url', None)
+            if (
+                part_index < 0
+                or type(presigned_url) is not str
+                or presigned_url == ''
+            ):
+                return None
+            part_block_size = event_action._get_upload_int(
+                part_this.get('block_size', None),
+                block_size_default
+            )
+            if part_block_size <= 0:
+                part_block_size = block_size_default
+            parts_sorted.append((part_index, presigned_url, part_block_size))
+        parts_sorted.sort(key=lambda part_this: part_this[0])
+        upload_parts = []
+        data_offset = 0
+        for part_index, presigned_url, part_block_size in parts_sorted:
+            data_end = min(data_offset + part_block_size, file_size)
+            if data_end <= data_offset:
+                return None
+            upload_parts.append({
+                'index': part_index,
+                'presigned_url': presigned_url,
+                'offset': data_offset,
+                'size': data_end - data_offset
+            })
+            data_offset = data_end
+        if data_offset != file_size:
+            # 分片总长与文件不一致说明预上传结果异常，避免上传残缺数据。
+            return None
+        return upload_parts
+
+    # 解析富媒体上传/合并响应；成功返回 (file_info, ttl)，失败返回 (None, None)。
+    def _parse_resource_upload_result(api_obj):
+        raw_obj = init_api_json(api_obj.res)
+        if type(raw_obj) is not dict:
+            return None, None
+        if event_action._get_api_error_code(raw_obj) not in [None, 0]:
+            return None, None
+        if api_obj.res_code is not None and not 200 <= api_obj.res_code < 300:
+            return None, None
+        # 当前接口成功时直接返回媒体对象；兼容部分环境的 data 包装格式。
+        raw_data = raw_obj.get('data', raw_obj)
+        if type(raw_data) is not dict:
+            return None, None
+        file_info = raw_data.get('file_info', None)
+        if type(file_info) is not str or file_info == '':
+            return None, None
+        return file_info, raw_data.get('ttl', None)
+
+    # 分片上传与文件消息需要文件名；优先用消息段提供的 name，再取 URL 路径，最后生成兜底名。
+    def _get_resource_file_name(url, type_path='files', file_name=None):
+        if type(file_name) is str and file_name.strip() != '':
+            return file_name.strip()
+        try:
+            url_path = parse.urlparse(url).path
+            base_name = os.path.basename(parse.unquote(url_path)).strip()
+        except Exception:
+            base_name = ''
+        if base_name != '' and '.' in base_name:
+            return base_name
+        ext_map = {
+            'images': 'png',
+            'videos': 'mp4',
+            'audios': 'silk',
+            'files': 'dat'
+        }
+        return '%s.%s' % (str(uuid.uuid4()), ext_map.get(type_path, 'dat'))
+
+    def _get_upload_int(value, default):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _get_upload_float(value, default):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return default
+        if value <= 0:
+            return default
+        return value
+
+    def _log_qq_upload(target_event, stage, api_obj=None, detail=None):
+        if target_event.log_func is None:
+            return
+        if api_obj is not None:
+            res_text = str(api_obj.res) if api_obj.res is not None else 'no response'
+            if len(res_text) > 1000:
+                res_text = res_text[:1000] + '...'
+            res_code_text = 'n/a' if api_obj.res_code is None else str(api_obj.res_code)
+            detail = 'HTTP %s %s' % (res_code_text, res_text)
+        try:
+            target_event.log_func(
+                3,
+                'OlivOS qqGuildv2SDK QQ media upload [%s] failed: %s' % (
+                    str(stage),
+                    str(detail)
+                ),
+                [
+                    (target_event.getBotIDStr(), 'default'),
+                    (modelName, 'default'),
+                    ('setResourceUploadFast', 'callback')
+                ]
+            )
+        except Exception:
+            traceback.print_exc()
 
 
 class inde_interface(OlivOS.API.inde_interface_T):
@@ -3315,6 +3789,59 @@ def _acquire_delete_rate(bot_hash):
             return False
         history.append(now)
         return True
+
+
+def _get_cached_resource_upload(cache_key):
+    """命中未过期的 file_info 缓存时直接复用，避免重复上传同一富媒体资源。"""
+    now = time.monotonic()
+    with sdkResourceUploadInfoLock:
+        cache_data = sdkResourceUploadInfo.get(cache_key, None)
+        if cache_data is None:
+            return None
+        if cache_data['expires_at'] <= now:
+            sdkResourceUploadInfo.pop(cache_key, None)
+            return None
+        return cache_data['file_info']
+
+
+def _cache_resource_upload(cache_key, file_info, ttl):
+    """按平台返回的 ttl 缓存 file_info；0 表示长期有效，其余留出安全余量。"""
+    try:
+        ttl_value = float(ttl)
+    except (TypeError, ValueError):
+        return
+    if ttl_value < 0:
+        return
+    now = time.monotonic()
+    if ttl_value == 0:
+        expires_at = now + sdkResourceUploadTTLLongTerm
+    else:
+        ttl_value -= sdkResourceUploadTTLMargin
+        if ttl_value <= 0:
+            return
+        expires_at = now + ttl_value
+    with sdkResourceUploadInfoLock:
+        if (
+            cache_key not in sdkResourceUploadInfo
+            and len(sdkResourceUploadInfo) >= sdkResourceUploadInfoMaxSize
+        ):
+            expired_keys = [
+                key_this
+                for key_this, data_this in sdkResourceUploadInfo.items()
+                if data_this['expires_at'] <= now
+            ]
+            for key_this in expired_keys:
+                sdkResourceUploadInfo.pop(key_this, None)
+            if len(sdkResourceUploadInfo) >= sdkResourceUploadInfoMaxSize:
+                oldest_key = min(
+                    sdkResourceUploadInfo,
+                    key=lambda key_this: sdkResourceUploadInfo[key_this]['expires_at']
+                )
+                sdkResourceUploadInfo.pop(oldest_key, None)
+        sdkResourceUploadInfo[cache_key] = {
+            'file_info': file_info,
+            'expires_at': expires_at
+        }
 
 
 def init_api_json(raw_str):
