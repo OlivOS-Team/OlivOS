@@ -1346,6 +1346,8 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_msg(self, message_id)
         return res_data
 
     def get_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):

@@ -42,6 +42,8 @@ class server(OlivOS.API.Proc_templet):
             'websocket_url': None,
             'pulse_interval': None,
             'last_s': None,
+            'session_id': None,
+            'last_rx_time': None,
             'ws_obj': None,
             'ws_item': None
         }
@@ -49,6 +51,7 @@ class server(OlivOS.API.Proc_templet):
 
     def run(self):
         self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] is running')
+        tmp_fail_count = 0
         while True:
             api_obj = OlivOS.qqGuildv2SDK.API.getGateway(
                 OlivOS.qqGuildv2SDK.get_SDK_bot_info_from_Plugin_bot_info(
@@ -62,12 +65,30 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
             if self.Proc_data['extend_data']['websocket_url'] is not None:
+                tmp_connect_start_time = time.time()
                 self.run_websocket_rx_connect_start()
+                if time.time() - tmp_connect_start_time < 5:
+                    # 连接存活过短,视作失败(鉴权被拒/立即断开),累计退避
+                    tmp_fail_count += 1
+                else:
+                    tmp_fail_count = 0
+            else:
+                tmp_fail_count += 1
+            if tmp_fail_count > 0:
+                # 指数退避:2s 起步,封顶 60s,避免高频打接口触发限频
+                tmp_backoff_interval = min(60, 2 ** min(tmp_fail_count, 6))
+                self.log(
+                    1,
+                    'OlivOS qqGuild link server [' + self.Proc_name + '] websocket retry in '
+                    + str(tmp_backoff_interval) + 's'
+                )
+                time.sleep(tmp_backoff_interval)
             time.sleep(self.Proc_info.scan_interval)
 
     def on_message(self, ws, message):
         try:
             # print(message)
+            self.Proc_data['extend_data']['last_rx_time'] = time.time()
             tmp_data_rx_obj = OlivOS.qqGuildv2SDK.PAYLOAD.rxPacket(
                 data=json.loads(message)
             )
@@ -81,7 +102,15 @@ class server(OlivOS.API.Proc_templet):
                     tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)
                 if tmp_data_rx_obj.data.t == 'READY':
+                    # 保存 session_id,供断线后 Resume(op 6) 恢复登录态使用
+                    if (
+                        type(tmp_data_rx_obj.data.d) is dict
+                        and type(tmp_data_rx_obj.data.d.get('session_id', None)) is str
+                    ):
+                        self.Proc_data['extend_data']['session_id'] = tmp_data_rx_obj.data.d['session_id']
                     self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify ACK')
+                elif tmp_data_rx_obj.data.t == 'RESUMED':
+                    self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket resume ACK')
             elif tmp_data_rx_obj.data.op == 1:
                 tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendHeartbeat(
                     self.Proc_data['extend_data']['last_s']
@@ -92,21 +121,43 @@ class server(OlivOS.API.Proc_templet):
                 self.log(1, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket reconnect requested')
                 ws.close()
             elif tmp_data_rx_obj.data.op == 9:
+                # Invalid Session:鉴权/Resume 参数错误,会话已不可恢复,清理后重连走全新 Identify
                 self.log(3, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket invalid session')
+                self.Proc_data['extend_data']['session_id'] = None
+                self.Proc_data['extend_data']['last_s'] = None
                 ws.close()
             elif tmp_data_rx_obj.data.op == 10:
                 self.Proc_data['extend_data']['pulse_interval'] = tmp_data_rx_obj.data.d['heartbeat_interval'] / 1000
-                tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendIdentify(
-                    OlivOS.qqGuildv2SDK.get_SDK_bot_info_from_Plugin_bot_info(
-                        self.Proc_data['bot_info_dict']
-                    )
-                ).dump()
+                # 存在有效会话时优先 Resume(op 6) 续传断线期间事件,否则全新 Identify(op 2)
+                flag_resume = (
+                    self.Proc_data['extend_data']['session_id'] is not None
+                    and self.Proc_data['extend_data']['last_s'] is not None
+                )
+                if flag_resume:
+                    tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendResume(
+                        OlivOS.qqGuildv2SDK.get_SDK_bot_info_from_Plugin_bot_info(
+                            self.Proc_data['bot_info_dict']
+                        ),
+                        self.Proc_data['extend_data']['session_id'],
+                        self.Proc_data['extend_data']['last_s']
+                    ).dump()
+                else:
+                    # 全新会话:seq 从头计,心跳的 d 首次应为 null
+                    self.Proc_data['extend_data']['last_s'] = None
+                    tmp_data = OlivOS.qqGuildv2SDK.PAYLOAD.sendIdentify(
+                        OlivOS.qqGuildv2SDK.get_SDK_bot_info_from_Plugin_bot_info(
+                            self.Proc_data['bot_info_dict']
+                        )
+                    ).dump()
                 threading.Thread(
                     target=self.run_pulse,
                     args=()
                 ).start()
                 ws.send(tmp_data)
-                self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
+                if flag_resume:
+                    self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket resume send')
+                else:
+                    self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket identify send')
             elif tmp_data_rx_obj.data.op == 11:
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse ACK')
         except Exception as error:
@@ -130,7 +181,15 @@ class server(OlivOS.API.Proc_templet):
         )
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link close')
+        # 4006 无效的 session id / 4007 seq 错误:会话不可恢复,清理后走全新 Identify
+        if close_status_code in [4006, 4007]:
+            self.Proc_data['extend_data']['session_id'] = None
+            self.Proc_data['extend_data']['last_s'] = None
+        self.log(
+            0,
+            'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link close ['
+            + str(close_status_code) + ']'
+        )
 
     def on_open(self, ws):
         self.log(2, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket link start')
@@ -151,6 +210,19 @@ class server(OlivOS.API.Proc_templet):
             ):
                 self.log(0, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse giveup')
                 return
+            tmp_last_rx_time = self.Proc_data['extend_data']['last_rx_time']
+            if (
+                tmp_last_rx_time is not None
+                and time.time() - tmp_last_rx_time > tmp_pulse_interval * 2 + 15
+            ):
+                # 链路静默过久(心跳 ACK/事件均无),判定为半开连接,强制断开触发重连(可 Resume)
+                self.log(1, 'OlivOS qqGuild link server [' + self.Proc_name + '] websocket pulse timeout')
+                try:
+                    if self.Proc_data['extend_data']['ws_obj'] is not None:
+                        self.Proc_data['extend_data']['ws_obj'].close()
+                except Exception:
+                    pass
+                break
             if self.Proc_data['extend_data']['ws_obj'] is not None:
                 try:
                     self.Proc_data['extend_data']['ws_obj'].send(tmp_data)
@@ -173,6 +245,7 @@ class server(OlivOS.API.Proc_templet):
         )
         self.Proc_data['extend_data']['ws_obj'] = ws
         self.Proc_data['extend_data']['ws_item'] = uuid.uuid4()
+        self.Proc_data['extend_data']['last_rx_time'] = time.time()
         ws.run_forever()
         self.Proc_data['extend_data']['pulse_interval'] = None
         self.Proc_data['extend_data']['ws_obj'] = None
