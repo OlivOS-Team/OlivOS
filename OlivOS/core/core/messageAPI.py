@@ -88,6 +88,7 @@ dictMessageType = {
             'private': 'olivos_para',
             'private_intents': 'olivos_para',
             'public': 'olivos_para',
+            'public_guild_only': 'olivos_para',
             'public_intents': 'olivos_para'
         }
     },
@@ -236,7 +237,7 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.dodo()
-        elif get_type == 'qqGuild_string':
+        elif get_type in ['qqGuild_string', 'qqGuildv2_string']:
             res = ''
             for data_this in self.data:
                 res += data_this.OP()
@@ -274,7 +275,9 @@ class Message_templet(object):
         elif self.mode_rx == 'dodo_string':
             self.init_from_angle_code_string()
         elif self.mode_rx == 'qqGuild_string':
-            self.init_from_angle_code_string()
+            self.init_from_qq_guild_code_string()
+        elif self.mode_rx == 'qqGuildv2_string':
+            self.init_from_qq_guild_v2_code_string()
         elif self.mode_rx == 'kaiheila_string':
             self.init_from_kaiheila_code_string()
         elif self.mode_rx == 'discord_string':
@@ -760,6 +763,34 @@ class Message_templet(object):
                     tmp_para_this = PARA.text(tmp_data_raw_this)
                     tmp_data.append(tmp_para_this)
                 it_data_base = it_data_this
+        self.data = tmp_data
+
+    def init_from_qq_guild_code_string(self):
+        self.init_from_qq_code_string()
+
+    def init_from_qq_guild_v2_code_string(self):
+        self.init_from_qq_code_string()
+
+    def init_from_qq_code_string(self):
+        tmp_data_raw = str(self.data_raw)
+        tmp_data = []
+        last_index = 0
+        at_tag_pattern = re.compile(
+            r'<qqbot-at-user\s+id=(?P<quote>["\'])(?P<qq_user>[^"\']+)'
+            r'(?P=quote)\s*/>|<qqbot-at-everyone\s*/>'
+            r'|<@!?(?P<guild_user>[^<>&]+)>|@everyone(?!\w)'
+        )
+        for match in at_tag_pattern.finditer(tmp_data_raw):
+            if match.start() > last_index:
+                tmp_data.append(PARA.text(tmp_data_raw[last_index:match.start()]))
+            user_id = match.group('qq_user') or match.group('guild_user')
+            if user_id is None:
+                tmp_data.append(PARA.at(id='all'))
+            else:
+                tmp_data.append(PARA.at(id=str(user_id)))
+            last_index = match.end()
+        if last_index < len(tmp_data_raw):
+            tmp_data.append(PARA.text(tmp_data_raw[last_index:]))
         self.data = tmp_data
 
     def init_from_kaiheila_code_string(self):
