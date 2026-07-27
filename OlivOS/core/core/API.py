@@ -2592,6 +2592,8 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_stranger_info(self, user_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_stranger_info(self, user_id, no_cache)
         return res_data
 
     def get_stranger_info(self, user_id: 'str|int', no_cache: bool = False, flag_log: bool = True,
@@ -2778,6 +2780,8 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_group_member_info(self, group_id, user_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_info(self, group_id, user_id)
         return res_data
 
     def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,

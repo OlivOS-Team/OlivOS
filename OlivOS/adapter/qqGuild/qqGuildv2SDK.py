@@ -216,12 +216,22 @@ sdkRxMessageInfoMaxSize = 20000
 # 用于把引用事件的 ref_msg_idx 还原成真正的 message_id。
 sdkMsgIdxInfo = {}
 sdkMsgIdxInfoLock = threading.Lock()
+sdkMsgIdxInfoLastCleanup = 0.0
 sdkMsgIdxInfoTTL = 7200.0
 sdkMsgIdxInfoMaxSize = 20000
+# 消息内容缓存单条文本上限:防御超长消息(长 markdown/合并转发)把缓存撑大。
+sdkRxMessageContentMaxLen = 4096
 # 未映射到 OlivOS 标准事件的平台事件环形缓存(按 bot 维度),供 SDK 层查询。
 sdkUnhandledEventInfo = {}
 sdkUnhandledEventLock = threading.Lock()
 sdkUnhandledEventMaxSize = 200
+# 用户信息缓存:消息/事件/mentions 中出现过的用户,按各类 openid 建索引,
+# 记录昵称/角色/union_openid 等,供 get_stranger_info / at 昵称补全使用。
+sdkUserInfo = {}
+sdkUserInfoLock = threading.Lock()
+sdkUserInfoLastCleanup = 0.0
+sdkUserInfoTTL = 7 * 86400.0
+sdkUserInfoMaxSize = 50000
 
 
 class bot_info_T(object):
@@ -1906,6 +1916,142 @@ def _get_qq_guild_sender_role(member):
     return 'member'
 
 
+def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_id=None):
+    # 登记/合并用户信息:author、mentions 条目、频道 user 对象均可直接传入。
+    # 同一用户的 member_openid/user_openid/union_openid/id 各建一条索引,指向同一记录。
+    global sdkUserInfoLastCleanup
+    if not isinstance(user_obj, dict):
+        return None
+    id_keys = ['member_openid', 'user_openid', 'union_openid', 'id']
+    user_ids = []
+    for id_key in id_keys:
+        user_id = user_obj.get(id_key, None)
+        if user_id is not None and str(user_id) != '' and str(user_id) not in user_ids:
+            user_ids.append(str(user_id))
+    if len(user_ids) == 0:
+        return None
+    username = user_obj.get('username', None)
+    if (
+        not isinstance(username, str)
+        or username.strip() == ''
+        or username in ['用户', 'Nobody']
+    ):
+        # 平台缺省昵称/框架占位名不入缓存,避免覆盖真实昵称。
+        username = None
+    now_monotonic = time.monotonic()
+    with sdkUserInfoLock:
+        if now_monotonic - sdkUserInfoLastCleanup >= 300:
+            expired_keys = [
+                key for key, data in sdkUserInfo.items()
+                if now_monotonic - data['time_monotonic'] >= sdkUserInfoTTL
+            ]
+            for key in expired_keys:
+                sdkUserInfo.pop(key, None)
+            sdkUserInfoLastCleanup = now_monotonic
+        record = None
+        for user_id in user_ids:
+            record = sdkUserInfo.get((str(bot_hash), user_id), None)
+            if record is not None:
+                break
+        if record is None:
+            record = {
+                'id': user_ids[0],
+                'name': None,
+                'member_openid': None,
+                'user_openid': None,
+                'union_openid': None,
+                'union_user_account': None,
+                'bot': None,
+                'role': None,
+                'chat_type': None,
+                'chat_id': None,
+                'time': 0,
+                'time_monotonic': 0.0
+            }
+        for id_key in ['member_openid', 'user_openid', 'union_openid']:
+            id_value = user_obj.get(id_key, None)
+            if id_value is not None and str(id_value) != '':
+                record[id_key] = str(id_value)
+        union_user_account = user_obj.get('union_user_account', None)
+        if union_user_account is not None and str(union_user_account) != '':
+            record['union_user_account'] = str(union_user_account)
+        if isinstance(user_obj.get('bot', None), bool):
+            record['bot'] = user_obj['bot']
+        if username is not None:
+            record['name'] = username
+        if role is not None:
+            record['role'] = str(role)
+        if chat_type is not None:
+            record['chat_type'] = str(chat_type)
+        if chat_id is not None and str(chat_id) != '':
+            record['chat_id'] = str(chat_id)
+        record['time'] = int(time.time())
+        record['time_monotonic'] = now_monotonic
+        # 容量上限:一次性淘汰最旧的一批,避免每条消息都全量扫描。
+        if len(sdkUserInfo) >= sdkUserInfoMaxSize:
+            oldest_keys = sorted(
+                sdkUserInfo,
+                key=lambda key: sdkUserInfo[key]['time_monotonic']
+            )[:max(100, len(sdkUserInfo) - sdkUserInfoMaxSize + len(user_ids))]
+            for key in oldest_keys:
+                sdkUserInfo.pop(key, None)
+        for user_id in user_ids:
+            sdkUserInfo[(str(bot_hash), user_id)] = record
+    return record
+
+
+def _register_qq_user_info_from_mentions(bot_hash, mentions, chat_type=None, chat_id=None):
+    if not isinstance(mentions, list):
+        return
+    for mention in mentions:
+        _register_qq_user_info(
+            bot_hash,
+            mention,
+            chat_type=chat_type,
+            chat_id=chat_id
+        )
+
+
+def _get_qq_user_info(bot_hash, user_id):
+    if user_id is None or str(user_id) == '':
+        return None
+    with sdkUserInfoLock:
+        record = sdkUserInfo.get((str(bot_hash), str(user_id)), None)
+        if record is None:
+            return None
+        if time.monotonic() - record['time_monotonic'] >= sdkUserInfoTTL:
+            sdkUserInfo.pop((str(bot_hash), str(user_id)), None)
+            return None
+        return copy.deepcopy(record)
+
+
+def _get_qq_user_name_from_cache(bot_hash, user_id):
+    record = _get_qq_user_info(bot_hash, user_id)
+    if record is None:
+        return None
+    return record.get('name', None)
+
+
+def _get_qq_author_name_cached(bot_hash, author, fallback_user_id=None):
+    # 本条消息带昵称就用本条的;缺省时回退到该用户历史消息留下的缓存昵称。
+    author_name = _get_qq_author_name(author)
+    if author_name != '用户':
+        return author_name
+    lookup_ids = []
+    if isinstance(author, dict):
+        for id_key in ['member_openid', 'user_openid', 'union_openid', 'id']:
+            id_value = author.get(id_key, None)
+            if id_value is not None and str(id_value) != '':
+                lookup_ids.append(str(id_value))
+    if fallback_user_id is not None and str(fallback_user_id) != '':
+        lookup_ids.append(str(fallback_user_id))
+    for lookup_id in lookup_ids:
+        cached_name = _get_qq_user_name_from_cache(bot_hash, lookup_id)
+        if cached_name is not None:
+            return cached_name
+    return '用户'
+
+
 def _parse_qq_message_scene_ext(message_scene):
     result = {}
     if not isinstance(message_scene, dict):
@@ -2043,21 +2189,27 @@ def _register_qq_msg_idx(bot_hash, chat_type, chat_id, msg_idx, message_id):
         or chat_id is None or str(chat_id) == ''
     ):
         return
+    global sdkMsgIdxInfoLastCleanup
     now = time.monotonic()
     cache_key = (str(bot_hash), str(chat_type), str(chat_id), str(msg_idx))
     with sdkMsgIdxInfoLock:
-        expired_keys = [
-            key for key, data in sdkMsgIdxInfo.items()
-            if now - data['created_monotonic'] >= sdkMsgIdxInfoTTL
-        ]
-        for key in expired_keys:
-            sdkMsgIdxInfo.pop(key, None)
+        # 过期清理按 60s 节流,避免每条消息全量扫描。
+        if now - sdkMsgIdxInfoLastCleanup >= 60:
+            expired_keys = [
+                key for key, data in sdkMsgIdxInfo.items()
+                if now - data['created_monotonic'] >= sdkMsgIdxInfoTTL
+            ]
+            for key in expired_keys:
+                sdkMsgIdxInfo.pop(key, None)
+            sdkMsgIdxInfoLastCleanup = now
         if cache_key not in sdkMsgIdxInfo and len(sdkMsgIdxInfo) >= sdkMsgIdxInfoMaxSize:
-            oldest_key = min(
+            # 一次性淘汰最旧的一批,摊薄满载时的每条消息开销。
+            oldest_keys = sorted(
                 sdkMsgIdxInfo,
                 key=lambda key: sdkMsgIdxInfo[key]['created_monotonic']
-            )
-            sdkMsgIdxInfo.pop(oldest_key, None)
+            )[:100]
+            for key in oldest_keys:
+                sdkMsgIdxInfo.pop(key, None)
         sdkMsgIdxInfo[cache_key] = {
             'message_id': str(message_id),
             'created_monotonic': now
@@ -2102,6 +2254,12 @@ def _register_qq_rx_message(
             message_str = message_obj.get('olivos_string')
         except Exception:
             message_str = None
+    # 超长内容截断,防御异常长消息撑大缓存。
+    if isinstance(message_str, str) and len(message_str) > sdkRxMessageContentMaxLen:
+        message_str = message_str[:sdkRxMessageContentMaxLen]
+    raw_message_str = raw_content if raw_content is not None else message_str
+    if isinstance(raw_message_str, str) and len(raw_message_str) > sdkRxMessageContentMaxLen:
+        raw_message_str = raw_message_str[:sdkRxMessageContentMaxLen]
     now = time.monotonic()
     cache_key = (str(bot_hash), str(message_id))
     with sdkRxMessageInfoLock:
@@ -2114,24 +2272,33 @@ def _register_qq_rx_message(
                 sdkRxMessageInfo.pop(key, None)
             sdkRxMessageInfoLastCleanup = now
         if cache_key not in sdkRxMessageInfo and len(sdkRxMessageInfo) >= sdkRxMessageInfoMaxSize:
-            oldest_key = min(
+            # 一次性淘汰最旧的一批,摊薄满载时的每条消息开销。
+            oldest_keys = sorted(
                 sdkRxMessageInfo,
                 key=lambda key: sdkRxMessageInfo[key]['created_monotonic']
-            )
-            sdkRxMessageInfo.pop(oldest_key, None)
+            )[:100]
+            for key in oldest_keys:
+                sdkRxMessageInfo.pop(key, None)
         sdkRxMessageInfo[cache_key] = {
             'message_id': str(message_id),
             'chat_type': str(chat_type),
             'chat_id': None if chat_id is None else str(chat_id),
             'channel_id': None if channel_id is None else str(channel_id),
             'message': message_str,
-            'raw_message': raw_content if raw_content is not None else message_str,
+            'raw_message': raw_message_str,
             'sender_id': None if sender_id is None else str(sender_id),
             'sender_name': sender_name,
             'time': _parse_qq_message_timestamp(timestamp),
             'created_monotonic': now
         }
     _register_qq_msg_idx(bot_hash, chat_type, chat_id, msg_idx, message_id)
+    if sender_id is not None and str(sender_id) != '':
+        _register_qq_user_info(
+            bot_hash,
+            {'id': str(sender_id), 'username': sender_name},
+            chat_type=chat_type,
+            chat_id=chat_id
+        )
 
 
 def _get_qq_rx_message(bot_hash, message_id):
@@ -2298,54 +2465,160 @@ def _get_qq_group_self_open_id_from_mentions(bot_hash, group_openid, mentions):
     return candidates[0]
 
 
-def _apply_qq_message_mentions(message_obj, mentions):
-    mention_map = _get_qq_mention_map(mentions)
-    if not mention_map or not isinstance(message_obj.data, list):
+def _get_qq_ordered_mention_ids(mentions):
+    # 按 mentions 数组原始顺序提取真实用户标识(群优先 member_openid,C2C 为 user_openid)。
+    result = []
+    if not isinstance(mentions, list):
+        return result
+    for mention in mentions:
+        if not isinstance(mention, dict):
+            continue
+        for id_key in ['member_openid', 'user_openid', 'id']:
+            user_id = mention.get(id_key, None)
+            if user_id is not None and str(user_id) != '':
+                result.append(str(user_id))
+                break
+    return result
+
+
+def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfill=False, bot_hash=None):
+    if not isinstance(message_obj.data, list):
         return
+    mention_map = _get_qq_mention_map(mentions)
     flag_updated = False
     message_data = []
-    for message_item in message_obj.data:
-        if isinstance(message_item, OlivOS.messageAPI.PARA.at):
-            user_id = str(message_item.data.get('id', ''))
-            username = mention_map.get(user_id, None)
-            if message_item.data.get('name', None) is None and username is not None:
-                message_item.data['name'] = username
-                flag_updated = True
-            message_data.append(message_item)
-            continue
-        if not isinstance(message_item, OlivOS.messageAPI.PARA.text):
-            message_data.append(message_item)
-            continue
-        text_content = message_item.data.get('text', '')
-        if not isinstance(text_content, str):
-            message_data.append(message_item)
-            continue
-        last_index = 0
-        flag_text_updated = False
-        for match in re.finditer(r'<@([^<>]+)>', text_content):
-            user_id = str(match.group(1))
-            if user_id not in mention_map:
+
+    def get_mention_username(user_id):
+        # mentions 优先,取不到时回退用户信息缓存里的历史昵称。
+        username = mention_map.get(user_id, None)
+        if username is None and bot_hash is not None:
+            username = _get_qq_user_name_from_cache(bot_hash, user_id)
+        return username
+
+    if mention_map:
+        for message_item in message_obj.data:
+            if isinstance(message_item, OlivOS.messageAPI.PARA.at):
+                user_id = str(message_item.data.get('id', ''))
+                username = get_mention_username(user_id)
+                if message_item.data.get('name', None) is None and username is not None:
+                    message_item.data['name'] = username
+                    flag_updated = True
+                message_data.append(message_item)
                 continue
-            if match.start() > last_index:
+            if not isinstance(message_item, OlivOS.messageAPI.PARA.text):
+                message_data.append(message_item)
+                continue
+            text_content = message_item.data.get('text', '')
+            if not isinstance(text_content, str):
+                message_data.append(message_item)
+                continue
+            last_index = 0
+            flag_text_updated = False
+            for match in re.finditer(r'<@([^<>]+)>', text_content):
+                user_id = str(match.group(1))
+                if user_id not in mention_map:
+                    continue
+                if match.start() > last_index:
+                    message_data.append(
+                        OlivOS.messageAPI.PARA.text(text_content[last_index:match.start()])
+                    )
                 message_data.append(
-                    OlivOS.messageAPI.PARA.text(text_content[last_index:match.start()])
+                    OlivOS.messageAPI.PARA.at(
+                        id=user_id,
+                        name=mention_map[user_id]
+                    )
                 )
-            message_data.append(
-                OlivOS.messageAPI.PARA.at(
-                    id=user_id,
-                    name=mention_map[user_id]
-                )
-            )
-            last_index = match.end()
-            flag_text_updated = True
-        if flag_text_updated:
-            if last_index < len(text_content):
-                message_data.append(
-                    OlivOS.messageAPI.PARA.text(text_content[last_index:])
-                )
+                last_index = match.end()
+                flag_text_updated = True
+            if flag_text_updated:
+                if last_index < len(text_content):
+                    message_data.append(
+                        OlivOS.messageAPI.PARA.text(text_content[last_index:])
+                    )
+                flag_updated = True
+            else:
+                message_data.append(message_item)
+    else:
+        message_data = list(message_obj.data)
+        # 无 mentions 时也尝试用缓存补全 at 段昵称。
+        if bot_hash is not None:
+            for message_item in message_data:
+                if (
+                    isinstance(message_item, OlivOS.messageAPI.PARA.at)
+                    and message_item.data.get('name', None) is None
+                ):
+                    user_id = str(message_item.data.get('id', ''))
+                    if user_id in ['', 'all', 'everyone']:
+                        continue
+                    cached_name = _get_qq_user_name_from_cache(bot_hash, user_id)
+                    if cached_name is not None:
+                        message_item.data['name'] = cached_name
+                        flag_updated = True
+
+    if flag_backfill:
+        # QQ 群/C2C 修正:平台把 @成员 降级为 <qqbot-at-user id=""/> 或
+        # <qqbot-at-everyone/>(群聊本无 @全体语义)时,content 中拿不到 openid,
+        # 但事件 mentions 数组按出现顺序携带真实 openid,这里按序回填。
+        tmp_self_ids = set()
+        if self_ids is not None:
+            tmp_self_ids = {str(self_id) for self_id in self_ids if self_id is not None}
+        used_ids = set()
+        for message_item in message_data:
+            if isinstance(message_item, OlivOS.messageAPI.PARA.at):
+                user_id = str(message_item.data.get('id', ''))
+                if user_id not in ['', 'all', 'everyone']:
+                    used_ids.add(user_id)
+        candidate_ids = [
+            mention_id
+            for mention_id in _get_qq_ordered_mention_ids(mentions)
+            if mention_id not in used_ids and mention_id not in tmp_self_ids
+        ]
+        placeholder_paras = [
+            message_item
+            for message_item in message_data
+            if isinstance(message_item, OlivOS.messageAPI.PARA.at)
+            and str(message_item.data.get('id', '')) == ''
+        ]
+        degraded_all_paras = [
+            message_item
+            for message_item in message_data
+            if isinstance(message_item, OlivOS.messageAPI.PARA.at)
+            and str(message_item.data.get('id', '')) in ['all', 'everyone']
+        ]
+        # 空 id 占位:能填多少填多少,按出现顺序对应 mentions 顺序。
+        for message_item in placeholder_paras:
+            if len(candidate_ids) == 0:
+                break
+            message_item.data['id'] = candidate_ids.pop(0)
+            username = get_mention_username(message_item.data['id'])
+            if username is not None and message_item.data.get('name', None) is None:
+                message_item.data['name'] = username
             flag_updated = True
-        else:
-            message_data.append(message_item)
+        # 降级成 all 的 at:仅在数量与剩余 mentions 完全对应时按序回填,
+        # 数量对不上时保持原样,避免误改(保守处理)。
+        if (
+            len(degraded_all_paras) > 0
+            and len(candidate_ids) > 0
+            and len(degraded_all_paras) == len(candidate_ids)
+        ):
+            for message_item in degraded_all_paras:
+                message_item.data['id'] = candidate_ids.pop(0)
+                username = get_mention_username(message_item.data['id'])
+                if username is not None and message_item.data.get('name', None) is None:
+                    message_item.data['name'] = username
+            flag_updated = True
+        # 未能回填的空 id 占位段没有任何可用语义,直接清理,避免误当 at 全体。
+        tmp_message_data = []
+        for message_item in message_data:
+            if (
+                isinstance(message_item, OlivOS.messageAPI.PARA.at)
+                and str(message_item.data.get('id', '')) == ''
+            ):
+                flag_updated = True
+                continue
+            tmp_message_data.append(message_item)
+        message_data = tmp_message_data
+
     if flag_updated:
         message_obj.data = message_data
         if isinstance(message_obj.data_raw, list):
@@ -2511,6 +2784,15 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'FRIEND_ADD':
         user_openid = event_data.get('openid', None)
         if user_openid is not None and str(user_openid) != '':
+            tmp_friend_user = {'user_openid': str(user_openid)}
+            if isinstance(event_data.get('author', None), dict):
+                tmp_friend_user.update(event_data['author'])
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                tmp_friend_user,
+                chat_type='qq_private',
+                chat_id=str(user_openid)
+            )
             target_event.active = True
             target_event.plugin_info['func_type'] = 'friend_add'
             target_event.data = target_event.friend_add(str(user_openid))
@@ -2565,19 +2847,12 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
             group_openid = event_data.get(
                 'group_openid',
                 event_data.get('group_id', None)
             )
-            reference_message_id = _get_qq_reference_message_id(
-                plugin_event_bot_hash,
-                'qq_group',
-                group_openid,
-                event_data
-            )
-            _apply_qq_message_reference(message_obj, reference_message_id)
+            # 先解析机器人自身 openid,供 mentions 回填时排除自身条目。
             sub_self_open_id = _get_qq_group_self_open_id(
                 plugin_event_bot_hash,
                 group_openid,
@@ -2593,6 +2868,43 @@ def get_Event_from_SDK(target_event):
                     group_openid,
                     event_data.get('mentions', None)
                 )
+            tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
+            if plugin_event_bot_hash in sdkSubSelfInfo:
+                tmp_self_ids.add(str(sdkSubSelfInfo[plugin_event_bot_hash]))
+            if sub_self_open_id is not None:
+                tmp_self_ids.add(str(sub_self_open_id))
+            # 发送者与被 @ 用户进用户信息缓存(昵称/角色/union_openid 等)。
+            # 角色仅在本条载荷明确携带时更新,缺省不得把缓存里的 admin/owner 冲成 member。
+            tmp_author_role = author.get('member_role', None)
+            if tmp_author_role not in ['member', 'admin', 'owner']:
+                tmp_author_role = None
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                author,
+                role=tmp_author_role,
+                chat_type='qq_group',
+                chat_id=group_openid
+            )
+            _register_qq_user_info_from_mentions(
+                plugin_event_bot_hash,
+                event_data.get('mentions', None),
+                chat_type='qq_group',
+                chat_id=group_openid
+            )
+            _apply_qq_message_mentions(
+                message_obj,
+                event_data.get('mentions', None),
+                self_ids=tmp_self_ids,
+                flag_backfill=True,
+                bot_hash=plugin_event_bot_hash
+            )
+            reference_message_id = _get_qq_reference_message_id(
+                plugin_event_bot_hash,
+                'qq_group',
+                group_openid,
+                event_data
+            )
+            _apply_qq_message_reference(message_obj, reference_message_id)
             member_openid = author.get(
                 'member_openid',
                 author.get('id', None)
@@ -2611,7 +2923,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
             target_event.data.sender['user_id'] = str(member_openid)
-            target_event.data.sender['nickname'] = _get_qq_author_name(author)
+            target_event.data.sender['nickname'] = _get_qq_author_name_cached(
+                plugin_event_bot_hash, author, member_openid
+            )
             target_event.data.sender['id'] = target_event.data.sender['user_id']
             target_event.data.sender['name'] = target_event.data.sender['nickname']
             target_event.data.sender['sex'] = 'unknown'
@@ -2678,11 +2992,32 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
+            tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
+            if plugin_event_bot_hash in sdkSubSelfInfo:
+                tmp_self_ids.add(str(sdkSubSelfInfo[plugin_event_bot_hash]))
             # C2C 新版事件的用户标识为 author.user_openid。
             user_openid = author.get(
                 'user_openid',
                 author.get('id', None)
+            )
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                author,
+                chat_type='qq_private',
+                chat_id=user_openid
+            )
+            _register_qq_user_info_from_mentions(
+                plugin_event_bot_hash,
+                event_data.get('mentions', None),
+                chat_type='qq_private',
+                chat_id=user_openid
+            )
+            _apply_qq_message_mentions(
+                message_obj,
+                event_data.get('mentions', None),
+                self_ids=tmp_self_ids,
+                flag_backfill=True,
+                bot_hash=plugin_event_bot_hash
             )
             reference_message_id = _get_qq_reference_message_id(
                 plugin_event_bot_hash,
@@ -2704,7 +3039,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.raw_message_sdk = message_obj
             target_event.data.font = None
             target_event.data.sender['user_id'] = str(user_openid)
-            target_event.data.sender['nickname'] = _get_qq_author_name(author)
+            target_event.data.sender['nickname'] = _get_qq_author_name_cached(
+                plugin_event_bot_hash, author, user_openid
+            )
             target_event.data.sender['id'] = target_event.data.sender['user_id']
             target_event.data.sender['name'] = target_event.data.sender['nickname']
             target_event.data.sender['sex'] = 'unknown'
@@ -2770,8 +3107,29 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             author_id = author.get('id', None)
+            tmp_member_obj = event_data.get('member', None)
+            tmp_author_role = None
+            if isinstance(tmp_member_obj, dict) and isinstance(tmp_member_obj.get('roles', None), list):
+                tmp_author_role = _get_qq_guild_sender_role(tmp_member_obj)
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                author,
+                role=tmp_author_role,
+                chat_type='guild_channel',
+                chat_id=event_data.get('channel_id', None)
+            )
+            _register_qq_user_info_from_mentions(
+                plugin_event_bot_hash,
+                event_data.get('mentions', None),
+                chat_type='guild_channel',
+                chat_id=event_data.get('channel_id', None)
+            )
+            _apply_qq_message_mentions(
+                message_obj,
+                event_data.get('mentions', None),
+                bot_hash=plugin_event_bot_hash
+            )
             # 频道消息直接携带 message_reference.message_id,与 OneBot reply 段对齐。
             reference_message_id = _get_qq_reference_message_id(
                 plugin_event_bot_hash,
@@ -2859,8 +3217,24 @@ def get_Event_from_SDK(target_event):
             message_obj.active = False
             message_obj.data = []
         if message_obj.active:
-            _apply_qq_message_mentions(message_obj, event_data.get('mentions', None))
             author_id = author.get('id', None)
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                author,
+                chat_type='guild_private',
+                chat_id=event_data.get('channel_id', None)
+            )
+            _register_qq_user_info_from_mentions(
+                plugin_event_bot_hash,
+                event_data.get('mentions', None),
+                chat_type='guild_private',
+                chat_id=event_data.get('channel_id', None)
+            )
+            _apply_qq_message_mentions(
+                message_obj,
+                event_data.get('mentions', None),
+                bot_hash=plugin_event_bot_hash
+            )
             reference_message_id = _get_qq_reference_message_id(
                 plugin_event_bot_hash,
                 'guild_private',
@@ -2924,6 +3298,12 @@ def get_Event_from_SDK(target_event):
         member_user_id = str(member_user.get('id', ''))
         member_guild_id = str(event_data.get('guild_id', ''))
         member_operator_id = str(event_data.get('op_user_id', '') or member_user_id)
+        _register_qq_user_info(
+            plugin_event_bot_hash,
+            member_user,
+            chat_type='guild',
+            chat_id=member_guild_id
+        )
         flag_increase = target_event.sdk_event.payload.data.t == 'GUILD_MEMBER_ADD'
         target_event.active = True
         if flag_increase:
@@ -4817,6 +5197,49 @@ class event_action(object):
         this_msg = API.getQQGroupBotState(get_SDK_bot_info_from_Event(target_event))
         this_msg.metadata.group_openid = str(group_openid)
         return event_action._run_raw_api(this_msg, 'get_qq_group_bot_state', 'GET')
+
+    # ============ 用户信息(基于消息/事件积累的缓存) ============
+    def get_stranger_info(target_event, user_id, no_cache=False):
+        # 平台无"查用户资料"接口,数据来自消息/事件/mentions 积累的缓存;
+        # 返回结构与 OneBot get_stranger_info 对齐,并附带各类 openid。
+        res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
+        record = _get_qq_user_info(target_event.bot_info.hash, user_id)
+        if record is not None:
+            res_data['active'] = True
+            res_data['data']['name'] = record.get('name', None)
+            res_data['data']['id'] = str(user_id)
+            for extra_key in [
+                'member_openid', 'user_openid', 'union_openid',
+                'union_user_account', 'role', 'chat_type', 'chat_id', 'time'
+            ]:
+                res_data['data'][extra_key] = record.get(extra_key, None)
+        return res_data
+
+    def get_group_member_info(target_event, group_id, user_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
+        record = _get_qq_user_info(target_event.bot_info.hash, user_id)
+        if record is not None:
+            res_data['active'] = True
+            res_data['data']['name'] = record.get('name', None)
+            res_data['data']['card'] = record.get('name', None)
+            res_data['data']['id'] = str(user_id)
+            res_data['data']['user_id'] = str(user_id)
+            res_data['data']['group_id'] = None if group_id is None else str(group_id)
+            res_data['data']['role'] = record.get('role', None)
+            res_data['data']['times']['last_sent_time'] = record.get('time', 0)
+            for extra_key in ['member_openid', 'user_openid', 'union_openid']:
+                res_data['data'][extra_key] = record.get(extra_key, None)
+        return res_data
+
+    def get_user_info(target_event, user_id):
+        # SDK 级完整记录:昵称/角色/全部 openid/最后活跃时间等。
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        record = _get_qq_user_info(target_event.bot_info.hash, user_id)
+        if record is not None:
+            record.pop('time_monotonic', None)
+            res_data['active'] = True
+            res_data['data']['user_info'] = record
+        return res_data
 
     # ============ 未映射平台事件查询 ============
     def get_unhandled_events(target_event, limit=50, flag_clear=False):
