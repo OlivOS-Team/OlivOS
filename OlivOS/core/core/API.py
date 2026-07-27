@@ -987,7 +987,7 @@ class Event(object):
             return None
         return self.__reply(message, flag_log=flag_log)
 
-    def __send(self, send_type, target_id, message, host_id=None, flag_log=True):
+    def __send(self, send_type, target_id, message, host_id=None, flag_log=True, force_active=False):
         flag_type = send_type
         res_data = None
         tmp_message = None
@@ -1139,56 +1139,89 @@ class Event(object):
                 and self.data.extend.get('flag_from_qq', False)
             ):
                 if flag_type == 'group':
-                    res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
+                    res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                        self,
+                        target_id,
+                        tmp_message,
+                        force_active=force_active
+                    )
                 elif flag_type == 'private':
                     if (
                         hasattr(self.data, 'extend')
                         and 'flag_from_direct' in self.data.extend
                     ):
-                        if self.data.extend['flag_from_direct']:
+                        if force_active or self.data.extend['flag_from_direct']:
                             res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
                                 self,
                                 target_id,
                                 tmp_message,
-                                flag_direct=True
+                                flag_direct=True,
+                                force_active=force_active
                             )
                         else:
                             # 主动私聊待实现
                             pass
+                    elif force_active:
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                            self,
+                            target_id,
+                            tmp_message,
+                            flag_direct=True,
+                            force_active=True
+                        )
                     else:
                         # 主动私聊待实现
                         pass
             else:
+                extend_data = getattr(self.data, 'extend', {})
+                if not isinstance(extend_data, dict):
+                    extend_data = {}
                 if flag_type == 'group':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and 'reply_msg_id' in self.data.extend
-                    ):
-                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
-                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
-                        )
-                    else:
-                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
+                    reply_msg_id = None if force_active else extend_data.get('reply_msg_id')
+                    res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                        self,
+                        target_id,
+                        tmp_message,
+                        reply_msg_id
+                    )
                 elif flag_type == 'private':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and host_id is not None
-                    ):
+                    if force_active and extend_data.get('flag_from_direct', False):
+                        direct_guild_id = host_id
+                        if direct_guild_id is None:
+                            direct_guild_id = extend_data.get('host_group_id')
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self,
+                            direct_guild_id,
+                            tmp_message,
+                            flag_direct=True
+                        )
+                    elif force_active:
+                        source_guild_id = host_id
+                        if source_guild_id is None:
+                            source_guild_id = getattr(self.data, 'host_id', None)
+                        if source_guild_id is None:
+                            source_guild_id = extend_data.get('host_group_id')
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_guild_private_msg(
+                            self,
+                            target_id,
+                            source_guild_id,
+                            tmp_message
+                        )
+                    elif host_id is not None:
                         res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
                             self,
                             host_id,
                             tmp_message,
-                            self.data.extend.get('reply_msg_id'),
+                            extend_data.get('reply_msg_id'),
                             flag_direct=True
                         )
                     elif (
-                        hasattr(self.data, 'extend')
-                        and 'flag_from_direct' in self.data.extend
-                        and 'reply_msg_id' in self.data.extend
+                        'flag_from_direct' in extend_data
+                        and 'reply_msg_id' in extend_data
                     ):
-                        if self.data.extend['flag_from_direct']:
+                        if extend_data['flag_from_direct']:
                             res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
-                                self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                                self, host_id, tmp_message, extend_data['reply_msg_id'], flag_direct=True
                             )
                         else:
                             # 主动私聊待实现
@@ -1282,9 +1315,9 @@ class Event(object):
 
     def send(self, send_type: str, target_id: 'str|int', message, host_id: 'str|int|None' = None, flag_log: bool = True,
              remote: bool = False):
-        """发送消息
+        """主动发送消息
 
-        用于发送消息
+        用于向指定目标主动发送消息，不复用当前事件的被动回复凭据。
 
         Args:
             send_type: 用于指定发送目标的类型
@@ -1294,7 +1327,14 @@ class Event(object):
         """
         if remote:
             return None
-        return self.__send(send_type, target_id, message, host_id=host_id, flag_log=flag_log)
+        return self.__send(
+            send_type,
+            target_id,
+            message,
+            host_id=host_id,
+            flag_log=flag_log,
+            force_active=True
+        )
 
     @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log=True):

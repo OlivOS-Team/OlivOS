@@ -4031,7 +4031,8 @@ class event_action(object):
         reply_msg_id=None,
         flag_direct=False,
         quote_msg_id=None,
-        event_id=None
+        event_id=None,
+        force_active=False
     ):
         chat_type = 'qq_private' if flag_direct else 'qq_group'
         if chat_id is None or str(chat_id) == '':
@@ -4048,18 +4049,24 @@ class event_action(object):
                 'send',
                 'msg_id and event_id are mutually exclusive'
             )
-        allow_active_fallback = reply_msg_id is None and event_id is None
-        msg_id, event_id = event_action._resolve_qq_passive_ids(
-            target_event,
-            chat_type,
-            chat_id,
-            msg_id=reply_msg_id,
-            event_id=event_id
-        )
-        allow_active_fallback = (
-            allow_active_fallback
-            and (msg_id is not None or event_id is not None)
-        )
+        if force_active:
+            # Event.send 是主动发送语义，不能复用当前事件的被动回复凭据。
+            msg_id = None
+            event_id = None
+            allow_active_fallback = False
+        else:
+            allow_active_fallback = reply_msg_id is None and event_id is None
+            msg_id, event_id = event_action._resolve_qq_passive_ids(
+                target_event,
+                chat_type,
+                chat_id,
+                msg_id=reply_msg_id,
+                event_id=event_id
+            )
+            allow_active_fallback = (
+                allow_active_fallback
+                and (msg_id is not None or event_id is not None)
+            )
         send_results = []
         if quote_msg_id is None:
             quote_msg_id = event_action._get_message_reference_id(message)
@@ -4383,6 +4390,57 @@ class event_action(object):
             )
         except Exception:
             traceback.print_exc()
+
+    def send_guild_private_msg(
+        target_event,
+        user_id,
+        source_guild_id,
+        message,
+        quote_msg_id=None
+    ):
+        """从频道上下文向指定用户主动发起私信。"""
+        if user_id is None or str(user_id) == '':
+            return event_action._make_local_result(
+                'guild_private',
+                user_id,
+                'send',
+                'user_id is required'
+            )
+        if source_guild_id is None or str(source_guild_id) == '':
+            return event_action._make_local_result(
+                'guild_private',
+                user_id,
+                'send',
+                'source_guild_id is required'
+            )
+        dms_result = event_action.create_dms_session(
+            target_event,
+            user_id,
+            source_guild_id
+        )
+        if not dms_result.get('active', False):
+            dms_result['data']['chat_type'] = 'guild_private'
+            dms_result['data']['chat_id'] = str(user_id)
+            dms_result['data']['operation'] = 'send'
+            return dms_result
+        response_data = dms_result.get('data', {}).get('response', None)
+        direct_guild_id = None
+        if isinstance(response_data, dict):
+            direct_guild_id = response_data.get('guild_id', None)
+        if direct_guild_id is None or str(direct_guild_id) == '':
+            return event_action._make_local_result(
+                'guild_private',
+                user_id,
+                'send',
+                'create dms session response has no guild_id'
+            )
+        return event_action.send_msg(
+            target_event,
+            direct_guild_id,
+            message,
+            flag_direct=True,
+            quote_msg_id=quote_msg_id
+        )
 
     def send_msg(
         target_event,
