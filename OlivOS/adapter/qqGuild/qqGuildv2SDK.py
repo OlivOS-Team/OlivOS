@@ -198,7 +198,9 @@ qqPassiveFallbackErrorCodes = {
     'event_id': {40034025, 40034026, 40034027, 40034128}
 }
 qqLocalPassiveFallbackErrors = {
+    'passive reply sequence cache is full',
     'passive reply count exceeded',
+    'passive event reply cache is full',
     'passive event reply count exceeded'
 }
 qqEventDedupeCache = {}
@@ -212,8 +214,8 @@ sdkRxMessageInfoLock = threading.Lock()
 sdkRxMessageInfoLastCleanup = 0.0
 sdkRxMessageInfoTTL = 7200.0
 sdkRxMessageInfoMaxSize = 20000
-# QQ 群/C2C 引用索引:message_scene.ext 的 msg_idx -> message_id,
-# 用于把引用事件的 ref_msg_idx 还原成真正的 message_id。
+# QQ 群/C2C 引用索引:message_scene.ext 的 msg_idx <-> message_id。
+# 接收时把 ref_msg_idx 还原为业务层 message_id，发送时再反向转为 REFIDX。
 sdkMsgIdxInfo = {}
 sdkMsgIdxInfoLock = threading.Lock()
 sdkMsgIdxInfoLastCleanup = 0.0
@@ -2284,6 +2286,7 @@ def _register_qq_rx_message(
             'chat_type': str(chat_type),
             'chat_id': None if chat_id is None else str(chat_id),
             'channel_id': None if channel_id is None else str(channel_id),
+            'msg_idx': None if msg_idx is None else str(msg_idx),
             'message': message_str,
             'raw_message': raw_message_str,
             'sender_id': None if sender_id is None else str(sender_id),
@@ -2314,6 +2317,53 @@ def _get_qq_rx_message(bot_hash, message_id):
             sdkRxMessageInfo.pop(cache_key, None)
             return None
         return copy.deepcopy(cache_data)
+
+
+def _get_qq_msg_idx_by_message_id(bot_hash, chat_type, chat_id, message_id):
+    cache_data = _get_qq_rx_message(bot_hash, message_id)
+    if cache_data is None:
+        return None
+    if (
+        cache_data.get('chat_type', None) != str(chat_type)
+        or cache_data.get('chat_id', None) != str(chat_id)
+    ):
+        return None
+    msg_idx = cache_data.get('msg_idx', None)
+    if msg_idx is None or not str(msg_idx).startswith('REFIDX_'):
+        return None
+    return str(msg_idx)
+
+
+def _resolve_qq_reference_msg_idx(target_event, chat_type, chat_id, message_id):
+    if message_id is None or str(message_id) == '':
+        return None
+    target_data = getattr(target_event, 'data', None)
+    extend_data = getattr(target_data, 'extend', None)
+    if isinstance(extend_data, dict):
+        if chat_type == 'qq_private':
+            source_chat_id = getattr(target_data, 'user_id', None)
+        else:
+            source_chat_id = getattr(target_data, 'group_id', None)
+        source_message_id = extend_data.get(
+            'qq_message_id',
+            extend_data.get('reply_msg_id', None)
+        )
+        source_msg_idx = extend_data.get('qq_msg_idx', None)
+        if (
+            source_chat_id is not None
+            and str(source_chat_id) == str(chat_id)
+            and source_message_id is not None
+            and str(source_message_id) == str(message_id)
+            and source_msg_idx is not None
+            and str(source_msg_idx).startswith('REFIDX_')
+        ):
+            return str(source_msg_idx)
+    return _get_qq_msg_idx_by_message_id(
+        target_event.bot_info.hash,
+        chat_type,
+        chat_id,
+        message_id
+    )
 
 
 def _get_qq_reference_message_id(bot_hash, chat_type, chat_id, event_data):
@@ -3624,13 +3674,21 @@ class event_action(object):
         message_id = fallback_message_id
         timestamp = None
         error_message = None
+        message_ref_idx = None
         if type(raw_obj) is dict:
             message_id = raw_obj.get('id', message_id)
             timestamp = raw_obj.get('timestamp', None)
             error_message = raw_obj.get('message', raw_obj.get('msg', None))
+            if type(raw_obj.get('ext_info', None)) is dict:
+                message_ref_idx = raw_obj['ext_info'].get('ref_idx', None)
             if type(raw_obj.get('data', None)) is dict:
                 message_id = raw_obj['data'].get('id', message_id)
                 timestamp = raw_obj['data'].get('timestamp', timestamp)
+                if type(raw_obj['data'].get('ext_info', None)) is dict:
+                    message_ref_idx = raw_obj['data']['ext_info'].get(
+                        'ref_idx',
+                        message_ref_idx
+                    )
         # 错误或异步审核响应中的 id 可能是请求/追踪标识，不得冒充消息 ID。
         if flag_async_accepted:
             message_id = None
@@ -3676,7 +3734,8 @@ class event_action(object):
                 sender_id=str(target_event.bot_info.id),
                 sender_name=sent_sender_name,
                 timestamp=timestamp,
-                channel_id=str(chat_id) if chat_type == 'guild_channel' else None
+                channel_id=str(chat_id) if chat_type == 'guild_channel' else None,
+                msg_idx=message_ref_idx
             )
         return res_data
 
@@ -3760,6 +3819,25 @@ class event_action(object):
         event_id,
         allow_active_fallback=False
     ):
+        message_reference = getattr(api_obj.data, 'message_reference', None)
+        if chat_type in ['qq_group', 'qq_private'] and isinstance(message_reference, dict):
+            reference_message_id = message_reference.get('message_id', None)
+            if (
+                reference_message_id is not None
+                and not str(reference_message_id).startswith('REFIDX_')
+            ):
+                reference_msg_idx = _resolve_qq_reference_msg_idx(
+                    target_event,
+                    chat_type,
+                    chat_id,
+                    reference_message_id
+                )
+                if reference_msg_idx is not None:
+                    message_reference['message_id'] = reference_msg_idx
+                else:
+                    # 普通 message_id 无法映射为 REFIDX 时只取消可见引用，
+                    # 不影响独立的 msg_id 被动回复凭据。
+                    api_obj.data.message_reference = None
         passive_error = event_action._prepare_qq_passive_message(
             target_event,
             api_obj,
@@ -4055,7 +4133,6 @@ class event_action(object):
             event_id = None
             allow_active_fallback = False
         else:
-            allow_active_fallback = reply_msg_id is None and event_id is None
             msg_id, event_id = event_action._resolve_qq_passive_ids(
                 target_event,
                 chat_type,
@@ -4064,8 +4141,7 @@ class event_action(object):
                 event_id=event_id
             )
             allow_active_fallback = (
-                allow_active_fallback
-                and (msg_id is not None or event_id is not None)
+                msg_id is not None or event_id is not None
             )
         send_results = []
         if quote_msg_id is None:
@@ -4232,7 +4308,6 @@ class event_action(object):
                 allow_at_all=chat_type == 'guild_channel'
             )
 
-        allow_active_fallback = msg_id is None and event_id is None
         if chat_type in ['qq_group', 'qq_private']:
             msg_id, event_id = event_action._resolve_qq_passive_ids(
                 target_event,
@@ -4242,8 +4317,7 @@ class event_action(object):
                 event_id=event_id
             )
             allow_active_fallback = (
-                allow_active_fallback
-                and (msg_id is not None or event_id is not None)
+                msg_id is not None or event_id is not None
             )
         else:
             allow_active_fallback = False
@@ -4341,9 +4415,9 @@ class event_action(object):
         event_action._log_qq_send_result(
             target_event,
             this_msg,
-            None if fallback_used else msg_id,
+            None if fallback_used else getattr(this_msg.data, 'msg_id', None),
             flag_direct=flag_direct,
-            event_id=None if fallback_used else event_id
+            event_id=None if fallback_used else getattr(this_msg.data, 'event_id', None)
         )
         return res_data
 
