@@ -1920,11 +1920,14 @@ def _get_qq_guild_sender_role(member):
 
 def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_id=None):
     # 登记/合并用户信息:author、mentions 条目、频道 user 对象均可直接传入。
-    # 同一用户的 member_openid/user_openid/union_openid/id 各建一条索引,指向同一记录。
+    # 同一用户的各类 OpenID/统一账号各建一条索引,指向同一记录。
     global sdkUserInfoLastCleanup
     if not isinstance(user_obj, dict):
         return None
-    id_keys = ['member_openid', 'user_openid', 'union_openid', 'id']
+    id_keys = [
+        'member_openid', 'user_openid', 'union_openid',
+        'union_user_account', 'id'
+    ]
     user_ids = []
     for id_key in id_keys:
         user_id = user_obj.get(id_key, None)
@@ -2041,7 +2044,10 @@ def _get_qq_author_name_cached(bot_hash, author, fallback_user_id=None):
         return author_name
     lookup_ids = []
     if isinstance(author, dict):
-        for id_key in ['member_openid', 'user_openid', 'union_openid', 'id']:
+        for id_key in [
+            'member_openid', 'user_openid', 'union_openid',
+            'union_user_account', 'id'
+        ]:
             id_value = author.get(id_key, None)
             if id_value is not None and str(id_value) != '':
                 lookup_ids.append(str(id_value))
@@ -2774,7 +2780,7 @@ def get_Event_from_SDK(target_event):
     if _is_qq_event_duplicate(dedupe_key):
         target_event.active = False
         return
-    if plugin_event_bot_hash not in sdkSubSelfInfo:
+    if plugin_event_bot_hash not in sdkSelfInfo:
         tmp_bot_info = bot_info_T(
             target_event.sdk_event.base_info['self_id'],
             target_event.sdk_event.base_info['token']
@@ -2783,16 +2789,21 @@ def get_Event_from_SDK(target_event):
         try:
             api_msg_obj.do_api('GET')
             api_res_json = json.loads(api_msg_obj.res)
-            sdkSubSelfInfo[plugin_event_bot_hash] = api_res_json['id']
+            if (
+                type(api_res_json) is dict
+                and 'id' in api_res_json
+                and 'username' in api_res_json
+            ):
+                sdkSelfInfo[plugin_event_bot_hash] = api_res_json
         except Exception:
             traceback.print_exc()
-        if (
-            plugin_event_bot_hash in sdkSelfInfo
-            and type(sdkSelfInfo[plugin_event_bot_hash]) is dict
-            and 'id' in sdkSelfInfo[plugin_event_bot_hash]
-            and 'username' in sdkSelfInfo[plugin_event_bot_hash]
-        ):
-            sdkSubSelfInfo[plugin_event_bot_hash] = str(sdkSelfInfo[plugin_event_bot_hash]['id'])
+    if (
+        plugin_event_bot_hash in sdkSelfInfo
+        and type(sdkSelfInfo[plugin_event_bot_hash]) is dict
+        and 'id' in sdkSelfInfo[plugin_event_bot_hash]
+        and 'username' in sdkSelfInfo[plugin_event_bot_hash]
+    ):
+        sdkSubSelfInfo[plugin_event_bot_hash] = str(sdkSelfInfo[plugin_event_bot_hash]['id'])
     if target_event.sdk_event.payload.data.t == 'READY':
         target_event.active = False
         if (
