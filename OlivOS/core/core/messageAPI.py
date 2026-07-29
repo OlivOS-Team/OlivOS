@@ -769,25 +769,41 @@ class Message_templet(object):
         self.init_from_qq_code_string()
 
     def init_from_qq_guild_v2_code_string(self):
-        self.init_from_qq_code_string()
+        # QQ 群/C2C:文档口径为 <qqbot-at-user id="..." /> 与 <qqbot-at-everyone />,
+        # 纯文本 @everyone 是频道旧协议,群聊里按普通文本保留。
+        self.init_from_qq_code_string(flag_qq_chat=True)
 
-    def init_from_qq_code_string(self):
+    def init_from_qq_code_string(self, flag_qq_chat=False):
         tmp_data_raw = str(self.data_raw)
         tmp_data = []
         last_index = 0
+        # id 属性兼容有/无引号、有/无自闭合斜杠;引号内允许为空(平台降级时会下发空 id)。
         at_tag_pattern = re.compile(
-            r'<qqbot-at-user\s+id=(?P<quote>["\'])(?P<qq_user>[^"\']+)'
-            r'(?P=quote)\s*/>|<qqbot-at-everyone\s*/>'
+            r'<qqbot-at-user\s+id=(?:(?P<quote>["\'])(?P<qq_user>[^"\']*)(?P=quote)'
+            r'|(?P<qq_user_bare>[^\s"\'<>/]+))\s*/?>'
+            r'|<qqbot-at-everyone\s*/?>'
             r'|<@!?(?P<guild_user>[^<>&]+)>|@everyone(?!\w)'
         )
         for match in at_tag_pattern.finditer(tmp_data_raw):
             if match.start() > last_index:
                 tmp_data.append(PARA.text(tmp_data_raw[last_index:match.start()]))
-            user_id = match.group('qq_user') or match.group('guild_user')
+            matched_text = match.group(0)
+            user_id = match.group('qq_user')
             if user_id is None:
-                tmp_data.append(PARA.at(id='all'))
-            else:
+                user_id = match.group('qq_user_bare')
+            if user_id is None:
+                user_id = match.group('guild_user')
+            if user_id is not None and str(user_id) != '':
                 tmp_data.append(PARA.at(id=str(user_id)))
+            elif matched_text.startswith('<qqbot-at-user'):
+                # id 为空的降级 at:先占位,由适配层用事件 mentions 回填真实 openid,
+                # 回填不了时会被适配层清理,避免误当作 at 全体。
+                tmp_data.append(PARA.at(id=''))
+            elif flag_qq_chat and matched_text.startswith('@everyone'):
+                # QQ 群/C2C 无 @全体成员语义,纯文本 @everyone 原样保留为文本。
+                tmp_data.append(PARA.text(matched_text))
+            else:
+                tmp_data.append(PARA.at(id='all'))
             last_index = match.end()
         if last_index < len(tmp_data_raw):
             tmp_data.append(PARA.text(tmp_data_raw[last_index:]))
