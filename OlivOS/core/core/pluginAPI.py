@@ -105,6 +105,47 @@ class shallow(API.Proc_templet):
         def __init__(self, sdk_event):
             self.sdk_event = sdk_event
 
+    def get_plugin_event_context(self, plugin_identity):
+        if plugin_identity is None:
+            return None
+        plugin_identity = str(plugin_identity)
+        plugin_models = list(self.plugin_models_dict.values())
+
+        plugin_model = self.plugin_models_dict.get(plugin_identity)
+        if plugin_model is None:
+            namespace_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('namespace', '')) == plugin_identity
+            ]
+            if len(namespace_matches) == 1:
+                plugin_model = namespace_matches[0]
+        if plugin_model is None:
+            name_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('name', '')) == plugin_identity
+            ]
+            if len(name_matches) == 1:
+                plugin_model = name_matches[0]
+        if plugin_model is None:
+            module_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('module_name', '')) == plugin_identity
+            ]
+            if len(module_matches) == 1:
+                plugin_model = module_matches[0]
+        if plugin_model is None:
+            return None
+        return {
+            'namespace': plugin_model.get('namespace'),
+            'message_mode': plugin_model.get(
+                'message_mode',
+                OlivOS.infoAPI.OlivOS_message_mode_tx_default
+            )
+        }
+
     def __init_GUI(self):
         if platform.system() == 'Windows':
             self.Proc_data['main_tk'] = tkinter.Tk()
