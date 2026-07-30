@@ -310,7 +310,7 @@ def get_Event_from_fake_SDK(target_event):
     if plugin_identity is None:
         plugin_identity = target_event.sdk_event.fakename
     plugin_proc = OlivOS.pluginAPI.gProc
-    if type(plugin_proc) is OlivOS.pluginAPI.shallow:
+    if isinstance(plugin_proc, OlivOS.pluginAPI.shallow):
         plugin_context = plugin_proc.get_plugin_event_context(plugin_identity)
         if plugin_context is not None:
             plugin_namespace = plugin_context.get('namespace')
