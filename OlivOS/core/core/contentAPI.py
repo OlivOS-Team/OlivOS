@@ -304,6 +304,22 @@ def get_Event_from_fake_SDK(target_event):
                         [target_event.platform['model']]
                     )
     target_event.plugin_info['name'] = target_event.sdk_event.fakename
+    plugin_namespace = getattr(target_event.sdk_event, 'plugin_namespace', None)
+    message_mode_tx = getattr(target_event.sdk_event, 'message_mode_tx', None)
+    plugin_identity = plugin_namespace
+    if plugin_identity is None:
+        plugin_identity = target_event.sdk_event.fakename
+    plugin_proc = OlivOS.pluginAPI.gProc
+    if type(plugin_proc) is OlivOS.pluginAPI.shallow:
+        plugin_context = plugin_proc.get_plugin_event_context(plugin_identity)
+        if plugin_context is not None:
+            plugin_namespace = plugin_context.get('namespace')
+            if message_mode_tx is None:
+                message_mode_tx = plugin_context.get('message_mode')
+    if plugin_namespace is not None:
+        target_event.plugin_info['namespace'] = plugin_namespace
+    if message_mode_tx is not None:
+        target_event.plugin_info['message_mode_tx'] = message_mode_tx
     if True:
         if target_event.sdk_event.data['type'] == 'fake_event':
             target_event.active = True
@@ -312,8 +328,18 @@ def get_Event_from_fake_SDK(target_event):
 
 
 class fake_sdk_event(object):
-    def __init__(self, bot_info, data=None, platform=None, fakename='unity'):
+    def __init__(
+        self,
+        bot_info,
+        data=None,
+        platform=None,
+        fakename='unity',
+        plugin_namespace=None,
+        message_mode_tx=None
+    ):
         self.fakename = fakename
+        self.plugin_namespace = plugin_namespace
+        self.message_mode_tx = message_mode_tx
         tmp_platform = {
             'sdk': 'fake',
             'platform': 'fake',
