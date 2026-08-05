@@ -41,6 +41,12 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
+        if type(self.Proc_data['bot_info_dict']) is not dict or not any(
+            getattr(bot_info_this, 'enable', True) is True
+            and bot_info_this.platform['sdk'] == 'dodobot_ea'
+            for bot_info_this in self.Proc_data['bot_info_dict'].values()
+        ):
+            return
         self.log(2, 'OlivOS dodobot ea server [' + self.Proc_name + '] is running')
         while True:
             headers = {
@@ -98,6 +104,11 @@ class server(OlivOS.API.Proc_templet):
                         if tmp_recv_pkg_data is not None:
                             for bot_info_this in self.Proc_data['bot_info_dict']:
                                 bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+                                if (
+                                    getattr(bot_info_this_obj, 'enable', True) is not True
+                                    or bot_info_this_obj.platform['sdk'] != 'dodobot_ea'
+                                ):
+                                    continue
                                 if bot_info_this_obj.id in self.Proc_data['platform_bot_info_dict']:
                                     sdk_bot_info_this = OlivOS.dodobotEASDK.get_SDK_bot_info_from_Plugin_bot_info(
                                         bot_info_this_obj,

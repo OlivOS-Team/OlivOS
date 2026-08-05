@@ -114,6 +114,7 @@ class dock(OlivOS.API.Proc_templet):
         self.UIData['shallow_plugin_data_dict'] = None
         self.UIData['shallow_account_list'] = []
         self.UIData['shallow_account_list_new'] = []
+        self.UIData['shallow_account_list_initialized'] = False
         self.updateShallowMenuList()
 
     def run(self):
@@ -146,6 +147,8 @@ class dock(OlivOS.API.Proc_templet):
                         self.UIData['shallow_cwcb_menu_list'] = None
                         self.UIData['shallow_virtual_terminal_menu_list'] = None
                         self.UIData['shallow_account_menu_list'] = None
+                        self.updateAccountList(flagInit=True)
+                        self.mergeAccountList()
                         self.updateShallowMenuList()
 
     def process_msg(self):
@@ -231,7 +234,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_napcat_menu_list'] is None:
                                     self.UIData['shallow_napcat_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -274,7 +277,7 @@ class dock(OlivOS.API.Proc_templet):
                                     and 'path' in rx_packet_data.key['data']
                                 ):
                                     hash = rx_packet_data.key['data']['hash']
-                                    if hash in self.bot_info:
+                                    if self.isAccountEnabled(hash):
                                         if hash in self.UIObject['root_qrcode_window']:
                                             try:
                                                 self.UIObject['root_qrcode_window'][hash].stop()
@@ -298,7 +301,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_gocqhttp_menu_list'] is None:
                                     self.UIData['shallow_gocqhttp_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -341,7 +344,7 @@ class dock(OlivOS.API.Proc_templet):
                                     and 'path' in rx_packet_data.key['data']
                                 ):
                                     hash = rx_packet_data.key['data']['hash']
-                                    if hash in self.bot_info:
+                                    if self.isAccountEnabled(hash):
                                         if hash in self.UIObject['root_qrcode_window']:
                                             try:
                                                 self.UIObject['root_qrcode_window'][hash].stop()
@@ -375,7 +378,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_walleq_menu_list'] is None:
                                     self.UIData['shallow_walleq_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -418,7 +421,7 @@ class dock(OlivOS.API.Proc_templet):
                                     and 'path' in rx_packet_data.key['data']
                                 ):
                                     hash = rx_packet_data.key['data']['hash']
-                                    if hash in self.bot_info:
+                                    if self.isAccountEnabled(hash):
                                         if hash in self.UIObject['root_qrcode_window']:
                                             try:
                                                 self.UIObject['root_qrcode_window'][hash].stop()
@@ -442,7 +445,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_cwcb_menu_list'] is None:
                                     self.UIData['shallow_cwcb_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -488,7 +491,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_opqbot_menu_list'] is None:
                                     self.UIData['shallow_opqbot_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -542,7 +545,7 @@ class dock(OlivOS.API.Proc_templet):
                                 if self.UIData['shallow_virtual_terminal_menu_list'] is None:
                                     self.UIData['shallow_virtual_terminal_menu_list'] = []
                                 if 'hash' in rx_packet_data.key['data']:
-                                    if rx_packet_data.key['data']['hash'] in self.bot_info:
+                                    if self.isAccountEnabled(rx_packet_data.key['data']['hash']):
                                         tmp_title = '%s' % (
                                             str(
                                                 self.bot_info[rx_packet_data.key['data']['hash']].id
@@ -703,16 +706,26 @@ class dock(OlivOS.API.Proc_templet):
         platform_name = self.getPlatformDisplayName(bot_info)
         return account_name, platform_name
 
+    def isAccountEnabled(self, bot_hash):
+        return (
+            type(self.bot_info) is dict
+            and bot_hash in self.bot_info
+            and getattr(self.bot_info[bot_hash], 'enable', True) is True
+        )
+
     def updateAccountList(self, flagInit=False):
         self.UIData['shallow_account_list_new'] = []
         if self.bot_info and type(self.bot_info) is dict:
             for botHash, bot_info in self.bot_info.items():
+                if getattr(bot_info, 'enable', True) is not True:
+                    continue
                 account_name, platform_name = self.getAccountDisplayInfo(botHash, bot_info, flagInit=flagInit)
                 self.UIData['shallow_account_list_new'].append((botHash, account_name, platform_name))
             self.UIData['shallow_account_list_new'].sort(key=lambda x: x[1])
 
     def mergeAccountList(self):
         self.UIData['shallow_account_list'] = self.UIData['shallow_account_list_new']
+        self.UIData['shallow_account_list_initialized'] = True
         return True
 
     def updateShallowMenuAccountList(self):
@@ -741,9 +754,11 @@ class dock(OlivOS.API.Proc_templet):
         account_items = []
         account_list = self.UIData['shallow_account_list']
         account_count = len(account_list)
-        if 0 == account_count:
+        if not self.UIData['shallow_account_list_initialized']:
             self.updateAccountList(flagInit=True)
             self.mergeAccountList()
+            account_list = self.UIData['shallow_account_list']
+            account_count = len(account_list)
         for botHash, account_name, platform_name in account_list:
             account_items.append(['account_info', f"{account_name} - {platform_name}", botHash])
 
@@ -906,7 +921,7 @@ class dock(OlivOS.API.Proc_templet):
         )
 
     def startGoCqhttpTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_gocqhttp_terminal']:
                 try:
                     self.UIObject['root_gocqhttp_terminal'][hash].lift()
@@ -923,7 +938,7 @@ class dock(OlivOS.API.Proc_templet):
                 self.UIObject['root_gocqhttp_terminal'][hash].start()
 
     def startWalleQTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_walleq_terminal']:
                 try:
                     self.UIObject['root_walleq_terminal'][hash].lift()
@@ -940,7 +955,7 @@ class dock(OlivOS.API.Proc_templet):
                 self.UIObject['root_walleq_terminal'][hash].start()
 
     def startCWCBTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_cwcb_terminal']:
                 try:
                     self.UIObject['root_cwcb_terminal'][hash].lift()
@@ -957,7 +972,7 @@ class dock(OlivOS.API.Proc_templet):
                 self.UIObject['root_cwcb_terminal'][hash].start()
 
     def startOPQBotTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_opqbot_terminal']:
                 try:
                     self.UIObject['root_opqbot_terminal'][hash].lift()
@@ -974,7 +989,7 @@ class dock(OlivOS.API.Proc_templet):
                 self.UIObject['root_opqbot_terminal'][hash].start()
 
     def startNapCatTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_napcat_terminal']:
                 try:
                     self.UIObject['root_napcat_terminal'][hash].lift()
@@ -1011,7 +1026,7 @@ class dock(OlivOS.API.Proc_templet):
         )
 
     def startVirtualTerminalUI(self, hash):
-        if hash in self.bot_info:
+        if self.isAccountEnabled(hash):
             if hash in self.UIObject['root_virtual_terminal_terminal']:
                 try:
                     self.UIObject['root_virtual_terminal_terminal'][hash].lift()
@@ -1261,7 +1276,7 @@ class dock(OlivOS.API.Proc_templet):
     def sendOpenQRcodeUrl(self, hash, url):
         if (
             type(self.bot_info) is dict
-            and hash in self.bot_info
+            and self.isAccountEnabled(hash)
         ):
             try:
                 res = tkinter.messagebox.askquestion(f'请使用账号 {self.bot_info[hash].id} 扫码', "是否使用内置浏览器?")
