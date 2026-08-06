@@ -19,6 +19,7 @@ import platform
 import time
 import datetime
 import os
+import sys
 
 import OlivOS
 from OlivOS.core.core import API
@@ -61,6 +62,17 @@ dict_ctype = {
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+
+
+def safe_text(value):
+    """将孤立 Unicode 代理字符转义，避免日志输出破坏日志线程。"""
+    try:
+        return str(value).encode('utf-8', errors='backslashreplace').decode('utf-8')
+    except Exception:
+        try:
+            return repr(value)
+        except Exception:
+            return '<unprintable>'
 
 
 class logger(API.Proc_templet):
@@ -216,8 +228,15 @@ class logger(API.Proc_templet):
         if log_segment is None:
             log_segment = []
         try:
+            log_segment_safe = []
+            for segment_this in log_segment:
+                try:
+                    segment_mark, segment_type = segment_this
+                    log_segment_safe.append((safe_text(segment_mark), segment_type))
+                except Exception:
+                    log_segment_safe.append(segment_this)
             self.Proc_config['logger_queue'].put(
-                self.log_packet(log_level, log_message, time.time(), log_segment),
+                self.log_packet(log_level, safe_text(log_message), time.time(), log_segment_safe),
                 block=False
             )
         except Exception:
@@ -310,7 +329,7 @@ class logger(API.Proc_templet):
                         << self.Proc_config['color_dict']['type_win']['front']
                     )
                 )
-            print(log_output_str)
+            self.log_output_print(log_output_str)
             ctypes.windll.kernel32.SetConsoleTextAttribute(
                 self.Proc_data['extend_data']['std_out_handle'],
                 self.Proc_config['color_dict']['shader_win'][
@@ -335,13 +354,35 @@ class logger(API.Proc_templet):
                     self.Proc_config['color_dict']['shader']['default']
                 ])
             )
-            print(log_output_str)
+            self.log_output_print(log_output_str)
         else:
+            self.log_output_print(log_output_str)
+
+    def log_output_print(self, log_output_str):
+        try:
             print(log_output_str)
+        except UnicodeEncodeError:
+            try:
+                stdout_encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+                fallback_str = str(log_output_str).encode(
+                    stdout_encoding,
+                    errors='backslashreplace'
+                ).decode(stdout_encoding)
+                print(fallback_str)
+            except Exception:
+                pass
 
     def log_output(self, log_packet_this, flag_need_refresh_out=False):
         tmp_logger_mode_list = []
         flag_need_refresh = False
+        try:
+            log_packet_this['log_message'] = safe_text(log_packet_this['log_message'])
+            log_packet_this['log_segment'] = [
+                (safe_text(segment_mark), segment_type)
+                for segment_mark, segment_type in log_packet_this['log_segment']
+            ]
+        except Exception:
+            pass
         if log_packet_this['log_level'] in self.Proc_config['logger_vis_level']:
             self.Proc_data['logfile_count'] -= 1
             if self.Proc_data['logfile_count'] <= 0 or flag_need_refresh_out:
@@ -367,7 +408,7 @@ class logger(API.Proc_templet):
                     if tmp_logger_mode_list_this == 'console_color':
                         self.log_output_shader(log_output_str, log_packet_this)
                     elif tmp_logger_mode_list_this == 'console':
-                        print(log_output_str)
+                        self.log_output_print(log_output_str)
                     elif tmp_logger_mode_list_this == 'logfile':
                         self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
                         if flag_need_refresh:
@@ -397,9 +438,9 @@ class logger(API.Proc_templet):
         for segment_this in log_packet_this['log_segment']:
             (segment_this_mark, segment_this_type) = segment_this
             log_output_str_1 += self.Proc_config['segment_type'][segment_this_type][0]
-            log_output_str_1 += str(segment_this_mark)
+            log_output_str_1 += safe_text(segment_this_mark)
             log_output_str_1 += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
-        log_output_str_1 += log_packet_this['log_message']
+        log_output_str_1 += safe_text(log_packet_this['log_message'])
         return log_output_str_1
 
     def __sendControlEventSend(self, action, data):
