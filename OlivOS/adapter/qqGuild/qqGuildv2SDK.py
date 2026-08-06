@@ -2406,7 +2406,16 @@ def _get_qq_reference_message_id(bot_hash, chat_type, chat_id, event_data):
     scene_ext = _parse_qq_message_scene_ext(event_data.get('message_scene', None))
     ref_msg_idx = scene_ext.get('ref_msg_idx', None)
     if ref_msg_idx is not None and str(ref_msg_idx) != '':
-        return _get_qq_message_id_by_idx(bot_hash, chat_type, chat_id, ref_msg_idx)
+        reference_message_id = _get_qq_message_id_by_idx(
+            bot_hash,
+            chat_type,
+            chat_id,
+            ref_msg_idx
+        )
+        if reference_message_id is not None:
+            return reference_message_id
+        # 与 OneBot V11 一样保留 reply 段；缓存未命中时使用 QQ 原始索引。
+        return str(ref_msg_idx)
     return None
 
 
