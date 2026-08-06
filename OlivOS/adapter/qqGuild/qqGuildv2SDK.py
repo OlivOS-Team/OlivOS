@@ -5017,6 +5017,134 @@ class event_action(object):
         this_msg.metadata.channel_id = str(channel_id)
         return event_action._run_raw_api(this_msg, 'get_channel_info', 'GET')
 
+    def _raw_response(raw_result):
+        if not isinstance(raw_result, dict):
+            return None
+        response = raw_result.get('data', {}).get('response', None)
+        return response
+
+    def _standard_group_info(raw_result, fallback_id=None):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False) or not isinstance(response, dict):
+            return res_data
+        group_id = response.get('id', fallback_id)
+        res_data['active'] = group_id is not None
+        res_data['data']['id'] = None if group_id is None else str(group_id)
+        res_data['data']['name'] = response.get('name', response.get('title', None))
+        res_data['data']['memo'] = response.get('topic', response.get('description', None))
+        res_data['data']['max_member_count'] = response.get(
+            'max_member_count', response.get('max_members_count', 0)
+        )
+        res_data['data']['extra'] = copy.deepcopy(response)
+        return res_data
+
+    def _standard_group_list(raw_result):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False):
+            return res_data
+        if isinstance(response, dict):
+            response_items = response.get('data', response.get('items', response.get('channels', None)))
+            if isinstance(response_items, dict):
+                response_items = response_items.get('items', response_items.get('channels', None))
+        else:
+            response_items = response
+        if not isinstance(response_items, list):
+            return res_data
+        res_data['active'] = True
+        for item in response_items:
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get('id', None)
+            if item_id is None:
+                continue
+            res_data['data'].append({
+                'id': str(item_id),
+                'name': item.get('name', item.get('title', None)),
+                'memo': item.get('topic', item.get('description', None)),
+                'max_member_count': item.get('max_member_count', item.get('max_members_count', 0)),
+                'extra': copy.deepcopy(item)
+            })
+        return res_data
+
+    def _standard_group_member_list(raw_result, fallback_group_id=None):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False):
+            return res_data
+        if isinstance(response, dict):
+            response_items = response.get('data', response.get('members', response.get('items', None)))
+            if isinstance(response_items, dict):
+                response_items = response_items.get('members', response_items.get('items', response_items.get('data', None)))
+        else:
+            response_items = response
+        if not isinstance(response_items, list):
+            return res_data
+        res_data['active'] = True
+        for item in response_items:
+            if not isinstance(item, dict):
+                continue
+            user_info = item.get('user', None)
+            if not isinstance(user_info, dict):
+                user_info = {}
+            user_id = item.get(
+                'user_id',
+                item.get('member_openid', item.get('id', user_info.get('id', None)))
+            )
+            if user_id is None:
+                continue
+            member = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+            member['id'] = str(user_id)
+            member['user_id'] = str(user_id)
+            member['group_id'] = None if fallback_group_id is None else str(fallback_group_id)
+            member['name'] = item.get(
+                'username',
+                item.get(
+                    'nickname',
+                    item.get('name', user_info.get('username', user_info.get('nickname', None)))
+                )
+            )
+            member['card'] = item.get('nick', item.get('card', member['name']))
+            member['role'] = item.get('role', None)
+            member['extra'] = copy.deepcopy(item)
+            res_data['data'].append(member)
+        return res_data
+
+    def get_guild_info_standard(target_event, guild_id):
+        return event_action._standard_group_info(
+            event_action.get_guild_info(target_event, guild_id),
+            fallback_id=guild_id
+        )
+
+    def get_guild_list_standard(target_event, before=None, after=None, limit=None):
+        return event_action._standard_group_list(
+            event_action.get_me_guild_list(target_event, before, after, limit)
+        )
+
+    def get_guild_channel_list_standard(target_event, guild_id):
+        return event_action._standard_group_list(
+            event_action.get_guild_channel_list(target_event, guild_id)
+        )
+
+    def get_channel_info_standard(target_event, channel_id):
+        return event_action._standard_group_info(
+            event_action.get_channel_info(target_event, channel_id),
+            fallback_id=channel_id
+        )
+
+    def get_guild_member_list_standard(target_event, guild_id, after=None, limit=None):
+        return event_action._standard_group_member_list(
+            event_action.get_guild_member_list(target_event, guild_id, after, limit),
+            fallback_group_id=guild_id
+        )
+
+    def get_qq_group_member_list_standard(target_event, group_openid, limit=None, start_index=None):
+        return event_action._standard_group_member_list(
+            event_action.get_qq_group_member_list(target_event, group_openid, limit, start_index),
+            fallback_group_id=group_openid
+        )
+
     def create_channel(target_event, guild_id, name, type=None, sub_type=None,
                        position=None, parent_id=None, private_type=None,
                        private_user_ids=None, speak_permission=None, application_id=None):
@@ -5234,6 +5362,37 @@ class event_action(object):
         this_msg.metadata.channel_id = str(channel_id)
         return event_action._run_raw_api(this_msg, 'get_pins_message', 'GET')
 
+    def get_essence_msg_list(target_event, channel_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
+        raw_result = event_action.get_pins_message(target_event, channel_id)
+        if not raw_result.get('active', False):
+            return res_data
+        raw_response = raw_result.get('data', {}).get('response', None)
+        if not isinstance(raw_response, dict):
+            return res_data
+        message_ids = raw_response.get('message_ids', None)
+        if not isinstance(message_ids, list):
+            return res_data
+        response_channel_id = raw_response.get('channel_id', channel_id)
+        res_data['active'] = True
+        for message_id in message_ids:
+            res_data['data'].append({
+                'sender_id': None,
+                'sender_nick': None,
+                'sender_time': None,
+                'operator_id': None,
+                'operator_nick': None,
+                'operator_time': None,
+                'message_id': str(message_id),
+                'message': None,
+                'wording': None,
+                'extra': {
+                    'channel_id': None if response_channel_id is None else str(response_channel_id),
+                    'qq_response': copy.deepcopy(raw_response)
+                }
+            })
+        return res_data
+
     # ============ 频道:日程 ============
     def get_schedule_list(target_event, channel_id, since=None):
         this_msg = API.getSchedules(get_SDK_bot_info_from_Event(target_event))
@@ -5386,6 +5545,73 @@ class event_action(object):
         this_msg.metadata.group_openid = str(group_openid)
         return event_action._run_raw_api(this_msg, 'get_qq_group_bot_state', 'GET')
 
+    def _make_resource_upload_result(chat_type, chat_id, file_info, operation):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = file_info is not None
+        res_data['data'].update({
+            'operation': operation,
+            'chat_type': chat_type,
+            'chat_id': None if chat_id is None else str(chat_id),
+            'file_info': file_info
+        })
+        return res_data
+
+    def _get_qq_upload_context_error(target_event, flag_direct):
+        target_data = getattr(target_event, 'data', None)
+        extend_data = getattr(target_data, 'extend', None)
+        if not isinstance(extend_data, dict) or 'flag_from_qq' not in extend_data:
+            return None
+        if not extend_data.get('flag_from_qq', False):
+            return 'QQ group/C2C file upload is unavailable in a guild context'
+        if extend_data.get('flag_from_direct', False) != flag_direct:
+            return 'current QQ event chat type does not match the file upload target'
+        return None
+
+    def upload_group_file(target_event, group_id, file, name='', folder_id=None):
+        # QQ 群文件接口不支持 OneBot 的 folder_id，保留参数仅为统一 API 签名。
+        context_error = event_action._get_qq_upload_context_error(
+            target_event,
+            flag_direct=False
+        )
+        if context_error is not None:
+            return event_action._make_local_result(
+                'qq_group', group_id, 'upload_group_file', context_error
+            )
+        file_info = event_action.setResourceUploadFast(
+            target_event,
+            file,
+            group_id,
+            type_path='files',
+            type_chat='qq_groups',
+            file_name=name,
+            flag_send_msg=True
+        )
+        return event_action._make_resource_upload_result(
+            'qq_group', group_id, file_info, 'upload_group_file'
+        )
+
+    def upload_private_file(target_event, user_id, file, name):
+        context_error = event_action._get_qq_upload_context_error(
+            target_event,
+            flag_direct=True
+        )
+        if context_error is not None:
+            return event_action._make_local_result(
+                'qq_private', user_id, 'upload_private_file', context_error
+            )
+        file_info = event_action.setResourceUploadFast(
+            target_event,
+            file,
+            user_id,
+            type_path='files',
+            type_chat='qq_users',
+            file_name=name,
+            flag_send_msg=True
+        )
+        return event_action._make_resource_upload_result(
+            'qq_private', user_id, file_info, 'upload_private_file'
+        )
+
     # ============ 用户信息(基于消息/事件积累的缓存) ============
     def get_stranger_info(target_event, user_id, no_cache=False):
         # 平台无"查用户资料"接口,数据来自消息/事件/mentions 积累的缓存;
@@ -5514,7 +5740,8 @@ class event_action(object):
         chat_id,
         type_path: str,
         type_chat: str,
-        file_name=None
+        file_name=None,
+        flag_send_msg=False
     ):
         file_type_map = {
             'images': 1,
@@ -5528,9 +5755,20 @@ class event_action(object):
             flag_remote = url_parsed.scheme in ['http', 'https']
             file_data = None
             if flag_remote:
+                if type_path == 'files':
+                    file_name = event_action._get_resource_file_name(
+                        url,
+                        type_path=type_path,
+                        file_name=file_name
+                    )
                 resource_key = 'url:%s' % url
             else:
                 file_data = event_action._get_local_resource_data(url, type_path)
+                file_name = event_action._get_resource_file_name(
+                    url,
+                    type_path=type_path,
+                    file_name=file_name
+                )
                 resource_key = 'md5:%s:%d' % (
                     hashlib.md5(file_data).hexdigest(),
                     len(file_data)
@@ -5542,9 +5780,10 @@ class event_action(object):
                 str(file_type),
                 resource_key
             )
-            file_info = _get_cached_resource_upload(cache_key)
-            if file_info is not None:
-                return file_info
+            if not flag_send_msg:
+                file_info = _get_cached_resource_upload(cache_key)
+                if file_info is not None:
+                    return file_info
 
             ttl = None
             if flag_remote:
@@ -5554,14 +5793,11 @@ class event_action(object):
                     chat_id,
                     type_chat,
                     file_type,
-                    url=url
+                    url=url,
+                    file_name=file_name,
+                    flag_send_msg=flag_send_msg
                 )
             else:
-                file_name = event_action._get_resource_file_name(
-                    url,
-                    type_path=type_path,
-                    file_name=file_name
-                )
                 if len(file_data) <= sdkResourceUploadDirectMaxSize:
                     file_info, ttl = event_action._upload_resource_direct(
                         target_event,
@@ -5569,7 +5805,8 @@ class event_action(object):
                         type_chat,
                         file_type,
                         file_data=file_data,
-                        file_name=file_name
+                        file_name=file_name,
+                        flag_send_msg=flag_send_msg
                     )
                     if file_info is None:
                         # file_data 直传失败时回退到文档的分片上传流程。
@@ -5579,7 +5816,8 @@ class event_action(object):
                             type_chat,
                             file_type,
                             file_data,
-                            file_name
+                            file_name,
+                            flag_send_msg=flag_send_msg
                         )
                 else:
                     # 大文件按文档走分片上传，避免超长 base64 请求体。
@@ -5589,9 +5827,10 @@ class event_action(object):
                         type_chat,
                         file_type,
                         file_data,
-                        file_name
+                        file_name,
+                        flag_send_msg=flag_send_msg
                     )
-            if file_info is not None:
+            if file_info is not None and not flag_send_msg:
                 _cache_resource_upload(cache_key, file_info, ttl)
             return file_info
         except Exception:
@@ -5599,7 +5838,7 @@ class event_action(object):
             return None
 
     # 富媒体直传：远程资源传 url，本地资源传 base64 file_data；
-    # srv_send_msg 固定为 False，消息统一由 send_qq_msg 走消息接口发送以支持被动回复。
+    # 普通消息传输不直接发消息，upload_*_file 调用则将 flag_send_msg 设为 True。
     def _upload_resource_direct(
         target_event,
         chat_id,
@@ -5607,14 +5846,15 @@ class event_action(object):
         file_type,
         url=None,
         file_data=None,
-        file_name=None
+        file_name=None,
+        flag_send_msg=False
     ):
         msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
         msg_upload_api.resource_type = type_chat
         msg_upload_api.metadata.openid = str(chat_id)
         msg_upload_api.data.file_type = file_type
         msg_upload_api.data.file_name = file_name
-        msg_upload_api.data.srv_send_msg = False
+        msg_upload_api.data.srv_send_msg = flag_send_msg
         if url is not None:
             msg_upload_api.data.url = url
         elif file_data is not None:
@@ -5633,7 +5873,8 @@ class event_action(object):
         type_chat,
         file_type,
         file_data,
-        file_name
+        file_name,
+        flag_send_msg=False
     ):
         sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
         prepare_api = API.uploadPrepare(sdk_bot_info)
@@ -5724,7 +5965,7 @@ class event_action(object):
         merge_api.data.file_type = file_type
         merge_api.data.file_name = file_name
         merge_api.data.upload_id = upload_id
-        merge_api.data.srv_send_msg = False
+        merge_api.data.srv_send_msg = flag_send_msg
         merge_api.do_api('POST')
         file_info, ttl = event_action._parse_resource_upload_result(merge_api)
         if file_info is None:
