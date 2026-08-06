@@ -69,6 +69,11 @@ class Account(object):
                 and dict is type(account_conf_account_this['extends'])
             ):
                 bot_info_tmp.extends = account_conf_account_this['extends']
+            if (
+                'enable' in account_conf_account_this
+                and bool is type(account_conf_account_this['enable'])
+            ):
+                bot_info_tmp.enable = account_conf_account_this['enable']
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
             logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
@@ -97,10 +102,20 @@ class Account(object):
             tmp_this_account_data['server']['port'] = Account_data_this.post_info.port
             tmp_this_account_data['server']['access_token'] = Account_data_this.post_info.access_token
             tmp_this_account_data['extends'] = Account_data_this.extends
+            tmp_this_account_data['enable'] = getattr(Account_data_this, 'enable', True)
             tmp_this_account_data['debug'] = Account_data_this.debug_mode
             tmp_total_account_data['account'].append(tmp_this_account_data)
         with open(path, 'w', encoding='utf-8') as account_conf_f:
             account_conf_f.write(json.dumps(tmp_total_account_data, indent=4))
+
+    def getEnabledAccountData(Account_data):
+        if type(Account_data) is not dict:
+            return {}
+        return {
+            Account_data_this_key: Account_data[Account_data_this_key]
+            for Account_data_this_key in Account_data
+            if getattr(Account_data[Account_data_this_key], 'enable', True) is True
+        }
 
 
 def accountFix(basic_conf_models, bot_info_dict, logger_proc):
@@ -134,6 +149,9 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
         for bot_info_dict_this in bot_info_dict:
             Account_data_this = bot_info_dict[bot_info_dict_this]
+            if getattr(Account_data_this, 'enable', True) is not True:
+                res[bot_info_dict_this] = Account_data_this
+                continue
             if platform.system() == 'Windows':
                 if (
                     Account_data_this.platform['model'] in OlivOS.libEXEModelAPI.gCheckList

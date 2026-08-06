@@ -1886,6 +1886,25 @@ def _get_message_attachments(attachments):
     return message_list
 
 
+def _get_qq_ark_message_para(event_data):
+    if not isinstance(event_data, dict):
+        return None
+    ark_data = event_data.get('ark_data', None)
+    if not isinstance(ark_data, dict):
+        ark_data = event_data.get('ark', None)
+    if not isinstance(ark_data, dict):
+        return None
+    try:
+        ark_json = json.dumps(
+            ark_data,
+            ensure_ascii=False,
+            separators=(',', ':')
+        )
+    except (TypeError, ValueError):
+        return None
+    return OlivOS.messageAPI.PARA.json(data=ark_json)
+
+
 def _get_qq_author_name(author):
     if not isinstance(author, dict):
         return '用户'
@@ -2132,6 +2151,8 @@ def _get_qq_message_event_extend(event_type, event_data):
     for source_key, target_key in field_map.items():
         if source_key in event_data:
             result[target_key] = copy.deepcopy(event_data[source_key])
+    if 'ark_data' not in event_data and 'ark' in event_data:
+        result['qq_ark_data'] = copy.deepcopy(event_data['ark'])
     if 'message_scene' in event_data:
         result['qq_message_scene'] = copy.deepcopy(safe_message_scene)
         scene_ext = _parse_qq_message_scene_ext(message_scene)
@@ -2873,13 +2894,19 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_obj = None
         message_content = event_data.get('content', None)
+        ark_message_para = _get_qq_ark_message_para(event_data)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
             event_type == 'GROUP_AT_MESSAGE_CREATE'
             and isinstance(message_content, str)
         ):
             message_content = message_content.lstrip(' ')
-        if message_content is not None:
+        if ark_message_para is not None:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [ark_message_para]
+            )
+        elif message_content is not None:
             if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuildv2_string',
@@ -3024,7 +3051,13 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        if 'content' in event_data:
+        ark_message_para = _get_qq_ark_message_para(event_data)
+        if ark_message_para is not None:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [ark_message_para]
+            )
+        elif 'content' in event_data:
             if event_data['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuildv2_string',
@@ -3139,7 +3172,13 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_content = event_data.get('content', None)
         message_obj = None
-        if message_content is not None:
+        ark_message_para = _get_qq_ark_message_para(event_data)
+        if ark_message_para is not None:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [ark_message_para]
+            )
+        elif message_content is not None:
             if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
@@ -3249,7 +3288,13 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        if 'content' in event_data:
+        ark_message_para = _get_qq_ark_message_para(event_data)
+        if ark_message_para is not None:
+            message_obj = OlivOS.messageAPI.Message_templet(
+                'olivos_para',
+                [ark_message_para]
+            )
+        elif 'content' in event_data:
             if event_data['content'] != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',

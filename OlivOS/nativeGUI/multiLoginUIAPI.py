@@ -14,19 +14,17 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-import tkinter
 import base64
-import os
+import copy
 import hashlib
+import json
+import os
+import platform
 import random
 import shutil
-import platform
+import tkinter
 import traceback
-import json
-import copy
-
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 import OlivOS
 
@@ -151,17 +149,44 @@ class HostUI(object):
         )
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
-        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree_style'] = ttk.Style(self.UIObject['root'])
+        self.UIObject['tree_style_name'] = 'OlivOSAccount.Treeview'
+        self.UIObject['tree_style'].configure(
+            self.UIObject['tree_style_name'],
+            rowheight=21
+        )
+        self.UIObject['tree_style'].map(
+            self.UIObject['tree_style_name'],
+            foreground=[('selected', '#FFFFFF')]
+        )
+        self.UIObject['tree'] = ttk.Treeview(
+            self.UIObject['root'],
+            style=self.UIObject['tree_style_name']
+        )
+        self.UIObject['tree_switch_dict'] = {}
         self.UIObject['tree']['show'] = 'headings'
         # self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
-        self.UIObject['tree']['columns'] = ('ID', 'TYPE')
-        self.UIObject['tree'].column('ID', width=200)
-        self.UIObject['tree'].column('TYPE', width=200)
+        self.UIObject['tree']['columns'] = ('ENABLE', 'ID', 'TYPE')
+        self.UIObject['tree'].column(
+            'ENABLE',
+            width=69,
+            minwidth=69,
+            stretch=False,
+            anchor='center'
+        )
+        self.UIObject['tree'].column('ID', width=180)
+        self.UIObject['tree'].column('TYPE', width=230)
         # self.UIObject['tree'].column('PLATFORM', width=100)
         # self.UIObject['tree'].column('SDK', width=100)
         # self.UIObject['tree'].column('MODEL', width=100)
+        self.UIObject['tree'].heading('ENABLE', text='启用')
         self.UIObject['tree'].heading('ID', text='ID')
         self.UIObject['tree'].heading('TYPE', text='账号类型')
+        self.UIObject['tree'].tag_configure('account_disabled', foreground='#888888')
+        self.UIObject['tree'].bind('<<TreeviewSelect>>', self.tree_update_selected_color)
+        self.UIObject['tree'].bind('<Configure>', self.tree_switch_scroll, add='+')
+        # 固定启用列宽度，保留其他列的手动调整能力
+        self.UIObject['tree'].bind('<ButtonPress-1>', self.tree_block_enable_resize, add='+')
         # self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
         # self.UIObject['tree'].heading('SDK', text='SDK')
         # self.UIObject['tree'].heading('MODEL', text='MODEL')
@@ -176,7 +201,7 @@ class HostUI(object):
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
             self.UIObject['root'],
             orient="vertical",
-            command=self.UIObject['tree'].yview
+            command=self.tree_yview
         )
         self.UIObject['tree_yscroll'].place(
             x=500,
@@ -185,7 +210,7 @@ class HostUI(object):
             height=350
         )
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.tree_yscroll_set
         )
 
         self.tree_UI_Button_init(
@@ -429,26 +454,259 @@ class HostUI(object):
         self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
 
     def tree_load(self):
+        self.tree_switch_clear()
         tmp_tree_item_children = self.UIObject['tree'].get_children()
         for tmp_tree_item_this in tmp_tree_item_children:
             self.UIObject['tree'].delete(tmp_tree_item_this)
         for Account_hash_this in self.UIData['Account_data']:
-            self.UIObject['tree'].insert(
+            item_id = self.UIObject['tree'].insert(
                 '',
                 0,
                 text=Account_hash_this,
                 values=(
+                    '',
                     self.UIData['Account_data'][Account_hash_this].id,
                     self.get_account_data_type_name(Account_hash_this)
                     # self.UIData['Account_data'][Account_hash_this].platform['platform'],
                     # self.UIData['Account_data'][Account_hash_this].platform['sdk'],
                     # self.UIData['Account_data'][Account_hash_this].platform['model']
+                ),
+                tags=(
+                    ()
+                    if getattr(self.UIData['Account_data'][Account_hash_this], 'enable', True) is True
+                    else ('account_disabled',)
                 )
             )
+            self.tree_switch_add(item_id, Account_hash_this)
+        self.UIObject['root'].update_idletasks()
+        self.tree_switch_refresh()
         if len(self.UIData['Account_data']) <= 0:
             self.frame_show('root_frame_first_root')
         else:
             self.frame_hide('root_frame_first_root')
+
+    def tree_switch_add(self, item_id, account_hash):
+        account = self.UIData['Account_data'][account_hash]
+        variable = tkinter.BooleanVar(
+            master=self.UIObject['root'],
+            value=getattr(account, 'enable', True) is True
+        )
+        switch = tkinter.Canvas(
+            self.UIObject['tree'],
+            highlightthickness=0,
+            borderwidth=0,
+            takefocus=False,
+            background='#FFFFFF',
+            cursor='arrow'
+        )
+        switch.bind(
+            '<Button-1>',
+            lambda event: self.tree_switch_click(event, account_hash)
+        )
+        switch.bind(
+            '<Motion>',
+            lambda event: self.tree_switch_motion(event, account_hash)
+        )
+        switch.bind('<Leave>', lambda event: switch.configure(cursor='arrow'))
+        self.UIObject['tree_switch_dict'][account_hash] = {
+            'item_id': item_id,
+            'variable': variable,
+            'widget': switch
+        }
+
+    def tree_switch_clear(self):
+        for switch_data in self.UIObject.get('tree_switch_dict', {}).values():
+            try:
+                switch_data['widget'].destroy()
+            except Exception:
+                pass
+        self.UIObject['tree_switch_dict'] = {}
+
+    def tree_switch_toggle(self, account_hash):
+        if (
+            account_hash not in self.UIData['Account_data']
+            or account_hash not in self.UIObject['tree_switch_dict']
+        ):
+            return
+        switch_data = self.UIObject['tree_switch_dict'][account_hash]
+        account = self.UIData['Account_data'][account_hash]
+        account.enable = switch_data['variable'].get() is True
+        self.UIObject['tree'].item(
+            switch_data['item_id'],
+            tags=(() if account.enable is True else ('account_disabled',))
+        )
+        self.UIObject['tree'].selection_set(switch_data['item_id'])
+        self.UIObject['tree'].focus(switch_data['item_id'])
+        self.tree_update_selected_color()
+
+    def tree_switch_click(self, event, account_hash):
+        switch_data = self.UIObject.get('tree_switch_dict', {}).get(account_hash)
+        if switch_data is None:
+            return 'break'
+        box_bounds = switch_data.get('box_bounds')
+        if box_bounds is not None and (
+            box_bounds[0] <= event.x <= box_bounds[2]
+            and box_bounds[1] <= event.y <= box_bounds[3]
+        ):
+            switch_data['variable'].set(not switch_data['variable'].get())
+            self.tree_switch_toggle(account_hash)
+        return 'break'
+
+    def tree_switch_motion(self, event, account_hash):
+        switch_data = self.UIObject.get('tree_switch_dict', {}).get(account_hash)
+        if switch_data is None:
+            return
+        box_bounds = switch_data.get('box_bounds')
+        cursor = 'hand2'
+        if box_bounds is None or not (
+            box_bounds[0] <= event.x <= box_bounds[2]
+            and box_bounds[1] <= event.y <= box_bounds[3]
+        ):
+            cursor = 'arrow'
+        switch_data['widget'].configure(cursor=cursor)
+
+    def tree_switch_refresh(self):
+        for switch_data in self.UIObject.get('tree_switch_dict', {}).values():
+            cell_bbox = self.UIObject['tree'].bbox(switch_data['item_id'], '#1')
+            if cell_bbox:
+                switch_width = min(25, cell_bbox[2])
+                switch_height = min(13, cell_bbox[3])
+                switch_data['widget'].place(
+                    x=cell_bbox[0] + (cell_bbox[2] - switch_width) // 2,
+                    y=cell_bbox[1] + (cell_bbox[3] - switch_height) // 2,
+                    width=switch_width,
+                    height=switch_height
+                )
+                switch_data['width'] = switch_width
+                switch_data['height'] = switch_height
+            else:
+                switch_data['widget'].place_forget()
+        self.tree_switch_update_appearance()
+
+    def tree_switch_update_appearance(self):
+        switch_dict = self.UIObject.get('tree_switch_dict', {})
+        if not switch_dict:
+            return
+        for switch_data in switch_dict.values():
+            self.tree_switch_draw(switch_data)
+
+    def tree_switch_draw(self, switch_data):
+        canvas = switch_data['widget']
+        canvas.delete('all')
+        width = switch_data.get('width', 25)
+        height = switch_data.get('height', 13)
+        item_id = switch_data['item_id']
+        canvas_background = '#FFFFFF'
+        selected = item_id in self.UIObject['tree'].selection()
+        if selected:
+            canvas_background = self.UIObject['tree_style'].lookup(
+                self.UIObject['tree_style_name'],
+                'background',
+                ('selected',)
+            ) or '#0078D7'
+        canvas.configure(background=canvas_background)
+
+        enabled = switch_data['variable'].get() is True
+        track_color = '#00A0EA' if enabled else '#A9AEB3'
+        if selected:
+            track_outline_color = '#FFFFFF'
+        else:
+            track_outline_color = '#005B86' if enabled else '#555C62'
+        track_pixel_runs = (
+            (4, 20),
+            (2, 22),
+            (1, 23),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (1, 23),
+            (2, 22),
+            (4, 20)
+        )
+        for pixel_top, (pixel_left, pixel_right) in enumerate(track_pixel_runs):
+            canvas.create_rectangle(
+                pixel_left,
+                pixel_top,
+                pixel_right + 1,
+                pixel_top + 1,
+                fill=track_outline_color,
+                outline=''
+            )
+        track_fill_pixel_runs = (
+            None,
+            (4, 20),
+            (3, 21),
+            (2, 22),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (2, 22),
+            (3, 21),
+            (4, 20),
+            None
+        )
+        for pixel_top, pixel_run in enumerate(track_fill_pixel_runs):
+            if pixel_run is None:
+                continue
+            pixel_left, pixel_right = pixel_run
+            canvas.create_rectangle(
+                pixel_left,
+                pixel_top,
+                pixel_right + 1,
+                pixel_top + 1,
+                fill=track_color,
+                outline=''
+            )
+        knob_size = height - 4
+        knob_left = width - knob_size - 2 if enabled else 2
+        canvas.create_oval(
+            knob_left,
+            2,
+            knob_left + knob_size - 1,
+            knob_size + 1,
+            fill='#FFFFFF',
+            outline=''
+        )
+        switch_data['box_bounds'] = (0, 0, width - 1, height - 1)
+
+    def tree_switch_scroll(self, event=None):
+        self.UIObject['root'].after_idle(self.tree_switch_refresh)
+
+    def tree_block_enable_resize(self, event):
+        tree = self.UIObject['tree']
+        if (
+            tree.identify_region(event.x, event.y) == 'separator'
+            and tree.identify_column(event.x) == '#1'
+        ):
+            return 'break'
+
+    def tree_yview(self, *args):
+        self.UIObject['tree'].yview(*args)
+        self.tree_switch_refresh()
+
+    def tree_yscroll_set(self, first, last):
+        self.UIObject['tree_yscroll'].set(first, last)
+        self.UIObject['root'].after_idle(self.tree_switch_refresh)
+
+    def tree_update_selected_color(self, event=None):
+        selected_item_list = self.UIObject['tree'].selection()
+        selected_foreground = '#FFFFFF'
+        if selected_item_list:
+            account_hash = self.UIObject['tree'].item(selected_item_list[0], 'text')
+            account = self.UIData['Account_data'].get(account_hash)
+            if account is not None and getattr(account, 'enable', True) is not True:
+                selected_foreground = '#888888'
+        self.UIObject['tree_style'].map(
+            self.UIObject['tree_style_name'],
+            foreground=[('selected', selected_foreground)]
+        )
+        self.tree_switch_update_appearance()
 
     def tree_edit(self, action):
         hash_key_how = None
@@ -1324,6 +1582,15 @@ class TreeEditUI(object):
                     platform_platform=tmp_platform_platform,
                     platform_model=tmp_platform_model
                 )
+                if (
+                    tmp_action == 'update'
+                    and self.hash_key in self.UIData['Account_data']
+                ):
+                    tmp_res_bot_info.enable = getattr(
+                        self.UIData['Account_data'][self.hash_key],
+                        'enable',
+                        True
+                    )
                 type_this = self.get_type_name(
                     tmp_platform_platform,
                     tmp_platform_sdk,

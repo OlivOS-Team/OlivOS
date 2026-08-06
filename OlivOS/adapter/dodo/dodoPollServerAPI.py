@@ -42,6 +42,12 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_island_list'] = {}
 
     def run(self):
+        if type(self.Proc_data['bot_info_dict']) is not dict or not any(
+            getattr(bot_info_this, 'enable', True) is True
+            and bot_info_this.platform['sdk'] == 'dodo_poll'
+            for bot_info_this in self.Proc_data['bot_info_dict'].values()
+        ):
+            return
         self.log(2, 'OlivOS dodo poll server [' + self.Proc_name + '] is running')
         while True:
             time.sleep(self.Proc_info.scan_interval)
@@ -51,6 +57,8 @@ class server(OlivOS.API.Proc_templet):
         for bot_info_this in self.Proc_data['bot_info_dict']:
             flag_not_attach = False
             bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+            if getattr(bot_info_this_obj, 'enable', True) is not True:
+                continue
             if bot_info_this_obj.platform['sdk'] == 'dodo_poll':
                 sdk_bot_info_this = OlivOS.dodoSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_this_obj)
                 if bot_info_this in self.Proc_data['bot_info_update_id']:

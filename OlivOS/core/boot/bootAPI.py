@@ -67,6 +67,7 @@ class Entity(object):
         Proc_dict = {}
         Proc_Proc_dict = {}
         Proc_logger_name = []
+        account_bot_info_dict = {}
         plugin_bot_info_dict = {}
         logger_proc = None
 
@@ -474,38 +475,47 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     )
                                     Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'account_config':
-                        plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
+                        account_bot_info_dict = OlivOS.accountAPI.Account.load(
                             path=basic_conf_models_this['data']['path'],
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
+                        plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
+                            account_bot_info_dict
+                        )
                     elif basic_conf_models_this['type'] == 'account_config_safe':
-                        plugin_bot_info_dict = OlivOS.accountAPI.Account.load(
+                        account_bot_info_dict = OlivOS.accountAPI.Account.load(
                             path=basic_conf_models_this['data']['path'],
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                             safe_mode=True
                         )
+                        plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
+                            account_bot_info_dict
+                        )
                     elif basic_conf_models_this['type'] == 'account_fix':
-                        plugin_bot_info_dict = OlivOS.fanbookPollServerAPI.accountFix(
-                            bot_info_dict=plugin_bot_info_dict,
+                        account_bot_info_dict = OlivOS.fanbookPollServerAPI.accountFix(
+                            bot_info_dict=account_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                         )
-                        plugin_bot_info_dict = OlivOS.kaiheilaLinkServerAPI.accountFix(
-                            bot_info_dict=plugin_bot_info_dict,
+                        account_bot_info_dict = OlivOS.kaiheilaLinkServerAPI.accountFix(
+                            bot_info_dict=account_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                         )
-                        plugin_bot_info_dict = OlivOS.discordLinkServerAPI.accountFix(
-                            bot_info_dict=plugin_bot_info_dict,
+                        account_bot_info_dict = OlivOS.discordLinkServerAPI.accountFix(
+                            bot_info_dict=account_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                         )
                         if platform.system() == 'Windows':
                             OlivOS.libEXEModelAPI.accountFix(
-                                bot_info_dict=plugin_bot_info_dict,
+                                bot_info_dict=account_bot_info_dict,
                                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                             )
-                        plugin_bot_info_dict = OlivOS.accountAPI.accountFix(
+                        account_bot_info_dict = OlivOS.accountAPI.accountFix(
                             basic_conf_models=basic_conf_models,
-                            bot_info_dict=plugin_bot_info_dict,
+                            bot_info_dict=account_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                        )
+                        plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
+                            account_bot_info_dict
                         )
                     elif basic_conf_models_this['type'] == 'qqGuild_link':
                         flag_need_enable = False
@@ -826,7 +836,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             tmp_callbackData = {'res': False}
                             HostUI_obj = OlivOS.multiLoginUIAPI.HostUI(
                                 Model_name=basic_conf_models_this['name'],
-                                Account_data=plugin_bot_info_dict,
+                                Account_data=account_bot_info_dict,
                                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
                                 callbackData=tmp_callbackData
                             )
@@ -834,7 +844,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             if tmp_res is not True:
                                 killMain()
                             if HostUI_obj.UIData['flag_commit']:
-                                plugin_bot_info_dict = HostUI_obj.UIData['Account_data']
+                                account_bot_info_dict = HostUI_obj.UIData['Account_data']
+                                plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
+                                    account_bot_info_dict
+                                )
                     elif basic_conf_models_this['type'] == 'multiLoginUI_asayc':
                         if platform.system() == 'Windows':
                             main_control.control_queue.put(
@@ -847,7 +860,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                         'data': {
                                             'action': 'account_edit',
                                             'event': 'account_edit_on',
-                                            'bot_info': plugin_bot_info_dict
+                                            'bot_info': account_bot_info_dict
                                         }
                                     }
                                 ),
@@ -864,7 +877,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     tx_queue=None,
                                     control_queue=multiprocessing_dict[basic_conf_models_this['control_queue']],
                                     logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
-                                    bot_info_dict=plugin_bot_info_dict
+                                    bot_info_dict=account_bot_info_dict
                                 )
                             # if True or 'auto' == tmp_proc_mode_raw:
                             #    tmp_proc_mode = 'processing'
@@ -874,7 +887,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'account_config_save':
                         OlivOS.accountAPI.Account.save(
                             path=basic_conf_models_this['data']['path'],
-                            Account_data=plugin_bot_info_dict,
+                            Account_data=account_bot_info_dict,
                             logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                         )
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
@@ -1139,7 +1152,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     and 'data' in rx_packet_data.key
                     and type(rx_packet_data.key['data']) is dict
                 ):
-                    plugin_bot_info_dict = rx_packet_data.key['data']
+                    account_bot_info_dict = rx_packet_data.key['data']
+                    plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
+                        account_bot_info_dict
+                    )
                     main_control.control_queue.put(
                         main_control.packet(
                             'send', {
@@ -1149,7 +1165,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 },
                                 'data': {
                                     'action': 'account_update',
-                                    'data': plugin_bot_info_dict
+                                    'data': account_bot_info_dict
                                 }
                             }
                         ),
