@@ -5076,7 +5076,10 @@ class event_action(object):
         if isinstance(response, dict):
             response_items = response.get('data', response.get('members', response.get('items', None)))
             if isinstance(response_items, dict):
-                response_items = response_items.get('members', response_items.get('items', response_items.get('data', None)))
+                response_items = response_items.get(
+                    'members',
+                    response_items.get('items', response_items.get('data', None))
+                )
         else:
             response_items = response
         if not isinstance(response_items, list):
