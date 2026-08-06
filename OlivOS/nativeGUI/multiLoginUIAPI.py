@@ -185,6 +185,8 @@ class HostUI(object):
         self.UIObject['tree'].tag_configure('account_disabled', foreground='#888888')
         self.UIObject['tree'].bind('<<TreeviewSelect>>', self.tree_update_selected_color)
         self.UIObject['tree'].bind('<Configure>', self.tree_switch_scroll, add='+')
+        # 固定启用列宽度，保留其他列的手动调整能力
+        self.UIObject['tree'].bind('<ButtonPress-1>', self.tree_block_enable_resize, add='+')
         # self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
         # self.UIObject['tree'].heading('SDK', text='SDK')
         # self.UIObject['tree'].heading('MODEL', text='MODEL')
@@ -675,6 +677,14 @@ class HostUI(object):
 
     def tree_switch_scroll(self, event=None):
         self.UIObject['root'].after_idle(self.tree_switch_refresh)
+
+    def tree_block_enable_resize(self, event):
+        tree = self.UIObject['tree']
+        if (
+            tree.identify_region(event.x, event.y) == 'separator'
+            and tree.identify_column(event.x) == '#1'
+        ):
+            return 'break'
 
     def tree_yview(self, *args):
         self.UIObject['tree'].yview(*args)
