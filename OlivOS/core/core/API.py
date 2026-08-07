@@ -1429,6 +1429,11 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_forward_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_forward_msg(
+                self,
+                message_id
+            )
         return res_data
 
     def get_forward_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
@@ -1436,8 +1441,8 @@ class Event(object):
 
         用于获取合并转发消息内容
 
-        支持平台：OneBotV11
-        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+        支持平台：OneBotV11、Milky、QQ官方/V2
+        QQ官方/V2 的合并转发内容来自接收事件缓存。
 
         Args:
             message_id: 合并转发消息ID

@@ -215,6 +215,12 @@ sdkRxMessageInfoLock = threading.Lock()
 sdkRxMessageInfoLastCleanup = 0.0
 sdkRxMessageInfoTTL = 7200.0
 sdkRxMessageInfoMaxSize = 20000
+# 合并转发节点缓存:OneBot 风格通过外层消息 ID 再取回节点列表。
+sdkForwardMessageInfo = {}
+sdkForwardMessageInfoLock = threading.Lock()
+sdkForwardMessageInfoLastCleanup = 0.0
+sdkForwardMessageInfoTTL = 7200.0
+sdkForwardMessageInfoMaxSize = 5000
 # QQ 群/C2C 引用索引:message_scene.ext 的 msg_idx <-> message_id。
 # 接收时把 ref_msg_idx 还原为业务层 message_id，发送时再反向转为 REFIDX。
 sdkMsgIdxInfo = {}
@@ -689,6 +695,353 @@ def _get_message_attachments(attachments):
                 )
             )
     return message_list
+
+
+def _get_qq_message_type(event_data):
+    if not isinstance(event_data, dict):
+        return 0
+    try:
+        return int(event_data.get('message_type', 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _get_qq_attachment_message_segment(attachment):
+    if not isinstance(attachment, dict):
+        return None
+    attachment_url = _get_attachment_url(attachment)
+    if attachment_url is None:
+        return None
+    content_type = str(attachment.get('content_type', '')).lower()
+    if content_type.startswith('image'):
+        segment_type = 'image'
+    elif content_type.startswith('video'):
+        segment_type = 'video'
+    elif content_type == 'voice' or content_type.startswith('audio'):
+        segment_type = 'record'
+    else:
+        segment_type = 'file'
+    segment_data = {
+        'file': attachment_url,
+        'url': attachment_url
+    }
+    for key in ['filename', 'size', 'width', 'height']:
+        if attachment.get(key, None) is not None:
+            segment_data[key] = attachment[key]
+    if 'filename' in segment_data:
+        segment_data['name'] = segment_data['filename']
+    return {
+        'type': segment_type,
+        'data': segment_data
+    }
+
+
+def _get_qq_forward_element_content(element):
+    if not isinstance(element, dict):
+        return []
+    content = []
+    content_text = element.get('content', None)
+    if isinstance(content_text, str) and content_text not in ['', ' ']:
+        content.append({
+            'type': 'text',
+            'data': {'text': content_text}
+        })
+    ark_data = element.get('ark_data', None)
+    if isinstance(ark_data, dict):
+        try:
+            content.append({
+                'type': 'json',
+                'data': {
+                    'data': json.dumps(
+                        ark_data,
+                        ensure_ascii=False,
+                        separators=(',', ':')
+                    )
+                }
+            })
+        except (TypeError, ValueError):
+            pass
+    for attachment in element.get('attachments', []):
+        segment = _get_qq_attachment_message_segment(attachment)
+        if segment is not None:
+            content.append(segment)
+    nested_elements = element.get('msg_elements', None)
+    if isinstance(nested_elements, list):
+        for nested_element in nested_elements:
+            content.extend(_get_qq_forward_element_content(nested_element))
+    if not content and isinstance(content_text, str) and content_text != '':
+        content.append({
+            'type': 'text',
+            'data': {'text': content_text}
+        })
+    return content
+
+
+def _get_qq_forward_node(element, content=None):
+    if not isinstance(element, dict):
+        element = {}
+    author = element.get('author', None)
+    if not isinstance(author, dict):
+        author = {}
+    user_id = (
+        author.get('member_openid', None)
+        or author.get('user_openid', None)
+        or author.get('union_openid', None)
+        or author.get('id', None)
+    )
+    if user_id is not None:
+        user_id = str(user_id)
+    sender_name = author.get('username', author.get('nickname', None))
+    if sender_name is not None:
+        sender_name = str(sender_name)
+    node_data = {
+        'user_id': user_id,
+        'uin': user_id,
+        'name': sender_name,
+        'nickname': sender_name,
+        'content': (
+            _get_qq_forward_element_content(element)
+            if content is None else content
+        )
+    }
+    msg_idx = element.get('msg_idx', None)
+    if msg_idx is not None and str(msg_idx) != '':
+        node_data['seq'] = str(msg_idx)
+    message_id = element.get('id', None)
+    if message_id is not None and str(message_id) != '':
+        node_data['id'] = str(message_id)
+    return {
+        'type': 'node',
+        'data': node_data
+    }
+
+
+def _get_qq_forward_nodes_from_elements(elements):
+    nodes = []
+    if not isinstance(elements, list):
+        return nodes
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        nested_elements = element.get('msg_elements', None)
+        message_type = _get_qq_message_type(element)
+        if message_type in [101, 102] and isinstance(nested_elements, list):
+            nested_nodes = _get_qq_forward_nodes_from_elements(nested_elements)
+            if nested_nodes:
+                nodes.extend(nested_nodes)
+                continue
+        nodes.append(_get_qq_forward_node(element))
+    return nodes
+
+
+def _split_qq_forward_text_blocks(content, marker_pattern):
+    matches = list(re.finditer(marker_pattern, content, flags=re.M))
+    if not matches:
+        return []
+    min_indent = min(len(match.group('indent').expandtabs(4)) for match in matches)
+    matches = [
+        match
+        for match in matches
+        if len(match.group('indent').expandtabs(4)) == min_indent
+    ]
+    blocks = []
+    for index, marker_match in enumerate(matches):
+        block_end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(content)
+        )
+        blocks.append(content[marker_match.end():block_end].strip())
+    return blocks
+
+
+def _get_qq_forward_text_field(block, field_name):
+    field_match = re.search(
+        r'(?m)^[ \t]*\[%s\][ \t]*(.*)$' % re.escape(field_name),
+        block
+    )
+    if field_match is None:
+        return None
+    value_lines = [field_match.group(1)]
+    remainder = block[field_match.end():]
+    for line in remainder.splitlines():
+        if re.match(
+            r'^[ \t]*\[(?:消息内容|发送者|消息类型|关联消息|附件\d+)\]',
+            line
+        ):
+            break
+        if re.match(r'^[ \t]*(?:===|---)\s*', line):
+            break
+        value_lines.append(line.strip())
+    value = '\n'.join(value_lines).strip()
+    return value if value != '' else None
+
+
+def _get_qq_forward_text_attachment(attachment_text):
+    url_match = re.search(r'URL:\s*(\S+)', attachment_text)
+    if url_match is None:
+        return None
+    type_match = re.search(r'类型:\s*([^\s]+)', attachment_text)
+    type_name = type_match.group(1).lower() if type_match else ''
+    if '图片' in type_name or 'image' in type_name:
+        content_type = 'image'
+    elif '视频' in type_name or 'video' in type_name:
+        content_type = 'video'
+    elif '语音' in type_name or '音频' in type_name or 'audio' in type_name:
+        content_type = 'audio'
+    else:
+        content_type = 'file'
+    attachment = {
+        'url': url_match.group(1),
+        'content_type': content_type
+    }
+    filename_match = re.search(
+        r'文件名:\s*(.*?)(?=\s+(?:尺寸|大小|URL):|$)',
+        attachment_text
+    )
+    if filename_match is not None:
+        attachment['filename'] = filename_match.group(1).strip()
+    size_match = re.search(r'大小:\s*([^\s]+)', attachment_text)
+    if size_match is not None:
+        attachment['size'] = size_match.group(1)
+    dimension_match = re.search(r'尺寸:\s*(\d+)\s*[xX×]\s*(\d+)', attachment_text)
+    if dimension_match is not None:
+        attachment['width'] = int(dimension_match.group(1))
+        attachment['height'] = int(dimension_match.group(2))
+    return _get_qq_attachment_message_segment(attachment)
+
+
+def _get_qq_forward_text_node(block, attachment_state):
+    sender_name = _get_qq_forward_text_field(block, '发送者')
+    message_text = _get_qq_forward_text_field(block, '消息内容')
+    content_segments = []
+    if message_text is not None:
+        content_segments.append({
+            'type': 'text',
+            'data': {'text': message_text}
+        })
+    attachment_matches = list(re.finditer(
+        r'(?m)^[ \t]*\[附件\d+\][ \t]*(.*)$',
+        block
+    ))
+    for attachment_match in attachment_matches:
+        segment = _get_qq_forward_text_attachment(attachment_match.group(1))
+        if segment is None and attachment_state['index'] < len(attachment_state['items']):
+            segment = _get_qq_attachment_message_segment(
+                attachment_state['items'][attachment_state['index']]
+            )
+            attachment_state['index'] += 1
+        if segment is not None:
+            content_segments.append(segment)
+    if not content_segments and block != '':
+        content_segments.append({
+            'type': 'text',
+            'data': {'text': block}
+        })
+    return _get_qq_forward_node({
+        'author': {'username': sender_name} if sender_name else {}
+    }, content=content_segments)
+
+
+def _get_qq_forward_text_block_nodes(block, attachment_state):
+    related_blocks = _split_qq_forward_text_blocks(
+        block,
+        r'^(?P<indent>[ \t]*)---\s*第\s*\d+\s*条\s*---\s*$'
+    )
+    if related_blocks:
+        nodes = []
+        for related_block in related_blocks:
+            nodes.extend(_get_qq_forward_text_block_nodes(
+                related_block,
+                attachment_state
+            ))
+        if nodes:
+            return nodes
+    return [_get_qq_forward_text_node(block, attachment_state)]
+
+
+def _get_qq_forward_text_nodes(content, attachments=None):
+    if not isinstance(content, str):
+        return []
+    normalized_content = content.replace('\\r\\n', '\n')
+    normalized_content = normalized_content.replace('\\n', '\n').replace('\r', '\n')
+    message_blocks = _split_qq_forward_text_blocks(
+        normalized_content,
+        r'^(?P<indent>[ \t]*)===\s*消息\s+\d+\s*===\s*$'
+    )
+    if not message_blocks:
+        message_blocks = [normalized_content]
+        if not re.search(
+            r'(?m)^\s*\[(?:消息内容|发送者|附件\d+)\]',
+            normalized_content
+        ) and not re.search(
+            r'(?m)^\s*---\s*第\s*\d+\s*条\s*---\s*$',
+            normalized_content
+        ):
+            return []
+    attachment_state = {
+        'items': attachments if isinstance(attachments, list) else [],
+        'index': 0
+    }
+    nodes = []
+    for message_block in message_blocks:
+        nodes.extend(_get_qq_forward_text_block_nodes(
+            message_block,
+            attachment_state
+        ))
+    if len(nodes) == 1 and attachment_state['index'] == 0:
+        for attachment in attachment_state['items']:
+            segment = _get_qq_attachment_message_segment(attachment)
+            if segment is not None:
+                nodes[0]['data']['content'].append(segment)
+    return nodes
+
+
+def _get_qq_forward_messages(event_data):
+    if not isinstance(event_data, dict):
+        return []
+    elements = event_data.get('msg_elements', None)
+    element_contents = []
+    if isinstance(elements, list):
+        for element in elements:
+            if isinstance(element, dict) and isinstance(element.get('content', None), str):
+                element_contents.append(element['content'])
+        text_nodes = _get_qq_forward_text_nodes(
+            '\n'.join(element_contents),
+            event_data.get('attachments', None)
+        )
+        if text_nodes:
+            return text_nodes
+        element_nodes = _get_qq_forward_nodes_from_elements(elements)
+        if element_nodes:
+            return element_nodes
+    text_nodes = _get_qq_forward_text_nodes(
+        event_data.get('content', None),
+        event_data.get('attachments', None)
+    )
+    if text_nodes:
+        return text_nodes
+    fallback_element = {
+        'author': event_data.get('author', {}),
+        'content': event_data.get('content', ''),
+        'attachments': event_data.get('attachments', [])
+    }
+    return [_get_qq_forward_node(fallback_element)]
+
+
+def _get_qq_message_para(event_data, bot_hash=None):
+    if _get_qq_message_type(event_data) == 102:
+        forward_id = event_data.get('id', None) if isinstance(event_data, dict) else None
+        if forward_id is not None and str(forward_id) != '':
+            forward_id = str(forward_id)
+            if bot_hash is not None:
+                _register_qq_forward_message(
+                    bot_hash,
+                    forward_id,
+                    _get_qq_forward_messages(event_data)
+                )
+            return OlivOS.messageAPI.PARA.forward(id=forward_id)
+    return _get_qq_ark_message_para(event_data)
 
 
 def _get_qq_ark_message_para(event_data):
@@ -1708,7 +2061,7 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_obj = None
         message_content = event_data.get('content', None)
-        ark_message_para = _get_qq_ark_message_para(event_data)
+        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
             event_type == 'GROUP_AT_MESSAGE_CREATE'
@@ -1738,11 +2091,12 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
+        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
+            message_obj.data_raw.extend(
+                _get_message_attachments(
+                    event_data.get('attachments', None)
+                )
             )
-        )
         try:
             message_obj.init_data()
         except Exception:
@@ -1865,7 +2219,7 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
+        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if ark_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -1889,11 +2243,12 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
+        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
+            message_obj.data_raw.extend(
+                _get_message_attachments(
+                    event_data.get('attachments', None)
+                )
             )
-        )
         try:
             message_obj.init_data()
         except Exception:
@@ -1986,7 +2341,7 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_content = event_data.get('content', None)
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
+        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if ark_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -2010,11 +2365,12 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
+        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
+            message_obj.data_raw.extend(
+                _get_message_attachments(
+                    event_data.get('attachments', None)
+                )
             )
-        )
         try:
             message_obj.init_data()
         except Exception:
@@ -2102,7 +2458,7 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
+        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if ark_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
@@ -2126,11 +2482,12 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
+        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
+            message_obj.data_raw.extend(
+                _get_message_attachments(
+                    event_data.get('attachments', None)
+                )
             )
-        )
         try:
             message_obj.init_data()
         except Exception:
@@ -3773,6 +4130,18 @@ class event_action(object):
                 fill_from_record(fetched_record)
         except Exception:
             traceback.print_exc()
+        return res_data
+
+    def get_forward_msg(target_event, message_id):
+        """获取收到的 QQ 合并转发节点,返回与 OneBot 对齐的结果。"""
+        res_data = OlivOS.contentAPI.api_result_data_template.get_forward_msg()
+        messages = _get_qq_forward_message(
+            target_event.bot_info.hash,
+            message_id
+        )
+        if messages is not None:
+            res_data['active'] = True
+            res_data['data']['messages'] = messages
         return res_data
 
     # ============ QQ 文件上传 ============
@@ -5470,6 +5839,54 @@ def _acquire_delete_rate(bot_hash):
             return False
         history.append(now)
         return True
+
+
+def _register_qq_forward_message(bot_hash, forward_id, messages):
+    global sdkForwardMessageInfoLastCleanup
+    if forward_id is None:
+        return
+    bot_hash = str(bot_hash)
+    forward_id = str(forward_id)
+    now = time.monotonic()
+    with sdkForwardMessageInfoLock:
+        if now - sdkForwardMessageInfoLastCleanup >= 60:
+            expired_keys = [
+                key_this
+                for key_this, data_this in sdkForwardMessageInfo.items()
+                if data_this['expires_at'] <= now
+            ]
+            for key_this in expired_keys:
+                sdkForwardMessageInfo.pop(key_this, None)
+            sdkForwardMessageInfoLastCleanup = now
+        cache_key = (bot_hash, forward_id)
+        if (
+            cache_key not in sdkForwardMessageInfo
+            and len(sdkForwardMessageInfo) >= sdkForwardMessageInfoMaxSize
+        ):
+            oldest_key = min(
+                sdkForwardMessageInfo,
+                key=lambda key_this: sdkForwardMessageInfo[key_this]['expires_at']
+            )
+            sdkForwardMessageInfo.pop(oldest_key, None)
+        sdkForwardMessageInfo[cache_key] = {
+            'messages': copy.deepcopy(messages),
+            'expires_at': now + sdkForwardMessageInfoTTL
+        }
+
+
+def _get_qq_forward_message(bot_hash, forward_id):
+    if forward_id is None:
+        return None
+    cache_key = (str(bot_hash), str(forward_id))
+    now = time.monotonic()
+    with sdkForwardMessageInfoLock:
+        cache_data = sdkForwardMessageInfo.get(cache_key, None)
+        if cache_data is None:
+            return None
+        if cache_data['expires_at'] <= now:
+            sdkForwardMessageInfo.pop(cache_key, None)
+            return None
+        return copy.deepcopy(cache_data['messages'])
 
 
 def _get_cached_resource_upload(cache_key):
