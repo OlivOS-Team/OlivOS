@@ -697,6 +697,17 @@ def _get_message_attachments(attachments):
     return message_list
 
 
+def _append_qq_message_attachments(message_obj, attachments, skip=False):
+    if skip:
+        return
+    attachment_data = _get_message_attachments(attachments)
+    if len(attachment_data) == 0:
+        return
+    message_obj.data.extend(attachment_data)
+    if isinstance(message_obj.data_raw, list):
+        message_obj.data_raw.extend(copy.deepcopy(attachment_data))
+
+
 def _get_qq_message_type(event_data):
     if not isinstance(event_data, dict):
         return 0
@@ -1309,6 +1320,15 @@ def _get_qq_message_event_extend(event_type, event_data):
     for source_key, target_key in field_map.items():
         if source_key in event_data:
             result[target_key] = copy.deepcopy(event_data[source_key])
+    attachment_segments = []
+    attachments = event_data.get('attachments', None)
+    if isinstance(attachments, list):
+        for attachment in attachments:
+            attachment_segment = _get_qq_attachment_message_segment(attachment)
+            if attachment_segment is not None:
+                attachment_segments.append(attachment_segment)
+    if len(attachment_segments) > 0:
+        result['qq_attachment_segments'] = attachment_segments
     if 'ark_data' not in event_data and 'ark' in event_data:
         result['qq_ark_data'] = copy.deepcopy(event_data['ark'])
     if 'message_scene' in event_data:
@@ -2091,17 +2111,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
-            message_obj.data_raw.extend(
-                _get_message_attachments(
-                    event_data.get('attachments', None)
-                )
-            )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+        )
         if message_obj.active:
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
             group_openid = event_data.get(
@@ -2243,17 +2257,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
-            message_obj.data_raw.extend(
-                _get_message_attachments(
-                    event_data.get('attachments', None)
-                )
-            )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+        )
         if message_obj.active:
             tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
             if plugin_event_bot_hash in sdkSubSelfInfo:
@@ -2365,17 +2373,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
-            message_obj.data_raw.extend(
-                _get_message_attachments(
-                    event_data.get('attachments', None)
-                )
-            )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+        )
         if message_obj.active:
             author_id = author.get('id', None)
             tmp_member_obj = event_data.get('member', None)
@@ -2482,17 +2484,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        if not isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward):
-            message_obj.data_raw.extend(
-                _get_message_attachments(
-                    event_data.get('attachments', None)
-                )
-            )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+        )
         if message_obj.active:
             author_id = author.get('id', None)
             _register_qq_user_info(
