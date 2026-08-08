@@ -14,24 +14,25 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-from enum import IntEnum
+import base64
+import copy
 import hashlib
 import json
 import mimetypes
 import os
-import requests as req
-import time
-from datetime import datetime, timezone
-import traceback
 import re
-from requests_toolbelt import MultipartEncoder
-import uuid
-import base64
-from urllib import parse
-import copy
 import threading
+import time
+import traceback
+import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from enum import IntEnum
+from urllib import parse
+
+import requests as req
+from requests_toolbelt import MultipartEncoder
 
 import OlivOS
 
@@ -155,6 +156,7 @@ qqInternalEventTypes = {
     'INTERACTION_CREATE',
     'FRIEND_DEL', 'C2C_MSG_REJECT', 'C2C_MSG_RECEIVE',
     'GROUP_MSG_REJECT', 'GROUP_MSG_RECEIVE',
+    'SUBSCRIBE_MESSAGE_STATUS',
     'FORUM_THREAD_CREATE', 'FORUM_THREAD_UPDATE', 'FORUM_THREAD_DELETE',
     'FORUM_POST_CREATE', 'FORUM_POST_DELETE',
     'FORUM_REPLY_CREATE', 'FORUM_REPLY_DELETE',
@@ -214,6 +216,12 @@ sdkRxMessageInfoLock = threading.Lock()
 sdkRxMessageInfoLastCleanup = 0.0
 sdkRxMessageInfoTTL = 7200.0
 sdkRxMessageInfoMaxSize = 20000
+# 合并转发节点缓存:OneBot 风格通过外层消息 ID 再取回节点列表。
+sdkForwardMessageInfo = {}
+sdkForwardMessageInfoLock = threading.Lock()
+sdkForwardMessageInfoLastCleanup = 0.0
+sdkForwardMessageInfoTTL = 7200.0
+sdkForwardMessageInfoMaxSize = 5000
 # QQ 群/C2C 引用索引:message_scene.ext 的 msg_idx <-> message_id。
 # 接收时把 ref_msg_idx 还原为业务层 message_id，发送时再反向转为 REFIDX。
 sdkMsgIdxInfo = {}
@@ -260,21 +268,6 @@ def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info):
 def get_SDK_bot_info_from_Event(target_event):
     res = get_SDK_bot_info_from_Plugin_bot_info(target_event.bot_info)
     return res
-
-
-class event(object):
-    def __init__(self, payload_obj=None, bot_info=None):
-        self.payload = payload_obj
-        self.platform = {'sdk': 'qqGuildv2_link', 'platform': 'qqGuild', 'model': 'default'}
-        self.active = False
-        if self.payload is not None:
-            self.active = True
-        self.base_info = {}
-        if self.active:
-            self.base_info['time'] = int(time.time())
-            self.base_info['self_id'] = bot_info.id
-            self.base_info['token'] = bot_info.post_info.access_token
-            self.base_info['post_type'] = None
 
 
 '''
@@ -640,1200 +633,19 @@ def getTokenNow(bot_info: bot_info_T):
     return access_token
 
 
-class API(object):
-    class getAppAccessToken(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = None
-            self.host = sdkAPIHost['bots']
-            self.route = sdkAPIRoute['getAppAccessToken']
-
-        class data_T(object):
-            def __init__(self):
-                self.appId = None
-                self.clientSecret = None
-
-    class getGateway(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = None
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['gateway']
-
-    class getMe(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = None
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['users'] + '/@me'
-
-    class getQQGroupBotState(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/bot_state'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.group_openid = '-1'
-
-    # 获取指定消息(仅频道):GET /channels/{channel_id}/messages/{message_id}
-    class getMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-
-    # ============ 频道模块:频道/子频道 ============
-    # GET /guilds/{guild_id} 获取频道详情
-    class getGuild(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-    # GET /users/@me/guilds 获取机器人加入的频道列表(query: before/after/limit)
-    class getMeGuilds(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = None
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['users_me'] + '/guilds'
-
-    # GET /guilds/{guild_id}/channels 获取子频道列表
-    class getGuildChannels(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/channels'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-    # GET /channels/{channel_id} 获取子频道详情
-    class getChannel(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # POST /guilds/{guild_id}/channels 创建子频道(私域)
-    class createChannel(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/channels'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.name = None            # str
-                self.type = None            # int 子频道类型
-                self.sub_type = None        # int 子频道子类型
-                self.position = None        # int
-                self.parent_id = None       # str 分组 id
-                self.private_type = None    # int 私密类型
-                self.private_user_ids = None  # list
-                self.speak_permission = None  # int
-                self.application_id = None  # str 应用子频道应用类型
-
-    # PATCH /channels/{channel_id} 修改子频道(私域)
-    class patchChannel(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.name = None
-                self.position = None
-                self.parent_id = None
-                self.private_type = None
-                self.speak_permission = None
-
-    # DELETE /channels/{channel_id} 删除子频道(私域)
-    class deleteChannel(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # GET /channels/{channel_id}/online_nums 获取音视频/直播子频道在线成员数
-    class getChannelOnlineNums(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/online_nums'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # ============ 频道模块:成员 ============
-    # GET /guilds/{guild_id}/members 获取频道成员列表(私域, query: after/limit)
-    class getGuildMembers(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-    # GET /guilds/{guild_id}/roles/{role_id}/members 获取身份组成员列表(query: start_index/limit)
-    class getGuildRoleMembers(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}/members'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.role_id = '-1'
-
-    # GET /guilds/{guild_id}/members/{user_id} 获取成员详情
-    class getGuildMember(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.user_id = '-1'
-
-    # DELETE /guilds/{guild_id}/members/{user_id} 删除频道成员(踢人,私域)
-    class deleteGuildMember(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.user_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.add_blacklist = None             # bool 是否同时加入黑名单
-                self.delete_history_msg_days = None   # int 撤回历史消息天数(3/7/15/30,0不撤回,-1全部)
-
-    # ============ 频道模块:身份组 ============
-    # GET /guilds/{guild_id}/roles 获取频道身份组列表
-    class getGuildRoles(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-    # POST /guilds/{guild_id}/roles 创建频道身份组
-    class createGuildRole(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.name = None   # str
-                self.color = None  # int ARGB 十进制
-                self.hoist = None  # int 是否在成员列表中单独展示(0/1)
-
-    # PATCH /guilds/{guild_id}/roles/{role_id} 修改频道身份组
-    class patchGuildRole(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.role_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.name = None
-                self.color = None
-                self.hoist = None
-
-    # DELETE /guilds/{guild_id}/roles/{role_id} 删除频道身份组
-    class deleteGuildRole(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.role_id = '-1'
-
-    # PUT /guilds/{guild_id}/members/{user_id}/roles/{role_id} 增加频道身份组成员
-    # 操作 5 号(子频道管理员)身份组时需在 body 传 channel.id。
-    class putGuildMemberRole(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/roles/{role_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.user_id = '-1'
-                self.role_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.channel = None  # dict {'id': channel_id}
-
-    # DELETE /guilds/{guild_id}/members/{user_id}/roles/{role_id} 删除频道身份组成员
-    class deleteGuildMemberRole(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/roles/{role_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.user_id = '-1'
-                self.role_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.channel = None  # dict {'id': channel_id}
-
-    # ============ 频道模块:子频道权限 ============
-    # GET /channels/{channel_id}/members/{user_id}/permissions 获取子频道用户权限
-    class getChannelMemberPermissions(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/members/{user_id}/permissions'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.user_id = '-1'
-
-    # PUT /channels/{channel_id}/members/{user_id}/permissions 修改子频道用户权限
-    class putChannelMemberPermissions(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/members/{user_id}/permissions'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.user_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.add = None     # str 权限位或值,如 '1'/'2'/'4'/'8' 的组合
-                self.remove = None  # str
-
-    # GET /channels/{channel_id}/roles/{role_id}/permissions 获取子频道身份组权限
-    class getChannelRolePermissions(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/roles/{role_id}/permissions'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.role_id = '-1'
-
-    # PUT /channels/{channel_id}/roles/{role_id}/permissions 修改子频道身份组权限
-    class putChannelRolePermissions(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/roles/{role_id}/permissions'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.role_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.add = None
-                self.remove = None
-
-    # ============ 频道模块:消息列表/私信会话 ============
-    # GET /channels/{channel_id}/messages 拉取消息列表(v1 存量接口, query: around/before/after/limit)
-    class getChannelMessages(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # POST /users/@me/dms 创建私信会话
-    class createDirectMessageSession(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = None
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['users_me'] + '/dms'
-
-        class data_T(object):
-            def __init__(self):
-                self.recipient_id = None      # str 接收者 id
-                self.source_guild_id = None   # str 源频道 id
-
-    # ============ 频道模块:禁言 ============
-    # PATCH /guilds/{guild_id}/mute 全员禁言(传 user_ids 时为批量成员禁言)
-    class patchGuildMute(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/mute'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.mute_end_timestamp = None  # str 秒级时间戳
-                self.mute_seconds = None        # str 禁言时长(秒),'0' 为解除
-                self.user_ids = None            # list 批量成员禁言
-
-    # PATCH /guilds/{guild_id}/members/{user_id}/mute 指定成员禁言
-    class patchGuildMemberMute(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/mute'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.user_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.mute_end_timestamp = None
-                self.mute_seconds = None
-
-    # ============ 频道模块:公告/精华 ============
-    # POST /guilds/{guild_id}/announces 创建频道公告
-    class createAnnounce(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/announces'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.message_id = None          # str
-                self.channel_id = None          # str
-                self.announces_type = None      # int 0成员公告 1欢迎公告
-                self.recommend_channels = None  # list RecommendChannel
-
-    # DELETE /guilds/{guild_id}/announces/{message_id} 删除频道公告(message_id 可为 'all')
-    class deleteAnnounce(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/announces/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.message_id = '-1'
-
-    # PUT /channels/{channel_id}/pins/{message_id} 添加精华消息
-    class putPinsMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-
-    # DELETE /channels/{channel_id}/pins/{message_id} 删除精华消息(message_id 可为 'all')
-    class deletePinsMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-
-    # GET /channels/{channel_id}/pins 获取精华消息列表
-    class getPinsMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # ============ 频道模块:日程 ============
-    # GET /channels/{channel_id}/schedules 获取日程列表(query: since)
-    class getSchedules(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # GET /channels/{channel_id}/schedules/{schedule_id} 获取日程详情
-    class getSchedule(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.schedule_id = '-1'
-
-    # POST /channels/{channel_id}/schedules 创建日程
-    class createSchedule(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.schedule = None  # dict Schedule 对象(不含 id)
-
-    # PATCH /channels/{channel_id}/schedules/{schedule_id} 修改日程
-    class patchSchedule(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.schedule_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.schedule = None  # dict Schedule 对象(不含 id)
-
-    # DELETE /channels/{channel_id}/schedules/{schedule_id} 删除日程
-    class deleteSchedule(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.schedule_id = '-1'
-
-    # ============ 频道模块:表情表态 ============
-    # PUT /channels/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id} 发表表情表态
-    class putMessageReaction(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = (
-                sdkAPIRoute['channels']
-                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
-            )
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-                self.emoji_type = '1'  # 1系统表情 2emoji
-                self.emoji_id = '-1'
-
-    # DELETE /channels/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id} 删除自己的表情表态
-    class deleteMessageReaction(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = (
-                sdkAPIRoute['channels']
-                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
-            )
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-                self.emoji_type = '1'
-                self.emoji_id = '-1'
-
-    # GET .../reactions/{emoji_type}/{emoji_id} 拉取表态用户列表(query: cookie/limit)
-    class getMessageReactionUsers(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = (
-                sdkAPIRoute['channels']
-                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
-            )
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-                self.emoji_type = '1'
-                self.emoji_id = '-1'
-
-    # ============ 频道模块:音频/麦克风 ============
-    # POST /channels/{channel_id}/audio 音频控制
-    class postAudioControl(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/audio'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.audio_url = None  # str
-                self.text = None       # str 状态文本
-                self.status = None     # int 0开始 1暂停 2继续 3停止
-
-    # PUT /channels/{channel_id}/mic 机器人上麦
-    class putMic(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/mic'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # DELETE /channels/{channel_id}/mic 机器人下麦
-    class deleteMic(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/mic'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # ============ 频道模块:帖子(论坛) ============
-    # GET /channels/{channel_id}/threads 获取帖子列表(私域)
-    class getThreads(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-    # GET /channels/{channel_id}/threads/{thread_id} 获取帖子详情(私域)
-    class getThread(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads/{thread_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.thread_id = '-1'
-
-    # PUT /channels/{channel_id}/threads 发表帖子(私域)
-    class putThread(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.title = None    # str
-                self.content = None  # str
-                self.format = None   # int 1文本 2HTML 3Markdown 4JSON
-
-    # DELETE /channels/{channel_id}/threads/{thread_id} 删除帖子(私域)
-    class deleteThread(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads/{thread_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.thread_id = '-1'
-
-    # ============ 频道模块:API 权限 ============
-    # GET /guilds/{guild_id}/api_permission 获取频道可用权限列表
-    class getGuildApiPermission(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/api_permission'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-    # POST /guilds/{guild_id}/api_permission/demand 创建频道 API 接口权限授权链接
-    class demandGuildApiPermission(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/api_permission/demand'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.channel_id = None    # str
-                self.api_identify = None  # dict {'path':..., 'method':...}
-                self.desc = None          # str
-
-    # ============ 互动回调应答 ============
-    # PUT /interactions/{interaction_id} 对 INTERACTION_CREATE 的应答(code: 0成功 1操作失败 2操作频繁 3重复操作 4没有权限 5仅管理员操作)
-    class putInteraction(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['interactions'] + '/{interaction_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.interaction_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.code = None  # int
-
-    # ============ QQ 群 ============
-    # GET /v2/groups/{group_openid}/members 获取群成员列表(query: limit/start_index,需相应权限)
-    class getQQGroupMembers(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/members'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.group_openid = '-1'
-
-    class sendMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.content = None  # str
-                self.embed = None  # object
-                self.ark = None  # object
-                self.message_reference = None  # object
-                self.image = None  # str
-                self.file_image = None  # multipart file
-                self.msg_id = None  # str
-                self.event_id = None  # str
-                self.markdown = None  # object
-                self.keyboard = None  # object
-
-        # 频道本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
-        def do_api(self, req_type='POST'):
-            if self.data.file_image is None:
-                return api_templet.do_api(self, req_type)
-            msg_res = _send_channel_multipart(
-                self.bot_info, self.metadata, self.data,
-                self.host, self.port, self.route, req_type
-            )
-            if msg_res is None:
-                self.res = None
-                self.res_code = None
-                return None
-            self.res = msg_res.text
-            self.res_code = msg_res.status_code
-            return self.res
-
-    class sendDirectMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.content = None     # str
-                self.embed = None       # object
-                self.ark = None         # object
-                self.message_reference = None  # object
-                self.image = None       # str
-                self.file_image = None  # multipart file
-                self.msg_id = None      # str
-                self.event_id = None    # str
-                self.markdown = None    # object
-                self.keyboard = None    # object
-
-        # 频道私信本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
-        def do_api(self, req_type='POST'):
-            if self.data.file_image is None:
-                return api_templet.do_api(self, req_type)
-            msg_res = _send_channel_multipart(
-                self.bot_info, self.metadata, self.data,
-                self.host, self.port, self.route, req_type
-            )
-            if msg_res is None:
-                self.res = None
-                self.res_code = None
-                return None
-            self.res = msg_res.text
-            self.res_code = msg_res.status_code
-            return self.res
-
-    class sendQQMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.group_openid = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.content = None     # str
-                self.media = None       # object
-                self.msg_type = 0       # int
-                self.markdown = None    # object
-                self.keyboard = None    # object
-                self.ark = None         # object
-                self.embed = None       # object
-                self.message_reference = None  # object
-                self.event_id = None    # str
-                self.msg_id = None      # str
-                self.msg_seq = None
-
-    class sendQQDirectMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.openid = '-1'
-
-        class data_T(object):
-            def __init__(self):
-                self.content = None     # str
-                self.msg_type = 0       # int
-                self.markdown = None    # object
-                self.keyboard = None    # object
-                self.ark = None         # object
-                self.embed = None       # object
-                self.media = None       # object
-                self.message_reference = None  # object
-                self.event_id = None    # str
-                self.msg_id = None      # str
-                self.msg_seq = None
-                self.is_wakeup = None   # bool
-
-    # QQ 单聊/群聊富媒体上传。名称保留以兼容已有内部引用，实际支持图片、视频、语音和文件。
-    # 直传时携带 url 或 file_data；分片上传完成后携带 upload_id 请求合并，两者均返回 file_info。
-    class setResourcePictureUpload(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/files'
-            self.resource_type = 'qq_groups'
-
-        class data_T(object):
-            def __init__(self):
-                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
-                self.url = None        # 远程资源 URL
-                self.srv_send_msg = None  # bool，False 时仅返回 file_info，不由平台直接发消息
-                self.file_name = None  # 文件名
-                self.upload_id = None  # 分片上传任务 ID，合并分片时携带
-                self.file_data = None  # 本地资源的 base64 数据
-
-        class metadata_T(object):
-            def __init__(self):
-                self.openid = '-1'
-
-        def do_api(self, req_type='POST'):
-            # 官方富媒体接口使用 JSON：远程资源传 url，本地资源传 base64 file_data。
-            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/files'
-            return api_templet.do_api(self, req_type)
-
-    # QQ 单聊/群聊富媒体预上传：按文件校验值换取 upload_id 与各分片的预签名 URL。
-    class uploadPrepare(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_prepare'
-            self.resource_type = 'qq_groups'
-
-        class data_T(object):
-            def __init__(self):
-                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
-                self.file_size = None  # str，文件总字节数
-                self.file_name = None  # 文件名
-                self.md5 = None        # 整个文件的 MD5
-                self.sha1 = None       # 整个文件的 SHA1
-                self.md5_10m = None    # 文件前 10002432 字节的 MD5
-
-        class metadata_T(object):
-            def __init__(self):
-                self.openid = '-1'
-
-        def do_api(self, req_type='POST'):
-            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_prepare'
-            return api_templet.do_api(self, req_type)
-
-    # QQ 单聊/群聊分片上传完成确认：每个分片 PUT 成功后通知平台。
-    class uploadPartFinish(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = self.data_T()
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_part_finish'
-            self.resource_type = 'qq_groups'
-
-        class data_T(object):
-            def __init__(self):
-                self.upload_id = None   # 分片上传任务 ID
-                self.part_index = None  # int，分片序号，从 0 开始
-                self.block_size = None  # str，该分片的字节数
-                self.md5 = None         # 该分片数据的 MD5
-
-        class metadata_T(object):
-            def __init__(self):
-                self.openid = '-1'
-
-        def do_api(self, req_type='POST'):
-            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_part_finish'
-            return api_templet.do_api(self, req_type)
-
-    class deleteMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.channel_id = '-1'
-                self.message_id = '-1'
-
-    class deleteDirectMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.guild_id = '-1'
-                self.message_id = '-1'
-
-    class deleteQQMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.group_openid = '-1'
-                self.message_id = '-1'
-
-    class deleteQQDirectMessage(api_templet):
-        def __init__(self, bot_info=None):
-            api_templet.__init__(self)
-            self.bot_info = bot_info
-            self.data = None
-            self.metadata = self.metadata_T()
-            self.host = sdkAPIHost['default']
-            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages/{message_id}'
-
-        class metadata_T(object):
-            def __init__(self):
-                self.openid = '-1'
-                self.message_id = '-1'
+class event(object):
+    def __init__(self, payload_obj=None, bot_info=None):
+        self.payload = payload_obj
+        self.platform = {'sdk': 'qqGuildv2_link', 'platform': 'qqGuild', 'model': 'default'}
+        self.active = False
+        if self.payload is not None:
+            self.active = True
+        self.base_info = {}
+        if self.active:
+            self.base_info['time'] = int(time.time())
+            self.base_info['self_id'] = bot_info.id
+            self.base_info['token'] = bot_info.post_info.access_token
+            self.base_info['post_type'] = None
 
 
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
@@ -1886,23 +698,390 @@ def _get_message_attachments(attachments):
     return message_list
 
 
-def _get_qq_ark_message_para(event_data):
+def _append_qq_message_attachments(message_obj, attachments, skip=False):
+    if skip:
+        return
+    attachment_data = _get_message_attachments(attachments)
+    if len(attachment_data) == 0:
+        return
+    message_obj.data.extend(attachment_data)
+    if isinstance(message_obj.data_raw, list):
+        message_obj.data_raw.extend(copy.deepcopy(attachment_data))
+
+
+def _get_qq_message_type(event_data):
+    if not isinstance(event_data, dict):
+        return 0
+    try:
+        return int(event_data.get('message_type', 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _get_qq_attachment_message_segment(attachment):
+    if not isinstance(attachment, dict):
+        return None
+    attachment_url = _get_attachment_url(attachment)
+    if attachment_url is None:
+        return None
+    content_type = str(attachment.get('content_type', '')).lower()
+    if content_type.startswith('image'):
+        segment_type = 'image'
+    elif content_type.startswith('video'):
+        segment_type = 'video'
+    elif content_type == 'voice' or content_type.startswith('audio'):
+        segment_type = 'record'
+    else:
+        segment_type = 'file'
+    segment_data = {
+        'file': attachment_url,
+        'url': attachment_url
+    }
+    for key in [
+        'filename', 'size', 'width', 'height', 'content_type',
+        'voice_wav_url', 'asr_refer_text'
+    ]:
+        if attachment.get(key, None) is not None:
+            segment_data[key] = copy.deepcopy(attachment[key])
+    if 'filename' in segment_data:
+        segment_data['name'] = segment_data['filename']
+    return {
+        'type': segment_type,
+        'data': segment_data
+    }
+
+
+def _get_qq_forward_element_content(element):
+    if not isinstance(element, dict):
+        return []
+    content = []
+    content_text = element.get('content', None)
+    if isinstance(content_text, str) and content_text not in ['', ' ']:
+        content.append({
+            'type': 'text',
+            'data': {'text': content_text}
+        })
+    ark_data = element.get('ark_data', None)
+    if isinstance(ark_data, dict):
+        try:
+            content.append({
+                'type': 'json',
+                'data': {
+                    'data': json.dumps(
+                        ark_data,
+                        ensure_ascii=False,
+                        separators=(',', ':')
+                    )
+                }
+            })
+        except (TypeError, ValueError):
+            pass
+    for attachment in element.get('attachments', []):
+        segment = _get_qq_attachment_message_segment(attachment)
+        if segment is not None:
+            content.append(segment)
+    nested_elements = element.get('msg_elements', None)
+    if isinstance(nested_elements, list):
+        for nested_element in nested_elements:
+            content.extend(_get_qq_forward_element_content(nested_element))
+    if not content and isinstance(content_text, str) and content_text != '':
+        content.append({
+            'type': 'text',
+            'data': {'text': content_text}
+        })
+    return content
+
+
+def _get_qq_forward_node(element, content=None):
+    if not isinstance(element, dict):
+        element = {}
+    author = element.get('author', None)
+    if not isinstance(author, dict):
+        author = {}
+    user_id = (
+        author.get('member_openid', None)
+        or author.get('user_openid', None)
+        or author.get('union_openid', None)
+        or author.get('id', None)
+    )
+    if user_id is not None:
+        user_id = str(user_id)
+    sender_name = author.get('username', author.get('nickname', None))
+    if sender_name is not None:
+        sender_name = str(sender_name)
+    node_data = {
+        'user_id': user_id,
+        'uin': user_id,
+        'name': sender_name,
+        'nickname': sender_name,
+        'content': (
+            _get_qq_forward_element_content(element)
+            if content is None else content
+        )
+    }
+    msg_idx = element.get('msg_idx', None)
+    if msg_idx is not None and str(msg_idx) != '':
+        node_data['seq'] = str(msg_idx)
+    message_id = element.get('id', None)
+    if message_id is not None and str(message_id) != '':
+        node_data['id'] = str(message_id)
+    return {
+        'type': 'node',
+        'data': node_data
+    }
+
+
+def _get_qq_forward_nodes_from_elements(elements):
+    nodes = []
+    if not isinstance(elements, list):
+        return nodes
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        nested_elements = element.get('msg_elements', None)
+        message_type = _get_qq_message_type(element)
+        if message_type in [101, 102] and isinstance(nested_elements, list):
+            nested_nodes = _get_qq_forward_nodes_from_elements(nested_elements)
+            if nested_nodes:
+                nodes.extend(nested_nodes)
+                continue
+        nodes.append(_get_qq_forward_node(element))
+    return nodes
+
+
+def _split_qq_forward_text_blocks(content, marker_pattern):
+    matches = list(re.finditer(marker_pattern, content, flags=re.M))
+    if not matches:
+        return []
+    min_indent = min(len(match.group('indent').expandtabs(4)) for match in matches)
+    matches = [
+        match
+        for match in matches
+        if len(match.group('indent').expandtabs(4)) == min_indent
+    ]
+    blocks = []
+    for index, marker_match in enumerate(matches):
+        block_end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(content)
+        )
+        blocks.append(content[marker_match.end():block_end].strip())
+    return blocks
+
+
+def _get_qq_forward_text_field(block, field_name):
+    field_match = re.search(
+        r'(?m)^[ \t]*\[%s\][ \t]*(.*)$' % re.escape(field_name),
+        block
+    )
+    if field_match is None:
+        return None
+    value_lines = [field_match.group(1)]
+    remainder = block[field_match.end():]
+    for line in remainder.splitlines():
+        if re.match(
+            r'^[ \t]*\[(?:消息内容|发送者|消息类型|关联消息|附件\d+)\]',
+            line
+        ):
+            break
+        if re.match(r'^[ \t]*(?:===|---)\s*', line):
+            break
+        value_lines.append(line.strip())
+    value = '\n'.join(value_lines).strip()
+    return value if value != '' else None
+
+
+def _get_qq_forward_text_attachment(attachment_text):
+    url_match = re.search(r'URL:\s*(\S+)', attachment_text)
+    if url_match is None:
+        return None
+    type_match = re.search(r'类型:\s*([^\s]+)', attachment_text)
+    type_name = type_match.group(1).lower() if type_match else ''
+    if '图片' in type_name or 'image' in type_name:
+        content_type = 'image'
+    elif '视频' in type_name or 'video' in type_name:
+        content_type = 'video'
+    elif '语音' in type_name or '音频' in type_name or 'audio' in type_name:
+        content_type = 'audio'
+    else:
+        content_type = 'file'
+    attachment = {
+        'url': url_match.group(1),
+        'content_type': content_type
+    }
+    filename_match = re.search(
+        r'文件名:\s*(.*?)(?=\s+(?:尺寸|大小|URL):|$)',
+        attachment_text
+    )
+    if filename_match is not None:
+        attachment['filename'] = filename_match.group(1).strip()
+    size_match = re.search(r'大小:\s*([^\s]+)', attachment_text)
+    if size_match is not None:
+        attachment['size'] = size_match.group(1)
+    dimension_match = re.search(r'尺寸:\s*(\d+)\s*[xX×]\s*(\d+)', attachment_text)
+    if dimension_match is not None:
+        attachment['width'] = int(dimension_match.group(1))
+        attachment['height'] = int(dimension_match.group(2))
+    return _get_qq_attachment_message_segment(attachment)
+
+
+def _get_qq_forward_text_node(block, attachment_state):
+    sender_name = _get_qq_forward_text_field(block, '发送者')
+    message_text = _get_qq_forward_text_field(block, '消息内容')
+    content_segments = []
+    if message_text is not None:
+        content_segments.append({
+            'type': 'text',
+            'data': {'text': message_text}
+        })
+    attachment_matches = list(re.finditer(
+        r'(?m)^[ \t]*\[附件\d+\][ \t]*(.*)$',
+        block
+    ))
+    for attachment_match in attachment_matches:
+        segment = _get_qq_forward_text_attachment(attachment_match.group(1))
+        if segment is None and attachment_state['index'] < len(attachment_state['items']):
+            segment = _get_qq_attachment_message_segment(
+                attachment_state['items'][attachment_state['index']]
+            )
+            attachment_state['index'] += 1
+        if segment is not None:
+            content_segments.append(segment)
+    if not content_segments and block != '':
+        content_segments.append({
+            'type': 'text',
+            'data': {'text': block}
+        })
+    return _get_qq_forward_node({
+        'author': {'username': sender_name} if sender_name else {}
+    }, content=content_segments)
+
+
+def _get_qq_forward_text_block_nodes(block, attachment_state):
+    related_blocks = _split_qq_forward_text_blocks(
+        block,
+        r'^(?P<indent>[ \t]*)---\s*第\s*\d+\s*条\s*---\s*$'
+    )
+    if related_blocks:
+        nodes = []
+        for related_block in related_blocks:
+            nodes.extend(_get_qq_forward_text_block_nodes(
+                related_block,
+                attachment_state
+            ))
+        if nodes:
+            return nodes
+    return [_get_qq_forward_text_node(block, attachment_state)]
+
+
+def _get_qq_forward_text_nodes(content, attachments=None):
+    if not isinstance(content, str):
+        return []
+    normalized_content = content.replace('\\r\\n', '\n')
+    normalized_content = normalized_content.replace('\\n', '\n').replace('\r', '\n')
+    message_blocks = _split_qq_forward_text_blocks(
+        normalized_content,
+        r'^(?P<indent>[ \t]*)===\s*消息\s+\d+\s*===\s*$'
+    )
+    if not message_blocks:
+        message_blocks = [normalized_content]
+        if not re.search(
+            r'(?m)^\s*\[(?:消息内容|发送者|附件\d+)\]',
+            normalized_content
+        ) and not re.search(
+            r'(?m)^\s*---\s*第\s*\d+\s*条\s*---\s*$',
+            normalized_content
+        ):
+            return []
+    attachment_state = {
+        'items': attachments if isinstance(attachments, list) else [],
+        'index': 0
+    }
+    nodes = []
+    for message_block in message_blocks:
+        nodes.extend(_get_qq_forward_text_block_nodes(
+            message_block,
+            attachment_state
+        ))
+    if len(nodes) == 1 and attachment_state['index'] == 0:
+        for attachment in attachment_state['items']:
+            segment = _get_qq_attachment_message_segment(attachment)
+            if segment is not None:
+                nodes[0]['data']['content'].append(segment)
+    return nodes
+
+
+def _get_qq_forward_messages(event_data):
+    if not isinstance(event_data, dict):
+        return []
+    elements = event_data.get('msg_elements', None)
+    element_contents = []
+    if isinstance(elements, list):
+        for element in elements:
+            if isinstance(element, dict) and isinstance(element.get('content', None), str):
+                element_contents.append(element['content'])
+        text_nodes = _get_qq_forward_text_nodes(
+            '\n'.join(element_contents),
+            event_data.get('attachments', None)
+        )
+        if text_nodes:
+            return text_nodes
+        element_nodes = _get_qq_forward_nodes_from_elements(elements)
+        if element_nodes:
+            return element_nodes
+    text_nodes = _get_qq_forward_text_nodes(
+        event_data.get('content', None),
+        event_data.get('attachments', None)
+    )
+    if text_nodes:
+        return text_nodes
+    fallback_element = {
+        'author': event_data.get('author', {}),
+        'content': event_data.get('content', ''),
+        'attachments': event_data.get('attachments', [])
+    }
+    return [_get_qq_forward_node(fallback_element)]
+
+
+def _get_qq_message_para(event_data, bot_hash=None):
+    if _get_qq_message_type(event_data) == 102:
+        forward_id = event_data.get('id', None) if isinstance(event_data, dict) else None
+        if forward_id is not None and str(forward_id) != '':
+            forward_id = str(forward_id)
+            if bot_hash is not None:
+                _register_qq_forward_message(
+                    bot_hash,
+                    forward_id,
+                    _get_qq_forward_messages(event_data)
+                )
+            return OlivOS.messageAPI.PARA.forward(id=forward_id)
+    return _get_qq_structured_message_para(event_data)
+
+
+def _get_qq_structured_message_para(event_data):
     if not isinstance(event_data, dict):
         return None
-    ark_data = event_data.get('ark_data', None)
-    if not isinstance(ark_data, dict):
-        ark_data = event_data.get('ark', None)
-    if not isinstance(ark_data, dict):
+    structured_data = event_data.get('ark_data', None)
+    if not isinstance(structured_data, dict):
+        structured_data = event_data.get('ark', None)
+    if not isinstance(structured_data, dict):
+        # 频道 Message 模型还定义了 embeds 卡片；目前官方不投递这类
+        # 入站消息，但若网关实际携带，仍按结构化消息完整交给插件。
+        embeds = event_data.get('embeds', None)
+        if isinstance(embeds, list) and len(embeds) > 0:
+            structured_data = {'embeds': copy.deepcopy(embeds)}
+    if not isinstance(structured_data, dict):
         return None
     try:
-        ark_json = json.dumps(
-            ark_data,
+        structured_json = json.dumps(
+            structured_data,
             ensure_ascii=False,
             separators=(',', ':')
         )
     except (TypeError, ValueError):
         return None
-    return OlivOS.messageAPI.PARA.json(data=ark_json)
+    return OlivOS.messageAPI.PARA.json(data=structured_json)
 
 
 def _get_qq_author_name(author):
@@ -2091,37 +1270,33 @@ def _parse_qq_message_scene_ext(message_scene):
             continue
         key, value = ext_item.split('=', 1)
         key = key.strip()
-        if key == '' or key.lower() == 'auth_token':
+        if key == '':
             continue
         result[key] = value
     return result
 
 
-def _sanitize_qq_message_scene(message_scene):
-    scene_copy = copy.deepcopy(message_scene)
-    auth_token_present = False
-    if not isinstance(scene_copy, dict):
-        return scene_copy, auth_token_present
-    scene_ext = scene_copy.get('ext', None)
-    if not isinstance(scene_ext, list):
-        return scene_copy, auth_token_present
-    safe_scene_ext = []
-    for ext_item in scene_ext:
-        if isinstance(ext_item, str) and '=' in ext_item:
-            key = ext_item.split('=', 1)[0].strip()
-            if key.lower() == 'auth_token':
-                auth_token_present = True
-                continue
-        safe_scene_ext.append(ext_item)
-    scene_copy['ext'] = safe_scene_ext
-    return scene_copy, auth_token_present
+def _get_qq_event_extend(event_type, event_data):
+    if not isinstance(event_data, dict):
+        event_data = {}
+    raw_event = copy.deepcopy(event_data)
+    result = {
+        'qq_event_type': str(event_type),
+        'qq_event_data': raw_event
+    }
+    # 官方事件 data 的每个顶层字段均提供稳定的 qq_ 前缀入口。
+    # 复用 raw_event 中的对象，避免大型转发/附件数据在单个事件内重复占用内存。
+    for field_name, field_value in raw_event.items():
+        if isinstance(field_name, str) and field_name != '':
+            result.setdefault('qq_%s' % field_name, field_value)
+    return result
 
 
 def _get_qq_message_event_extend(event_type, event_data):
     if not isinstance(event_data, dict):
         event_data = {}
-    result = {
-        'qq_event_type': str(event_type),
+    result = _get_qq_event_extend(event_type, event_data)
+    result.update({
         # 全量群消息事件本身不能证明消息是否 @ 机器人；保留未知态，
         # 避免其先于 GROUP_AT_MESSAGE_CREATE 到达时被错误标记为 False。
         'qq_at_bot': (
@@ -2130,31 +1305,24 @@ def _get_qq_message_event_extend(event_type, event_data):
             else event_type in qqAtBotEventTypes
         ),
         'qq_at_bot_known': event_type != 'GROUP_MESSAGE_CREATE',
-        'qq_raw_content': copy.deepcopy(event_data.get('content', None))
-    }
-    raw_event = copy.deepcopy(event_data)
+        'qq_raw_content': result.get('qq_content', None)
+    })
+    if 'id' in event_data:
+        # 保留既有消息专用名称；qq_id 则由通用入口提供。
+        result['qq_message_id'] = result.get('qq_id', event_data['id'])
     message_scene = event_data.get('message_scene', None)
-    safe_message_scene, auth_token_present = _sanitize_qq_message_scene(message_scene)
-    if 'message_scene' in raw_event:
-        raw_event['message_scene'] = copy.deepcopy(safe_message_scene)
-    result['qq_event_data'] = raw_event
-    field_map = {
-        'id': 'qq_message_id',
-        'author': 'qq_author',
-        'message_type': 'qq_message_type',
-        'msg_elements': 'qq_msg_elements',
-        'ark_data': 'qq_ark_data',
-        'mentions': 'qq_mentions',
-        'attachments': 'qq_attachments',
-        'timestamp': 'qq_timestamp'
-    }
-    for source_key, target_key in field_map.items():
-        if source_key in event_data:
-            result[target_key] = copy.deepcopy(event_data[source_key])
+    attachment_segments = []
+    attachments = event_data.get('attachments', None)
+    if isinstance(attachments, list):
+        for attachment in attachments:
+            attachment_segment = _get_qq_attachment_message_segment(attachment)
+            if attachment_segment is not None:
+                attachment_segments.append(attachment_segment)
+    if len(attachment_segments) > 0:
+        result['qq_attachment_segments'] = attachment_segments
     if 'ark_data' not in event_data and 'ark' in event_data:
-        result['qq_ark_data'] = copy.deepcopy(event_data['ark'])
+        result['qq_ark_data'] = result.get('qq_ark', event_data['ark'])
     if 'message_scene' in event_data:
-        result['qq_message_scene'] = copy.deepcopy(safe_message_scene)
         scene_ext = _parse_qq_message_scene_ext(message_scene)
         result['qq_message_scene_ext'] = scene_ext
         if 'msg_idx' in scene_ext:
@@ -2162,8 +1330,6 @@ def _get_qq_message_event_extend(event_type, event_data):
         if 'ref_msg_idx' in scene_ext:
             # ref_msg_idx 是 QQ 的消息索引，不是可发送的 message_id。
             result['qq_ref_msg_idx'] = scene_ext['ref_msg_idx']
-    if auth_token_present:
-        result['qq_message_scene_auth_token_present'] = True
     return result
 
 
@@ -2406,7 +1572,16 @@ def _get_qq_reference_message_id(bot_hash, chat_type, chat_id, event_data):
     scene_ext = _parse_qq_message_scene_ext(event_data.get('message_scene', None))
     ref_msg_idx = scene_ext.get('ref_msg_idx', None)
     if ref_msg_idx is not None and str(ref_msg_idx) != '':
-        return _get_qq_message_id_by_idx(bot_hash, chat_type, chat_id, ref_msg_idx)
+        reference_message_id = _get_qq_message_id_by_idx(
+            bot_hash,
+            chat_type,
+            chat_id,
+            ref_msg_idx
+        )
+        if reference_message_id is not None:
+            return reference_message_id
+        # 与 OneBot V11 一样保留 reply 段；缓存未命中时使用 QQ 原始索引。
+        return str(ref_msg_idx)
     return None
 
 
@@ -2894,17 +2069,17 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_obj = None
         message_content = event_data.get('content', None)
-        ark_message_para = _get_qq_ark_message_para(event_data)
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
             event_type == 'GROUP_AT_MESSAGE_CREATE'
             and isinstance(message_content, str)
         ):
             message_content = message_content.lstrip(' ')
-        if ark_message_para is not None:
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif message_content is not None:
             if message_content != '':
@@ -2924,16 +2099,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
-            )
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
         if message_obj.active:
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
             group_openid = event_data.get(
@@ -3051,11 +2221,11 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif 'content' in event_data:
             if event_data['content'] != '':
@@ -3075,16 +2245,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
-            )
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
         if message_obj.active:
             tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
             if plugin_event_bot_hash in sdkSubSelfInfo:
@@ -3172,11 +2337,11 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_content = event_data.get('content', None)
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif message_content is not None:
             if message_content != '':
@@ -3196,16 +2361,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
-            )
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
         if message_obj.active:
             author_id = author.get('id', None)
             tmp_member_obj = event_data.get('member', None)
@@ -3288,11 +2448,11 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_ark_message_para(event_data)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif 'content' in event_data:
             if event_data['content'] != '':
@@ -3312,16 +2472,11 @@ def get_Event_from_SDK(target_event):
                 'olivos_para',
                 []
             )
-        message_obj.data_raw.extend(
-            _get_message_attachments(
-                event_data.get('attachments', None)
-            )
+        _append_qq_message_attachments(
+            message_obj,
+            event_data.get('attachments', None),
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
-        try:
-            message_obj.init_data()
-        except Exception:
-            message_obj.active = False
-            message_obj.data = []
         if message_obj.active:
             author_id = author.get('id', None)
             _register_qq_user_info(
@@ -3529,9 +2684,19 @@ def get_Event_from_SDK(target_event):
         and hasattr(target_event.data, 'extend')
         and type(target_event.data.extend) is dict
     ):
+        if event_type not in qqMessageEventTypes:
+            target_event.data.extend.update(
+                _get_qq_event_extend(event_type, event_data)
+            )
+        payload_data = target_event.sdk_event.payload.data
         target_event.data.extend.setdefault('qq_event_type', str(event_type))
+        if payload_data.op is not None:
+            target_event.data.extend['qq_payload_op'] = payload_data.op
+        if payload_data.s is not None:
+            target_event.data.extend['qq_payload_seq'] = payload_data.s
         if event_id is not None:
             target_event.data.extend['event_id'] = str(event_id)
+            target_event.data.extend['qq_payload_id'] = str(event_id)
 
 
 # 支持OlivOS API调用的方法实现
@@ -4961,6 +4126,86 @@ class event_action(object):
             traceback.print_exc()
         return res_data
 
+    def get_forward_msg(target_event, message_id):
+        """获取收到的 QQ 合并转发节点,返回与 OneBot 对齐的结果。"""
+        res_data = OlivOS.contentAPI.api_result_data_template.get_forward_msg()
+        messages = _get_qq_forward_message(
+            target_event.bot_info.hash,
+            message_id
+        )
+        if messages is not None:
+            res_data['active'] = True
+            res_data['data']['messages'] = messages
+        return res_data
+
+    # ============ QQ 文件上传 ============
+    def _make_resource_upload_result(chat_type, chat_id, file_info, operation):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = file_info is not None
+        res_data['data'].update({
+            'operation': operation,
+            'chat_type': chat_type,
+            'chat_id': None if chat_id is None else str(chat_id),
+            'file_info': file_info
+        })
+        return res_data
+
+    def _get_qq_upload_context_error(target_event, flag_direct):
+        target_data = getattr(target_event, 'data', None)
+        extend_data = getattr(target_data, 'extend', None)
+        if not isinstance(extend_data, dict) or 'flag_from_qq' not in extend_data:
+            return None
+        if not extend_data.get('flag_from_qq', False):
+            return 'QQ group/C2C file upload is unavailable in a guild context'
+        if extend_data.get('flag_from_direct', False) != flag_direct:
+            return 'current QQ event chat type does not match the file upload target'
+        return None
+
+    def upload_group_file(target_event, group_id, file, name='', folder_id=None):
+        # QQ 群文件接口不支持 OneBot 的 folder_id，保留参数仅为统一 API 签名。
+        context_error = event_action._get_qq_upload_context_error(
+            target_event,
+            flag_direct=False
+        )
+        if context_error is not None:
+            return event_action._make_local_result(
+                'qq_group', group_id, 'upload_group_file', context_error
+            )
+        file_info = event_action.setResourceUploadFast(
+            target_event,
+            file,
+            group_id,
+            type_path='files',
+            type_chat='qq_groups',
+            file_name=name,
+            flag_send_msg=True
+        )
+        return event_action._make_resource_upload_result(
+            'qq_group', group_id, file_info, 'upload_group_file'
+        )
+
+    def upload_private_file(target_event, user_id, file, name):
+        context_error = event_action._get_qq_upload_context_error(
+            target_event,
+            flag_direct=True
+        )
+        if context_error is not None:
+            return event_action._make_local_result(
+                'qq_private', user_id, 'upload_private_file', context_error
+            )
+        file_info = event_action.setResourceUploadFast(
+            target_event,
+            file,
+            user_id,
+            type_path='files',
+            type_chat='qq_users',
+            file_name=name,
+            flag_send_msg=True
+        )
+        return event_action._make_resource_upload_result(
+            'qq_private', user_id, file_info, 'upload_private_file'
+        )
+
     # ============ 通用原始接口调用结果包装 ============
     # 平台接口返回体差异较大(对象/数组/空体),统一包装为 universal_result,
     # 原始响应放在 data.response,由调用方按文档自行取字段。
@@ -5016,6 +4261,137 @@ class event_action(object):
         this_msg = API.getChannel(get_SDK_bot_info_from_Event(target_event))
         this_msg.metadata.channel_id = str(channel_id)
         return event_action._run_raw_api(this_msg, 'get_channel_info', 'GET')
+
+    def _raw_response(raw_result):
+        if not isinstance(raw_result, dict):
+            return None
+        response = raw_result.get('data', {}).get('response', None)
+        return response
+
+    def _standard_group_info(raw_result, fallback_id=None):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False) or not isinstance(response, dict):
+            return res_data
+        group_id = response.get('id', fallback_id)
+        res_data['active'] = group_id is not None
+        res_data['data']['id'] = None if group_id is None else str(group_id)
+        res_data['data']['name'] = response.get('name', response.get('title', None))
+        res_data['data']['memo'] = response.get('topic', response.get('description', None))
+        res_data['data']['max_member_count'] = response.get(
+            'max_member_count', response.get('max_members_count', 0)
+        )
+        res_data['data']['extra'] = copy.deepcopy(response)
+        return res_data
+
+    def _standard_group_list(raw_result):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False):
+            return res_data
+        if isinstance(response, dict):
+            response_items = response.get('data', response.get('items', response.get('channels', None)))
+            if isinstance(response_items, dict):
+                response_items = response_items.get('items', response_items.get('channels', None))
+        else:
+            response_items = response
+        if not isinstance(response_items, list):
+            return res_data
+        res_data['active'] = True
+        for item in response_items:
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get('id', None)
+            if item_id is None:
+                continue
+            res_data['data'].append({
+                'id': str(item_id),
+                'name': item.get('name', item.get('title', None)),
+                'memo': item.get('topic', item.get('description', None)),
+                'max_member_count': item.get('max_member_count', item.get('max_members_count', 0)),
+                'extra': copy.deepcopy(item)
+            })
+        return res_data
+
+    def _standard_group_member_list(raw_result, fallback_group_id=None):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        response = event_action._raw_response(raw_result)
+        if not isinstance(raw_result, dict) or not raw_result.get('active', False):
+            return res_data
+        if isinstance(response, dict):
+            response_items = response.get('data', response.get('members', response.get('items', None)))
+            if isinstance(response_items, dict):
+                response_items = response_items.get(
+                    'members',
+                    response_items.get('items', response_items.get('data', None))
+                )
+        else:
+            response_items = response
+        if not isinstance(response_items, list):
+            return res_data
+        res_data['active'] = True
+        for item in response_items:
+            if not isinstance(item, dict):
+                continue
+            user_info = item.get('user', None)
+            if not isinstance(user_info, dict):
+                user_info = {}
+            user_id = item.get(
+                'user_id',
+                item.get('member_openid', item.get('id', user_info.get('id', None)))
+            )
+            if user_id is None:
+                continue
+            member = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+            member['id'] = str(user_id)
+            member['user_id'] = str(user_id)
+            member['group_id'] = None if fallback_group_id is None else str(fallback_group_id)
+            member['name'] = item.get(
+                'username',
+                item.get(
+                    'nickname',
+                    item.get('name', user_info.get('username', user_info.get('nickname', None)))
+                )
+            )
+            member['card'] = item.get('nick', item.get('card', member['name']))
+            member['role'] = item.get('role', None)
+            member['extra'] = copy.deepcopy(item)
+            res_data['data'].append(member)
+        return res_data
+
+    def get_guild_info_standard(target_event, guild_id):
+        return event_action._standard_group_info(
+            event_action.get_guild_info(target_event, guild_id),
+            fallback_id=guild_id
+        )
+
+    def get_guild_list_standard(target_event, before=None, after=None, limit=None):
+        return event_action._standard_group_list(
+            event_action.get_me_guild_list(target_event, before, after, limit)
+        )
+
+    def get_guild_channel_list_standard(target_event, guild_id):
+        return event_action._standard_group_list(
+            event_action.get_guild_channel_list(target_event, guild_id)
+        )
+
+    def get_channel_info_standard(target_event, channel_id):
+        return event_action._standard_group_info(
+            event_action.get_channel_info(target_event, channel_id),
+            fallback_id=channel_id
+        )
+
+    def get_guild_member_list_standard(target_event, guild_id, after=None, limit=None):
+        return event_action._standard_group_member_list(
+            event_action.get_guild_member_list(target_event, guild_id, after, limit),
+            fallback_group_id=guild_id
+        )
+
+    def get_qq_group_member_list_standard(target_event, group_openid, limit=None, start_index=None):
+        return event_action._standard_group_member_list(
+            event_action.get_qq_group_member_list(target_event, group_openid, limit, start_index),
+            fallback_group_id=group_openid
+        )
 
     def create_channel(target_event, guild_id, name, type=None, sub_type=None,
                        position=None, parent_id=None, private_type=None,
@@ -5233,6 +4609,37 @@ class event_action(object):
         this_msg = API.getPinsMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.metadata.channel_id = str(channel_id)
         return event_action._run_raw_api(this_msg, 'get_pins_message', 'GET')
+
+    def get_essence_msg_list(target_event, channel_id):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
+        raw_result = event_action.get_pins_message(target_event, channel_id)
+        if not raw_result.get('active', False):
+            return res_data
+        raw_response = raw_result.get('data', {}).get('response', None)
+        if not isinstance(raw_response, dict):
+            return res_data
+        message_ids = raw_response.get('message_ids', None)
+        if not isinstance(message_ids, list):
+            return res_data
+        response_channel_id = raw_response.get('channel_id', channel_id)
+        res_data['active'] = True
+        for message_id in message_ids:
+            res_data['data'].append({
+                'sender_id': None,
+                'sender_nick': None,
+                'sender_time': None,
+                'operator_id': None,
+                'operator_nick': None,
+                'operator_time': None,
+                'message_id': str(message_id),
+                'message': None,
+                'wording': None,
+                'extra': {
+                    'channel_id': None if response_channel_id is None else str(response_channel_id),
+                    'qq_response': copy.deepcopy(raw_response)
+                }
+            })
+        return res_data
 
     # ============ 频道:日程 ============
     def get_schedule_list(target_event, channel_id, since=None):
@@ -5514,7 +4921,8 @@ class event_action(object):
         chat_id,
         type_path: str,
         type_chat: str,
-        file_name=None
+        file_name=None,
+        flag_send_msg=False
     ):
         file_type_map = {
             'images': 1,
@@ -5528,9 +4936,20 @@ class event_action(object):
             flag_remote = url_parsed.scheme in ['http', 'https']
             file_data = None
             if flag_remote:
+                if type_path == 'files':
+                    file_name = event_action._get_resource_file_name(
+                        url,
+                        type_path=type_path,
+                        file_name=file_name
+                    )
                 resource_key = 'url:%s' % url
             else:
                 file_data = event_action._get_local_resource_data(url, type_path)
+                file_name = event_action._get_resource_file_name(
+                    url,
+                    type_path=type_path,
+                    file_name=file_name
+                )
                 resource_key = 'md5:%s:%d' % (
                     hashlib.md5(file_data).hexdigest(),
                     len(file_data)
@@ -5542,9 +4961,10 @@ class event_action(object):
                 str(file_type),
                 resource_key
             )
-            file_info = _get_cached_resource_upload(cache_key)
-            if file_info is not None:
-                return file_info
+            if not flag_send_msg:
+                file_info = _get_cached_resource_upload(cache_key)
+                if file_info is not None:
+                    return file_info
 
             ttl = None
             if flag_remote:
@@ -5554,14 +4974,11 @@ class event_action(object):
                     chat_id,
                     type_chat,
                     file_type,
-                    url=url
+                    url=url,
+                    file_name=file_name,
+                    flag_send_msg=flag_send_msg
                 )
             else:
-                file_name = event_action._get_resource_file_name(
-                    url,
-                    type_path=type_path,
-                    file_name=file_name
-                )
                 if len(file_data) <= sdkResourceUploadDirectMaxSize:
                     file_info, ttl = event_action._upload_resource_direct(
                         target_event,
@@ -5569,7 +4986,8 @@ class event_action(object):
                         type_chat,
                         file_type,
                         file_data=file_data,
-                        file_name=file_name
+                        file_name=file_name,
+                        flag_send_msg=flag_send_msg
                     )
                     if file_info is None:
                         # file_data 直传失败时回退到文档的分片上传流程。
@@ -5579,7 +4997,8 @@ class event_action(object):
                             type_chat,
                             file_type,
                             file_data,
-                            file_name
+                            file_name,
+                            flag_send_msg=flag_send_msg
                         )
                 else:
                     # 大文件按文档走分片上传，避免超长 base64 请求体。
@@ -5589,9 +5008,10 @@ class event_action(object):
                         type_chat,
                         file_type,
                         file_data,
-                        file_name
+                        file_name,
+                        flag_send_msg=flag_send_msg
                     )
-            if file_info is not None:
+            if file_info is not None and not flag_send_msg:
                 _cache_resource_upload(cache_key, file_info, ttl)
             return file_info
         except Exception:
@@ -5599,7 +5019,7 @@ class event_action(object):
             return None
 
     # 富媒体直传：远程资源传 url，本地资源传 base64 file_data；
-    # srv_send_msg 固定为 False，消息统一由 send_qq_msg 走消息接口发送以支持被动回复。
+    # 普通消息传输不直接发消息，upload_*_file 调用则将 flag_send_msg 设为 True。
     def _upload_resource_direct(
         target_event,
         chat_id,
@@ -5607,22 +5027,27 @@ class event_action(object):
         file_type,
         url=None,
         file_data=None,
-        file_name=None
+        file_name=None,
+        flag_send_msg=False
     ):
         msg_upload_api = API.setResourcePictureUpload(get_SDK_bot_info_from_Event(target_event))
         msg_upload_api.resource_type = type_chat
         msg_upload_api.metadata.openid = str(chat_id)
         msg_upload_api.data.file_type = file_type
         msg_upload_api.data.file_name = file_name
-        msg_upload_api.data.srv_send_msg = False
+        msg_upload_api.data.srv_send_msg = flag_send_msg
         if url is not None:
             msg_upload_api.data.url = url
         elif file_data is not None:
             msg_upload_api.data.file_data = base64.b64encode(file_data).decode('ascii')
         msg_upload_api.do_api('POST')
         file_info, ttl = event_action._parse_resource_upload_result(msg_upload_api)
-        if file_info is None:
-            event_action._log_qq_upload(target_event, 'files', api_obj=msg_upload_api)
+        event_action._log_qq_upload(
+            target_event,
+            'direct',
+            api_obj=msg_upload_api,
+            flag_success=file_info is not None
+        )
         return file_info, ttl
 
     # 按文档的分片上传流程处理本地文件：预上传换取 upload_id 与分片预签名 URL，
@@ -5633,7 +5058,8 @@ class event_action(object):
         type_chat,
         file_type,
         file_data,
-        file_name
+        file_name,
+        flag_send_msg=False
     ):
         sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
         prepare_api = API.uploadPrepare(sdk_bot_info)
@@ -5658,8 +5084,17 @@ class event_action(object):
         upload_id = None
         if flag_prepare_ok:
             upload_id = prepare_obj.get('upload_id', None)
+        event_action._log_qq_upload(
+            target_event,
+            'upload_prepare',
+            api_obj=prepare_api,
+            flag_success=(
+                flag_prepare_ok
+                and upload_id is not None
+                and str(upload_id) != ''
+            )
+        )
         if upload_id is None or str(upload_id) == '':
-            event_action._log_qq_upload(target_event, 'upload_prepare', api_obj=prepare_api)
             return None, None
         upload_id = str(upload_id)
 
@@ -5693,7 +5128,8 @@ class event_action(object):
                 upload_part,
                 file_data,
                 retry_timeout,
-                retry_delay
+                retry_delay,
+                target_event=target_event
             )
 
         if concurrency > 1:
@@ -5717,6 +5153,15 @@ class event_action(object):
                 )
             )
             return None, None
+        event_action._log_qq_upload(
+            target_event,
+            'upload_part',
+            detail='chunk upload completed (%d/%d parts)' % (
+                len(part_results),
+                len(upload_parts)
+            ),
+            flag_success=True
+        )
 
         merge_api = API.setResourcePictureUpload(sdk_bot_info)
         merge_api.resource_type = type_chat
@@ -5724,11 +5169,15 @@ class event_action(object):
         merge_api.data.file_type = file_type
         merge_api.data.file_name = file_name
         merge_api.data.upload_id = upload_id
-        merge_api.data.srv_send_msg = False
+        merge_api.data.srv_send_msg = flag_send_msg
         merge_api.do_api('POST')
         file_info, ttl = event_action._parse_resource_upload_result(merge_api)
-        if file_info is None:
-            event_action._log_qq_upload(target_event, 'chunk merge', api_obj=merge_api)
+        event_action._log_qq_upload(
+            target_event,
+            'chunk_merge',
+            api_obj=merge_api,
+            flag_success=file_info is not None
+        )
         return file_info, ttl
 
     # 上传单个分片：PUT 预签名 URL 成功后调用 upload_part_finish 确认，
@@ -5741,7 +5190,8 @@ class event_action(object):
         upload_part,
         file_data,
         retry_timeout,
-        retry_delay
+        retry_delay,
+        target_event=None
     ):
         part_data = file_data[upload_part['offset']:upload_part['offset'] + upload_part['size']]
         part_md5 = hashlib.md5(part_data).hexdigest()
@@ -5759,8 +5209,33 @@ class event_action(object):
                     timeout=sdkResourceUploadPartTimeout
                 )
                 flag_put_ok = 200 <= put_res.status_code < 300
-            except Exception:
+                if target_event is not None:
+                    put_text = getattr(put_res, 'text', None)
+                    if put_text is None:
+                        put_text = str(put_res)
+                    event_action._log_qq_upload(
+                        target_event,
+                        'upload_part_put',
+                        detail='part=%d attempt=%d HTTP %s response: %s' % (
+                            upload_part['index'],
+                            attempt_count,
+                            str(put_res.status_code),
+                            str(put_text)
+                        ),
+                        flag_success=flag_put_ok
+                    )
+            except Exception as exc:
                 traceback.print_exc()
+                if target_event is not None:
+                    event_action._log_qq_upload(
+                        target_event,
+                        'upload_part_put',
+                        detail='part=%d attempt=%d request exception: %s' % (
+                            upload_part['index'],
+                            attempt_count,
+                            str(exc)
+                        )
+                    )
             if flag_put_ok:
                 finish_api = API.uploadPartFinish(sdk_bot_info)
                 finish_api.resource_type = type_chat
@@ -5771,14 +5246,25 @@ class event_action(object):
                 finish_api.data.md5 = part_md5
                 finish_api.do_api('POST')
                 finish_obj = init_api_json(finish_api.res)
-                if (
+                flag_finish_ok = (
                     finish_api.res_code is not None
                     and 200 <= finish_api.res_code < 300
                     and (
                         type(finish_obj) is not dict
                         or event_action._get_api_error_code(finish_obj) in [None, 0]
                     )
-                ):
+                )
+                event_action._log_qq_upload(
+                    target_event,
+                    'upload_part_finish',
+                    api_obj=finish_api,
+                    detail='part=%d attempt=%d' % (
+                        upload_part['index'],
+                        attempt_count
+                    ),
+                    flag_success=flag_finish_ok
+                )
+                if flag_finish_ok:
                     return True
             if (
                 attempt_count >= sdkResourceUploadPartRetryMax
@@ -5888,21 +5374,41 @@ class event_action(object):
             return default
         return value
 
-    def _log_qq_upload(target_event, stage, api_obj=None, detail=None):
-        if target_event.log_func is None:
+    def _log_qq_upload(
+        target_event,
+        stage,
+        api_obj=None,
+        detail=None,
+        flag_success=None
+    ):
+        if target_event is None or target_event.log_func is None:
             return
+        if flag_success is True:
+            return
+        detail_parts = []
+        if detail is not None:
+            detail_parts.append(str(detail))
         if api_obj is not None:
             res_text = str(api_obj.res) if api_obj.res is not None else 'no response'
-            if len(res_text) > 1000:
-                res_text = res_text[:1000] + '...'
             res_code_text = 'n/a' if api_obj.res_code is None else str(api_obj.res_code)
-            detail = 'HTTP %s %s' % (res_code_text, res_text)
+            detail_parts.append('HTTP %s response: %s' % (res_code_text, res_text))
+            if flag_success is None:
+                flag_success = (
+                    api_obj.res_code is not None
+                    and 200 <= api_obj.res_code < 300
+                )
+        if flag_success is None:
+            flag_success = False
+        if flag_success:
+            return
+        if len(detail_parts) == 0:
+            detail_parts.append('no response detail')
         try:
             target_event.log_func(
                 3,
                 'OlivOS qqGuildv2SDK QQ media upload [%s] failed: %s' % (
                     str(stage),
-                    str(detail)
+                    ' | '.join(detail_parts)
                 ),
                 [
                     (target_event.getBotIDStr(), 'default'),
@@ -6329,6 +5835,54 @@ def _acquire_delete_rate(bot_hash):
         return True
 
 
+def _register_qq_forward_message(bot_hash, forward_id, messages):
+    global sdkForwardMessageInfoLastCleanup
+    if forward_id is None:
+        return
+    bot_hash = str(bot_hash)
+    forward_id = str(forward_id)
+    now = time.monotonic()
+    with sdkForwardMessageInfoLock:
+        if now - sdkForwardMessageInfoLastCleanup >= 60:
+            expired_keys = [
+                key_this
+                for key_this, data_this in sdkForwardMessageInfo.items()
+                if data_this['expires_at'] <= now
+            ]
+            for key_this in expired_keys:
+                sdkForwardMessageInfo.pop(key_this, None)
+            sdkForwardMessageInfoLastCleanup = now
+        cache_key = (bot_hash, forward_id)
+        if (
+            cache_key not in sdkForwardMessageInfo
+            and len(sdkForwardMessageInfo) >= sdkForwardMessageInfoMaxSize
+        ):
+            oldest_key = min(
+                sdkForwardMessageInfo,
+                key=lambda key_this: sdkForwardMessageInfo[key_this]['expires_at']
+            )
+            sdkForwardMessageInfo.pop(oldest_key, None)
+        sdkForwardMessageInfo[cache_key] = {
+            'messages': copy.deepcopy(messages),
+            'expires_at': now + sdkForwardMessageInfoTTL
+        }
+
+
+def _get_qq_forward_message(bot_hash, forward_id):
+    if forward_id is None:
+        return None
+    cache_key = (str(bot_hash), str(forward_id))
+    now = time.monotonic()
+    with sdkForwardMessageInfoLock:
+        cache_data = sdkForwardMessageInfo.get(cache_key, None)
+        if cache_data is None:
+            return None
+        if cache_data['expires_at'] <= now:
+            sdkForwardMessageInfo.pop(cache_key, None)
+            return None
+        return copy.deepcopy(cache_data['messages'])
+
+
 def _get_cached_resource_upload(cache_key):
     """命中未过期的 file_info 缓存时直接复用，避免重复上传同一富媒体资源。"""
     now = time.monotonic()
@@ -6418,3 +5972,1203 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
             return None
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
+
+
+# QQ official API request models
+class API(object):
+    class getAppAccessToken(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['bots']
+            self.route = sdkAPIRoute['getAppAccessToken']
+
+        class data_T(object):
+            def __init__(self):
+                self.appId = None
+                self.clientSecret = None
+
+    class getGateway(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['gateway']
+
+    class getMe(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['users'] + '/@me'
+
+    class getQQGroupBotState(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/bot_state'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+    # 获取指定消息(仅频道):GET /channels/{channel_id}/messages/{message_id}
+    class getMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+
+    # ============ 频道模块:频道/子频道 ============
+    # GET /guilds/{guild_id} 获取频道详情
+    class getGuild(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+    # GET /users/@me/guilds 获取机器人加入的频道列表(query: before/after/limit)
+    class getMeGuilds(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['users_me'] + '/guilds'
+
+    # GET /guilds/{guild_id}/channels 获取子频道列表
+    class getGuildChannels(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/channels'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+    # GET /channels/{channel_id} 获取子频道详情
+    class getChannel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # POST /guilds/{guild_id}/channels 创建子频道(私域)
+    class createChannel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/channels'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.name = None            # str
+                self.type = None            # int 子频道类型
+                self.sub_type = None        # int 子频道子类型
+                self.position = None        # int
+                self.parent_id = None       # str 分组 id
+                self.private_type = None    # int 私密类型
+                self.private_user_ids = None  # list
+                self.speak_permission = None  # int
+                self.application_id = None  # str 应用子频道应用类型
+
+    # PATCH /channels/{channel_id} 修改子频道(私域)
+    class patchChannel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.name = None
+                self.position = None
+                self.parent_id = None
+                self.private_type = None
+                self.speak_permission = None
+
+    # DELETE /channels/{channel_id} 删除子频道(私域)
+    class deleteChannel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # GET /channels/{channel_id}/online_nums 获取音视频/直播子频道在线成员数
+    class getChannelOnlineNums(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/online_nums'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # ============ 频道模块:成员 ============
+    # GET /guilds/{guild_id}/members 获取频道成员列表(私域, query: after/limit)
+    class getGuildMembers(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+    # GET /guilds/{guild_id}/roles/{role_id}/members 获取身份组成员列表(query: start_index/limit)
+    class getGuildRoleMembers(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}/members'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.role_id = '-1'
+
+    # GET /guilds/{guild_id}/members/{user_id} 获取成员详情
+    class getGuildMember(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.user_id = '-1'
+
+    # DELETE /guilds/{guild_id}/members/{user_id} 删除频道成员(踢人,私域)
+    class deleteGuildMember(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.user_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.add_blacklist = None             # bool 是否同时加入黑名单
+                self.delete_history_msg_days = None   # int 撤回历史消息天数(3/7/15/30,0不撤回,-1全部)
+
+    # ============ 频道模块:身份组 ============
+    # GET /guilds/{guild_id}/roles 获取频道身份组列表
+    class getGuildRoles(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+    # POST /guilds/{guild_id}/roles 创建频道身份组
+    class createGuildRole(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.name = None   # str
+                self.color = None  # int ARGB 十进制
+                self.hoist = None  # int 是否在成员列表中单独展示(0/1)
+
+    # PATCH /guilds/{guild_id}/roles/{role_id} 修改频道身份组
+    class patchGuildRole(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.role_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.name = None
+                self.color = None
+                self.hoist = None
+
+    # DELETE /guilds/{guild_id}/roles/{role_id} 删除频道身份组
+    class deleteGuildRole(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/roles/{role_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.role_id = '-1'
+
+    # PUT /guilds/{guild_id}/members/{user_id}/roles/{role_id} 增加频道身份组成员
+    # 操作 5 号(子频道管理员)身份组时需在 body 传 channel.id。
+    class putGuildMemberRole(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/roles/{role_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.user_id = '-1'
+                self.role_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.channel = None  # dict {'id': channel_id}
+
+    # DELETE /guilds/{guild_id}/members/{user_id}/roles/{role_id} 删除频道身份组成员
+    class deleteGuildMemberRole(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/roles/{role_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.user_id = '-1'
+                self.role_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.channel = None  # dict {'id': channel_id}
+
+    # ============ 频道模块:子频道权限 ============
+    # GET /channels/{channel_id}/members/{user_id}/permissions 获取子频道用户权限
+    class getChannelMemberPermissions(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/members/{user_id}/permissions'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.user_id = '-1'
+
+    # PUT /channels/{channel_id}/members/{user_id}/permissions 修改子频道用户权限
+    class putChannelMemberPermissions(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/members/{user_id}/permissions'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.user_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.add = None     # str 权限位或值,如 '1'/'2'/'4'/'8' 的组合
+                self.remove = None  # str
+
+    # GET /channels/{channel_id}/roles/{role_id}/permissions 获取子频道身份组权限
+    class getChannelRolePermissions(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/roles/{role_id}/permissions'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.role_id = '-1'
+
+    # PUT /channels/{channel_id}/roles/{role_id}/permissions 修改子频道身份组权限
+    class putChannelRolePermissions(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/roles/{role_id}/permissions'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.role_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.add = None
+                self.remove = None
+
+    # ============ 频道模块:消息列表/私信会话 ============
+    # GET /channels/{channel_id}/messages 拉取消息列表(v1 存量接口, query: around/before/after/limit)
+    class getChannelMessages(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # POST /users/@me/dms 创建私信会话
+    class createDirectMessageSession(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['users_me'] + '/dms'
+
+        class data_T(object):
+            def __init__(self):
+                self.recipient_id = None      # str 接收者 id
+                self.source_guild_id = None   # str 源频道 id
+
+    # ============ 频道模块:禁言 ============
+    # PATCH /guilds/{guild_id}/mute 全员禁言(传 user_ids 时为批量成员禁言)
+    class patchGuildMute(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/mute'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.mute_end_timestamp = None  # str 秒级时间戳
+                self.mute_seconds = None        # str 禁言时长(秒),'0' 为解除
+                self.user_ids = None            # list 批量成员禁言
+
+    # PATCH /guilds/{guild_id}/members/{user_id}/mute 指定成员禁言
+    class patchGuildMemberMute(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/members/{user_id}/mute'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.user_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.mute_end_timestamp = None
+                self.mute_seconds = None
+
+    # ============ 频道模块:公告/精华 ============
+    # POST /guilds/{guild_id}/announces 创建频道公告
+    class createAnnounce(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/announces'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.message_id = None          # str
+                self.channel_id = None          # str
+                self.announces_type = None      # int 0成员公告 1欢迎公告
+                self.recommend_channels = None  # list RecommendChannel
+
+    # DELETE /guilds/{guild_id}/announces/{message_id} 删除频道公告(message_id 可为 'all')
+    class deleteAnnounce(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/announces/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.message_id = '-1'
+
+    # PUT /channels/{channel_id}/pins/{message_id} 添加精华消息
+    class putPinsMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+
+    # DELETE /channels/{channel_id}/pins/{message_id} 删除精华消息(message_id 可为 'all')
+    class deletePinsMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+
+    # GET /channels/{channel_id}/pins 获取精华消息列表
+    class getPinsMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/pins'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # ============ 频道模块:日程 ============
+    # GET /channels/{channel_id}/schedules 获取日程列表(query: since)
+    class getSchedules(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # GET /channels/{channel_id}/schedules/{schedule_id} 获取日程详情
+    class getSchedule(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.schedule_id = '-1'
+
+    # POST /channels/{channel_id}/schedules 创建日程
+    class createSchedule(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.schedule = None  # dict Schedule 对象(不含 id)
+
+    # PATCH /channels/{channel_id}/schedules/{schedule_id} 修改日程
+    class patchSchedule(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.schedule_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.schedule = None  # dict Schedule 对象(不含 id)
+
+    # DELETE /channels/{channel_id}/schedules/{schedule_id} 删除日程
+    class deleteSchedule(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/schedules/{schedule_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.schedule_id = '-1'
+
+    # ============ 频道模块:表情表态 ============
+    # PUT /channels/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id} 发表表情表态
+    class putMessageReaction(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+                self.emoji_type = '1'  # 1系统表情 2emoji
+                self.emoji_id = '-1'
+
+    # DELETE /channels/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id} 删除自己的表情表态
+    class deleteMessageReaction(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+                self.emoji_type = '1'
+                self.emoji_id = '-1'
+
+    # GET .../reactions/{emoji_type}/{emoji_id} 拉取表态用户列表(query: cookie/limit)
+    class getMessageReactionUsers(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['channels']
+                + '/{channel_id}/messages/{message_id}/reactions/{emoji_type}/{emoji_id}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+                self.emoji_type = '1'
+                self.emoji_id = '-1'
+
+    # ============ 频道模块:音频/麦克风 ============
+    # POST /channels/{channel_id}/audio 音频控制
+    class postAudioControl(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/audio'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.audio_url = None  # str
+                self.text = None       # str 状态文本
+                self.status = None     # int 0开始 1暂停 2继续 3停止
+
+    # PUT /channels/{channel_id}/mic 机器人上麦
+    class putMic(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/mic'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # DELETE /channels/{channel_id}/mic 机器人下麦
+    class deleteMic(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/mic'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # ============ 频道模块:帖子(论坛) ============
+    # GET /channels/{channel_id}/threads 获取帖子列表(私域)
+    class getThreads(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+    # GET /channels/{channel_id}/threads/{thread_id} 获取帖子详情(私域)
+    class getThread(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads/{thread_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.thread_id = '-1'
+
+    # PUT /channels/{channel_id}/threads 发表帖子(私域)
+    class putThread(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.title = None    # str
+                self.content = None  # str
+                self.format = None   # int 1文本 2HTML 3Markdown 4JSON
+
+    # DELETE /channels/{channel_id}/threads/{thread_id} 删除帖子(私域)
+    class deleteThread(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/threads/{thread_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.thread_id = '-1'
+
+    # ============ 频道模块:API 权限 ============
+    # GET /guilds/{guild_id}/api_permission 获取频道可用权限列表
+    class getGuildApiPermission(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/api_permission'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+    # POST /guilds/{guild_id}/api_permission/demand 创建频道 API 接口权限授权链接
+    class demandGuildApiPermission(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['guilds'] + '/{guild_id}/api_permission/demand'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.channel_id = None    # str
+                self.api_identify = None  # dict {'path':..., 'method':...}
+                self.desc = None          # str
+
+    # ============ 互动回调应答 ============
+    # PUT /interactions/{interaction_id} 对 INTERACTION_CREATE 的应答(code: 0成功 1操作失败 2操作频繁 3重复操作 4没有权限 5仅管理员操作)
+    class putInteraction(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['interactions'] + '/{interaction_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.interaction_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.code = None  # int
+
+    # ============ QQ 群 ============
+    # GET /v2/groups/{group_openid}/members 获取群成员列表(query: limit/start_index,需相应权限)
+    class getQQGroupMembers(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/members'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+    # ============ 消息发送 ============
+    class sendMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None  # str
+                self.embed = None  # object
+                self.ark = None  # object
+                self.message_reference = None  # object
+                self.image = None  # str
+                self.file_image = None  # multipart file
+                self.msg_id = None  # str
+                self.event_id = None  # str
+                self.markdown = None  # object
+                self.keyboard = None  # object
+
+        # 频道本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
+        def do_api(self, req_type='POST'):
+            if self.data.file_image is None:
+                return api_templet.do_api(self, req_type)
+            msg_res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            if msg_res is None:
+                self.res = None
+                self.res_code = None
+                return None
+            self.res = msg_res.text
+            self.res_code = msg_res.status_code
+            return self.res
+
+    class sendDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None     # str
+                self.embed = None       # object
+                self.ark = None         # object
+                self.message_reference = None  # object
+                self.image = None       # str
+                self.file_image = None  # multipart file
+                self.msg_id = None      # str
+                self.event_id = None    # str
+                self.markdown = None    # object
+                self.keyboard = None    # object
+
+        # 频道私信本地图片使用 multipart/form-data，其他消息沿用通用 JSON 请求
+        def do_api(self, req_type='POST'):
+            if self.data.file_image is None:
+                return api_templet.do_api(self, req_type)
+            msg_res = _send_channel_multipart(
+                self.bot_info, self.metadata, self.data,
+                self.host, self.port, self.route, req_type
+            )
+            if msg_res is None:
+                self.res = None
+                self.res_code = None
+                return None
+            self.res = msg_res.text
+            self.res_code = msg_res.status_code
+            return self.res
+
+    class sendQQMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None     # str
+                self.media = None       # object
+                self.msg_type = 0       # int
+                self.markdown = None    # object
+                self.keyboard = None    # object
+                self.ark = None         # object
+                self.embed = None       # object
+                self.message_reference = None  # object
+                self.event_id = None    # str
+                self.msg_id = None      # str
+                self.msg_seq = None
+
+    class sendQQDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.content = None     # str
+                self.msg_type = 0       # int
+                self.markdown = None    # object
+                self.keyboard = None    # object
+                self.ark = None         # object
+                self.embed = None       # object
+                self.media = None       # object
+                self.message_reference = None  # object
+                self.event_id = None    # str
+                self.msg_id = None      # str
+                self.msg_seq = None
+                self.is_wakeup = None   # bool
+
+    # ============ QQ 富媒体上传 ============
+    # 名称保留以兼容已有内部引用，实际支持图片、视频、语音和文件。
+    # 直传时携带 url 或 file_data；分片上传完成后携带 upload_id 请求合并，两者均返回 file_info。
+    class setResourcePictureUpload(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/files'
+            self.resource_type = 'qq_groups'
+
+        class data_T(object):
+            def __init__(self):
+                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
+                self.url = None        # 远程资源 URL
+                self.srv_send_msg = None  # bool，False 时仅返回 file_info，不由平台直接发消息
+                self.file_name = None  # 文件名
+                self.upload_id = None  # 分片上传任务 ID，合并分片时携带
+                self.file_data = None  # 本地资源的 base64 数据
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST'):
+            # 官方富媒体接口使用 JSON：远程资源传 url，本地资源传 base64 file_data。
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/files'
+            return api_templet.do_api(self, req_type)
+
+    # QQ 单聊/群聊富媒体预上传：按文件校验值换取 upload_id 与各分片的预签名 URL。
+    class uploadPrepare(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_prepare'
+            self.resource_type = 'qq_groups'
+
+        class data_T(object):
+            def __init__(self):
+                self.file_type = None  # 1 图片、2 视频、3 语音、4 文件
+                self.file_size = None  # str，文件总字节数
+                self.file_name = None  # 文件名
+                self.md5 = None        # 整个文件的 MD5
+                self.sha1 = None       # 整个文件的 SHA1
+                self.md5_10m = None    # 文件前 10002432 字节的 MD5
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST'):
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_prepare'
+            return api_templet.do_api(self, req_type)
+
+    # QQ 单聊/群聊分片上传完成确认：每个分片 PUT 成功后通知平台。
+    class uploadPartFinish(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{openid}/upload_part_finish'
+            self.resource_type = 'qq_groups'
+
+        class data_T(object):
+            def __init__(self):
+                self.upload_id = None   # 分片上传任务 ID
+                self.part_index = None  # int，分片序号，从 0 开始
+                self.block_size = None  # str，该分片的字节数
+                self.md5 = None         # 该分片数据的 MD5
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+
+        def do_api(self, req_type='POST'):
+            self.route = sdkAPIRoute[self.resource_type] + '/{openid}/upload_part_finish'
+            return api_templet.do_api(self, req_type)
+
+    # ============ 消息删除 ============
+    class deleteMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['channels'] + '/{channel_id}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.channel_id = '-1'
+                self.message_id = '-1'
+
+    class deleteDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['dms'] + '/{guild_id}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.guild_id = '-1'
+                self.message_id = '-1'
+
+    class deleteQQMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+                self.message_id = '-1'
+
+    class deleteQQDirectMessage(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_users'] + '/{openid}/messages/{message_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
+                self.message_id = '-1'
