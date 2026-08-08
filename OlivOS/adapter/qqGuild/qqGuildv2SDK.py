@@ -156,6 +156,7 @@ qqInternalEventTypes = {
     'INTERACTION_CREATE',
     'FRIEND_DEL', 'C2C_MSG_REJECT', 'C2C_MSG_RECEIVE',
     'GROUP_MSG_REJECT', 'GROUP_MSG_RECEIVE',
+    'SUBSCRIBE_MESSAGE_STATUS',
     'FORUM_THREAD_CREATE', 'FORUM_THREAD_UPDATE', 'FORUM_THREAD_DELETE',
     'FORUM_POST_CREATE', 'FORUM_POST_DELETE',
     'FORUM_REPLY_CREATE', 'FORUM_REPLY_DELETE',
@@ -736,9 +737,12 @@ def _get_qq_attachment_message_segment(attachment):
         'file': attachment_url,
         'url': attachment_url
     }
-    for key in ['filename', 'size', 'width', 'height']:
+    for key in [
+        'filename', 'size', 'width', 'height', 'content_type',
+        'voice_wav_url', 'asr_refer_text'
+    ]:
         if attachment.get(key, None) is not None:
-            segment_data[key] = attachment[key]
+            segment_data[key] = copy.deepcopy(attachment[key])
     if 'filename' in segment_data:
         segment_data['name'] = segment_data['filename']
     return {
@@ -1052,26 +1056,32 @@ def _get_qq_message_para(event_data, bot_hash=None):
                     _get_qq_forward_messages(event_data)
                 )
             return OlivOS.messageAPI.PARA.forward(id=forward_id)
-    return _get_qq_ark_message_para(event_data)
+    return _get_qq_structured_message_para(event_data)
 
 
-def _get_qq_ark_message_para(event_data):
+def _get_qq_structured_message_para(event_data):
     if not isinstance(event_data, dict):
         return None
-    ark_data = event_data.get('ark_data', None)
-    if not isinstance(ark_data, dict):
-        ark_data = event_data.get('ark', None)
-    if not isinstance(ark_data, dict):
+    structured_data = event_data.get('ark_data', None)
+    if not isinstance(structured_data, dict):
+        structured_data = event_data.get('ark', None)
+    if not isinstance(structured_data, dict):
+        # 频道 Message 模型还定义了 embeds 卡片；目前官方不投递这类
+        # 入站消息，但若网关实际携带，仍按结构化消息完整交给插件。
+        embeds = event_data.get('embeds', None)
+        if isinstance(embeds, list) and len(embeds) > 0:
+            structured_data = {'embeds': copy.deepcopy(embeds)}
+    if not isinstance(structured_data, dict):
         return None
     try:
-        ark_json = json.dumps(
-            ark_data,
+        structured_json = json.dumps(
+            structured_data,
             ensure_ascii=False,
             separators=(',', ':')
         )
     except (TypeError, ValueError):
         return None
-    return OlivOS.messageAPI.PARA.json(data=ark_json)
+    return OlivOS.messageAPI.PARA.json(data=structured_json)
 
 
 def _get_qq_author_name(author):
@@ -1260,37 +1270,33 @@ def _parse_qq_message_scene_ext(message_scene):
             continue
         key, value = ext_item.split('=', 1)
         key = key.strip()
-        if key == '' or key.lower() == 'auth_token':
+        if key == '':
             continue
         result[key] = value
     return result
 
 
-def _sanitize_qq_message_scene(message_scene):
-    scene_copy = copy.deepcopy(message_scene)
-    auth_token_present = False
-    if not isinstance(scene_copy, dict):
-        return scene_copy, auth_token_present
-    scene_ext = scene_copy.get('ext', None)
-    if not isinstance(scene_ext, list):
-        return scene_copy, auth_token_present
-    safe_scene_ext = []
-    for ext_item in scene_ext:
-        if isinstance(ext_item, str) and '=' in ext_item:
-            key = ext_item.split('=', 1)[0].strip()
-            if key.lower() == 'auth_token':
-                auth_token_present = True
-                continue
-        safe_scene_ext.append(ext_item)
-    scene_copy['ext'] = safe_scene_ext
-    return scene_copy, auth_token_present
+def _get_qq_event_extend(event_type, event_data):
+    if not isinstance(event_data, dict):
+        event_data = {}
+    raw_event = copy.deepcopy(event_data)
+    result = {
+        'qq_event_type': str(event_type),
+        'qq_event_data': raw_event
+    }
+    # 官方事件 data 的每个顶层字段均提供稳定的 qq_ 前缀入口。
+    # 复用 raw_event 中的对象，避免大型转发/附件数据在单个事件内重复占用内存。
+    for field_name, field_value in raw_event.items():
+        if isinstance(field_name, str) and field_name != '':
+            result.setdefault('qq_%s' % field_name, field_value)
+    return result
 
 
 def _get_qq_message_event_extend(event_type, event_data):
     if not isinstance(event_data, dict):
         event_data = {}
-    result = {
-        'qq_event_type': str(event_type),
+    result = _get_qq_event_extend(event_type, event_data)
+    result.update({
         # 全量群消息事件本身不能证明消息是否 @ 机器人；保留未知态，
         # 避免其先于 GROUP_AT_MESSAGE_CREATE 到达时被错误标记为 False。
         'qq_at_bot': (
@@ -1299,27 +1305,12 @@ def _get_qq_message_event_extend(event_type, event_data):
             else event_type in qqAtBotEventTypes
         ),
         'qq_at_bot_known': event_type != 'GROUP_MESSAGE_CREATE',
-        'qq_raw_content': copy.deepcopy(event_data.get('content', None))
-    }
-    raw_event = copy.deepcopy(event_data)
+        'qq_raw_content': result.get('qq_content', None)
+    })
+    if 'id' in event_data:
+        # 保留既有消息专用名称；qq_id 则由通用入口提供。
+        result['qq_message_id'] = result.get('qq_id', event_data['id'])
     message_scene = event_data.get('message_scene', None)
-    safe_message_scene, auth_token_present = _sanitize_qq_message_scene(message_scene)
-    if 'message_scene' in raw_event:
-        raw_event['message_scene'] = copy.deepcopy(safe_message_scene)
-    result['qq_event_data'] = raw_event
-    field_map = {
-        'id': 'qq_message_id',
-        'author': 'qq_author',
-        'message_type': 'qq_message_type',
-        'msg_elements': 'qq_msg_elements',
-        'ark_data': 'qq_ark_data',
-        'mentions': 'qq_mentions',
-        'attachments': 'qq_attachments',
-        'timestamp': 'qq_timestamp'
-    }
-    for source_key, target_key in field_map.items():
-        if source_key in event_data:
-            result[target_key] = copy.deepcopy(event_data[source_key])
     attachment_segments = []
     attachments = event_data.get('attachments', None)
     if isinstance(attachments, list):
@@ -1330,9 +1321,8 @@ def _get_qq_message_event_extend(event_type, event_data):
     if len(attachment_segments) > 0:
         result['qq_attachment_segments'] = attachment_segments
     if 'ark_data' not in event_data and 'ark' in event_data:
-        result['qq_ark_data'] = copy.deepcopy(event_data['ark'])
+        result['qq_ark_data'] = result.get('qq_ark', event_data['ark'])
     if 'message_scene' in event_data:
-        result['qq_message_scene'] = copy.deepcopy(safe_message_scene)
         scene_ext = _parse_qq_message_scene_ext(message_scene)
         result['qq_message_scene_ext'] = scene_ext
         if 'msg_idx' in scene_ext:
@@ -1340,8 +1330,6 @@ def _get_qq_message_event_extend(event_type, event_data):
         if 'ref_msg_idx' in scene_ext:
             # ref_msg_idx 是 QQ 的消息索引，不是可发送的 message_id。
             result['qq_ref_msg_idx'] = scene_ext['ref_msg_idx']
-    if auth_token_present:
-        result['qq_message_scene_auth_token_present'] = True
     return result
 
 
@@ -2081,17 +2069,17 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_obj = None
         message_content = event_data.get('content', None)
-        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
             event_type == 'GROUP_AT_MESSAGE_CREATE'
             and isinstance(message_content, str)
         ):
             message_content = message_content.lstrip(' ')
-        if ark_message_para is not None:
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif message_content is not None:
             if message_content != '':
@@ -2114,7 +2102,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
-            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
@@ -2233,11 +2221,11 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif 'content' in event_data:
             if event_data['content'] != '':
@@ -2260,7 +2248,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
-            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
             tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
@@ -2349,11 +2337,11 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_content = event_data.get('content', None)
         message_obj = None
-        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif message_content is not None:
             if message_content != '':
@@ -2376,7 +2364,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
-            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
             author_id = author.get('id', None)
@@ -2460,11 +2448,11 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        ark_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if ark_message_para is not None:
+        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+        if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
-                [ark_message_para]
+                [structured_message_para]
             )
         elif 'content' in event_data:
             if event_data['content'] != '':
@@ -2487,7 +2475,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
-            skip=isinstance(ark_message_para, OlivOS.messageAPI.PARA.forward)
+            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
             author_id = author.get('id', None)
@@ -2696,9 +2684,19 @@ def get_Event_from_SDK(target_event):
         and hasattr(target_event.data, 'extend')
         and type(target_event.data.extend) is dict
     ):
+        if event_type not in qqMessageEventTypes:
+            target_event.data.extend.update(
+                _get_qq_event_extend(event_type, event_data)
+            )
+        payload_data = target_event.sdk_event.payload.data
         target_event.data.extend.setdefault('qq_event_type', str(event_type))
+        if payload_data.op is not None:
+            target_event.data.extend['qq_payload_op'] = payload_data.op
+        if payload_data.s is not None:
+            target_event.data.extend['qq_payload_seq'] = payload_data.s
         if event_id is not None:
             target_event.data.extend['event_id'] = str(event_id)
+            target_event.data.extend['qq_payload_id'] = str(event_id)
 
 
 # 支持OlivOS API调用的方法实现
