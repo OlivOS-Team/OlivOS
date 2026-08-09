@@ -669,8 +669,10 @@ def _unquote_qq_face_value(value):
 
 def _strip_qq_face_tags(content):
     """移除 QQ 原始表情标签,同时返回可供 extend 使用的结构化信息。"""
+    if content is None:
+        return None, []
     if not isinstance(content, str):
-        return content, []
+        return '', []
     face_data = []
 
     def replace_face_tag(match):
@@ -687,6 +689,13 @@ def _strip_qq_face_tags(content):
         return ''
 
     return qqFaceTagPattern.sub(replace_face_tag, content), face_data
+
+
+def _get_qq_message_content(event_data):
+    """统一取得清理后的消息正文及 QQ 表情扩展数据。"""
+    if not isinstance(event_data, dict):
+        return None, []
+    return _strip_qq_face_tags(event_data.get('content', None))
 
 
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
@@ -1337,7 +1346,7 @@ def _get_qq_event_extend(event_type, event_data):
     return result
 
 
-def _get_qq_message_event_extend(event_type, event_data):
+def _get_qq_message_event_extend(event_type, event_data, face_data=None):
     if not isinstance(event_data, dict):
         event_data = {}
     result = _get_qq_event_extend(event_type, event_data)
@@ -1352,9 +1361,10 @@ def _get_qq_message_event_extend(event_type, event_data):
         'qq_at_bot_known': event_type != 'GROUP_MESSAGE_CREATE',
         'qq_raw_content': result.get('qq_content', None)
     })
-    _, face_data = _strip_qq_face_tags(result.get('qq_content', None))
+    if face_data is None:
+        _, face_data = _get_qq_message_content(event_data)
     if len(face_data) > 0:
-        result['qq_face_data'] = face_data
+        result['qq_face_data'] = copy.deepcopy(face_data)
     if 'id' in event_data:
         # 保留既有消息专用名称；qq_id 则由通用入口提供。
         result['qq_message_id'] = result.get('qq_id', event_data['id'])
@@ -2116,8 +2126,7 @@ def get_Event_from_SDK(target_event):
     ]:
         author = event_data.get('author', {})
         message_obj = None
-        message_content = event_data.get('content', None)
-        message_content, _ = _strip_qq_face_tags(message_content)
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
@@ -2245,7 +2254,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = True
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2270,7 +2279,7 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        message_content, _ = _strip_qq_face_tags(event_data.get('content', None))
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
@@ -2360,7 +2369,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = True
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2385,8 +2394,7 @@ def get_Event_from_SDK(target_event):
         'AT_MESSAGE_CREATE'
     ]:
         author = event_data.get('author', {})
-        message_content = event_data.get('content', None)
-        message_content, _ = _strip_qq_face_tags(message_content)
+        message_content, face_data = _get_qq_message_content(event_data)
         message_obj = None
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
@@ -2478,7 +2486,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2499,7 +2507,7 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
-        message_content, _ = _strip_qq_face_tags(event_data.get('content', None))
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
@@ -2580,7 +2588,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
