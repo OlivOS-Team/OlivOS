@@ -648,6 +648,47 @@ class event(object):
             self.base_info['post_type'] = None
 
 
+# QQ 消息会把表情编码成正文前缀,正文不应把该平台标记原样暴露给插件。
+qqFaceTagPattern = re.compile(
+    r'<faceType\s*=\s*(?P<face_type>[^,>]+)\s*,\s*faceId\s*=\s*'
+    r'(?P<face_id>"[^"]*"|\'[^\']*\'|[^,\s>]+)'
+    r'(?P<extra>(?:,[^>]*)?)\s*/?>'
+)
+qqFaceAttributePattern = re.compile(
+    r'(?:^|,)\s*(?P<key>[A-Za-z_][\w-]*)\s*=\s*'
+    r'(?P<value>"[^"]*"|\'[^\']*\'|[^,>]*)'
+)
+
+
+def _unquote_qq_face_value(value):
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ['"', "'"]:
+        return value[1:-1]
+    return value
+
+
+def _strip_qq_face_tags(content):
+    """移除 QQ 原始表情标签,同时返回可供 extend 使用的结构化信息。"""
+    if not isinstance(content, str):
+        return content, []
+    face_data = []
+
+    def replace_face_tag(match):
+        face_item = {
+            'face_type': _unquote_qq_face_value(match.group('face_type')),
+            'face_id': _unquote_qq_face_value(match.group('face_id')),
+            'raw': match.group(0)
+        }
+        for attribute_match in qqFaceAttributePattern.finditer(match.group('extra')):
+            face_item[attribute_match.group('key')] = _unquote_qq_face_value(
+                attribute_match.group('value')
+            )
+        face_data.append(face_item)
+        return ''
+
+    return qqFaceTagPattern.sub(replace_face_tag, content), face_data
+
+
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
 def _get_attachment_url(attachment):
     attachment_url = attachment.get('url', None)
@@ -757,10 +798,12 @@ def _get_qq_forward_element_content(element):
     content = []
     content_text = element.get('content', None)
     if isinstance(content_text, str) and content_text not in ['', ' ']:
-        content.append({
-            'type': 'text',
-            'data': {'text': content_text}
-        })
+        content_text, _ = _strip_qq_face_tags(content_text)
+        if content_text not in ['', ' ']:
+            content.append({
+                'type': 'text',
+                'data': {'text': content_text}
+            })
     ark_data = element.get('ark_data', None)
     if isinstance(ark_data, dict):
         try:
@@ -931,10 +974,12 @@ def _get_qq_forward_text_node(block, attachment_state):
     message_text = _get_qq_forward_text_field(block, '消息内容')
     content_segments = []
     if message_text is not None:
-        content_segments.append({
-            'type': 'text',
-            'data': {'text': message_text}
-        })
+        message_text, _ = _strip_qq_face_tags(message_text)
+        if message_text != '':
+            content_segments.append({
+                'type': 'text',
+                'data': {'text': message_text}
+            })
     attachment_matches = list(re.finditer(
         r'(?m)^[ \t]*\[附件\d+\][ \t]*(.*)$',
         block
@@ -1307,6 +1352,9 @@ def _get_qq_message_event_extend(event_type, event_data):
         'qq_at_bot_known': event_type != 'GROUP_MESSAGE_CREATE',
         'qq_raw_content': result.get('qq_content', None)
     })
+    _, face_data = _strip_qq_face_tags(result.get('qq_content', None))
+    if len(face_data) > 0:
+        result['qq_face_data'] = face_data
     if 'id' in event_data:
         # 保留既有消息专用名称；qq_id 则由通用入口提供。
         result['qq_message_id'] = result.get('qq_id', event_data['id'])
@@ -2069,6 +2117,7 @@ def get_Event_from_SDK(target_event):
         author = event_data.get('author', {})
         message_obj = None
         message_content = event_data.get('content', None)
+        message_content, _ = _strip_qq_face_tags(message_content)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
@@ -2221,17 +2270,18 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
+        message_content, _ = _strip_qq_face_tags(event_data.get('content', None))
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
                 [structured_message_para]
             )
-        elif 'content' in event_data:
-            if event_data['content'] != '':
+        elif message_content is not None:
+            if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuildv2_string',
-                    event_data['content']
+                    message_content
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -2336,6 +2386,7 @@ def get_Event_from_SDK(target_event):
     ]:
         author = event_data.get('author', {})
         message_content = event_data.get('content', None)
+        message_content, _ = _strip_qq_face_tags(message_content)
         message_obj = None
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
@@ -2448,17 +2499,18 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
+        message_content, _ = _strip_qq_face_tags(event_data.get('content', None))
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
                 [structured_message_para]
             )
-        elif 'content' in event_data:
-            if event_data['content'] != '':
+        elif message_content is not None:
+            if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    event_data['content'].lstrip(' ')
+                    message_content.lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
