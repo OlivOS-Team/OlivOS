@@ -566,6 +566,27 @@ class Message_templet(object):
                         tmp_para_this = PARA.face(
                             id=str(self.get_from_dict(tmp_code_data_dict, ['id']))
                         )
+                    elif tmp_data_type_key == 'mface':
+                        tmp_para_this = PARA.mface(
+                            emoji_package_id=self.get_from_dict(
+                                tmp_code_data_dict, ['emoji_package_id'], None
+                            ),
+                            emoji_id=self.get_from_dict(
+                                tmp_code_data_dict, ['emoji_id'], None
+                            ),
+                            key=self.get_from_dict(tmp_code_data_dict, ['key'], None),
+                            summary=self.get_from_dict(
+                                tmp_code_data_dict, ['summary'], None
+                            ),
+                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None),
+                            face_type=self.get_from_dict(
+                                tmp_code_data_dict, ['face_type'], None
+                            ),
+                            face_id=self.get_from_dict(
+                                tmp_code_data_dict, ['face_id'], None
+                            ),
+                            ext=self.get_from_dict(tmp_code_data_dict, ['ext'], None)
+                        )
                     elif tmp_data_type_key == 'at':
                         if code_key == 'CQ':
                             tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
@@ -1149,6 +1170,54 @@ class PARA(object):
         class data_T(dict):
             def __init__(self, id):
                 self['id'] = id
+
+    class mface(PARA_templet):
+        def __init__(
+            self,
+            emoji_package_id=None,
+            emoji_id=None,
+            key=None,
+            summary=None,
+            url=None,
+            face_type=None,
+            face_id=None,
+            ext=None
+        ):
+            PARA_templet.__init__(
+                self,
+                'mface',
+                self.data_T(
+                    emoji_package_id,
+                    emoji_id,
+                    key,
+                    summary,
+                    url,
+                    face_type,
+                    face_id,
+                    ext
+                )
+            )
+
+        class data_T(dict):
+            def __init__(
+                self,
+                emoji_package_id,
+                emoji_id,
+                key,
+                summary,
+                url,
+                face_type,
+                face_id,
+                ext
+            ):
+                self['emoji_package_id'] = emoji_package_id
+                self['emoji_id'] = emoji_id
+                self['key'] = key
+                self['summary'] = summary
+                self['url'] = url
+                self['face_type'] = face_type
+                self['face_id'] = face_id
+                self['ext'] = ext
 
     class image(PARA_templet):
         def __init__(self, file, type=None, url=None, cache=None, proxy=None, timeout=None):

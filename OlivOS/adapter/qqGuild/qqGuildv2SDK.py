@@ -698,6 +698,27 @@ def _get_qq_message_content(event_data):
     return _strip_qq_face_tags(event_data.get('content', None))
 
 
+def _get_qq_mface_data(face_item):
+    if not isinstance(face_item, dict):
+        return None
+    mface_data = {}
+    for key in ['face_type', 'face_id', 'ext']:
+        if face_item.get(key, None) is not None:
+            mface_data[key] = str(face_item[key])
+    return mface_data if len(mface_data) > 0 else None
+
+
+def _get_qq_mface_fallback_data(face_data, image_count):
+    if not isinstance(face_data, list):
+        return []
+    fallback_data = []
+    for face_item in face_data[max(0, image_count):]:
+        mface_data = _get_qq_mface_data(face_item)
+        if mface_data is not None:
+            fallback_data.append(mface_data)
+    return fallback_data
+
+
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
 def _get_attachment_url(attachment):
     attachment_url = attachment.get('url', None)
@@ -748,15 +769,30 @@ def _get_message_attachments(attachments):
     return message_list
 
 
-def _append_qq_message_attachments(message_obj, attachments, skip=False):
+def _append_qq_message_attachments(
+    message_obj,
+    attachments,
+    face_data=None,
+    skip=False
+):
     if skip:
         return
     attachment_data = _get_message_attachments(attachments)
-    if len(attachment_data) == 0:
+    image_count = sum(
+        isinstance(attachment, OlivOS.messageAPI.PARA.image)
+        for attachment in attachment_data
+    )
+    fallback_data = _get_qq_mface_fallback_data(face_data, image_count)
+    mface_data = [
+        OlivOS.messageAPI.PARA.mface(**face_item)
+        for face_item in fallback_data
+    ]
+    message_data = attachment_data + mface_data
+    if len(message_data) == 0:
         return
-    message_obj.data.extend(attachment_data)
+    message_obj.data.extend(message_data)
     if isinstance(message_obj.data_raw, list):
-        message_obj.data_raw.extend(copy.deepcopy(attachment_data))
+        message_obj.data_raw.extend(copy.deepcopy(message_data))
 
 
 def _get_qq_message_type(event_data):
@@ -806,8 +842,9 @@ def _get_qq_forward_element_content(element):
         return []
     content = []
     content_text = element.get('content', None)
+    face_data = []
     if isinstance(content_text, str) and content_text not in ['', ' ']:
-        content_text, _ = _strip_qq_face_tags(content_text)
+        content_text, face_data = _strip_qq_face_tags(content_text)
         if content_text not in ['', ' ']:
             content.append({
                 'type': 'text',
@@ -832,6 +869,16 @@ def _get_qq_forward_element_content(element):
         segment = _get_qq_attachment_message_segment(attachment)
         if segment is not None:
             content.append(segment)
+    image_count = sum(
+        segment.get('type', None) == 'image'
+        for segment in content
+        if isinstance(segment, dict)
+    )
+    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
+        content.append({
+            'type': 'mface',
+            'data': mface_data
+        })
     nested_elements = element.get('msg_elements', None)
     if isinstance(nested_elements, list):
         for nested_element in nested_elements:
@@ -982,8 +1029,9 @@ def _get_qq_forward_text_node(block, attachment_state):
     sender_name = _get_qq_forward_text_field(block, '发送者')
     message_text = _get_qq_forward_text_field(block, '消息内容')
     content_segments = []
+    face_data = []
     if message_text is not None:
-        message_text, _ = _strip_qq_face_tags(message_text)
+        message_text, face_data = _strip_qq_face_tags(message_text)
         if message_text != '':
             content_segments.append({
                 'type': 'text',
@@ -1002,6 +1050,16 @@ def _get_qq_forward_text_node(block, attachment_state):
             attachment_state['index'] += 1
         if segment is not None:
             content_segments.append(segment)
+    image_count = sum(
+        segment.get('type', None) == 'image'
+        for segment in content_segments
+        if isinstance(segment, dict)
+    )
+    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
+        content_segments.append({
+            'type': 'mface',
+            'data': mface_data
+        })
     if not content_segments and block != '':
         content_segments.append({
             'type': 'text',
@@ -2160,6 +2218,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2307,6 +2366,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2423,6 +2483,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2535,6 +2596,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
