@@ -1862,6 +1862,23 @@ class Event(object):
         elif self.platform['sdk'] == 'milky':
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_group_system_msg(self, count)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            target_data = getattr(self, 'data', None)
+            extend_data = getattr(target_data, 'extend', None)
+            if (
+                isinstance(extend_data, dict)
+                and extend_data.get('flag_from_qq', False)
+                and not extend_data.get('flag_from_direct', False)
+                and getattr(target_data, 'group_id', None) is not None
+            ):
+                res_data = (
+                    OlivOS.qqGuildv2SDK.event_action
+                    .get_qq_group_join_request_list_standard(
+                        self,
+                        target_data.group_id,
+                        count
+                    )
+                )
         return res_data
 
     def get_group_system_msg(self, count: int = 50, flag_log: bool = True, remote: bool = False):
@@ -1869,14 +1886,14 @@ class Event(object):
 
         用于获取群系统消息（包括加群申请和邀请）
 
-        支持平台：OneBotV11
+        支持平台：OneBotV11、QQ官方/V2
         支持协议：NapCat、LLOneBot
         - LLOneBot 使用 GET 方法，不支持 count 参数
         - NapCat 使用 POST 方法，支持 count 参数
         - LLOneBot 的已过滤请求也在此接口查看
 
         Args:
-            count: 获取数量（仅NapCat支持） (default: 50)
+            count: 获取数量（NapCat、QQ官方/V2支持） (default: 50)
 
         Returns:
             invited_requests (list): 邀请加群申请列表，Defaults to []
@@ -2167,11 +2184,19 @@ class Event(object):
                 tmp_host_id = self.data.host_id
             OlivOS.xiaoheiheSDK.event_action.set_group_ban(self, tmp_host_id, user_id, duration)
         elif self.platform['sdk'] == 'qqGuildv2_link':
-            # QQ 频道禁言使用 guild_id；QQ 群没有对应的官方成员禁言接口。
+            target_data = getattr(self, 'data', None)
             tmp_host_id = host_id
-            if tmp_host_id is None and hasattr(self.data, 'host_id'):
-                tmp_host_id = self.data.host_id
-            if tmp_host_id is not None:
+            if tmp_host_id is None:
+                tmp_host_id = getattr(target_data, 'host_id', None)
+            if tmp_host_id is None:
+                OlivOS.qqGuildv2SDK.event_action.set_qq_group_member_mute(
+                    self,
+                    group_id,
+                    user_id,
+                    duration
+                )
+            else:
+                # 频道禁言接口使用 guild_id，而通用 API 的 host_id 即频道 ID。
                 OlivOS.qqGuildv2SDK.event_action.set_guild_member_mute(
                     self,
                     tmp_host_id,
@@ -2593,6 +2618,14 @@ class Event(object):
                 OlivOS.milkySDK.event_action.set_group_add_request(
                     self, flag, sub_type, approve, reason
                 )
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            OlivOS.qqGuildv2SDK.event_action.set_group_add_request(
+                self,
+                flag,
+                sub_type,
+                approve,
+                reason
+            )
 
     def set_group_add_request(self, flag: str, sub_type: str, approve: bool, reason: str, flag_log: bool = True,
                               remote: bool = False):
@@ -2908,7 +2941,12 @@ class Event(object):
             if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
                 res_data = OlivOS.milkySDK.event_action.get_group_member_info(self, group_id, user_id)
         elif self.platform['sdk'] == 'qqGuildv2_link':
-            res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_info(self, group_id, user_id)
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_info(
+                self,
+                group_id,
+                user_id,
+                no_cache=no_cache
+            )
         return res_data
 
     def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,

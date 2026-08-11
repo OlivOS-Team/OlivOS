@@ -27,7 +27,7 @@ import traceback
 import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from urllib import parse
 
@@ -58,9 +58,9 @@ class intents_T(IntEnum):
 
 
 sdkAPIHost = {
-    'default': 'https://api.sgroup.qq.com',
-    'sandbox': 'https://sandbox.api.sgroup.qq.com',
-    'bots': 'https://bots.qq.com'
+    'default': 'https://api.bot.qq.com',
+    'sandbox': 'https://api.bot.qq.com',
+    'bots': 'https://api.bot.qq.com'
 }
 
 sdkAPIRoute = {
@@ -82,7 +82,9 @@ sdkAPIRouteTemp = {
     'user_id': '-1',
     'openid': '-1',
     'group_openid': '-1',
-    'message_id': '-1'
+    'message_id': '-1',
+    'member_openid': '-1',
+    'strategy_id': '-1'
 }
 
 sdkSubSelfInfo = {}
@@ -122,6 +124,10 @@ sdkResourceUploadBlockSize = 5 * 1024 * 1024  # 预上传未返回分块大小�
 sdkResourceUploadPartTimeout = 120.0  # 单个分片 PUT 的请求超时
 sdkResourceUploadPartRetryMax = 3  # 单个分片的最大尝试次数
 sdkResourceUploadPartMaxConcurrency = 8  # 分片并发上限,防御平台下发异常并发数
+sdkGroupRestrictChatInfo = {}
+sdkGroupRestrictChatInfoLock = threading.Lock()
+sdkGroupRestrictChatInfoTTL = 30.0
+sdkGroupRestrictChatInfoMaxSize = 100
 
 qqMessageEventTypes = {
     'MESSAGE_CREATE',
@@ -178,6 +184,7 @@ qqDispatchEventTypes = (
         'GROUP_DEL_ROBOT',
         'GROUP_MEMBER_ADD',
         'GROUP_MEMBER_REMOVE',
+        'GROUP_JOIN_REQUEST',
         'READY'
     }
 )
@@ -648,6 +655,77 @@ class event(object):
             self.base_info['post_type'] = None
 
 
+# QQ 消息会把表情编码成正文前缀,正文不应把该平台标记原样暴露给插件。
+qqFaceTagPattern = re.compile(
+    r'<faceType\s*=\s*(?P<face_type>[^,>]+)\s*,\s*faceId\s*=\s*'
+    r'(?P<face_id>"[^"]*"|\'[^\']*\'|[^,\s>]+)'
+    r'(?P<extra>(?:,[^>]*)?)\s*/?>'
+)
+qqFaceAttributePattern = re.compile(
+    r'(?:^|,)\s*(?P<key>[A-Za-z_][\w-]*)\s*=\s*'
+    r'(?P<value>"[^"]*"|\'[^\']*\'|[^,>]*)'
+)
+
+
+def _unquote_qq_face_value(value):
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ['"', "'"]:
+        return value[1:-1]
+    return value
+
+
+def _strip_qq_face_tags(content):
+    """移除 QQ 原始表情标签,同时返回可供 extend 使用的结构化信息。"""
+    if content is None:
+        return None, []
+    if not isinstance(content, str):
+        return '', []
+    face_data = []
+
+    def replace_face_tag(match):
+        face_item = {
+            'face_type': _unquote_qq_face_value(match.group('face_type')),
+            'face_id': _unquote_qq_face_value(match.group('face_id')),
+            'raw': match.group(0)
+        }
+        for attribute_match in qqFaceAttributePattern.finditer(match.group('extra')):
+            face_item[attribute_match.group('key')] = _unquote_qq_face_value(
+                attribute_match.group('value')
+            )
+        face_data.append(face_item)
+        return ''
+
+    return qqFaceTagPattern.sub(replace_face_tag, content), face_data
+
+
+def _get_qq_message_content(event_data):
+    """统一取得清理后的消息正文及 QQ 表情扩展数据。"""
+    if not isinstance(event_data, dict):
+        return None, []
+    return _strip_qq_face_tags(event_data.get('content', None))
+
+
+def _get_qq_mface_data(face_item):
+    if not isinstance(face_item, dict):
+        return None
+    mface_data = {}
+    for key in ['face_type', 'face_id', 'ext']:
+        if face_item.get(key, None) is not None:
+            mface_data[key] = str(face_item[key])
+    return mface_data if len(mface_data) > 0 else None
+
+
+def _get_qq_mface_fallback_data(face_data, image_count):
+    if not isinstance(face_data, list):
+        return []
+    fallback_data = []
+    for face_item in face_data[max(0, image_count):]:
+        mface_data = _get_qq_mface_data(face_item)
+        if mface_data is not None:
+            fallback_data.append(mface_data)
+    return fallback_data
+
+
 # 将 QQ 事件中的附件地址规范化为 OlivOS 可直接使用的 URL
 def _get_attachment_url(attachment):
     attachment_url = attachment.get('url', None)
@@ -698,15 +776,30 @@ def _get_message_attachments(attachments):
     return message_list
 
 
-def _append_qq_message_attachments(message_obj, attachments, skip=False):
+def _append_qq_message_attachments(
+    message_obj,
+    attachments,
+    face_data=None,
+    skip=False
+):
     if skip:
         return
     attachment_data = _get_message_attachments(attachments)
-    if len(attachment_data) == 0:
+    image_count = sum(
+        isinstance(attachment, OlivOS.messageAPI.PARA.image)
+        for attachment in attachment_data
+    )
+    fallback_data = _get_qq_mface_fallback_data(face_data, image_count)
+    mface_data = [
+        OlivOS.messageAPI.PARA.mface(**face_item)
+        for face_item in fallback_data
+    ]
+    message_data = attachment_data + mface_data
+    if len(message_data) == 0:
         return
-    message_obj.data.extend(attachment_data)
+    message_obj.data.extend(message_data)
     if isinstance(message_obj.data_raw, list):
-        message_obj.data_raw.extend(copy.deepcopy(attachment_data))
+        message_obj.data_raw.extend(copy.deepcopy(message_data))
 
 
 def _get_qq_message_type(event_data):
@@ -756,11 +849,14 @@ def _get_qq_forward_element_content(element):
         return []
     content = []
     content_text = element.get('content', None)
+    face_data = []
     if isinstance(content_text, str) and content_text not in ['', ' ']:
-        content.append({
-            'type': 'text',
-            'data': {'text': content_text}
-        })
+        content_text, face_data = _strip_qq_face_tags(content_text)
+        if content_text not in ['', ' ']:
+            content.append({
+                'type': 'text',
+                'data': {'text': content_text}
+            })
     ark_data = element.get('ark_data', None)
     if isinstance(ark_data, dict):
         try:
@@ -780,6 +876,16 @@ def _get_qq_forward_element_content(element):
         segment = _get_qq_attachment_message_segment(attachment)
         if segment is not None:
             content.append(segment)
+    image_count = sum(
+        segment.get('type', None) == 'image'
+        for segment in content
+        if isinstance(segment, dict)
+    )
+    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
+        content.append({
+            'type': 'mface',
+            'data': mface_data
+        })
     nested_elements = element.get('msg_elements', None)
     if isinstance(nested_elements, list):
         for nested_element in nested_elements:
@@ -930,11 +1036,14 @@ def _get_qq_forward_text_node(block, attachment_state):
     sender_name = _get_qq_forward_text_field(block, '发送者')
     message_text = _get_qq_forward_text_field(block, '消息内容')
     content_segments = []
+    face_data = []
     if message_text is not None:
-        content_segments.append({
-            'type': 'text',
-            'data': {'text': message_text}
-        })
+        message_text, face_data = _strip_qq_face_tags(message_text)
+        if message_text != '':
+            content_segments.append({
+                'type': 'text',
+                'data': {'text': message_text}
+            })
     attachment_matches = list(re.finditer(
         r'(?m)^[ \t]*\[附件\d+\][ \t]*(.*)$',
         block
@@ -948,6 +1057,16 @@ def _get_qq_forward_text_node(block, attachment_state):
             attachment_state['index'] += 1
         if segment is not None:
             content_segments.append(segment)
+    image_count = sum(
+        segment.get('type', None) == 'image'
+        for segment in content_segments
+        if isinstance(segment, dict)
+    )
+    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
+        content_segments.append({
+            'type': 'mface',
+            'data': mface_data
+        })
     if not content_segments and block != '':
         content_segments.append({
             'type': 'text',
@@ -1292,7 +1411,7 @@ def _get_qq_event_extend(event_type, event_data):
     return result
 
 
-def _get_qq_message_event_extend(event_type, event_data):
+def _get_qq_message_event_extend(event_type, event_data, face_data=None):
     if not isinstance(event_data, dict):
         event_data = {}
     result = _get_qq_event_extend(event_type, event_data)
@@ -1307,6 +1426,10 @@ def _get_qq_message_event_extend(event_type, event_data):
         'qq_at_bot_known': event_type != 'GROUP_MESSAGE_CREATE',
         'qq_raw_content': result.get('qq_content', None)
     })
+    if face_data is None:
+        _, face_data = _get_qq_message_content(event_data)
+    if len(face_data) > 0:
+        result['qq_face_data'] = copy.deepcopy(face_data)
     if 'id' in event_data:
         # 保留既有消息专用名称；qq_id 则由通用入口提供。
         result['qq_message_id'] = result.get('qq_id', event_data['id'])
@@ -1879,17 +2002,26 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
 
 
 def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
-    if event_type not in qqMessageEventTypes or not isinstance(event_data, dict):
+    if not isinstance(event_data, dict):
         return None
-    message_id = event_data.get('id', None)
-    if message_id is None or str(message_id) == '':
+    if event_type in qqMessageEventTypes:
+        event_data_id = event_data.get('id', None)
+        scene_ext = _parse_qq_message_scene_ext(
+            event_data.get('message_scene', None)
+        )
+        event_data_index = scene_ext.get('msg_idx', '')
+    elif event_type == 'GROUP_JOIN_REQUEST':
+        event_data_id = event_data.get('join_request_id', None)
+        event_data_index = event_data.get('group_openid', '')
+    else:
         return None
-    scene_ext = _parse_qq_message_scene_ext(event_data.get('message_scene', None))
+    if event_data_id is None or str(event_data_id) == '':
+        return None
     return (
         str(bot_id),
         str(event_type),
-        str(message_id),
-        str(scene_ext.get('msg_idx', ''))
+        str(event_data_id),
+        str(event_data_index)
     )
 
 
@@ -1950,6 +2082,61 @@ def _set_qq_group_member_event(
         'flag_from_qq': True,
         'timestamp': event_data.get('timestamp', None)
     }
+
+
+def _get_qq_join_request_comment(event_data):
+    if not isinstance(event_data, dict):
+        return ''
+    verify_info = event_data.get('verify_info', None)
+    if not isinstance(verify_info, dict):
+        return ''
+    verify_message = verify_info.get('verify_message', None)
+    if isinstance(verify_message, str) and verify_message != '':
+        return verify_message
+    review_qa_list = verify_info.get('review_qa_list', None)
+    if not isinstance(review_qa_list, list):
+        return ''
+    comment_lines = []
+    for review_qa in review_qa_list:
+        if not isinstance(review_qa, dict):
+            continue
+        question = review_qa.get('question', '')
+        answer = review_qa.get('answer', '')
+        comment_lines.append('%s: %s' % (str(question), str(answer)))
+    return '\n'.join(comment_lines)
+
+
+def _make_qq_join_request_flag(group_openid, member_openid, join_request_id):
+    return json.dumps(
+        {
+            'group_openid': None if group_openid is None else str(group_openid),
+            'member_openid': None if member_openid is None else str(member_openid),
+            'join_request_id': (
+                None if join_request_id is None else str(join_request_id)
+            )
+        },
+        ensure_ascii=False,
+        separators=(',', ':')
+    )
+
+
+def _parse_qq_join_request_flag(flag):
+    if isinstance(flag, dict):
+        flag_data = flag
+    else:
+        try:
+            flag_data = json.loads(str(flag))
+        except (TypeError, ValueError):
+            return None
+    if not isinstance(flag_data, dict):
+        return None
+    result = {}
+    for field_name in ['group_openid', 'member_openid', 'join_request_id']:
+        field_value = flag_data.get(field_name, None)
+        if field_value is None or str(field_value) == '':
+            return None
+        result[field_name] = str(field_value)
+    return result
 
 
 def get_Event_from_SDK(target_event):
@@ -2038,6 +2225,50 @@ def get_Event_from_SDK(target_event):
             member_openid,
             'approve' if flag_increase else 'leave'
         )
+    elif target_event.sdk_event.payload.data.t == 'GROUP_JOIN_REQUEST':
+        group_openid = event_data.get('group_openid', None)
+        member_openid = event_data.get('member_openid', None)
+        join_request_id = event_data.get('join_request_id', None)
+        if all(
+            field_value is not None and str(field_value) != ''
+            for field_value in [group_openid, member_openid, join_request_id]
+        ):
+            group_openid = str(group_openid)
+            member_openid = str(member_openid)
+            _register_qq_user_info(
+                plugin_event_bot_hash,
+                {
+                    'member_openid': member_openid,
+                    'union_openid': event_data.get('union_openid', None),
+                    'username': event_data.get('username', None),
+                    'bot': event_data.get('bot', None)
+                },
+                chat_type='qq_group',
+                chat_id=group_openid
+            )
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'group_add_request'
+            target_event.data = target_event.group_add_request(
+                group_openid,
+                member_openid,
+                _get_qq_join_request_comment(event_data)
+            )
+            target_event.data.flag = _make_qq_join_request_flag(
+                group_openid,
+                member_openid,
+                join_request_id
+            )
+            target_event.data.extend = {
+                'flag_from_qq': True,
+                'flag_from_direct': False,
+                'group_id': group_openid,
+                'host_group_id': None,
+                'qq_apply_source': event_data.get('apply_source', None),
+                'qq_invited_by': event_data.get('invited_by', None),
+                'qq_auto_approved': copy.deepcopy(
+                    event_data.get('auto_approved', None)
+                )
+            }
     elif target_event.sdk_event.payload.data.t == 'FRIEND_ADD':
         user_openid = event_data.get('openid', None)
         if user_openid is not None and str(user_openid) != '':
@@ -2068,7 +2299,7 @@ def get_Event_from_SDK(target_event):
     ]:
         author = event_data.get('author', {})
         message_obj = None
-        message_content = event_data.get('content', None)
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
         if (
@@ -2102,6 +2333,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2196,7 +2428,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = True
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2221,17 +2453,18 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
                 [structured_message_para]
             )
-        elif 'content' in event_data:
-            if event_data['content'] != '':
+        elif message_content is not None:
+            if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuildv2_string',
-                    event_data['content']
+                    message_content
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -2248,6 +2481,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2310,7 +2544,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = True
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2335,7 +2569,7 @@ def get_Event_from_SDK(target_event):
         'AT_MESSAGE_CREATE'
     ]:
         author = event_data.get('author', {})
-        message_content = event_data.get('content', None)
+        message_content, face_data = _get_qq_message_content(event_data)
         message_obj = None
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
@@ -2364,6 +2598,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2427,7 +2662,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -2448,17 +2683,18 @@ def get_Event_from_SDK(target_event):
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
         message_obj = None
+        message_content, face_data = _get_qq_message_content(event_data)
         structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         if structured_message_para is not None:
             message_obj = OlivOS.messageAPI.Message_templet(
                 'olivos_para',
                 [structured_message_para]
             )
-        elif 'content' in event_data:
-            if event_data['content'] != '':
+        elif message_content is not None:
+            if message_content != '':
                 message_obj = OlivOS.messageAPI.Message_templet(
                     'qqGuild_string',
-                    event_data['content'].lstrip(' ')
+                    message_content.lstrip(' ')
                 )
                 message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
                 message_obj.data_raw = message_obj.data.copy()
@@ -2475,6 +2711,7 @@ def get_Event_from_SDK(target_event):
         _append_qq_message_attachments(
             message_obj,
             event_data.get('attachments', None),
+            face_data=face_data,
             skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
         )
         if message_obj.active:
@@ -2528,7 +2765,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['flag_from_qq'] = False
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
-                _get_qq_message_event_extend(event_type, event_data)
+                _get_qq_message_event_extend(event_type, event_data, face_data)
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -3486,7 +3723,8 @@ class event_action(object):
         msg_id=None,
         event_id=None,
         keyboard=None,
-        quote_msg_id=None
+        quote_msg_id=None,
+        force_verify_image_resource=None
     ):
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         res_data['data']['chat_type'] = str(chat_type)
@@ -3516,6 +3754,36 @@ class event_action(object):
         if 'params' in markdown and type(markdown['params']) is not list:
             res_data['data']['error'] = 'markdown params must be a list'
             return res_data
+        if (
+            'force_verify_image_resource' in markdown
+            and type(markdown['force_verify_image_resource']) is not bool
+        ):
+            res_data['data']['error'] = (
+                'markdown force_verify_image_resource must be a boolean'
+            )
+            return res_data
+        if (
+            force_verify_image_resource is not None
+            and type(force_verify_image_resource) is not bool
+        ):
+            res_data['data']['error'] = (
+                'force_verify_image_resource must be a boolean'
+            )
+            return res_data
+        if (
+            chat_type not in ['qq_group', 'qq_private']
+            and (
+                'force_verify_image_resource' in markdown
+                or force_verify_image_resource is not None
+            )
+        ):
+            res_data['data']['error'] = (
+                'force_verify_image_resource only supports qq_group and qq_private'
+            )
+            return res_data
+        markdown = copy.deepcopy(markdown)
+        if force_verify_image_resource is not None:
+            markdown['force_verify_image_resource'] = force_verify_image_resource
         keyboard_error = event_action._validate_keyboard_permissions(keyboard, chat_type)
         if keyboard_error is not None:
             res_data['data']['error'] = keyboard_error
@@ -4793,6 +5061,379 @@ class event_action(object):
         this_msg.metadata.group_openid = str(group_openid)
         return event_action._run_raw_api(this_msg, 'get_qq_group_bot_state', 'GET')
 
+    def get_qq_group_restrict_chat_setting(target_event, group_openid):
+        this_msg = API.getQQGroupRestrictChatSetting(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.group_openid = str(group_openid)
+        return event_action._run_raw_api(
+            this_msg,
+            'get_qq_group_restrict_chat_setting',
+            'GET'
+        )
+
+    def _get_qq_group_restrict_chat_setting_cached(
+        target_event,
+        group_openid,
+        no_cache=False
+    ):
+        cache_key = (
+            str(target_event.bot_info.hash),
+            str(group_openid)
+        )
+        now = time.monotonic()
+        if not no_cache:
+            with sdkGroupRestrictChatInfoLock:
+                cache_data = sdkGroupRestrictChatInfo.get(cache_key, None)
+                if (
+                    isinstance(cache_data, dict)
+                    and now - cache_data.get('cached_at', 0)
+                    < sdkGroupRestrictChatInfoTTL
+                ):
+                    return copy.deepcopy(cache_data.get('result', None))
+                sdkGroupRestrictChatInfo.pop(cache_key, None)
+
+        raw_result = event_action.get_qq_group_restrict_chat_setting(
+            target_event,
+            group_openid
+        )
+        if (
+            isinstance(raw_result, dict)
+            and raw_result.get('active', False)
+            and isinstance(event_action._raw_response(raw_result), dict)
+        ):
+            with sdkGroupRestrictChatInfoLock:
+                expired_keys = [
+                    this_key
+                    for this_key, this_data in sdkGroupRestrictChatInfo.items()
+                    if now - this_data.get('cached_at', 0)
+                    >= sdkGroupRestrictChatInfoTTL
+                ]
+                for expired_key in expired_keys:
+                    sdkGroupRestrictChatInfo.pop(expired_key, None)
+                if (
+                    cache_key not in sdkGroupRestrictChatInfo
+                    and len(sdkGroupRestrictChatInfo)
+                    >= sdkGroupRestrictChatInfoMaxSize
+                ):
+                    oldest_key = min(
+                        sdkGroupRestrictChatInfo,
+                        key=lambda this_key: sdkGroupRestrictChatInfo[
+                            this_key
+                        ].get('cached_at', 0)
+                    )
+                    sdkGroupRestrictChatInfo.pop(oldest_key, None)
+                sdkGroupRestrictChatInfo[cache_key] = {
+                    'cached_at': now,
+                    'result': copy.deepcopy(raw_result)
+                }
+        return raw_result
+
+    def set_qq_group_restrict_chat_setting(target_event, group_openid, members):
+        this_msg = API.setQQGroupRestrictChatSetting(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.data.members = copy.deepcopy(members)
+        res_data = event_action._run_raw_api(
+            this_msg,
+            'set_qq_group_restrict_chat_setting',
+            'POST'
+        )
+        if res_data.get('active', False):
+            cache_key = (
+                str(target_event.bot_info.hash),
+                str(group_openid)
+            )
+            with sdkGroupRestrictChatInfoLock:
+                sdkGroupRestrictChatInfo.pop(cache_key, None)
+        return res_data
+
+    def get_qq_group_join_request_list(
+        target_event,
+        group_openid,
+        cursor=None,
+        limit=None
+    ):
+        this_msg = API.getQQGroupJoinRequestList(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.query = {'cursor': cursor, 'limit': limit}
+        return event_action._run_raw_api(
+            this_msg,
+            'get_qq_group_join_request_list',
+            'GET'
+        )
+
+    def approve_qq_group_join_request(
+        target_event,
+        group_openid,
+        member_openid,
+        op,
+        join_request_id=None,
+        reject_reason=None,
+        add_to_member_blacklist=None
+    ):
+        this_msg = API.approveQQGroupJoinRequest(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.metadata.member_openid = str(member_openid)
+        this_msg.data.op = str(op)
+        this_msg.data.join_request_id = (
+            None if join_request_id is None else str(join_request_id)
+        )
+        this_msg.data.reject_reason = reject_reason
+        this_msg.data.add_to_member_blacklist = add_to_member_blacklist
+        return event_action._run_raw_api(
+            this_msg,
+            'approve_qq_group_join_request',
+            'POST'
+        )
+
+    def get_qq_join_approval_strategy_list(
+        target_event,
+        cursor=None,
+        limit=None
+    ):
+        this_msg = API.getQQJoinApprovalStrategyList(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.query = {'cursor': cursor, 'limit': limit}
+        return event_action._run_raw_api(
+            this_msg,
+            'get_qq_join_approval_strategy_list',
+            'GET'
+        )
+
+    def create_qq_join_approval_strategy(
+        target_event,
+        group_openids=None,
+        group_ids=None,
+        is_enable=None,
+        expire_at=None,
+        remark=None
+    ):
+        this_msg = API.createQQJoinApprovalStrategy(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.data.group_openids = copy.deepcopy(group_openids)
+        this_msg.data.group_ids = copy.deepcopy(group_ids)
+        this_msg.data.is_enable = is_enable
+        this_msg.data.expire_at = expire_at
+        this_msg.data.remark = remark
+        return event_action._run_raw_api(
+            this_msg,
+            'create_qq_join_approval_strategy',
+            'POST'
+        )
+
+    def patch_qq_join_approval_strategy(
+        target_event,
+        strategy_id,
+        is_enable=None,
+        expire_at=None,
+        group_action=None,
+        remark=None
+    ):
+        this_msg = API.patchQQJoinApprovalStrategy(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.strategy_id = str(strategy_id)
+        this_msg.data.is_enable = is_enable
+        this_msg.data.expire_at = expire_at
+        this_msg.data.group_action = copy.deepcopy(group_action)
+        this_msg.data.remark = remark
+        return event_action._run_raw_api(
+            this_msg,
+            'patch_qq_join_approval_strategy',
+            'PATCH'
+        )
+
+    def delete_qq_join_approval_strategy(target_event, strategy_id):
+        this_msg = API.deleteQQJoinApprovalStrategy(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.strategy_id = str(strategy_id)
+        return event_action._run_raw_api(
+            this_msg,
+            'delete_qq_join_approval_strategy',
+            'DELETE'
+        )
+
+    def execute_qq_join_approval_strategy(target_event, strategy_id):
+        this_msg = API.executeQQJoinApprovalStrategy(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.strategy_id = str(strategy_id)
+        return event_action._run_raw_api(
+            this_msg,
+            'execute_qq_join_approval_strategy',
+            'POST'
+        )
+
+    def update_qq_join_approval_strategy_whitelist(
+        target_event,
+        strategy_id,
+        op,
+        whitelist_users
+    ):
+        this_msg = API.updateQQJoinApprovalStrategyWhitelist(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.strategy_id = str(strategy_id)
+        this_msg.data.op = str(op)
+        this_msg.data.whitelist_users = copy.deepcopy(whitelist_users)
+        return event_action._run_raw_api(
+            this_msg,
+            'update_qq_join_approval_strategy_whitelist',
+            'POST'
+        )
+
+    def _get_qq_group_member_mute_state(raw_result, member_openid):
+        response = event_action._raw_response(raw_result)
+        if not isinstance(response, dict):
+            return None
+        members = response.get('members', None)
+        if not isinstance(members, list):
+            return None
+        for member in members:
+            if (
+                isinstance(member, dict)
+                and str(member.get('member_openid', '')) == str(member_openid)
+            ):
+                return member
+        return None
+
+    def set_qq_group_member_mute(
+        target_event,
+        group_openid,
+        member_openid,
+        duration=1800
+    ):
+        try:
+            duration = int(duration)
+        except (TypeError, ValueError):
+            return event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'set_group_ban',
+                'duration must be an integer'
+            )
+        if duration <= 0:
+            operation = 'del'
+            mute_expire_at = ''
+        else:
+            mute_result = event_action.get_qq_group_restrict_chat_setting(
+                target_event,
+                group_openid
+            )
+            mute_state = event_action._get_qq_group_member_mute_state(
+                mute_result,
+                member_openid
+            )
+            operation = 'update' if mute_state is not None else 'add'
+            mute_expire_at = (
+                datetime.now(timezone.utc) + timedelta(seconds=duration)
+            ).isoformat(timespec='seconds')
+        return event_action.set_qq_group_restrict_chat_setting(
+            target_event,
+            group_openid,
+            [{
+                'op': operation,
+                'member_openid': str(member_openid),
+                'mute_expire_at': mute_expire_at
+            }]
+        )
+
+    def set_group_add_request(
+        target_event,
+        flag,
+        sub_type,
+        approve,
+        reason=None
+    ):
+        flag_data = _parse_qq_join_request_flag(flag)
+        if flag_data is None:
+            return event_action._make_local_result(
+                'qq_group',
+                None,
+                'set_group_add_request',
+                'invalid QQ group join request flag'
+            )
+        if sub_type not in ['add', 'invite']:
+            return event_action._make_local_result(
+                'qq_group',
+                flag_data['group_openid'],
+                'set_group_add_request',
+                'unsupported group request sub_type'
+            )
+        return event_action.approve_qq_group_join_request(
+            target_event,
+            flag_data['group_openid'],
+            flag_data['member_openid'],
+            'approve' if approve else 'decline',
+            join_request_id=flag_data['join_request_id'],
+            reject_reason=None if approve else reason
+        )
+
+    def get_qq_group_join_request_list_standard(
+        target_event,
+        group_openid,
+        count=50
+    ):
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_system_msg()
+        try:
+            limit = min(100, max(1, int(count)))
+        except (TypeError, ValueError):
+            limit = 50
+        raw_result = event_action.get_qq_group_join_request_list(
+            target_event,
+            group_openid,
+            limit=limit
+        )
+        response = event_action._raw_response(raw_result)
+        if (
+            not isinstance(raw_result, dict)
+            or not raw_result.get('active', False)
+            or not isinstance(response, dict)
+        ):
+            return res_data
+        request_list = response.get('list', None)
+        if not isinstance(request_list, list):
+            return res_data
+        res_data['active'] = True
+        res_data['data']['next_cursor'] = response.get('next_cursor', '')
+        res_data['data']['qq_response'] = copy.deepcopy(response)
+        for request_data in request_list:
+            if not isinstance(request_data, dict):
+                continue
+            member_openid = request_data.get('member_openid', None)
+            join_request_id = request_data.get('join_request_id', None)
+            if member_openid is None or join_request_id is None:
+                continue
+            request_item = copy.deepcopy(request_data)
+            request_item.update({
+                'request_id': str(join_request_id),
+                'group_id': str(group_openid),
+                'user_id': str(member_openid),
+                'comment': _get_qq_join_request_comment(request_data),
+                'flag': _make_qq_join_request_flag(
+                    group_openid,
+                    member_openid,
+                    join_request_id
+                ),
+                'sub_type': 'add',
+                'time': _parse_qq_message_timestamp(
+                    request_data.get('apply_at', None),
+                    default=0
+                ),
+                'extra': copy.deepcopy(request_data)
+            })
+            res_data['data']['join_requests'].append(request_item)
+        return res_data
+
     # ============ 用户信息(基于消息/事件积累的缓存) ============
     def get_stranger_info(target_event, user_id, no_cache=False):
         # 平台无"查用户资料"接口,数据来自消息/事件/mentions 积累的缓存;
@@ -4810,7 +5451,7 @@ class event_action(object):
                 res_data['data'][extra_key] = record.get(extra_key, None)
         return res_data
 
-    def get_group_member_info(target_event, group_id, user_id):
+    def get_group_member_info(target_event, group_id, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         record = _get_qq_user_info(target_event.bot_info.hash, user_id)
         if record is not None:
@@ -4824,6 +5465,46 @@ class event_action(object):
             res_data['data']['times']['last_sent_time'] = record.get('time', 0)
             for extra_key in ['member_openid', 'user_openid', 'union_openid']:
                 res_data['data'][extra_key] = record.get(extra_key, None)
+        target_data = getattr(target_event, 'data', None)
+        extend_data = getattr(target_data, 'extend', None)
+        if (
+            isinstance(extend_data, dict)
+            and extend_data.get('flag_from_qq', False)
+            and not extend_data.get('flag_from_direct', False)
+            and group_id is not None
+        ):
+            mute_result = (
+                event_action._get_qq_group_restrict_chat_setting_cached(
+                    target_event,
+                    group_id,
+                    no_cache=no_cache
+                )
+            )
+            mute_response = event_action._raw_response(mute_result)
+            mute_state = event_action._get_qq_group_member_mute_state(
+                mute_result,
+                user_id
+            )
+            if isinstance(mute_response, dict):
+                res_data['data']['qq_restrict_chat_setting'] = mute_response
+                res_data['data']['times']['shut_up_timestamp'] = 0
+            if mute_state is not None:
+                res_data['active'] = True
+                res_data['data']['name'] = mute_state.get(
+                    'username',
+                    res_data['data'].get('name', None)
+                )
+                res_data['data']['card'] = res_data['data']['name']
+                res_data['data']['id'] = str(user_id)
+                res_data['data']['user_id'] = str(user_id)
+                res_data['data']['group_id'] = str(group_id)
+                res_data['data']['times']['shut_up_timestamp'] = (
+                    _parse_qq_message_timestamp(
+                        mute_state.get('mute_expire_at', None),
+                        default=0
+                    )
+                )
+                res_data['data']['qq_mute_state'] = copy.deepcopy(mute_state)
         return res_data
 
     def get_user_info(target_event, user_id):
@@ -5616,6 +6297,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
         event_id=None,
         keyboard=None,
         quote_msg_id=None,
+        force_verify_image_resource=None,
         flag_log=True
     ):
         return OlivOS.qqGuildv2SDK.event_action.create_markdown_message(
@@ -5626,7 +6308,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
             msg_id=msg_id,
             event_id=event_id,
             keyboard=keyboard,
-            quote_msg_id=quote_msg_id
+            quote_msg_id=quote_msg_id,
+            force_verify_image_resource=force_verify_image_resource
         )
 
     def create_markdown_message(
@@ -5639,7 +6322,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
         keyboard=None,
         quote_msg_id=None,
         flag_log=True,
-        remote=False
+        remote=False,
+        force_verify_image_resource=None
     ):
         res_data = None
         if remote:
@@ -5654,9 +6338,211 @@ class inde_interface(OlivOS.API.inde_interface_T):
                 event_id=event_id,
                 keyboard=keyboard,
                 quote_msg_id=quote_msg_id,
+                force_verify_image_resource=force_verify_image_resource,
                 flag_log=flag_log
             )
         return res_data
+
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:group_management_api',
+        ['operation', 'http_status']
+    )
+    def __call_qq_group_api(
+        target_event,
+        action_name,
+        action_args=(),
+        action_kwargs=None,
+        flag_log=True
+    ):
+        if action_kwargs is None:
+            action_kwargs = {}
+        action_func = getattr(OlivOS.qqGuildv2SDK.event_action, action_name)
+        return action_func(target_event, *action_args, **action_kwargs)
+
+    def _call_qq_group_api(
+        self,
+        action_name,
+        action_args=(),
+        action_kwargs=None,
+        flag_log=True,
+        remote=False
+    ):
+        if remote:
+            return None
+        return inde_interface.__call_qq_group_api(
+            self.event,
+            action_name,
+            action_args=action_args,
+            action_kwargs=action_kwargs,
+            flag_log=flag_log
+        )
+
+    def get_qq_group_restrict_chat_setting(
+        self,
+        group_openid,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'get_qq_group_restrict_chat_setting',
+            (group_openid,),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def set_qq_group_restrict_chat_setting(
+        self,
+        group_openid,
+        members,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'set_qq_group_restrict_chat_setting',
+            (group_openid, members),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def get_qq_group_join_request_list(
+        self,
+        group_openid,
+        cursor=None,
+        limit=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'get_qq_group_join_request_list',
+            (group_openid,),
+            {'cursor': cursor, 'limit': limit},
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def approve_qq_group_join_request(
+        self,
+        group_openid,
+        member_openid,
+        op,
+        join_request_id=None,
+        reject_reason=None,
+        add_to_member_blacklist=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'approve_qq_group_join_request',
+            (group_openid, member_openid, op),
+            {
+                'join_request_id': join_request_id,
+                'reject_reason': reject_reason,
+                'add_to_member_blacklist': add_to_member_blacklist
+            },
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def get_qq_join_approval_strategy_list(
+        self,
+        cursor=None,
+        limit=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'get_qq_join_approval_strategy_list',
+            action_kwargs={'cursor': cursor, 'limit': limit},
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def create_qq_join_approval_strategy(
+        self,
+        group_openids=None,
+        group_ids=None,
+        is_enable=None,
+        expire_at=None,
+        remark=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'create_qq_join_approval_strategy',
+            action_kwargs={
+                'group_openids': group_openids,
+                'group_ids': group_ids,
+                'is_enable': is_enable,
+                'expire_at': expire_at,
+                'remark': remark
+            },
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def patch_qq_join_approval_strategy(
+        self,
+        strategy_id,
+        is_enable=None,
+        expire_at=None,
+        group_action=None,
+        remark=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'patch_qq_join_approval_strategy',
+            (strategy_id,),
+            {
+                'is_enable': is_enable,
+                'expire_at': expire_at,
+                'group_action': group_action,
+                'remark': remark
+            },
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def delete_qq_join_approval_strategy(
+        self,
+        strategy_id,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'delete_qq_join_approval_strategy',
+            (strategy_id,),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def execute_qq_join_approval_strategy(
+        self,
+        strategy_id,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'execute_qq_join_approval_strategy',
+            (strategy_id,),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def update_qq_join_approval_strategy_whitelist(
+        self,
+        strategy_id,
+        op,
+        whitelist_users,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'update_qq_join_approval_strategy_whitelist',
+            (strategy_id, op, whitelist_users),
+            flag_log=flag_log,
+            remote=remote
+        )
 
 
 class markdown_tag:
@@ -6890,6 +7776,194 @@ class API(object):
         class metadata_T(object):
             def __init__(self):
                 self.group_openid = '-1'
+
+    # GET /v2/groups/{group_openid}/restrict_chat_setting 查询群禁言状态
+    class getQQGroupRestrictChatSetting(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/{group_openid}/restrict_chat_setting'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+    # POST /v2/groups/{group_openid}/restrict_chat_setting 设置成员禁言
+    class setQQGroupRestrictChatSetting(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/{group_openid}/restrict_chat_setting'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.members = None  # list[SetMemberMuteState]
+
+    # GET /v2/groups/{group_openid}/join_request_list 拉取入群申请
+    class getQQGroupJoinRequestList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/{group_openid}/join_request_list'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+    # POST /v2/groups/{group_openid}/approval_join_request/{member_openid}
+    class approveQQGroupJoinRequest(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/{group_openid}/approval_join_request/{member_openid}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+                self.member_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.op = None
+                self.join_request_id = None
+                self.reject_reason = None
+                self.add_to_member_blacklist = None
+
+    # GET /v2/groups/join_approval_strategy 查询自动审批策略
+    class getQQJoinApprovalStrategyList(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/join_approval_strategy'
+
+    # POST /v2/groups/join_approval_strategy 创建自动审批策略
+    class createQQJoinApprovalStrategy(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/join_approval_strategy'
+
+        class data_T(object):
+            def __init__(self):
+                self.group_openids = None
+                self.group_ids = None
+                self.is_enable = None
+                self.expire_at = None
+                self.remark = None
+
+    # PATCH /v2/groups/join_approval_strategy/{strategy_id}
+    class patchQQJoinApprovalStrategy(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/join_approval_strategy/{strategy_id}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.strategy_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.is_enable = None
+                self.expire_at = None
+                self.group_action = None
+                self.remark = None
+
+    # DELETE /v2/groups/join_approval_strategy/{strategy_id}
+    class deleteQQJoinApprovalStrategy(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/join_approval_strategy/{strategy_id}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.strategy_id = '-1'
+
+    # POST /v2/groups/join_approval_strategy/{strategy_id}/execute
+    class executeQQJoinApprovalStrategy(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/join_approval_strategy/{strategy_id}/execute'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.strategy_id = '-1'
+
+    # POST /v2/groups/join_approval_strategy/{strategy_id}/whitelist_users
+    class updateQQJoinApprovalStrategyWhitelist(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/join_approval_strategy/{strategy_id}/whitelist_users'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.strategy_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.op = None
+                self.whitelist_users = None
 
     # ============ 消息发送 ============
     class sendMessage(api_templet):
