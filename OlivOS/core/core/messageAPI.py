@@ -650,13 +650,13 @@ class Message_templet(object):
                         )
                     elif tmp_data_type_key == 'music':
                         tmp_para_this = PARA.music(
-                            type=str(self.get_from_dict(tmp_code_data_dict, ['type'], '')),
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], '')),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], '')),
-                            audio=str(self.get_from_dict(tmp_code_data_dict, ['audio'], '')),
-                            title=str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
-                            content=str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
-                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                            type=self.get_from_dict(tmp_code_data_dict, ['type'], ''),
+                            id=self.get_from_dict(tmp_code_data_dict, ['id'], None),
+                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None),
+                            audio=self.get_from_dict(tmp_code_data_dict, ['audio'], None),
+                            title=self.get_from_dict(tmp_code_data_dict, ['title'], None),
+                            content=self.get_from_dict(tmp_code_data_dict, ['content'], None),
+                            image=self.get_from_dict(tmp_code_data_dict, ['image'], None)
                         )
                     elif tmp_data_type_key == 'forward':
                         tmp_para_this = PARA.forward(
