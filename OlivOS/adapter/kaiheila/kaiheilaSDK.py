@@ -1173,7 +1173,7 @@ class event_action(object):
         res_data['data'] = {}
         res_data['data']['chat_type'] = 'private' if flag_direct else 'group'
         res_data['data']['chat_id'] = str(chat_id)
-        res_data['data']['content_type'] = str(content_type)
+        res_data['data']['content_type'] = content_type
         res_data['data']['content'] = str(json.dumps(content, ensure_ascii=False))
         return res_data
 
