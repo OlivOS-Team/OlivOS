@@ -14,6 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import time
 import json
 import re
 
@@ -61,7 +62,17 @@ dictMessageType = {
             'napcat_show_old': 'old_string',
             'napcat_default': 'old_string',
             'llonebot_default': 'old_string',
-            'lagrange_default': 'old_string'
+            'lagrange_default': 'old_string',
+            'milky_default': 'milky_para_tx',
+            'llonebot_milky': 'milky_para_tx',
+            'lagrange_milky': 'milky_para_tx',
+            'yogurt_milky': 'milky_para_tx'
+        },
+        'milky': {
+            'default': 'milky_para_tx',
+            'yogurt_default': 'milky_para_tx',
+            'llonebot_default': 'milky_para_tx',
+            'lagrange_default': 'milky_para_tx'
         }
     },
     'qqGuild': {
@@ -77,6 +88,7 @@ dictMessageType = {
             'private': 'olivos_para',
             'private_intents': 'olivos_para',
             'public': 'olivos_para',
+            'public_guild_only': 'olivos_para',
             'public_intents': 'olivos_para'
         }
     },
@@ -225,7 +237,7 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.dodo()
-        elif get_type == 'qqGuild_string':
+        elif get_type in ['qqGuild_string', 'qqGuildv2_string']:
             res = ''
             for data_this in self.data:
                 res += data_this.OP()
@@ -237,6 +249,14 @@ class Message_templet(object):
             res = ''
             for data_this in self.data:
                 res += data_this.xiaoheihe()
+        elif get_type == 'milky_para_rx':
+            res = []
+            for data_this in self.data:
+                res.append(data_this.MILKY_RX())
+        elif get_type == 'milky_para_tx':
+            res = []
+            for data_this in self.data:
+                res.append(data_this.MILKY_TX())
         else:
             res = str(self)
         return res
@@ -255,13 +275,19 @@ class Message_templet(object):
         elif self.mode_rx == 'dodo_string':
             self.init_from_angle_code_string()
         elif self.mode_rx == 'qqGuild_string':
-            self.init_from_angle_code_string()
+            self.init_from_qq_guild_code_string()
+        elif self.mode_rx == 'qqGuildv2_string':
+            self.init_from_qq_guild_v2_code_string()
         elif self.mode_rx == 'kaiheila_string':
             self.init_from_kaiheila_code_string()
         elif self.mode_rx == 'discord_string':
             self.init_from_discord_code_string()
         elif self.mode_rx == 'xiaoheihe_string':
             self.init_from_xiaoheihe_string()
+        elif self.mode_rx == 'milky_para_rx':
+            self.init_from_milky_para_rx()
+        elif self.mode_rx == 'milky_para_tx':
+            self.init_from_milky_para_rx()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -374,6 +400,130 @@ class Message_templet(object):
         else:
             self.active = False
 
+    def init_from_milky_para_rx(self):
+        tmp_data = []
+        if isinstance(self.data_raw, list):
+            for data_raw_this in self.data_raw:
+                if not (
+                    isinstance(data_raw_this, dict)
+                    and 'type' in data_raw_this
+                    and 'data' in data_raw_this
+                ):
+                    continue
+                paraType = data_raw_this.get('type')
+                paraData = data_raw_this.get('data', {})
+                if paraType == 'text':
+                    text = paraData['text']
+                    tmp_para = PARA.text(text)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'mention':
+                    user_id = str(paraData['user_id'])
+                    name = paraData['name']
+                    tmp_para = PARA.at(id=user_id, name=name)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'mention_all':
+                    tmp_para = PARA.at(id='all')
+                    tmp_data.append(tmp_para)
+                elif paraType == 'face':
+                    face_id = paraData['face_id']
+                    tmp_para = PARA.face(id=face_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'reply':
+                    message_seq = paraData['message_seq']
+                    tmp_para = PARA.reply(id=message_seq)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'image':
+                    resource_id = paraData['resource_id']
+                    temp_url = paraData['temp_url']
+                    tmp_para = PARA.image(file=resource_id, url=temp_url)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'record':
+                    resource_id = paraData['resource_id']
+                    temp_url = paraData['temp_url']
+                    tmp_para = PARA.record(file=resource_id, url=temp_url)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'video':
+                    resource_id = paraData['resource_id']
+                    temp_url = paraData['temp_url']
+                    tmp_para = PARA.video(file=resource_id, url=temp_url)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'file':
+                    file_id = paraData['file_id']
+                    file_name = paraData['file_name']
+                    file_size = paraData['file_size']
+                    tmp_para = PARA.file(file=file_id, name=file_name, size=file_size)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'forward':
+                    forward_id = paraData['forward_id']
+                    tmp_para = PARA.forward(id=forward_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'light_app':
+                    app_name = paraData['app_name']
+                    json_payload = paraData['json_payload']
+                    tmp_para = PARA.json(data=json_payload, resid=app_name)
+                elif paraType == 'xml':
+                    service_id = paraData['service_id']
+                    xml_payload = paraData['xml_payload']
+                    tmp_para = PARA.xml(data=xml_payload, resid=service_id)
+                    tmp_data.append(tmp_para)
+            self.data = tmp_data
+        else:
+            self.active = False
+
+    def init_from_milky_para_tx(self):
+        tmp_data = []
+        if isinstance(self.data_raw, list):
+            for data_raw_this in self.data_raw:
+                if not (
+                    isinstance(data_raw_this, dict)
+                    and 'type' in data_raw_this
+                    and 'data' in data_raw_this
+                ):
+                    continue
+                paraType = data_raw_this.get('type')
+                paraData = data_raw_this.get('data', {})
+                if paraType == 'text':
+                    text = paraData['text']
+                    tmp_para = PARA.text(text)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'mention':
+                    user_id = str(paraData['user_id'])
+                    tmp_para = PARA.at(id=user_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'mention_all':
+                    tmp_para = PARA.at(id='all')
+                    tmp_data.append(tmp_para)
+                elif paraType == 'face':
+                    face_id = paraData['face_id']
+                    tmp_para = PARA.face(id=face_id)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'reply':
+                    message_seq = paraData['message_seq']
+                    tmp_para = PARA.reply(id=message_seq)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'image':
+                    uri = paraData['uri']
+                    sub_type = paraData['sub_type']
+                    tmp_para = PARA.image(file=uri, url=uri, type=sub_type)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'record':
+                    uri = paraData['uri']
+                    tmp_para = PARA.record(file=uri, url=uri)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'video':
+                    uri = paraData['uri']
+                    tmp_para = PARA.video(file=uri, url=uri)
+                    tmp_data.append(tmp_para)
+                elif paraType == 'forward':
+                    pass
+                elif paraType == 'light_app':
+                    app_name = paraData['app_name']
+                    json_payload = paraData['json_payload']
+                    tmp_para = PARA.json(data=json_payload, resid=app_name)
+            self.data = tmp_data
+        else:
+            self.active = False
+
     def init_from_code_string(self, code_key):
         tmp_data_raw = str(self.data_raw)
         tmp_data = []
@@ -416,6 +566,27 @@ class Message_templet(object):
                         tmp_para_this = PARA.face(
                             id=str(self.get_from_dict(tmp_code_data_dict, ['id']))
                         )
+                    elif tmp_data_type_key == 'mface':
+                        tmp_para_this = PARA.mface(
+                            emoji_package_id=self.get_from_dict(
+                                tmp_code_data_dict, ['emoji_package_id'], None
+                            ),
+                            emoji_id=self.get_from_dict(
+                                tmp_code_data_dict, ['emoji_id'], None
+                            ),
+                            key=self.get_from_dict(tmp_code_data_dict, ['key'], None),
+                            summary=self.get_from_dict(
+                                tmp_code_data_dict, ['summary'], None
+                            ),
+                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None),
+                            face_type=self.get_from_dict(
+                                tmp_code_data_dict, ['face_type'], None
+                            ),
+                            face_id=self.get_from_dict(
+                                tmp_code_data_dict, ['face_id'], None
+                            ),
+                            ext=self.get_from_dict(tmp_code_data_dict, ['ext'], None)
+                        )
                     elif tmp_data_type_key == 'at':
                         if code_key == 'CQ':
                             tmp_code_data_dict['id'] = str(self.get_from_dict(tmp_code_data_dict, ['qq'], -1))
@@ -436,12 +607,20 @@ class Message_templet(object):
                     elif tmp_data_type_key == 'record':
                         tmp_para_this = PARA.record(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], None))
                         )
                     elif tmp_data_type_key == 'video':
                         tmp_para_this = PARA.video(
                             file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url']))
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], None))
+                        )
+                    elif tmp_data_type_key == 'file':
+                        tmp_para_this = PARA.file(
+                            file=str(self.get_from_dict(tmp_code_data_dict, ['file'])),
+                            path=self.get_from_dict(tmp_code_data_dict, ['path'], None),
+                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], None)),
+                            name=self.get_from_dict(tmp_code_data_dict, ['name'], None),
+                            size=self.get_from_dict(tmp_code_data_dict, ['size'], None)
                         )
                     elif tmp_data_type_key == 'rps':
                         tmp_para_this = PARA.rps()
@@ -471,13 +650,13 @@ class Message_templet(object):
                         )
                     elif tmp_data_type_key == 'music':
                         tmp_para_this = PARA.music(
-                            type=str(self.get_from_dict(tmp_code_data_dict, ['type'], '')),
-                            id=str(self.get_from_dict(tmp_code_data_dict, ['id'], '')),
-                            url=str(self.get_from_dict(tmp_code_data_dict, ['url'], '')),
-                            audio=str(self.get_from_dict(tmp_code_data_dict, ['audio'], '')),
-                            title=str(self.get_from_dict(tmp_code_data_dict, ['title'], '')),
-                            content=str(self.get_from_dict(tmp_code_data_dict, ['content'], '')),
-                            image=str(self.get_from_dict(tmp_code_data_dict, ['image'], ''))
+                            type=self.get_from_dict(tmp_code_data_dict, ['type'], ''),
+                            id=self.get_from_dict(tmp_code_data_dict, ['id'], None),
+                            url=self.get_from_dict(tmp_code_data_dict, ['url'], None),
+                            audio=self.get_from_dict(tmp_code_data_dict, ['audio'], None),
+                            title=self.get_from_dict(tmp_code_data_dict, ['title'], None),
+                            content=self.get_from_dict(tmp_code_data_dict, ['content'], None),
+                            image=self.get_from_dict(tmp_code_data_dict, ['image'], None)
                         )
                     elif tmp_data_type_key == 'forward':
                         tmp_para_this = PARA.forward(
@@ -607,6 +786,50 @@ class Message_templet(object):
                 it_data_base = it_data_this
         self.data = tmp_data
 
+    def init_from_qq_guild_code_string(self):
+        self.init_from_qq_code_string()
+
+    def init_from_qq_guild_v2_code_string(self):
+        # QQ 群/C2C:文档口径为 <qqbot-at-user id="..." /> 与 <qqbot-at-everyone />,
+        # 纯文本 @everyone 是频道旧协议,群聊里按普通文本保留。
+        self.init_from_qq_code_string(flag_qq_chat=True)
+
+    def init_from_qq_code_string(self, flag_qq_chat=False):
+        tmp_data_raw = str(self.data_raw)
+        tmp_data = []
+        last_index = 0
+        # id 属性兼容有/无引号、有/无自闭合斜杠;引号内允许为空(平台降级时会下发空 id)。
+        at_tag_pattern = re.compile(
+            r'<qqbot-at-user\s+id=(?:(?P<quote>["\'])(?P<qq_user>[^"\']*)(?P=quote)'
+            r'|(?P<qq_user_bare>[^\s"\'<>/]+))\s*/?>'
+            r'|<qqbot-at-everyone\s*/?>'
+            r'|<@!?(?P<guild_user>[^<>&]+)>|@everyone(?!\w)'
+        )
+        for match in at_tag_pattern.finditer(tmp_data_raw):
+            if match.start() > last_index:
+                tmp_data.append(PARA.text(tmp_data_raw[last_index:match.start()]))
+            matched_text = match.group(0)
+            user_id = match.group('qq_user')
+            if user_id is None:
+                user_id = match.group('qq_user_bare')
+            if user_id is None:
+                user_id = match.group('guild_user')
+            if user_id is not None and str(user_id) != '':
+                tmp_data.append(PARA.at(id=str(user_id)))
+            elif matched_text.startswith('<qqbot-at-user'):
+                # id 为空的降级 at:先占位,由适配层用事件 mentions 回填真实 openid,
+                # 回填不了时会被适配层清理,避免误当作 at 全体。
+                tmp_data.append(PARA.at(id=''))
+            elif flag_qq_chat and matched_text.startswith('@everyone'):
+                # QQ 群/C2C 无 @全体成员语义,纯文本 @everyone 原样保留为文本。
+                tmp_data.append(PARA.text(matched_text))
+            else:
+                tmp_data.append(PARA.at(id='all'))
+            last_index = match.end()
+        if last_index < len(tmp_data_raw):
+            tmp_data.append(PARA.text(tmp_data_raw[last_index:]))
+        self.data = tmp_data
+
     def init_from_kaiheila_code_string(self):
         tmp_data_raw = str(self.data_raw)
         tmp_data_raw = re.sub(r'\(met\)(\d+)\(met\)', r'[OP:at,id=\1]', tmp_data_raw)
@@ -688,6 +911,123 @@ class PARA_templet(object):
             elif type(self) is PARA.xml:
                 paraType = 'xml'
                 paraData['data'] = self.data['data']
+        except Exception:
+            traceback.print_exc()
+            paraType = None
+        if paraType is None:
+            paraType = 'text'
+            paraData = {'text': ''}
+        res = {
+            'type': paraType,
+            'data': paraData
+        }
+        return res
+
+    def MILKY_RX(self):
+        paraType: str = None
+        paraData: dict = {}
+        try:
+            if type(self) is PARA.text:
+                paraType = 'text'
+                paraData['text'] = str(self.data['text'])
+            elif type(self) is PARA.at:
+                if self.data['id'] == 'all':
+                    paraType = 'mention_all'
+                else:
+                    paraType = 'mention'
+                    paraData['user_id'] = int(self.data['id'])
+                    paraData['name'] = str(self.data['name'])
+            elif type(self) is PARA.face:
+                paraType = 'face'
+                paraData['face_id'] = self.data['id']
+                paraData['is_large'] = False
+            elif type(self) is PARA.reply:
+                paraType = 'reply'
+                scene, peer_id, seq = self.data['id'].split('|')
+                paraData['message_seq'] = int(seq)
+                paraData['sender_id'] = int(peer_id)
+                paraData['time'] = int(time.time())
+            elif type(self) is PARA.image:
+                paraType = 'image'
+                paraData['resource_id'] = self.data['file']
+                paraData['temp_url'] = self.data['url']
+                paraData['sub_type'] = 'normal'
+            elif type(self) is PARA.record:
+                paraType = 'record'
+                paraData['resource_id'] = self.data['file']
+                paraData['temp_url'] = self.data['url']
+            elif type(self) is PARA.video:
+                paraType = 'video'
+                paraData['resource_id'] = self.data['file']
+                paraData['temp_url'] = self.data['url']
+            elif type(self) is PARA.forward:
+                paraType = 'forward'
+                paraData['forward_id'] = str(self.data['id'])
+            elif type(self) is PARA.json:
+                paraType = 'light_app'
+                paraData['app_name'] = self.data['resid']
+                paraData['json_payload'] = self.data['data']
+            elif type(self) is PARA.xml:
+                paraType = 'xml'
+                paraData['service_id'] = int(self.data['resid'])
+                paraData['xml_payload'] = self.data['data']
+        except Exception:
+            traceback.print_exc()
+            paraType = None
+        if paraType is None:
+            paraType = 'text'
+            paraData = {'text': ''}
+        res = {
+            'type': paraType,
+            'data': paraData
+        }
+        return res
+
+    def MILKY_TX(self):
+        paraType: str = None
+        paraData: dict = {}
+        try:
+            if type(self) is PARA.text:
+                paraType = 'text'
+                paraData['text'] = str(self.data['text'])
+            elif type(self) is PARA.at:
+                if self.data['id'] == 'all':
+                    paraType = 'mention_all'
+                else:
+                    paraType = 'mention'
+                    paraData['user_id'] = int(self.data['id'])
+            elif type(self) is PARA.face:
+                paraType = 'face'
+                paraData['face_id'] = str(self.data['id'])
+                paraData['is_large'] = False
+            elif type(self) is PARA.reply:
+                paraType = 'reply'
+                scene, peer_id, seq = self.data['id'].split('|')
+                paraData['message_seq'] = int(seq)
+            elif type(self) is PARA.image:
+                paraType = 'image'
+                paraData['uri'] = self.data['file']
+                if self.data['url'] is not None:
+                    paraData['uri'] = self.data['url']
+                paraData['sub_type'] = 'normal'
+            elif type(self) is PARA.record:
+                paraType = 'record'
+                paraData['uri'] = self.data['file']
+                if self.data['url'] is not None:
+                    if self.data['url'] != 'None':
+                        paraData['uri'] = self.data['url']
+            elif type(self) is PARA.video:
+                paraType = 'video'
+                paraData['uri'] = self.data['file']
+                if self.data['url'] is not None:
+                    if self.data['url'] != 'None':
+                        paraData['uri'] = self.data['url']
+            elif type(self) is PARA.forward:
+                paraType = 'forward'
+                paraData['messages'] = []
+            elif type(self) is PARA.json:
+                paraType = 'light_app'
+                paraData['json_payload'] = self.data['data']
         except Exception:
             traceback.print_exc()
             paraType = None
@@ -831,6 +1171,54 @@ class PARA(object):
             def __init__(self, id):
                 self['id'] = id
 
+    class mface(PARA_templet):
+        def __init__(
+            self,
+            emoji_package_id=None,
+            emoji_id=None,
+            key=None,
+            summary=None,
+            url=None,
+            face_type=None,
+            face_id=None,
+            ext=None
+        ):
+            PARA_templet.__init__(
+                self,
+                'mface',
+                self.data_T(
+                    emoji_package_id,
+                    emoji_id,
+                    key,
+                    summary,
+                    url,
+                    face_type,
+                    face_id,
+                    ext
+                )
+            )
+
+        class data_T(dict):
+            def __init__(
+                self,
+                emoji_package_id,
+                emoji_id,
+                key,
+                summary,
+                url,
+                face_type,
+                face_id,
+                ext
+            ):
+                self['emoji_package_id'] = emoji_package_id
+                self['emoji_id'] = emoji_id
+                self['key'] = key
+                self['summary'] = summary
+                self['url'] = url
+                self['face_type'] = face_type
+                self['face_id'] = face_id
+                self['ext'] = ext
+
     class image(PARA_templet):
         def __init__(self, file, type=None, url=None, cache=None, proxy=None, timeout=None):
             PARA_templet.__init__(self, 'image', self.data_T(file, type, url, cache, proxy, timeout))
@@ -886,6 +1274,18 @@ class PARA(object):
                 self['cache'] = cache
                 self['proxy'] = proxy
                 self['timeout'] = timeout
+
+    class file(PARA_templet):
+        def __init__(self, file, path=None, url=None, name=None, size=None):
+            PARA_templet.__init__(self, 'file', self.data_T(file, path, url, name, size))
+
+        class data_T(dict):
+            def __init__(self, file, path=None, url=None, name=None, size=None):
+                self['file'] = file
+                self['path'] = path
+                self['url'] = url
+                self['name'] = name
+                self['size'] = size
 
     class at(PARA_templet):
         def __init__(self, id, name=None):

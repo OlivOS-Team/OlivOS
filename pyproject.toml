@@ -116,6 +116,8 @@ extend = [
     "prompt-toolkit",
     "regex",
     "rich",
+    "openai>=0.28.1,<1.0; python_version < '3.8'",
+    "openai>=1,<2; python_version >= '3.8'",
 ]
 
 # 开发工具

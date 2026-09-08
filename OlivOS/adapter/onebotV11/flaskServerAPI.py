@@ -25,7 +25,6 @@ modelName = 'flaskServerAPI'
 
 gCheckList = [
     'default',
-    'shamrock_default',
     'para_default',
     'gocqhttp',
     'gocqhttp_hide',
@@ -43,7 +42,8 @@ gCheckList = [
     'napcat_show_old',
     'napcat_default',
     'llonebot_default',
-    'lagrange_default'
+    'lagrange_default',
+    'shamrock_default',
 ]
 
 

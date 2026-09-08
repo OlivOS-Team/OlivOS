@@ -210,7 +210,7 @@ class API(object):
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['user'] + '/me'
 
-    class creatMessage(api_templet):
+    class createMessage(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -228,7 +228,7 @@ class API(object):
                 self.nonce = None
                 self.temp_target_id = None
 
-    class creatDirectMessage(api_templet):
+    class createDirectMessage(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -1078,9 +1078,9 @@ class event_action(object):
                 "modules": []
             }
         if flag_direct:
-            this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg = API.createDirectMessage(get_SDK_bot_info_from_Event(target_event))
         else:
-            this_msg = API.creatMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg = API.createMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.target_id = str(chat_id)
         if this_msg is None:
             return
@@ -1163,9 +1163,9 @@ class event_action(object):
         res_data['active'] = True
         this_msg = None
         if flag_direct:
-            this_msg = API.creatDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg = API.createDirectMessage(get_SDK_bot_info_from_Event(target_event))
         else:
-            this_msg = API.creatMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg = API.createMessage(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.target_id = str(chat_id)
         this_msg.data.type = content_type
         this_msg.data.content = content
@@ -1173,8 +1173,8 @@ class event_action(object):
         res_data['data'] = {}
         res_data['data']['chat_type'] = 'private' if flag_direct else 'group'
         res_data['data']['chat_id'] = str(chat_id)
-        res_data['data']['content_type'] = str(content_type)
-        res_data['data']['content'] = str(json.dumps(content, ensure_ascii=False))
+        res_data['data']['content_type'] = content_type
+        res_data['data']['content'] = str(content)
         return res_data
 
     def get_login_info(target_event):

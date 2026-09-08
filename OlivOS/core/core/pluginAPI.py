@@ -99,11 +99,52 @@ class shallow(API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
-        self.database = None
+        self.database: OlivOS.userModule.UserConfDB.DataBaseAPI = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
             self.sdk_event = sdk_event
+
+    def get_plugin_event_context(self, plugin_identity):
+        if plugin_identity is None:
+            return None
+        plugin_identity = str(plugin_identity)
+        plugin_models = list(self.plugin_models_dict.values())
+
+        plugin_model = self.plugin_models_dict.get(plugin_identity)
+        if plugin_model is None:
+            namespace_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('namespace', '')) == plugin_identity
+            ]
+            if len(namespace_matches) == 1:
+                plugin_model = namespace_matches[0]
+        if plugin_model is None:
+            name_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('name', '')) == plugin_identity
+            ]
+            if len(name_matches) == 1:
+                plugin_model = name_matches[0]
+        if plugin_model is None:
+            module_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('module_name', '')) == plugin_identity
+            ]
+            if len(module_matches) == 1:
+                plugin_model = module_matches[0]
+        if plugin_model is None:
+            return None
+        return {
+            'namespace': plugin_model.get('namespace'),
+            'message_mode': plugin_model.get(
+                'message_mode',
+                OlivOS.infoAPI.OlivOS_message_mode_tx_default
+            )
+        }
 
     def __init_GUI(self):
         if platform.system() == 'Windows':
@@ -135,6 +176,7 @@ class shallow(API.Proc_templet):
         releaseDir('./data/images')
         releaseDir('./data/videos')
         releaseDir('./data/audios')
+        releaseDir('./data/files')
         threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
@@ -199,6 +241,10 @@ class shallow(API.Proc_templet):
                         self.set_restart()
 
     def set_restart(self):
+        """重载插件
+
+        该接口可以重启整个插件加载器，并重新加载这个插件。
+        """
         self.log(2, OlivOS.L10NAPI.getTrans(
             'OlivOS plugin shallow [{0}] call restart', [
                 self.Proc_name
@@ -217,6 +263,13 @@ class shallow(API.Proc_templet):
         self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_get'), block=False)
 
     def get_plugin_list(self):
+        """获取插件列表
+
+        该接口可以获得一个由插件的`namespace`填充的`list`，这可以让你知道当前的`OlivOS`上存在哪些插件。
+
+        Returns:
+            list: 插件列表，Defaults to []
+        """
         return self.plugin_models_call_list
 
     def get_main_root(self):
@@ -342,6 +395,8 @@ class shallow(API.Proc_templet):
                     plugin_model.main.Event.group_lucky_king(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_honor':
                     plugin_model.main.Event.group_honor(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'friend_add':
+                    plugin_model.main.Event.friend_add(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'friend_add_request':
                     plugin_model.main.Event.friend_add_request(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_add_request':
@@ -512,7 +567,7 @@ class shallow(API.Proc_templet):
                 }
             }
         }
-                              )
+        )
         self.sendControlEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
@@ -521,7 +576,7 @@ class shallow(API.Proc_templet):
                 'action': 'start_shallow'
             }
         }
-                              )
+        )
 
     def sendControlEvent(self, action, data):
         if self.Proc_info.control_queue is not None:

@@ -9,3 +9,4 @@ flake8_output.log
 *.egg-info
 build
 dist
+.vscode/settings.json

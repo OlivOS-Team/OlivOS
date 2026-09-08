@@ -36,11 +36,25 @@ accountTypeList = [
     'Hack.Chat',
     'Hack.Chat/私有',
     'onebotV12/正向WS',
+    'onebotV11/正向WS',
+    'onebotV11/正向WS/NapCat',
+    'onebotV11/正向WS/LLOneBot',
+    'onebotV11/正向WS/Lagrange',
+    'onebotV11/正向WS/Shamrock',
+    'onebotV11/反向WS',
+    'onebotV11/反向WS/NapCat',
+    'onebotV11/反向WS/LLOneBot',
+    'onebotV11/反向WS/Lagrange',
+    'onebotV11/反向WS/Shamrock',
     'onebotV11/Http',
     'onebotV11/Http/NapCat',
     'onebotV11/Http/LLOneBot',
     'onebotV11/Http/Lagrange',
     'onebotV11/Http/Shamrock',
+    'Milky/自动',
+    'Milky/自动/Yogurt',
+    'Milky/自动/LLOneBot',
+    'Milky/自动/Lagrange',
     'RED协议',
     '微信/ComWeChat',
     '米游社/大别野/公域',
@@ -74,13 +88,26 @@ accountTypeList = [
 ]
 
 accountTypeMappingList = {
+    'onebotV11/正向WS': ['qq', 'onebot', 'default', 'True', 'websocket'],
+    'onebotV11/正向WS/NapCat': ['qq', 'onebot', 'napcat_default', 'False', 'websocket'],
+    'onebotV11/正向WS/LLOneBot': ['qq', 'onebot', 'llonebot_default', 'False', 'websocket'],
+    'onebotV11/正向WS/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'websocket'],
+    'onebotV11/正向WS/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'websocket'],
+    'onebotV11/反向WS': ['qq', 'onebot', 'default', 'False', 'websocket_host'],
+    'onebotV11/反向WS/NapCat': ['qq', 'onebot', 'napcat_default', 'False', 'websocket_host'],
+    'onebotV11/反向WS/LLOneBot': ['qq', 'onebot', 'llonebot_default', 'False', 'websocket_host'],
+    'onebotV11/反向WS/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'websocket_host'],
+    'onebotV11/反向WS/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'websocket_host'],
     'onebotV11/Http': ['qq', 'onebot', 'default', 'False', 'post'],
     'onebotV11/Http/NapCat': ['qq', 'onebot', 'napcat_default', 'False', 'post'],
     'onebotV11/Http/LLOneBot': ['qq', 'onebot', 'llonebot_default', 'False', 'post'],
     'onebotV11/Http/Lagrange': ['qq', 'onebot', 'lagrange_default', 'False', 'post'],
     'onebotV11/Http/Shamrock': ['qq', 'onebot', 'shamrock_default', 'False', 'post'],
-    'onebotV11/Http/消息段': ['qq', 'onebot', 'array_default', 'False', 'post'],
     'onebotV12/正向WS': ['qq', 'onebot', 'onebotV12', 'False', 'websocket'],
+    'Milky/自动': ['qq', 'onebot', 'milky_default', 'True', 'auto'],
+    'Milky/自动/Yogurt': ['qq', 'onebot', 'yogurt_milky', 'True', 'auto'],
+    'Milky/自动/LLOneBot': ['qq', 'onebot', 'llonebot_milky', 'True', 'auto'],
+    'Milky/自动/Lagrange': ['qq', 'onebot', 'lagrange_milky', 'True', 'auto'],
     'RED协议': ['qq', 'onebot', 'red', 'False', 'websocket'],
     'OPQBot/正向WS': ['qq', 'onebot', 'opqbot_default', 'False', 'websocket'],
     'QQ/OPQ/默认': ['qq', 'onebot', 'opqbot_auto', 'True', 'websocket'],
@@ -132,7 +159,7 @@ accountTypeMappingList = {
     '虚拟终端': ['terminal', 'terminal_link', 'default', 'True', 'websocket'],
     '接口终端': ['terminal', 'terminal_link', 'postapi', 'True', 'post'],
     'FF14终端': ['terminal', 'terminal_link', 'ff14', 'True', 'post'],
-    "钉钉": ["dingtalk", "dingtalk_link", "default",  "True", "websocket"],
+    "钉钉": ["dingtalk", "dingtalk_link", "default", "True", "websocket"],
     # 这个自定义屁用没有，只是占位用的
     # 对应代码里这个作为缺省项使用，不走这个逻辑
     '自定义': ['qq', 'default', 'default', 'True', 'post']
@@ -160,7 +187,8 @@ accountTypeDataList_platform_sdk = {
         'onebot'
     ],
     'qq': [
-        'onebot'
+        'onebot',
+        'milky'
     ],
     'qqGuild': [
         'qqGuild_link',
@@ -245,6 +273,16 @@ accountTypeDataList_platform_sdk_model = {
             'napcat_show_new',
             'napcat_show_old',
             'napcat_default',
+            'llonebot_default',
+            'lagrange_default'
+            'milky_default',
+            'yogurt_milky',
+            'llonebot_milky',
+            'lagrange_milky'
+        ],
+        'milky': [
+            'default',
+            'yogurt_default',
             'llonebot_default',
             'lagrange_default'
         ]
@@ -349,5 +387,7 @@ accountTypeDataList_server_auto = [
 
 accountTypeDataList_server_type = [
     'post',
-    'websocket'
+    "auto",
+    'websocket',
+    'websocket_host'
 ]

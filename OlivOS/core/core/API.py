@@ -23,8 +23,10 @@ import traceback
 import inspect
 import ctypes
 import html
+import os
 
 from functools import wraps
+from urllib import parse
 
 import OlivOS
 from OlivOS.core.info.infoAPI import OlivOS_Version  # noqa
@@ -60,6 +62,7 @@ class bot_info_T(object):
             access_token=access_token
         )
         self.extends = {}
+        self.enable = True
         self.debug_mode = False
         self.getHash()
 
@@ -151,12 +154,12 @@ class Event(object):
         }
         self.sdk_event = sdk_event
         self.sdk_event_type = type(self.sdk_event)
-        if type(OlivOS.pluginAPI.gProc) is OlivOS.pluginAPI.shallow:
+        if isinstance(OlivOS.pluginAPI.gProc, OlivOS.pluginAPI.shallow):
             self.plugin_info['control_queue'] = OlivOS.pluginAPI.gProc.Proc_info.control_queue
             self.log_func = OlivOS.pluginAPI.gProc.log
         if (
             self.plugin_info['control_queue'] is None
-            and type(Proc) is OlivOS.pluginAPI.shallow
+            and isinstance(Proc, OlivOS.pluginAPI.shallow)
         ):
             self.plugin_info['control_queue'] = Proc.Proc_info.control_queue
         if type(self.log_func) is None:
@@ -171,6 +174,8 @@ class Event(object):
         self.indeAPI = inde_interface_T(self, self.platform['platform'])
         if self.platform['sdk'] == 'kaiheila_link':
             self.indeAPI = OlivOS.kaiheilaSDK.inde_interface(self, self.platform['platform'])
+        if self.platform['sdk'] == 'qqGuildv2_link':
+            self.indeAPI = OlivOS.qqGuildv2SDK.inde_interface(self, self.platform['platform'])
         if self.platform['sdk'] == 'mhyVila_link':
             self.indeAPI = OlivOS.mhyVilaSDK.inde_interface(self, self.platform['platform'])
 
@@ -215,6 +220,8 @@ class Event(object):
             OlivOS.dingtalkSDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.biliLiveSDK.event:
             OlivOS.biliLiveSDK.get_Event_from_SDK(self)
+        elif self.sdk_event_type is OlivOS.milkySDK.event:
+            OlivOS.milkySDK.get_Event_from_SDK(self)
         elif self.sdk_event_type is OlivOS.API.Control.packet:
             getMenuEvent(self)
 
@@ -668,32 +675,35 @@ class Event(object):
                 if flag_log and event_obj is not None:
                     if warppedRes is None:
                         callback_msg = 'done'
-                    elif warppedRes.__class__.__base__ is dict:
-                        if 'active' in warppedRes:
-                            if warppedRes['active'] is True:
-                                if type(val_list) is list and 'data' in warppedRes:
-                                    callback_msg_list = []
-                                    for val_list_this in val_list:
-                                        if val_list_this in warppedRes['data']:
-                                            callback_msg_list.append(
-                                                '%s(%s)' % (
-                                                    val_list_this,
-                                                    str(warppedRes['data'][val_list_this])
-                                                )
-                                            )
-                                    callback_msg = ' '.join(callback_msg_list)
-                                else:
-                                    callback_msg = 'succeed'
-                            else:
-                                callback_msg = 'failed'
-                        else:
-                            callback_msg = 'done'
+                    elif not (warppedRes.__class__.__base__ is dict):
+                        pass
+                    elif not ('active' in warppedRes):
+                        callback_msg = 'done'
+                    elif not (warppedRes['active'] is True):
+                        callback_msg = 'failed'
+                    elif not (type(val_list) is list and 'data' in warppedRes):
+                        callback_msg = 'succeed'
+                    else:
+                        callback_msg_list = []
+                        for val_list_this in val_list:
+                            if val_list_this in warppedRes['data']:
+                                callback_msg_list.append(
+                                    '%s(%s)' % (
+                                        val_list_this,
+                                        str(warppedRes['data'][val_list_this])
+                                    )
+                                )
+                        callback_msg = ' '.join(callback_msg_list)
                     if event_obj.log_func is not None:
-                        event_obj.log_func(2, callback_msg, [
-                            (event_obj.getBotIDStr(), 'default'),
-                            (event_obj.plugin_info['name'], 'default'),
-                            (func_name, 'callback')
-                        ])
+                        try:
+                            event_obj.log_func(2, callback_msg, [
+                                (event_obj.getBotIDStr(), 'default'),
+                                (event_obj.plugin_info['name'], 'default'),
+                                (func_name, 'callback')
+                            ])
+                        except Exception:
+                            # 回调日志失败不能改变已经完成的发送/撤回结果。
+                            traceback.print_exc()
                 return warppedRes
 
             return funcWarpped
@@ -719,6 +729,13 @@ class Event(object):
             ])
 
     def set_block(self, enable: bool = True, flag_log: bool = True, remote: bool = False):
+        """阻塞后续插件
+
+        用于就此阻塞丢弃该消息事件而不传递给后续插件处理
+
+        Args:
+            enable: 阻塞状态 (default: True)
+        """
         if remote:
             pass
         else:
@@ -746,8 +763,102 @@ class Event(object):
             tmp_message = tmp_message_obj.get(self.plugin_info['message_mode_rx'])
         return [tmp_message, tmp_message_obj]
 
+    def __support_file_segment_upload(self, send_type, host_id=None):
+        if send_type not in ['private', 'group']:
+            return False
+        if host_id is not None:
+            return False
+        if self.platform['sdk'] == 'milky':
+            return self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList
+        if self.platform['sdk'] != 'onebot':
+            return False
+        return (
+            self.platform['model'] in OlivOS.flaskServerAPI.gCheckList
+            or self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList
+            or self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList
+        )
+
+    def __get_file_segment_data(self, message_para):
+        file_data = message_para.data
+        if not isinstance(file_data, dict):
+            return None, None
+        file_resource = None
+        for data_key in ['path', 'url', 'file']:
+            data_value = file_data.get(data_key)
+            if data_value is None:
+                continue
+            data_value = str(data_value)
+            if data_value not in ['', 'None']:
+                file_resource = data_value
+                break
+        if file_resource is None:
+            return None, None
+
+        resource_parsed = parse.urlparse(file_resource)
+        if resource_parsed.scheme == '' and not os.path.isabs(file_resource):
+            file_resource = OlivOS.contentAPI.resourcePathTransform('files', file_resource)
+
+        file_name = file_data.get('name')
+        if file_name is not None and str(file_name) not in ['', 'None']:
+            return file_resource, str(file_name)
+        resource_parsed = parse.urlparse(file_resource)
+        if resource_parsed.scheme in ['base64', 'data']:
+            return file_resource, 'file'
+        resource_path = parse.unquote(resource_parsed.path)
+        file_name = resource_path.replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
+        if file_name == '':
+            file_name = 'file'
+        return file_resource, file_name
+
+    def __send_file_segments(self, send_type, target_id, message_obj, host_id=None, flag_log=True):
+        if not self.__support_file_segment_upload(send_type, host_id):
+            return False
+        if not any(isinstance(para, OlivOS.messageAPI.PARA.file) for para in message_obj.data):
+            return False
+
+        message_buffer = []
+
+        def flush_message_buffer():
+            if len(message_buffer) == 0:
+                return
+            message_chunk = OlivOS.messageAPI.Message_templet('olivos_para', message_buffer.copy())
+            self.__send(
+                send_type,
+                target_id,
+                message_chunk,
+                host_id=host_id,
+                flag_log=flag_log
+            )
+            message_buffer.clear()
+
+        for message_para in message_obj.data:
+            if not isinstance(message_para, OlivOS.messageAPI.PARA.file):
+                message_buffer.append(message_para)
+                continue
+            flush_message_buffer()
+            file_resource, file_name = self.__get_file_segment_data(message_para)
+            if file_resource is None:
+                continue
+            if send_type == 'group':
+                self.__upload_group_file(
+                    target_id,
+                    file_resource,
+                    name=file_name,
+                    flag_log=flag_log
+                )
+            else:
+                self.__upload_private_file(
+                    target_id,
+                    file_resource,
+                    file_name,
+                    flag_log=flag_log
+                )
+        flush_message_buffer()
+        return True
+
     def __reply(self, message, flag_log=True):
         flag_type = None
+        res_data = None
         tmp_message = None
         tmp_message_obj = None
         tmp_message_log = None
@@ -769,10 +880,15 @@ class Event(object):
                 hasattr(self.data, 'extend')
                 and 'host_group_id' in self.data.extend
             ):
-                self.__send('private', self.data.user_id, tmp_message, host_id=self.data.extend['host_group_id'],
-                            flag_log=False)
+                res_data = self.__send(
+                    'private',
+                    self.data.user_id,
+                    tmp_message,
+                    host_id=self.data.extend['host_group_id'],
+                    flag_log=False
+                )
             else:
-                self.__send('private', self.data.user_id, tmp_message, flag_log=False)
+                res_data = self.__send('private', self.data.user_id, tmp_message, flag_log=False)
             flag_type = 'private'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -781,7 +897,13 @@ class Event(object):
                     'group_message'
                 ]
         ):
-            self.__send('group', self.data.group_id, tmp_message, host_id=self.data.host_id, flag_log=False)
+            res_data = self.__send(
+                'group',
+                self.data.group_id,
+                tmp_message,
+                host_id=self.data.host_id,
+                flag_log=False
+            )
             flag_type = 'group'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -798,7 +920,7 @@ class Event(object):
                     'group_invite_request'
                 ]
         ):
-            self.__send('group', self.data.group_id, tmp_message, flag_log=False)
+            res_data = self.__send('group', self.data.group_id, tmp_message, flag_log=False)
             flag_type = 'group'
         elif checkByListOrEqual(
                 self.plugin_info['func_type'],
@@ -807,10 +929,10 @@ class Event(object):
                 ]
         ):
             if self.data.group_id in [-1, '-1', None]:
-                self.__send('private', self.data.user_id, tmp_message, flag_log=False)
+                res_data = self.__send('private', self.data.user_id, tmp_message, flag_log=False)
                 flag_type = 'private'
             else:
-                self.__send('group', self.data.group_id, tmp_message, flag_log=False)
+                res_data = self.__send('group', self.data.group_id, tmp_message, flag_log=False)
                 flag_type = 'group'
 
         if flag_log and self.log_func is not None:
@@ -835,11 +957,11 @@ class Event(object):
                     if self.data.host_id is not None:
                         self.log_func(2, 'Host(' + str(self.data.host_id) + ') Group(' + str(
                             self.data.group_id) + '): ' + tmp_message_log, [
-                                          (self.getBotIDStr(), 'default'),
-                                          (self.plugin_info['name'], 'default'),
-                                          ('reply', 'callback')
-                                      ])
-                        return
+                            (self.getBotIDStr(), 'default'),
+                            (self.plugin_info['name'], 'default'),
+                            ('reply', 'callback')
+                        ])
+                        return res_data
                     else:
                         self.log_func(2, 'Group(' + str(self.data.group_id) + '): ' + tmp_message_log, [
                             (self.getBotIDStr(), 'default'),
@@ -852,20 +974,36 @@ class Event(object):
                         (self.plugin_info['name'], 'default'),
                         ('reply', 'callback')
                     ])
+        return res_data
 
     def reply(self, message, flag_log: bool = True, remote: bool = False):
-        if remote:
-            pass
-        else:
-            self.__reply(message, flag_log=True)
+        """回复消息
 
-    def __send(self, send_type, target_id, message, host_id=None, flag_log=True):
+        用于快速原路回复消息
+
+        Args:
+            message: 所需要发送的消息
+        """
+        if remote:
+            return None
+        return self.__reply(message, flag_log=flag_log)
+
+    def __send(self, send_type, target_id, message, host_id=None, flag_log=True, force_active=False):
         flag_type = send_type
+        res_data = None
         tmp_message = None
         tmp_message_obj = None
         tmp_message_log = None
         [tmp_message, tmp_message_obj] = self.__message_router(message)
         if tmp_message is None:
+            return
+        if self.__send_file_segments(
+            flag_type,
+            target_id,
+            tmp_message_obj,
+            host_id=host_id,
+            flag_log=flag_log
+        ):
             return
         if self.platform['sdk'] == 'terminal_link':
             OlivOS.virtualTerminalSDK.event_action.send_msg(
@@ -906,6 +1044,36 @@ class Event(object):
                         OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
                     else:
                         OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if flag_type == 'private':
+                    if (
+                        'host_id' in self.data.__dict__
+                        and self.data.host_id is not None
+                    ):
+                        # 此处缺少接口
+                        pass
+                    else:
+                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    if host_id is not None:
+                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                    else:
+                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if flag_type == 'private':
+                    if (
+                        'host_id' in self.data.__dict__
+                        and self.data.host_id is not None
+                    ):
+                        # 此处缺少接口
+                        pass
+                    else:
+                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    if host_id is not None:
+                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                    else:
+                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
                 if flag_type == 'private':
                     OlivOS.qqRedSDK.event_action.send_msg(
@@ -924,6 +1092,12 @@ class Event(object):
                     OlivOS.OPQBotSDK.event_action.send_msg(
                         self, 'group', target_id, tmp_message, self.plugin_info['control_queue']
                     )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                if flag_type == 'private':
+                    OlivOS.milkySDK.event_action.send_private_msg(self, target_id, tmp_message)
+                elif flag_type == 'group':
+                    OlivOS.milkySDK.event_action.send_group_msg(self, target_id, tmp_message)
         elif self.platform['sdk'] == 'qqGuild_link':
             if flag_type == 'group':
                 if (
@@ -966,57 +1140,89 @@ class Event(object):
                 and self.data.extend.get('flag_from_qq', False)
             ):
                 if flag_type == 'group':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and 'reply_msg_id' in self.data.extend
-                    ):
-                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
-                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
-                        )
-                    else:
-                        OlivOS.qqGuildv2SDK.event_action.send_qq_msg(self, target_id, tmp_message)
+                    res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                        self,
+                        target_id,
+                        tmp_message,
+                        force_active=force_active
+                    )
                 elif flag_type == 'private':
                     if (
                         hasattr(self.data, 'extend')
                         and 'flag_from_direct' in self.data.extend
                     ):
-                        if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
-                                self, target_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                        if force_active or self.data.extend['flag_from_direct']:
+                            res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                                self,
+                                target_id,
+                                tmp_message,
+                                flag_direct=True,
+                                force_active=force_active
                             )
                         else:
                             # 主动私聊待实现
                             pass
+                    elif force_active:
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_qq_msg(
+                            self,
+                            target_id,
+                            tmp_message,
+                            flag_direct=True,
+                            force_active=True
+                        )
                     else:
                         # 主动私聊待实现
                         pass
             else:
+                extend_data = getattr(self.data, 'extend', {})
+                if not isinstance(extend_data, dict):
+                    extend_data = {}
                 if flag_type == 'group':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and 'reply_msg_id' in self.data.extend
-                    ):
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(
-                            self, target_id, tmp_message, self.data.extend['reply_msg_id']
-                        )
-                    else:
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(self, target_id, tmp_message)
+                    reply_msg_id = None if force_active else extend_data.get('reply_msg_id')
+                    res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                        self,
+                        target_id,
+                        tmp_message,
+                        reply_msg_id
+                    )
                 elif flag_type == 'private':
-                    if (
-                        hasattr(self.data, 'extend')
-                        and host_id is not None
-                    ):
-                        OlivOS.qqGuildv2SDK.event_action.send_msg(
-                            self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                    if force_active and extend_data.get('flag_from_direct', False):
+                        direct_guild_id = host_id
+                        if direct_guild_id is None:
+                            direct_guild_id = extend_data.get('host_group_id')
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self,
+                            direct_guild_id,
+                            tmp_message,
+                            flag_direct=True
+                        )
+                    elif force_active:
+                        source_guild_id = host_id
+                        if source_guild_id is None:
+                            source_guild_id = getattr(self.data, 'host_id', None)
+                        if source_guild_id is None:
+                            source_guild_id = extend_data.get('host_group_id')
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_guild_private_msg(
+                            self,
+                            target_id,
+                            source_guild_id,
+                            tmp_message
+                        )
+                    elif host_id is not None:
+                        res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                            self,
+                            host_id,
+                            tmp_message,
+                            extend_data.get('reply_msg_id'),
+                            flag_direct=True
                         )
                     elif (
-                        hasattr(self.data, 'extend')
-                        and 'flag_from_direct' in self.data.extend
-                        and 'reply_msg_id' in self.data.extend
+                        'flag_from_direct' in extend_data
+                        and 'reply_msg_id' in extend_data
                     ):
-                        if self.data.extend['flag_from_direct']:
-                            OlivOS.qqGuildv2SDK.event_action.send_msg(
-                                self, host_id, tmp_message, self.data.extend['reply_msg_id'], flag_direct=True
+                        if extend_data['flag_from_direct']:
+                            res_data = OlivOS.qqGuildv2SDK.event_action.send_msg(
+                                self, host_id, tmp_message, extend_data['reply_msg_id'], flag_direct=True
                             )
                         else:
                             # 主动私聊待实现
@@ -1106,29 +1312,63 @@ class Event(object):
                         (self.plugin_info['name'], 'default'),
                         ('send', 'callback')
                     ])
+        return res_data
 
     def send(self, send_type: str, target_id: 'str|int', message, host_id: 'str|int|None' = None, flag_log: bool = True,
              remote: bool = False):
+        """主动发送消息
+
+        用于向指定目标主动发送消息，不复用当前事件的被动回复凭据。
+
+        Args:
+            send_type: 用于指定发送目标的类型
+            target_id: 发送目标的ID
+            message: 所需要发送的消息
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
-            pass
-        else:
-            self.__send(send_type, target_id, message, host_id=host_id, flag_log=True)
+            return None
+        return self.__send(
+            send_type,
+            target_id,
+            message,
+            host_id=host_id,
+            flag_log=flag_log,
+            force_active=True
+        )
 
     @callbackLogger('delete_msg')
     def __delete_msg(self, message_id, flag_log=True):
+        res_data = None
         if self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 OlivOS.onebotV12SDK.event_action.delete_msg(self, message_id)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.delete_msg(self, message_id)
+        return res_data
 
     def delete_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """撤回消息
+
+        用于撤回当前会话中由机器人发送的指定消息
+
+        Args:
+            message_id: 需要撤回的消息ID
+        """
         if remote:
-            pass
-        else:
-            self.__delete_msg(message_id, flag_log=True)
+            return None
+        return self.__delete_msg(message_id, flag_log=flag_log)
 
     @callbackLogger('get_msg')
     def __get_msg(self, message_id, flag_log=True):
@@ -1138,11 +1378,35 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_msg(self, message_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_msg(self, message_id)
         return res_data
 
     def get_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取消息
+
+        用于获取指定消息详情
+
+        Args:
+            message_id: 需要查询的消息ID
+
+        Returns:
+            message_id (ID): 所查询的消息ID，Defaults to None
+            id (ID): 所查询的消息的实际ID，Defaults to -1
+            sender (USER): 发送者信息
+            time (int): 消息时间戳，Defaults to -1
+            message (MSG): 消息内容，Defaults to None
+            raw_message (MSG): 消息原生内容，Defaults to None
+        """
         res_data = None
         if remote:
             pass
@@ -1158,9 +1422,34 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_forward_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_forward_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_forward_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_forward_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_forward_msg(
+                self,
+                message_id
+            )
         return res_data
 
     def get_forward_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取合并转发消息
+
+        用于获取合并转发消息内容
+
+        支持平台：OneBotV11、Milky、QQ官方/V2
+        QQ官方/V2 的合并转发内容来自接收事件缓存。
+
+        Args:
+            message_id: 合并转发消息ID
+
+        Returns:
+            messages (list): 消息列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -1175,8 +1464,26 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_forward_msg(self, group_id, messages)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_forward_msg(self, group_id, messages)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_forward_msg(self, group_id, messages)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_forward_msg(self, group_id, messages)
 
     def send_group_forward_msg(self, group_id: 'str|int', messages, flag_log: bool = True, remote: bool = False):
+        """发送群合并转发消息
+
+        用于发送群合并转发消息
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            messages: 消息节点列表
+        """
         if remote:
             pass
         else:
@@ -1189,8 +1496,26 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_private_forward_msg(self, user_id, messages)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_private_forward_msg(self, user_id, messages)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_private_forward_msg(self, user_id, messages)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_private_forward_msg(self, user_id, messages)
 
     def send_private_forward_msg(self, user_id: 'str|int', messages, flag_log: bool = True, remote: bool = False):
+        """发送私聊合并转发消息
+
+        用于发送私聊合并转发消息
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            user_id: 用户ID
+            messages: 消息节点列表
+        """
         if remote:
             pass
         else:
@@ -1203,8 +1528,35 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_essence_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_essence_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            extend_data = getattr(self.data, 'extend', {})
+            if extend_data.get('qq_event_type') in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
+                channel_id = getattr(self.data, 'group_id', None)
+                if channel_id is not None:
+                    OlivOS.qqGuildv2SDK.event_action.set_pins_message(
+                        self,
+                        channel_id,
+                        message_id
+                    )
 
     def set_essence_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """设置精华消息
+
+        用于设置精华消息
+
+        支持平台：OneBotV11、QQ Guild V2（频道精华消息）
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            message_id: 消息ID
+        """
         if remote:
             pass
         else:
@@ -1217,8 +1569,35 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_essence_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_essence_msg(self, message_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_essence_msg(self, message_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            extend_data = getattr(self.data, 'extend', {})
+            if extend_data.get('qq_event_type') in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
+                channel_id = getattr(self.data, 'group_id', None)
+                if channel_id is not None:
+                    OlivOS.qqGuildv2SDK.event_action.delete_pins_message(
+                        self,
+                        channel_id,
+                        message_id
+                    )
 
     def delete_essence_msg(self, message_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """移出精华消息
+
+        用于移出精华消息
+
+        支持平台：OneBotV11、QQ Guild V2（频道精华消息）
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            message_id: 消息ID
+        """
         if remote:
             pass
         else:
@@ -1231,10 +1610,25 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_like(self, user_id, times)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_like(self, user_id, times)
 
     def send_like(self, user_id: 'str|int', times: int = 1, flag_log: bool = True, remote: bool = False):
+        """发送赞
+
+        用于发送赞
+
+        Args:
+            user_id: 点赞对象ID
+            times: 点赞次数 (default: 1)
+        """
         if remote:
             pass
         else:
@@ -1247,8 +1641,25 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_sign(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_sign(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_sign(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_sign(self, group_id)
 
     def send_group_sign(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """群打卡
+
+        用于群打卡
+
+        支持平台：OneBotV11
+        支持协议：NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+        """
         if remote:
             pass
         else:
@@ -1262,9 +1673,46 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_essence_msg_list(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_essence_msg_list(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_essence_msg_list(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_essence_msg_list(self, group_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            extend_data = getattr(self.data, 'extend', {})
+            if extend_data.get('qq_event_type') in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']:
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_essence_msg_list(self, group_id)
         return res_data
 
     def get_essence_msg_list(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取精华消息列表
+
+        用于获取群精华消息列表
+
+        支持平台：OneBotV11、QQ Guild V2（频道精华消息）
+        支持协议：Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+
+        Returns:
+            list[dict]: 返回值为列表，列表中每项包含以下字段：
+                - sender_id (int): 发送者QQ号
+                - sender_nick (str): 发送者昵称
+                - sender_time (int): 发送时间戳
+                - operator_id (int): 操作者QQ号
+                - operator_nick (str): 操作者昵称
+                - operator_time (int): 操作时间戳
+                - message_id (int): 消息ID
+                - message (str): 消息内容
+                - wording (str): 精华消息说明
+                - extra (dict): 平台特有扩展数据
+                    * extra.msg_seq (int): 消息序号 NapCat
+                    * extra.msg_random (int): 消息随机数 NapCat
+                    * extra.content (list): 消息内容列表 NapCat, Lagrange
+        """
         if remote:
             pass
         else:
@@ -1278,9 +1726,38 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_ignore_add_request(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_ignore_add_request(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_ignore_add_request(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_ignore_add_request(self, group_id)
         return res_data
 
     def get_group_ignore_add_request(self, group_id: 'str|int' = None, flag_log: bool = True, remote: bool = False):
+        """获取已过滤的加群通知
+
+        用于获取已过滤的加群通知
+
+        支持平台：OneBotV11
+        支持协议：NapCat（LLOneBot请使用`get_group_system_msg`）
+
+        Args:
+            group_id: 群ID（可选，用于筛选特定群） (default: None)
+
+        Returns:
+            list[dict]: 返回值为列表，列表中每项包含以下字段：
+                - request_id (int): 请求ID
+                - invitor_uin (int): 邀请者QQ号
+                - invitor_nick (str): 邀请者昵称
+                - group_id (int): 群号
+                - group_name (str): 群名称
+                - checked (bool): 是否已处理
+                - actor (int): 操作者QQ号
+                - requester_nick (str): 请求者昵称
+                - message (str): 请求消息
+        """
         if remote:
             pass
         else:
@@ -1294,9 +1771,39 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_doubt_friends_add_request(self, count)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_doubt_friends_add_request(self, count)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_doubt_friends_add_request(self, count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_doubt_friends_add_request(self, count)
         return res_data
 
     def get_doubt_friends_add_request(self, count: int = 50, flag_log: bool = True, remote: bool = False):
+        """获取被过滤的好友请求
+
+        用于获取被过滤的好友请求
+
+        支持平台：OneBotV11
+        支持协议：NapCat、LLOneBot
+
+        Args:
+            count: 获取数量 (default: 50)
+
+        Returns:
+            list[dict]: 返回值为列表，列表中每项包含以下字段：
+                - flag (str): 请求标识
+                - uin (str): 请求者QQ号
+                - nick (str): 请求者昵称
+                - source (str): 请求来源
+                - reason (str): 验证消息
+                - msg (str): 附加消息
+                - group_code (str): 来源群号
+                - time (str): 请求时间
+                - type (str): 请求类型
+                - extra (dict): 平台特有扩展数据
+        """
         if remote:
             pass
         else:
@@ -1309,6 +1816,13 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_doubt_friends_add_request(self, flag, approve)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_doubt_friends_add_request(self, flag, approve)
 
     def set_doubt_friends_add_request(
         self, flag: str,
@@ -1316,6 +1830,18 @@ class Event(object):
         flag_log: bool = True,
         remote: bool = False
     ):
+        """处理被过滤的好友请求
+
+        用于处理被过滤的好友请求
+
+        支持平台：OneBotV11
+        支持协议：NapCat、LLOneBot
+        - LLOneBot 不使用`approve`参数
+
+        Args:
+            flag: 加好友请求的`flag`（需下事件的数据中获得）
+            approve: 是否同意请求 (default: True)
+        """
         if remote:
             pass
         else:
@@ -1329,9 +1855,50 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_system_msg(self, count)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_system_msg(self, count)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_system_msg(self, count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_system_msg(self, count)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            target_data = getattr(self, 'data', None)
+            extend_data = getattr(target_data, 'extend', None)
+            if (
+                isinstance(extend_data, dict)
+                and extend_data.get('flag_from_qq', False)
+                and not extend_data.get('flag_from_direct', False)
+                and getattr(target_data, 'group_id', None) is not None
+            ):
+                res_data = (
+                    OlivOS.qqGuildv2SDK.event_action
+                    .get_qq_group_join_request_list_standard(
+                        self,
+                        target_data.group_id,
+                        count
+                    )
+                )
         return res_data
 
     def get_group_system_msg(self, count: int = 50, flag_log: bool = True, remote: bool = False):
+        """获取群系统消息
+
+        用于获取群系统消息（包括加群申请和邀请）
+
+        支持平台：OneBotV11、QQ官方/V2
+        支持协议：NapCat、LLOneBot
+        - LLOneBot 使用 GET 方法，不支持 count 参数
+        - NapCat 使用 POST 方法，支持 count 参数
+        - LLOneBot 的已过滤请求也在此接口查看
+
+        Args:
+            count: 获取数量（NapCat、QQ官方/V2支持） (default: 50)
+
+        Returns:
+            invited_requests (list): 邀请加群申请列表，Defaults to []
+            join_requests (list): 加群申请列表，Defaults to []
+        """
         if remote:
             pass
         else:
@@ -1344,10 +1911,28 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.group_poke(self, group_id, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.group_poke(self, group_id, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.group_poke(self, group_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.group_poke(self, group_id, user_id)
 
     def group_poke(self, group_id: 'str|int', user_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """群戳一戳
+
+        用于在群内戳一戳某人
+
+        支持平台：OneBotV11
+        支持协议：Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            user_id: 用户ID
+        """
         if remote:
             pass
         else:
@@ -1361,9 +1946,37 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_notice(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_notice(self, group_id)
         return res_data
 
     def get_group_notice(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取群公告
+
+        用于获取群公告列表
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+        - NapCat/Lagrange: notice_id 为字符串类型，extra.notice_id_type = 'string'
+        - 其他平台: notice_id 为整数类型，extra.notice_id_type = 'int'
+
+        Args:
+            group_id: 群ID
+
+        Returns:
+            list[dict]: 返回值为列表，列表中每项包含以下字段：
+                - sender_id (int): 发送者QQ号
+                - publish_time (int): 发布时间戳
+                - message (dict): 公告内容(字典格式)
+                - notice_id (str/int): 公告ID
+                - extra (dict): 扩展信息
+                    * notice_id_type (str): 公告类型，可能值为 'string' 或 'int'
+        """
         if remote:
             pass
         else:
@@ -1376,6 +1989,15 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.send_group_notice(self, group_id, content, image, **kwargs)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.send_group_notice(
+                    self, group_id, content, image, **kwargs
+                )
 
     def send_group_notice(
         self, group_id: 'str|int', content: str,
@@ -1384,6 +2006,25 @@ class Event(object):
         remote: bool = False,
         **kwargs
     ):
+        """发送群公告
+
+        用于发送群公告
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+        - NapCat具有额外参数kwargs
+
+        Args:
+            group_id: 群ID
+            content: 公告内容
+            image: 公告图片URL (default: None)
+            **kwargs (dict): NapCat 额外参数
+                - pinned (int): 是否置顶(0-不置顶, 1-置顶)
+                - type (int): 公告类型
+                - confirm_required (int): 是否需要确认(0-不需要, 1-需要)
+                - is_show_edit_card (int): 是否显示编辑卡片
+                - tip_window_type (int): 提示窗口类型
+        """
         if remote:
             pass
         else:
@@ -1396,8 +2037,23 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.del_group_notice(self, group_id, notice_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.del_group_notice(self, group_id, notice_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.del_group_notice(self, group_id, notice_id)
 
     def del_group_notice(self, group_id: 'str|int', notice_id: str, flag_log: bool = True, remote: bool = False):
+        """删除群公告
+
+        用于删除群公告
+
+        支持平台：OneBotV11
+        支持协议：Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            notice_id: 公告ID
+        """
         if remote:
             pass
         else:
@@ -1410,24 +2066,47 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.friend_poke(self, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.friend_poke(self, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.friend_poke(self, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.friend_poke(self, user_id)
 
     def friend_poke(self, user_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """好友戳一戳
+
+        用于戳一戳好友
+
+        支持平台：OneBotV11
+        支持协议：Lagrange、NapCat、LLOneBot
+
+        Args:
+            user_id: 用户ID
+        """
         if remote:
             pass
         else:
             self.__friend_poke(user_id, flag_log=True)
 
     @callbackLogger('set_group_kick')
-    def __set_group_kick(self, group_id, user_id, host_id, rehect_add_request, flag_log=True):
+    def __set_group_kick(self, group_id, user_id, host_id, reject_add_request, flag_log=True):
         if self.platform['sdk'] == 'onebot':
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotV12SDK.event_action.set_group_kick(self, group_id, user_id)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
-                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, rehect_add_request)
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_kick(self, group_id, user_id, reject_add_request)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id
@@ -1444,15 +2123,57 @@ class Event(object):
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
             OlivOS.xiaoheiheSDK.event_action.set_group_kick(self, tmp_host_id, user_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            # QQ 频道踢人使用 guild_id;QQ 群走官方 batch_remove_members(内邀能力,
+            # 单次上限 20 个,此处单踢一个,批量能力见 adapter 的
+            # set_qq_group_batch_remove_members)。
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            if tmp_host_id is not None:
+                OlivOS.qqGuildv2SDK.event_action.delete_guild_member(
+                    self,
+                    tmp_host_id,
+                    user_id,
+                    reject_add_request
+                )
+            elif (
+                hasattr(self.data, 'extend')
+                and self.data.extend.get('flag_from_qq', False)
+                and not self.data.extend.get('flag_from_direct', False)
+                and group_id is not None
+            ):
+                # QQ 群踢人:reject_add_request 映射为同时加入群黑名单。
+                OlivOS.qqGuildv2SDK.event_action.set_qq_group_batch_remove_members(
+                    self,
+                    group_id,
+                    [user_id],
+                    add_to_member_blacklist=bool(reject_add_request)
+                )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_kick(
+                    self, group_id, user_id, reject_add_request
+                )
 
     def set_group_kick(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
-                       rehect_add_request: bool = False, flag_log: bool = True, remote: bool = False):
+                       reject_add_request: bool = False, flag_log: bool = True, remote: bool = False):
+        """踢出群成员
+
+        用于踢出群成员
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+            reject_add_request: 是否拉黑对象 (default: False)
+        """
         if remote:
             pass
         else:
-            self.__set_group_kick(group_id, user_id, host_id, rehect_add_request, flag_log=True)
+            self.__set_group_kick(group_id, user_id, host_id, reject_add_request, flag_log=True)
 
     @callbackLogger('set_group_ban')
     def __set_group_ban(self, group_id, user_id, host_id, duration, flag_log=True):
@@ -1463,6 +2184,12 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_ban(self, group_id, user_id, duration)
         elif self.platform['sdk'] == 'xiaoheihe_link':
             # 小黑盒中，host_id 是 room_id(房间ID)，group_id 是 channel_id(频道ID)
             # 禁言操作使用 host_id(room_id)
@@ -1471,11 +2198,44 @@ class Event(object):
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
             OlivOS.xiaoheiheSDK.event_action.set_group_ban(self, tmp_host_id, user_id, duration)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            target_data = getattr(self, 'data', None)
+            tmp_host_id = host_id
+            if tmp_host_id is None:
+                tmp_host_id = getattr(target_data, 'host_id', None)
+            if tmp_host_id is None:
+                OlivOS.qqGuildv2SDK.event_action.set_qq_group_member_mute(
+                    self,
+                    group_id,
+                    user_id,
+                    duration
+                )
+            else:
+                # 频道禁言接口使用 guild_id，而通用 API 的 host_id 即频道 ID。
+                OlivOS.qqGuildv2SDK.event_action.set_guild_member_mute(
+                    self,
+                    tmp_host_id,
+                    user_id,
+                    mute_seconds=duration
+                )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_ban(self, group_id, user_id, duration)
 
     def set_group_ban(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
                       duration: int = 1800, flag_log: bool = True, remote: bool = False):
+        """禁言群成员
+
+        用于禁言群成员
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+            duration: 禁言时长/秒 (default: 1800)，0表示解除禁言
+        """
         if remote:
             pass
         else:
@@ -1487,6 +2247,14 @@ class Event(object):
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous_ban(
+                        self, group_id, anonymous, anonymous_flag, duration)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous_ban(
+                        self, group_id, anonymous, anonymous_flag, duration)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_anonymous_ban(
                         self, group_id, anonymous, anonymous_flag, duration)
@@ -1509,11 +2277,29 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_whole_ban(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_whole_ban(self, group_id, enable)
 
     def set_group_whole_ban(self, group_id: 'str|int', enable: bool, host_id: 'str|int|None' = None,
                             flag_log: bool = True, remote: bool = False):
+        """禁言本群
+
+        用于禁言本群
+
+        Args:
+            group_id: 群对象ID
+            enable: 禁言状态
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
             pass
         else:
@@ -1528,11 +2314,30 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_admin(self, group_id, user_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_admin(self, group_id, user_id, enable)
 
     def set_group_admin(self, group_id: 'str|int', user_id: 'str|int', enable: bool, host_id: 'str|int|None' = None,
                         flag_log: bool = True, remote: bool = False):
+        """设置群管理员
+
+        用于设置群管理员
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            enable: 管理员状态
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
             pass
         else:
@@ -1544,6 +2349,12 @@ class Event(object):
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_anonymous(self, group_id, enable)
         elif self.platform['sdk'] == 'telegram_poll':
@@ -1564,6 +2375,12 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_card(self, group_id, user_id, card)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 服务器相关操作需要使用 host_id
@@ -1582,9 +2399,22 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_card(self, tmp_host_id, user_id, card)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_card(self, group_id, user_id, card)
 
     def set_group_card(self, group_id: 'str|int', user_id: 'str|int', card, host_id: 'str|int|None' = None,
                        flag_log: bool = True, remote: bool = False):
+        """设置群成员名片
+
+        用于设置群成员名片
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            card: 新的群名片
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
             pass
         else:
@@ -1599,11 +2429,42 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_name(self, group_id, group_name)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            # group_id 在频道事件中对应子频道 ID，使用 PATCH /channels/{id} 改名。
+            event_type = getattr(self.data, 'extend', {}).get('qq_event_type')
+            if (
+                event_type in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']
+                and hasattr(self.data, 'host_id')
+                and self.data.host_id is not None
+            ):
+                OlivOS.qqGuildv2SDK.event_action.patch_channel(
+                    self,
+                    group_id,
+                    name=group_name
+                )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_name(self, group_id, group_name)
 
     def set_group_name(self, group_id: 'str|int', group_name: str, host_id: 'str|int|None' = None,
                        flag_log: bool = True, remote: bool = False):
+        """设置群名
+
+        用于设置群名
+
+        Args:
+            group_id: 群对象ID
+            group_name: 新的群名
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
             pass
         else:
@@ -1616,6 +2477,12 @@ class Event(object):
                 if host_id is None:
                     OlivOS.onebotV12SDK.event_action.set_group_leave(self, group_id)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if host_id is None:
                     OlivOS.onebotSDK.event_action.set_group_leave(self, group_id, is_dismiss)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
@@ -1639,9 +2506,21 @@ class Event(object):
             OlivOS.xiaoheiheSDK.event_action.set_group_leave(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             OlivOS.telegramSDK.event_action.set_chat_leave(self, group_id, is_dismiss)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_leave(self, group_id, is_dismiss)
 
     def set_group_leave(self, group_id: 'str|int', host_id: 'str|int|None' = None, is_dismiss: bool = False,
                         flag_log: bool = True, remote: bool = False):
+        """退出群
+
+        用于退出群
+
+        Args:
+            group_id: 群对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+            is_dismiss: 当为群主时是否解散该群 (default: False)
+        """
         if remote:
             pass
         else:
@@ -1657,11 +2536,37 @@ class Event(object):
                     OlivOS.onebotSDK.event_action.set_group_special_title(
                         self, group_id, user_id, special_title, duration
                     )
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_special_title(
+                        self, group_id, user_id, special_title, duration
+                    )
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    OlivOS.onebotSDK.event_action.set_group_special_title(
+                        self, group_id, user_id, special_title, duration
+                    )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_special_title(
+                    self, group_id, user_id, special_title, duration
+                )
 
     def set_group_special_title(self, group_id: 'str|int', user_id: 'str|int', special_title: str, duration: int,
                                 host_id: 'str|int|None' = None, flag_log: bool = True, remote: bool = False):
+        """设置群成员特殊头衩
+
+        用于设置群成员特殊头衣
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            special_title: 专属头衣，不填或空字符串表示删除专属头衣
+            duration: 专属头衣有效期/秒，`-1`表示永久
+            host_id: 发送目标的所属HOST ID (default: None)
+        """
         if remote:
             pass
         else:
@@ -1674,15 +2579,33 @@ class Event(object):
                 OlivOS.onebotV12SDK.event_action.set_friend_add_request(self, flag, approve, remark)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_friend_add_request(self, flag, approve, remark)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 OlivOS.OPQBotSDK.event_action.set_friend_add_request(
                     self, flag, approve, self.plugin_info['control_queue']
                 )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_friend_add_request(
+                    self, flag, approve, remark
+                )
 
     def set_friend_add_request(self, flag: str, approve: bool, remark: str, flag_log: bool = True,
                                remote: bool = False):
+        """处理好友请求
+
+        用于处理好友请求
+
+        Args:
+            flag: 加好友请求的`flag`（需下事件的数据中获得）
+            approve: 是否同意请求
+            remark: 添加后的好友备注（仅在同意时有效）
+        """
         if remote:
             pass
         else:
@@ -1695,15 +2618,42 @@ class Event(object):
                 OlivOS.onebotV12SDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_group_add_request(self, flag, sub_type, approve, reason)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 OlivOS.OPQBotSDK.event_action.set_group_add_request(
                     self, flag, sub_type, approve, self.plugin_info['control_queue']
                 )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_add_request(
+                    self, flag, sub_type, approve, reason
+                )
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            OlivOS.qqGuildv2SDK.event_action.set_group_add_request(
+                self,
+                flag,
+                sub_type,
+                approve,
+                reason
+            )
 
     def set_group_add_request(self, flag: str, sub_type: str, approve: bool, reason: str, flag_log: bool = True,
                               remote: bool = False):
+        """处理群请求
+
+        用于处理群请求
+
+        Args:
+            flag: 加群请求的`flag`（需下事件的数据中获得）
+            sub_type: 请求类型（需要和事件中的`sub_type`字段相符）
+            approve: 是否同意请求/邀请
+            reason: 拒绝理由（仅在拒绝时有效）
+        """
         if remote:
             pass
         else:
@@ -1715,6 +2665,10 @@ class Event(object):
             if self.platform['model'] in OlivOS.onebotV12LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotV12SDK.event_action.get_login_info(self)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_login_info(self)
@@ -1730,6 +2684,9 @@ class Event(object):
             res_data = OlivOS.kaiheilaSDK.event_action.get_login_info(self)
         elif self.platform['sdk'] == 'dodo_link':
             res_data = OlivOS.dodoLinkSDK.event_action.get_login_info(self)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_login_info(self)
 
         if res_data is None:
             return None
@@ -1757,6 +2714,13 @@ class Event(object):
         return res_data
 
     def get_login_info(self, flag_log: bool = True, remote: bool = False):
+        """获取登录账号信息
+
+        用于获取登录账号信息
+
+        Returns:
+            dict: 整个返回值为USER类型
+        """
         res_data = None
         if remote:
             pass
@@ -1772,14 +2736,33 @@ class Event(object):
                 res_data = OlivOS.onebotV12SDK.event_action.get_stranger_info(self, user_id)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_stranger_info(self, user_id, no_cache)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         elif self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_stranger_info(self, user_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_stranger_info(self, user_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_stranger_info(self, user_id, no_cache)
         return res_data
 
     def get_stranger_info(self, user_id: 'str|int', no_cache: bool = False, flag_log: bool = True,
                           remote: bool = False):
+        """获取陌生人信息
+
+        用于获取陌生人信息
+
+        Args:
+            user_id: 陌生人对象ID
+
+        Returns:
+            dict: 整个返回值为USER类型
+        """
         res_data = None
         if remote:
             pass
@@ -1795,11 +2778,25 @@ class Event(object):
                 res_data = OlivOS.onebotV12SDK.event_action.get_friend_list(self)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_friend_list(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_friend_list(self)
         return res_data
 
     def get_friend_list(self, flag_log: bool = True, remote: bool = False):
+        """获取好友列表
+
+        用于获取好友列表
+
+        Returns:
+            list[dict]: 整个返回值为USER类型的列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -1817,16 +2814,49 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_info(self, group_id, no_cache)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # get_group_info 获取的是频道详情，使用 group_id（channel_id）
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_info(self, group_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            # QQ 频道中 group_id 是子频道 ID，只有频道消息能可靠提供所属 guild_id。
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            event_type = getattr(self.data, 'extend', {}).get('qq_event_type')
+            if event_type in ['GUILD_MEMBER_ADD', 'GUILD_MEMBER_REMOVE']:
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_guild_info_standard(self, group_id)
+            elif (
+                event_type in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']
+                and tmp_host_id is not None
+            ):
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_channel_info_standard(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_info(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_info(self, group_id)
         return res_data
 
     def get_group_info(self, group_id: 'str|int', host_id: 'str|int|None' = None, no_cache: bool = False,
                        flag_log: bool = True, remote: bool = False):
+        """获取群信息
+
+        用于获取群信息
+
+        Args:
+            group_id: 群对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+
+        Returns:
+            dict: 整个返回值为GROUP类型
+        """
         res_data = None
         if remote:
             pass
@@ -1842,6 +2872,10 @@ class Event(object):
                 res_data = OlivOS.onebotV12SDK.event_action.get_group_list(self)
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_list(self)
             elif self.platform['model'] in OlivOS.OPQBotLinkServerAPI.gCheckList:
                 res_data = OlivOS.OPQBotSDK.event_action.get_group_list(self, self.plugin_info['control_queue'])
         elif self.platform['sdk'] == 'kaiheila_link':
@@ -1855,11 +2889,28 @@ class Event(object):
                 res_data = OlivOS.kaiheilaSDK.event_action.get_group_list(self, tmp_host_id)
         elif self.platform['sdk'] == 'xiaoheihe_link':
             res_data = OlivOS.xiaoheiheSDK.event_action.get_group_list(self)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            # 频道列表属于 guild，使用事件中的 host_id；QQ 群没有群列表接口。
+            tmp_host_id = None
+            if hasattr(self.data, 'host_id') and self.data.host_id is not None:
+                tmp_host_id = self.data.host_id
+            if tmp_host_id is not None:
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_guild_channel_list_standard(self, tmp_host_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_list(self)
         return res_data
 
     def get_group_list(self, flag_log: bool = True, remote: bool = False):
+        """获取群列表
+
+        用于获取群列表
+
+        Returns:
+            list[dict]: 整个返回值为GROUP类型的列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -1881,6 +2932,16 @@ class Event(object):
                     res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
                 else:
                     res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+                else:
+                    res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_info(self, group_id, user_id, no_cache)
+                else:
+                    res_data = OlivOS.onebotSDK.event_action.get_guild_member_profile(self, host_id, user_id)
         elif self.platform['sdk'] == 'telegram_poll':
             res_data = OlivOS.telegramSDK.event_action.get_group_member_info(self, group_id, user_id)
         elif self.platform['sdk'] == 'kaiheila_link':
@@ -1891,10 +2952,32 @@ class Event(object):
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
             res_data = OlivOS.kaiheilaSDK.event_action.get_group_member_info(self, tmp_host_id, user_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_member_info(self, group_id, user_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_info(
+                self,
+                group_id,
+                user_id,
+                no_cache=no_cache
+            )
         return res_data
 
     def get_group_member_info(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
                               no_cache: bool = False, flag_log: bool = True, remote: bool = False):
+        """获取群成员信息
+
+        用于获取群成员信息
+
+        Args:
+            group_id: 群对象ID
+            user_id: 群成员对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+
+        Returns:
+            dict: 整个返回值为GROUPUSER类型
+        """
         res_data = None
         if remote:
             pass
@@ -1912,6 +2995,15 @@ class Event(object):
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 if host_id is None:
                     res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                if host_id is None:
+                    res_data = OlivOS.onebotSDK.event_action.get_group_member_list(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'kaiheila_link':
             # KOOK 中，host_id 是服务器ID（guild_id），group_id 是频道ID（channel_id）
             # 获取服务器成员列表需要使用 host_id（guild_id）
@@ -1928,12 +3020,36 @@ class Event(object):
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
             res_data = OlivOS.xiaoheiheSDK.event_action.get_group_member_list(self, tmp_host_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            tmp_host_id = host_id
+            if tmp_host_id is None and hasattr(self.data, 'host_id'):
+                tmp_host_id = self.data.host_id
+            if tmp_host_id is not None:
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_guild_member_list_standard(self, tmp_host_id)
+            elif (
+                hasattr(self.data, 'extend')
+                and self.data.extend.get('flag_from_qq', False)
+                and not self.data.extend.get('flag_from_direct', False)
+            ):
+                # QQ 群成员列表:本地缓存优先(大群全量需 60 次请求,不能每次实时翻页)。
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
 
     def get_group_member_list(self, group_id: 'str|int', host_id: 'str|int|None' = None, flag_log: bool = True,
                               remote: bool = False):
+        """获取群成员列表
+
+        用于获取群成员列表
+
+        Args:
+            group_id: 群对象ID
+            host_id: 发送目标的所属HOST ID (default: None)
+
+        Returns:
+            list[dict]: 整个返回值为GROUPUSER类型的列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -1946,9 +3062,18 @@ class Event(object):
         res_data = None
         if self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_host_list(self)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_guild_list_standard(self)
         return res_data
 
     def get_host_list(self, flag_log: bool = True, remote: bool = False):
+        """获取频道列表
+
+        用于获取频道列表
+
+        Returns:
+            list: 频道列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -1961,9 +3086,18 @@ class Event(object):
         res_data = None
         if self.platform['sdk'] == 'kaiheila_link':
             res_data = OlivOS.kaiheilaSDK.event_action.get_host_info(self, host_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.get_guild_info_standard(self, host_id)
         return res_data
 
     def get_host_info(self, host_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取频道信息
+
+        用于获取频道信息
+
+        Args:
+            host_id: 频道ID
+        """
         res_data = None
         if remote:
             pass
@@ -1979,11 +3113,25 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_image(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.can_send_image(self)
         return res_data
 
     def can_send_image(self, flag_log: bool = True, remote: bool = False):
+        """检查是否可以发送图片
+
+        用于检查是否可以发送图片
+
+        Returns:
+            yes (bool): 是否可以发送图片
+        """
         res_data = None
         if remote:
             pass
@@ -1999,11 +3147,25 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.can_send_record(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.can_send_record(self)
         return res_data
 
     def can_send_record(self, flag_log: bool = True, remote: bool = False):
+        """检查是否可以发送语音
+
+        用于检查是否可以发送语音
+
+        Returns:
+            yes (bool): 是否可以发送语音
+        """
         res_data = None
         if remote:
             pass
@@ -2019,11 +3181,26 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_status(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_status(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_status(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_status(self)
         return res_data
 
     def get_status(self, flag_log: bool = True, remote: bool = False):
+        """获取运行状态
+
+        用于获取OneBot运行状态
+
+        Returns:
+            online (bool): 当前QQ在线状态
+            good (bool): 状态符合预期
+        """
         res_data = None
         if remote:
             pass
@@ -2039,11 +3216,27 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_version_info(self)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_version_info(self)
         return res_data
 
     def get_version_info(self, flag_log: bool = True, remote: bool = False):
+        """获取版本信息
+
+        用于获取OneBot版本信息
+
+        Returns:
+            name (str): 应用标识
+            version (str): 应用版本
+            protocol_version (str): OneBot协议版本
+        """
         res_data = None
         if remote:
             pass
@@ -2060,13 +3253,38 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.upload_group_file(self, group_id, file, name, folder_id)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.upload_group_file(
+                self, group_id, file, name, folder_id
+            )
+            return res_data
 
     def upload_group_file(self, group_id: 'str|int', file: str, name: str = '', folder_id: 'str|None' = None,
                           flag_log: bool = True, remote: bool = False):
+        """上传群文件
+
+        用于上传群文件
+
+        支持平台：OneBotV11、QQ Guild V2（QQ 群）
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            file: 本地文件路径
+            name: 存储名称 (default: '')
+            folder_id: 父目录ID (default: None)
+        """
         if remote:
             pass
         else:
-            self.__upload_group_file(group_id, file, name, folder_id, flag_log)
+            return self.__upload_group_file(group_id, file, name, folder_id, flag_log)
 
     @callbackLogger('delete_group_file')
     def __delete_group_file(self, group_id, file_id, name=None, flag_log=True):
@@ -2075,9 +3293,28 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_group_file(self, group_id, file_id, name)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_group_file(self, group_id, file_id, name)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_group_file(self, group_id, file_id, name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_group_file(self, group_id, file_id, name)
 
     def delete_group_file(self, group_id: 'str|int', file_id: str, name: 'str|None' = None, flag_log: bool = True,
                           remote: bool = False):
+        """删除群文件
+
+        用于删除群文件
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            file_id: 文件ID
+            name: 文件名（未使用） (default: None)
+        """
         if remote:
             pass
         else:
@@ -2090,9 +3327,28 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.create_group_file_folder(self, group_id, name, parent_id)
 
     def create_group_file_folder(self, group_id: 'str|int', name: str, parent_id: str = '/', flag_log: bool = True,
                                  remote: bool = False):
+        """创建群文件夹
+
+        用于创建群文件夹
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            name: 文件夹名称
+            parent_id: 父目录ID (default: '/')
+        """
         if remote:
             pass
         else:
@@ -2105,8 +3361,26 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.delete_group_folder(self, group_id, folder_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_group_folder(self, group_id, folder_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.delete_group_folder(self, group_id, folder_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.delete_group_folder(self, group_id, folder_id)
 
     def delete_group_folder(self, group_id: 'str|int', folder_id: str, flag_log: bool = True, remote: bool = False):
+        """删除群文件夹
+
+        用于删除群文件夹
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            folder_id: 文件夹ID
+        """
         if remote:
             pass
         else:
@@ -2120,9 +3394,32 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_system_info(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_file_system_info(self, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_file_system_info(self, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_file_system_info(self, group_id)
         return res_data
 
     def get_group_file_system_info(self, group_id: 'str|int', flag_log: bool = True, remote: bool = False):
+        """获取群文件系统信息
+
+        用于获取群文件系统信息
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+
+        Returns:
+            file_count (int): 文件数量，Defaults to 0
+            limit_count (int): 文件数量限制，Defaults to 0
+            used_space (int): 已使用空间，Defaults to 0
+            total_space (int): 总空间，Defaults to 0
+        """
         res_data = None
         if remote:
             pass
@@ -2138,6 +3435,15 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_root_files(self, group_id, file_count)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_root_files(
+                    self, group_id, file_count
+                )
         return res_data
 
     def get_group_root_files(
@@ -2146,6 +3452,22 @@ class Event(object):
         flag_log: bool = True,
         remote: bool = False
     ):
+        """获取群根目录文件列表
+
+        用于获取群根目录文件列表
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot（file_count参数仅NapCat支持）
+
+        Args:
+            group_id: 群ID
+            file_count: 获取数量（NapCat支持） (default: None)
+
+        Returns:
+            list[dict]: 整个返回值为列表，列表中每项包含以下字段：
+                - files (list): 文件列表，Defaults to []
+                - folders (list): 文件夹列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -2163,10 +3485,39 @@ class Event(object):
                 res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(
                     self, group_id, folder_id, file_count
                 )
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(
+                    self, group_id, folder_id, file_count
+                )
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_files_by_folder(
+                    self, group_id, folder_id, file_count
+                )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_files_by_folder(
+                    self, group_id, folder_id, file_count
+                )
         return res_data
 
     def get_group_files_by_folder(self, group_id: 'str|int', folder_id: str, file_count: 'int|None' = None,
                                   flag_log: bool = True, remote: bool = False):
+        """获取群子目录文件列表
+
+        用于获取群子目录文件列表
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot（file_count参数仅NapCat支持）
+
+        Args:
+            group_id: 群ID
+            folder_id: 文件夹ID
+            file_count: 获取数量（NapCat支持） (default: None)
+
+        Returns:
+            files (list): 文件列表，Defaults to []
+            folders (list): 文件夹列表，Defaults to []
+        """
         res_data = None
         if remote:
             pass
@@ -2182,10 +3533,32 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 res_data = OlivOS.onebotSDK.event_action.get_group_file_url(self, group_id, file_id, busid)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_file_url(self, group_id, file_id, busid)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                res_data = OlivOS.onebotSDK.event_action.get_group_file_url(self, group_id, file_id, busid)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                res_data = OlivOS.milkySDK.event_action.get_group_file_url(self, group_id, file_id)
         return res_data
 
     def get_group_file_url(self, group_id: 'str|int', file_id: str, busid: int, flag_log: bool = True,
                            remote: bool = False):
+        """获取群文件下载链接
+
+        用于获取群文件下载链接
+
+        支持平台：OneBotV11
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            file_id: 文件ID
+            busid: 文件类型
+
+        Returns:
+            url (str): 文件下载URL, Defaults to ''
+        """
         res_data = None
         if remote:
             pass
@@ -2200,13 +3573,37 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.upload_private_file(self, user_id, file, name)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.upload_private_file(self, user_id, file, name)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.upload_private_file(self, user_id, file, name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.upload_private_file(self, user_id, file, name)
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            res_data = OlivOS.qqGuildv2SDK.event_action.upload_private_file(
+                self, user_id, file, name
+            )
+            return res_data
 
     def upload_private_file(self, user_id: 'str|int', file: str, name: str, flag_log: bool = True,
                             remote: bool = False):
+        """上传私聊文件
+
+        用于上传私聊文件
+
+        支持平台：OneBotV11、QQ Guild V2（C2C 私聊）
+        支持协议：go-cqhttp、Lagrange、NapCat、LLOneBot
+
+        Args:
+            user_id: 用户ID
+            file: 本地文件路径
+            name: 文件名称
+        """
         if remote:
             pass
         else:
-            self.__upload_private_file(user_id, file, name, flag_log)
+            return self.__upload_private_file(user_id, file, name, flag_log)
 
     @callbackLogger('rename_group_file_folder')
     def __rename_group_file_folder(self, group_id, folder_id, new_folder_name, flag_log=True):
@@ -2215,12 +3612,31 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.rename_group_file_folder(self, group_id, folder_id, new_folder_name)
 
     def rename_group_file_folder(
         self, group_id: 'str|int', folder_id: str, new_folder_name: str,
         flag_log: bool = True,
         remote: bool = False
     ):
+        """重命名群文件夹
+
+        用于重命名群文件夹
+
+        支持平台：OneBotV11
+        支持协议：LLOneBot、Lagrange
+
+        Args:
+            group_id: 群ID
+            folder_id: 文件夹ID
+            new_folder_name: 新文件夹名称
+        """
         if remote:
             pass
         else:
@@ -2235,12 +3651,38 @@ class Event(object):
                 OlivOS.onebotSDK.event_action.rename_group_file(
                     self, group_id, file_id, current_parent_directory, new_name
                 )
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.rename_group_file(
+                    self, group_id, file_id, current_parent_directory, new_name
+                )
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.rename_group_file(
+                    self, group_id, file_id, current_parent_directory, new_name
+                )
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.rename_group_file(
+                    self, group_id, file_id, current_parent_directory, new_name
+                )
 
     def rename_group_file(
         self, group_id: 'str|int', file_id: str, current_parent_directory: str, new_name: str,
         flag_log: bool = True,
         remote: bool = False
     ):
+        """重命名群文件
+
+        用于重命名群文件
+
+        支持平台：OneBotV11
+        支持协议：NapCat
+
+        Args:
+            group_id: 群ID
+            file_id: 文件ID
+            current_parent_directory: 当前父目录路径
+            new_name: 新文件名
+        """
         if remote:
             pass
         else:
@@ -2253,8 +3695,28 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_group_file_forever(self, group_id, file_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_group_file_forever(self, group_id, file_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_group_file_forever(self, group_id, file_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_group_file_forever(
+                    self, group_id, file_id
+                )
 
     def set_group_file_forever(self, group_id: 'str|int', file_id: str, flag_log: bool = True, remote: bool = False):
+        """群文件转永久
+
+        用于将群文件转为永久保存
+
+        支持平台：OneBotV11
+        支持协议：NapCat、LLOneBot
+
+        Args:
+            group_id: 群ID
+            file_id: 文件ID
+        """
         if remote:
             pass
         else:
@@ -2267,6 +3729,37 @@ class Event(object):
                 pass
             elif self.platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                 OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
+            elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
+                OlivOS.onebotSDK.event_action.set_msg_emoji_like(self, message_id, emoji_id, is_set, group_id)
+        elif self.platform['sdk'] == 'milky':
+            if self.platform['model'] in OlivOS.milkyAutoServerAPI.gCheckList:
+                OlivOS.milkySDK.event_action.set_msg_emoji_like(
+                    self, message_id, emoji_id, is_set, group_id
+                )
+        elif self.platform['sdk'] == 'qqGuildv2_link':
+            # QQ 频道表情回应使用子频道 ID，QQ 群/C2C 暂无对应接口。
+            if (
+                group_id is not None
+                and hasattr(self.data, 'host_id')
+                and self.data.host_id is not None
+                and getattr(self.data, 'extend', {}).get('qq_event_type') in ['MESSAGE_CREATE', 'AT_MESSAGE_CREATE']
+            ):
+                if is_set:
+                    OlivOS.qqGuildv2SDK.event_action.set_message_reaction(
+                        self,
+                        group_id,
+                        message_id,
+                        emoji_id
+                    )
+                else:
+                    OlivOS.qqGuildv2SDK.event_action.delete_message_reaction(
+                        self,
+                        group_id,
+                        message_id,
+                        emoji_id
+                    )
 
     def set_msg_emoji_like(
         self, message_id: 'str|int', emoji_id: 'str|int',
@@ -2275,6 +3768,22 @@ class Event(object):
         flag_log: bool = True,
         remote: bool = False
     ):
+        """消息表情回应
+
+        用于给消息添加或取消表情回应，统合了所有主流协议的接口实现
+
+        支持平台：OneBotV11、QQ Guild V2（频道消息）
+        支持协议：Lagrange、NapCat、LLOneBot
+        - Lagrange 平台必须提供 group_id 参数，使用 set_group_reaction 接口
+        - NapCat 使用 set_msg_emoji_like 接口，emoji_id为整数
+        - LLOneBot 根据is_set使用 set_msg_emoji_like 或 unset_msg_emoji_like 接口
+
+        Args:
+            message_id: 消息ID
+            emoji_id: 表情ID（Lagrange使用字符串code，NapCat和LLOneBot使用整数ID）
+            is_set: True为添加，False为取消 (default: True)
+            group_id: 群ID或频道ID（Lagrange、QQ Guild V2 必需） (default: None)
+        """
         if remote:
             pass
         else:

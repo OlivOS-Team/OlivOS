@@ -19,6 +19,7 @@ import requests as req
 from urllib import parse
 import os
 import time
+import uuid
 import traceback
 
 import OlivOS
@@ -47,6 +48,8 @@ lagrangeModelMap = [
 
 gFlagCheckList = []
 
+gResReg = {}
+
 
 class bot_info_T(object):
     def __init__(self, id=-1, host='', port=-1, access_token=None):
@@ -58,6 +61,20 @@ class bot_info_T(object):
         self.debug_logger = None
 
 
+def get_SDK_bot_info_from_Plugin_bot_info(plugin_bot_info: OlivOS.API.bot_info_T):
+    res = bot_info_T(
+        id=plugin_bot_info.id,
+        host=plugin_bot_info.post_info.host,
+        port=plugin_bot_info.post_info.port,
+        access_token=plugin_bot_info.post_info.access_token
+    )
+    res.hash = plugin_bot_info.hash
+    res.server_type = plugin_bot_info.post_info.type
+    res.platform = plugin_bot_info.platform['platform']
+    res.debug_mode = plugin_bot_info.debug_mode
+    return res
+
+
 def get_SDK_bot_info_from_Event(target_event):
     res = bot_info_T(
         target_event.bot_info.id,
@@ -65,8 +82,38 @@ def get_SDK_bot_info_from_Event(target_event):
         target_event.bot_info.post_info.port,
         target_event.bot_info.post_info.access_token
     )
+    res.hash = target_event.bot_info.hash
+    res.server_type = target_event.bot_info.post_info.type
     res.debug_mode = target_event.bot_info.debug_mode
     return res
+
+
+def sendControlEventSend(action, data, control_queue):
+    if control_queue is not None:
+        control_queue.put(
+            OlivOS.API.Control.packet(
+                action,
+                data
+            ),
+            block=False
+        )
+
+
+def send_ws_event(type, hash, data, control_queue):
+    sendControlEventSend(
+        'send',
+        {
+            'target': {
+                'type': type,
+                'hash': hash
+            },
+            'data': {
+                'action': 'send',
+                'data': data
+            }
+        },
+        control_queue
+    )
 
 
 class send_onebot_post_json_T(object):
@@ -86,21 +133,22 @@ class send_onebot_post_json_T(object):
             return None
         else:
             try:
+                # clear_dict = {k: v for k, v in self.obj.__dict__.items() if v != -1}
                 clear_dict = self.obj.__dict__
                 if clear_dict.get('message_type') == 'private':
                     clear_dict.pop('group_id', 'No "group_id"')
                 json_str_tmp = json.dumps(obj=clear_dict, ensure_ascii=False)
-                tmp_host = self.bot_info.host
-                if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
-                    pass
+
+                if self.bot_info.host.startswith('http://') or self.bot_info.host.startswith('https://'):
+                    protocol_header = ''
                 else:
-                    tmp_host = 'http://' + tmp_host
+                    protocol_header = 'http://'
                 token_str = ''
                 token_dict = {}
                 if len(self.bot_info.access_token) > 0:
                     token_str = f'?access_token={self.bot_info.access_token}'
                     token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
-                send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
+                send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
 
                 if self.bot_info.debug_mode:
                     if self.bot_info.debug_logger is not None:
@@ -126,18 +174,69 @@ class api_templet(object):
         self.bot_info = None
         self.data = None
         self.node_ext = None
-        self.res = None
+        self.echo = str(uuid.uuid4())
+        self.res: api_templet.Result = None
 
-    def do_api(self):
-        this_post_json = send_onebot_post_json_T()
-        this_post_json.bot_info = self.bot_info
-        this_post_json.obj = self.data
-        this_post_json.node_ext = self.node_ext
-        try:
-            self.res = this_post_json.send_onebot_post_json()
-        except Exception:
-            self.res = None
+    class Result(object):
+        def __init__(self, raw: str | dict):
+            self.body = raw
+
+    def do_api(self, control_queue=None):
+        server_type = self.bot_info.server_type
+        if server_type == "post":
+            this_post_json = send_onebot_post_json_T()
+            this_post_json.bot_info = self.bot_info
+            this_post_json.obj = self.data
+            this_post_json.node_ext = self.node_ext
+            try:
+                tmp_raw = this_post_json.send_onebot_post_json()
+                self.res = self.Result(tmp_raw.text)
+            except Exception:
+                self.res = None
+        elif server_type == "websocket":
+            try:
+                bot_hash = self.bot_info.hash
+                data = self.do_dump()
+                waitForResReady(self.echo)
+                self.res = send_ws_event(
+                    type="onebotV11_link",
+                    hash=bot_hash,
+                    data=data,
+                    control_queue=control_queue
+                )
+                tmp_raw = waitForRes(self.echo)
+                self.res = self.Result(tmp_raw)
+            except Exception:
+                self.res = None
+        elif server_type == "websocket_host":
+            try:
+                bot_hash = self.bot_info.hash
+                data = self.do_dump()
+                waitForResReady(self.echo)
+                send_ws_event(
+                    type='onebotV11_host',
+                    hash=bot_hash,
+                    data=data,
+                    control_queue=control_queue
+                )
+                tmp_raw = waitForRes(self.echo)
+                self.res = self.Result(tmp_raw)
+            except Exception:
+                self.res = None
         return self.res
+
+    def do_dump(self):
+        res_obj = {
+            'action': self.node_ext,
+            'params': {},
+            'echo': self.echo
+        }
+        if self.data is not None:
+            for key_this in self.data.__dict__:
+                if self.data.__dict__[key_this] != -1:
+                    res_obj['params'][key_this] = self.data.__dict__[key_this]
+        res = json.dumps(res_obj, ensure_ascii=False)
+        return res
 
     def do_api_async(self):
         this_post_json = send_onebot_post_json_T()
@@ -170,17 +269,16 @@ class api_templet(object):
         ):
             return None
         try:
-            tmp_host = self.bot_info.host
-            if tmp_host.startswith('http://') or tmp_host.startswith('https://'):
-                pass
+            if self.bot_info.host.startswith('http://') or self.bot_info.host.startswith('https://'):
+                protocol_header = ''
             else:
-                tmp_host = 'http://' + tmp_host
+                protocol_header = 'http://'
             token_str = ''
             token_dict = {}
             if len(self.bot_info.access_token) > 0:
                 token_str = f'?access_token={self.bot_info.access_token}'
                 token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
-            send_url = f'{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
+            send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ': GET request')
@@ -199,7 +297,7 @@ class api_templet(object):
 
 
 class event(object):
-    def __init__(self, raw):
+    def __init__(self, raw, extras: dict = None):
         self.raw = raw
         self.json = self.event_load(raw)
         self.platform = {'sdk': 'onebot', 'platform': 'qq', 'model': 'default'}
@@ -208,9 +306,19 @@ class event(object):
             self.active = True
         self.base_info = {}
         if self.active:
-            self.base_info['time'] = self.json['time']
-            self.base_info['self_id'] = self.json['self_id']
-            self.base_info['post_type'] = self.json['post_type']
+            if 'retcode' not in self.json:
+                # 以retcode字段区分事件上报/API响应
+                self.base_info['time'] = self.json['time']
+                self.base_info['self_id'] = self.json['self_id']
+                self.base_info['post_type'] = self.json['post_type']
+            if extras is not None:
+                # 兼容新的websocket驱动器(onebotV11HostServer/onebotV11LinkServer)
+                if 'id' in extras:
+                    self.base_info['self_id'] = extras['id']
+                if 'type' in extras:
+                    self.base_info['server_type'] = extras['type']
+                if 'token' in extras:
+                    self.base_info['access_token'] = extras['token']
 
     def event_load(self, raw):
         try:
@@ -227,12 +335,10 @@ def format_cq_code_msg(msg):
     elif type(msg) is list:
         res = ''
         for msg_this in msg:
-            if (
-                type(msg_this) is dict
-                and 'type' in msg_this
-                and 'data' in msg_this
-                and type(msg_this['data']) is dict
-            ):
+            if type(msg_this) is dict \
+                    and 'type' in msg_this \
+                    and 'data' in msg_this \
+                    and type(msg_this['data']) is dict:
                 if msg_this['type'] == 'text':
                     if 'text' in msg_this['data']:
                         res += msg_this['data']['text']
@@ -243,23 +349,37 @@ def format_cq_code_msg(msg):
                             cq_params.append(f"name={msg_this['data']['name']}")
                         res += f"[CQ:at,{','.join(cq_params)}]"
                 else:
-                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + [
-                        f"{key_this}={msg_this['data'][key_this]}"
-                        for key_this in msg_this['data']
-                    ]) + ']'
+                    res += (
+                        '['
+                        + ','.join(
+                            [f"CQ:{msg_this['type']}"]
+                            + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]
+                        )
+                        + ']'
+                    )
     return res
 
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
-    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
-    target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']
+    target_event.base_info['self_id'] = str(target_event.sdk_event.base_info.get('self_id', '-1'))
+    target_event.base_info['type'] = target_event.sdk_event.base_info.get('post_type', 'None')
     target_event.platform['sdk'] = target_event.sdk_event.platform['sdk']
     target_event.platform['platform'] = target_event.sdk_event.platform['platform']
     target_event.platform['model'] = target_event.sdk_event.platform['model']
     target_event.plugin_info['message_mode_rx'] = 'old_string'
-    if target_event.base_info['type'] == 'message_sent':
+    if (
+        'retcode' in target_event.sdk_event.json
+        and 'echo' in target_event.sdk_event.json
+        and type(target_event.sdk_event.json['echo']) is str
+    ):
+        target_event.active = False
+        waitForResSet(
+            target_event.sdk_event.json['echo'],
+            target_event.sdk_event.json
+        )
+    elif target_event.base_info['type'] == 'message_sent':
         """_自身消息事件_
         添加`message_sent`事件,详见:https://docs.go-cqhttp.org/event/#%E6%89%80%E6%9C%89%E4%B8%8A%E6%8A%A5
         """
@@ -582,8 +702,9 @@ def paraMapper(paraList, msgType='para'):
             res += para.CQ()
     return res
 
-
 # 支持OlivOS API调用的方法实现
+
+
 class event_action(object):
     def reply_private_msg(target_event, message):
         event_action.send_private_msg(
@@ -601,16 +722,18 @@ class event_action(object):
 
     def send_private_msg(target_event, user_id, message):
         msgType = 'msg'
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'private'
         this_msg.data.user_id = str(user_id)
         if target_event.bot_info.platform['model'] in paraMsgMap:
             msgType = 'para'
         this_msg.data.message = formatMessage(data=message, msgType=msgType)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def send_group_msg(target_event, group_id, message):
         msgType = 'msg'
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_type = 'group'
         this_msg.data.group_id = str(group_id)
@@ -619,23 +742,25 @@ class event_action(object):
         if target_event.bot_info.platform['model'] in paraMsgMap:
             msgType = 'para'
         this_msg.data.message = formatMessage(data=message, msgType=msgType)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def delete_msg(target_event, message_id):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.delete_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = str(message_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def get_msg(target_event, message_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_msg()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = str(message_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['message_id'] = str(init_api_do_mapping_for_dict(raw_obj, ['message_id'], int))
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['real_id'], int))
@@ -654,115 +779,132 @@ class event_action(object):
     def get_forward_msg(target_event, message_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_forward_msg()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_forward_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.id = str(message_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['messages'] = init_api_do_mapping_for_dict(raw_obj, ['messages'], list)
         return res_data
 
     def send_group_forward_msg(target_event, group_id, messages):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_group_forward_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.messages = messages
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def send_private_forward_msg(target_event, user_id, messages):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_private_forward_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.messages = messages
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_essence_msg(target_event, message_id):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_essence_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = int(message_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def delete_essence_msg(target_event, message_id):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.delete_essence_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.message_id = int(message_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def send_like(target_event, user_id, times=1):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_like(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.times = times
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def send_group_sign(target_event, group_id):
         model = target_event.bot_info.platform['model']
         if model in lagrangeModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_group_sign(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
-    def set_group_kick(target_event, group_id, user_id, rehect_add_request=False):
+    def set_group_kick(target_event, group_id, user_id, reject_add_request=False):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
-        this_msg.data.rehect_add_request = rehect_add_request
-        this_msg.do_api()
+        this_msg.data.reject_add_request = reject_add_request
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_ban(target_event, group_id, user_id, duration=1800):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_ban(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.duration = duration
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_anonymous_ban(target_event, group_id, anonymous, anonymous_flag, duration=1800):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_anonymous_ban(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.anonymous = anonymous
         this_msg.data.anonymous_flag = anonymous_flag
         this_msg.data.duration = duration
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_whole_ban(target_event, group_id, enable):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_whole_ban(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.enable = enable
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_admin(target_event, group_id, user_id, enable):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_admin(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.enable = enable
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_anonymous(target_event, group_id, enable):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_anonymous(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.enable = enable
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_card(target_event, group_id, user_id, card):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_card(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.card = card
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_name(target_event, group_id, group_name):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_name(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.group_name = group_name
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_leave(target_event, group_id, is_dismiss=False):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_leave(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.is_dismiss = is_dismiss
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_special_title(target_event, group_id, user_id, special_title, duration):
         model = target_event.bot_info.platform['model']
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_special_title(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
@@ -770,32 +912,35 @@ class event_action(object):
         # llonebot 和 napcat 不需要 duration 参数
         if model not in llonebotModelMap and model not in napcatModelMap:
             this_msg.data.duration = duration
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_friend_add_request(target_event, flag, approve, remark):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_friend_add_request(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.flag = flag
         this_msg.data.approve = approve
         this_msg.data.remark = remark
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_add_request(target_event, flag, sub_type, approve, reason):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_add_request(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.flag = flag
         this_msg.data.sub_type = sub_type
         this_msg.data.approve = approve
         this_msg.data.reason = reason
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_login_info(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -804,14 +949,15 @@ class event_action(object):
     def get_stranger_info(target_event, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_stranger_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -820,12 +966,13 @@ class event_action(object):
     def get_friend_list(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_friend_list()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_friend_list(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
@@ -837,14 +984,15 @@ class event_action(object):
     def get_group_info(target_event, group_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.no_cache = no_cache
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['group_name'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['group_id'], int))
@@ -856,37 +1004,41 @@ class event_action(object):
     def get_group_list(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_list()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_list(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_info_strip()
                     tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_name'], str)
                     tmp_res_data_this['id'] = str(init_api_do_mapping_for_dict(raw_obj_this, ['group_id'], int))
                     tmp_res_data_this['memo'] = init_api_do_mapping_for_dict(raw_obj_this, ['group_memo'], str)
-                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(raw_obj_this, ['member_count'],
-                                                                                     int)
-                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(raw_obj_this,
-                                                                                         ['max_member_count'], int)
+                    tmp_res_data_this['member_count'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['member_count'], int
+                    )
+                    tmp_res_data_this['max_member_count'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['max_member_count'], int
+                    )
                     res_data['data'].append(tmp_res_data_this)
         return res_data
 
     def get_group_member_info(target_event, group_id, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_member_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
         this_msg.data.no_cache = no_cache
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['user_id'], int))
@@ -907,13 +1059,14 @@ class event_action(object):
     def get_group_member_list(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_member_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
@@ -939,12 +1092,13 @@ class event_action(object):
     def can_send_image(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.can_send_image()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.can_send_image(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -952,12 +1106,13 @@ class event_action(object):
     def can_send_record(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.can_send_record()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.can_send_record(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['yes'] = init_api_do_mapping_for_dict(raw_obj, ['yes'], bool)
         return res_data
@@ -965,49 +1120,67 @@ class event_action(object):
     def get_status(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_status()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_status(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['online'] = init_api_do_mapping_for_dict(raw_obj, ['online'], bool)
                 res_data['data']['status']['packet_received'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'packet_received'], int
+                    raw_obj,
+                    ['stat', 'packet_received'],
+                    int
                 )
                 res_data['data']['status']['packet_sent'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'packet_sent'], int
+                    raw_obj,
+                    ['stat', 'packet_sent'],
+                    int
                 )
                 res_data['data']['status']['packet_lost'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'packet_lost'], int
+                    raw_obj,
+                    ['stat', 'packet_lost'],
+                    int
                 )
                 res_data['data']['status']['message_received'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'message_received'], int
+                    raw_obj,
+                    ['stat', 'message_received'],
+                    int
                 )
                 res_data['data']['status']['message_sent'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'message_sent'], int
+                    raw_obj,
+                    ['stat', 'message_sent'],
+                    int
                 )
                 res_data['data']['status']['disconnect_times'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'disconnect_times'], int
+                    raw_obj,
+                    ['stat', 'disconnect_times'],
+                    int
                 )
                 res_data['data']['status']['lost_times'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'lost_times'], int
+                    raw_obj,
+                    ['stat', 'lost_times'],
+                    int
                 )
                 res_data['data']['status']['last_message_time'] = init_api_do_mapping_for_dict(
-                    raw_obj, ['stat', 'last_message_time'], int
+                    raw_obj,
+                    ['stat', 'last_message_time'],
+                    int
                 )
         return res_data
 
     def get_version_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_version_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_version_info(get_SDK_bot_info_from_Event(target_event))
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['app_name'], str)
                 res_data['data']['version_full'] = init_api_do_mapping_for_dict(raw_obj, ['app_full_name'], str)
@@ -1019,23 +1192,25 @@ class event_action(object):
     # 以下为 go-cqhttp v1.0.0-beta8-fix1 引入的试验性接口
 
     def send_guild_channel_msg(target_event, guild_id, channel_id, message):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_guild_channel_msg(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.guild_id = int(guild_id)
         this_msg.data.channel_id = int(channel_id)
         this_msg.data.message = message
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def get_guild_member_profile(target_event, guild_id, user_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_guild_member_profile(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.guild_id = int(guild_id)
         this_msg.data.user_id = int(user_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['nickname'], str)
                 res_data['data']['id'] = str(init_api_do_mapping_for_dict(raw_obj, ['tiny_id'], str))
@@ -1052,13 +1227,14 @@ class event_action(object):
     def get_group_notice(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_notice()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_notice(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 model = target_event.bot_info.platform['model']
                 for raw_obj_this in raw_obj:
@@ -1077,6 +1253,7 @@ class event_action(object):
 
     def send_group_notice(target_event, group_id, content, image=None, **kwargs):
         model = target_event.bot_info.platform['model']
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.send_group_notice(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.content = str(content)
@@ -1094,19 +1271,21 @@ class event_action(object):
                 this_msg.data.is_show_edit_card = kwargs['is_show_edit_card']
             if 'tip_window_type' in kwargs and kwargs['tip_window_type'] is not None:
                 this_msg.data.tip_window_type = kwargs['tip_window_type']
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def del_group_notice(target_event, group_id, notice_id):
         """删除群公告（支持 NapCat、Lagrange 和 LLOneBot）"""
         model = target_event.bot_info.platform['model']
         if model not in napcatModelMap and model not in lagrangeModelMap and model not in llonebotModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.del_group_notice(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.notice_id = str(notice_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def upload_group_file(target_event, group_id, file, name='', folder_id=None):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.upload_group_file(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.file = file
@@ -1114,10 +1293,13 @@ class event_action(object):
             this_msg.data.name = name
         if folder_id is not None:
             this_msg.data.folder_id = folder_id
-        this_msg.do_api()
+        elif hasattr(this_msg.data, 'folder_id'):
+            del this_msg.data.folder_id
+        this_msg.do_api(control_queue=control_queue)
 
     def delete_group_file(target_event, group_id, file_id, name=None):
         model = target_event.bot_info.platform['model']
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.delete_group_file(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         # llonebot 和 napcat 没有 parent_id
@@ -1126,31 +1308,34 @@ class event_action(object):
         else:
             this_msg.data.file_id = str(file_id)
             this_msg.data.parent_id = '/'
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def create_group_file_folder(target_event, group_id, name, parent_id='/'):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.create_group_file_folder(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.name = name
         this_msg.data.parent_id = parent_id
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def delete_group_folder(target_event, group_id, folder_id):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.delete_group_folder(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.folder_id = str(folder_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def get_group_file_system_info(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_system_info()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_file_system_info(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['file_count'] = init_api_do_mapping_for_dict(raw_obj, ['file_count'], int)
                 res_data['data']['limit_count'] = init_api_do_mapping_for_dict(raw_obj, ['limit_count'], int)
@@ -1162,16 +1347,17 @@ class event_action(object):
         model = target_event.bot_info.platform['model']
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_root_files()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_root_files(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         # napcat 支持 file_count 参数
         if model in napcatModelMap and file_count is not None:
             this_msg.data.file_count = int(file_count)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1181,17 +1367,18 @@ class event_action(object):
         model = target_event.bot_info.platform['model']
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_files_by_folder()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_files_by_folder(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.folder_id = str(folder_id)
         # napcat 支持 file_count 参数
         if model in napcatModelMap and file_count is not None:
             this_msg.data.file_count = int(file_count)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['files'] = init_api_do_mapping_for_dict(raw_obj, ['files'], list)
                 res_data['data']['folders'] = init_api_do_mapping_for_dict(raw_obj, ['folders'], list)
@@ -1200,25 +1387,27 @@ class event_action(object):
     def get_group_file_url(target_event, group_id, file_id, busid):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_file_url()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_file_url(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.file_id = str(file_id)
         this_msg.data.busid = int(busid)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 res_data['data']['url'] = init_api_do_mapping_for_dict(raw_obj, ['url'], str)
         return res_data
 
     def upload_private_file(target_event, user_id, file, name):
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.upload_private_file(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.user_id = int(user_id)
         this_msg.data.file = file
         this_msg.data.name = name
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     # 这里是三协议新引入的接口，以 LLOneBot 为主，NapCat 和 Lagrange 兼容实现
     def rename_group_file_folder(target_event, group_id, folder_id, new_folder_name):
@@ -1226,23 +1415,25 @@ class event_action(object):
         model = target_event.bot_info.platform['model']
         if model not in llonebotModelMap and model not in lagrangeModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.rename_group_file_folder(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.folder_id = str(folder_id)
         this_msg.data.new_folder_name = str(new_folder_name)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def rename_group_file(target_event, group_id, file_id, current_parent_directory, new_name):
         """重命名群文件（仅 NapCat）"""
         model = target_event.bot_info.platform['model']
         if model not in napcatModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.rename_group_file(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.file_id = str(file_id)
         this_msg.data.current_parent_directory = str(current_parent_directory)
         this_msg.data.new_name = str(new_name)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def set_group_file_forever(target_event, group_id, file_id):
         """群文件转永久（仅 LLOneBot 和 NapCat）"""
@@ -1250,12 +1441,14 @@ class event_action(object):
         if model not in llonebotModelMap and model not in napcatModelMap:
             return
         if model in llonebotModelMap:
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.set_group_file_forever(get_SDK_bot_info_from_Event(target_event))
         elif model in napcatModelMap:
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.trans_group_file(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.file_id = str(file_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def get_essence_msg_list(target_event, group_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_essence_msg_list()
@@ -1263,13 +1456,14 @@ class event_action(object):
         model = target_event.bot_info.platform['model']
         if model not in llonebotModelMap and model not in napcatModelMap and model not in lagrangeModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_essence_msg_list(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1302,14 +1496,15 @@ class event_action(object):
             return
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_ignore_add_request()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_ignore_add_request(get_SDK_bot_info_from_Event(target_event))
         if group_id is not None:
             this_msg.data.group_id = int(group_id)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1331,13 +1526,14 @@ class event_action(object):
             return
         res_data = OlivOS.contentAPI.api_result_data_template.get_doubt_friends_add_request()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_doubt_friends_add_request(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.count = int(count)
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is list:
+            if isinstance(raw_obj, list):
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
                     item = {}
@@ -1363,17 +1559,18 @@ class event_action(object):
             return
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_system_msg()
         raw_obj = None
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.get_group_system_msg(get_SDK_bot_info_from_Event(target_event))
         # LLOneBot 使用 GET，NapCat 使用 POST
         if model in llonebotModelMap:
-            this_msg.do_api_get()
+            this_msg.do_api(control_queue=control_queue)
         elif model in napcatModelMap:
             this_msg.data.count = int(count)
-            this_msg.do_api()
+            this_msg.do_api(control_queue=control_queue)
         if this_msg.res is not None:
-            raw_obj = init_api_json(this_msg.res.text)
+            raw_obj = init_api(this_msg.res.body)
         if raw_obj is not None:
-            if type(raw_obj) is dict:
+            if isinstance(raw_obj, dict):
                 res_data['active'] = True
                 # 处理邀请加群申请
                 if 'invited_requests' in raw_obj or 'InvitedRequest' in raw_obj:
@@ -1393,32 +1590,36 @@ class event_action(object):
         model = target_event.bot_info.platform['model']
         if model not in llonebotModelMap and model not in napcatModelMap:
             return
+        control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_doubt_friends_add_request(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.flag = str(flag)
         if model in napcatModelMap:
             this_msg.data.approve = approve
-        this_msg.do_api()
+        this_msg.do_api(control_queue=control_queue)
 
     def group_poke(target_event, group_id, user_id):
         model = target_event.bot_info.platform['model']
         if model in napcatModelMap or model in lagrangeModelMap or model in llonebotModelMap:
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.group_poke(get_SDK_bot_info_from_Event(target_event))
             this_msg.data.group_id = int(group_id)
             this_msg.data.user_id = int(user_id)
-            this_msg.do_api()
+            this_msg.do_api(control_queue=control_queue)
 
     def friend_poke(target_event, user_id):
         model = target_event.bot_info.platform['model']
         if model in napcatModelMap or model in lagrangeModelMap or model in llonebotModelMap:
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.friend_poke(get_SDK_bot_info_from_Event(target_event))
             this_msg.data.user_id = int(user_id)
-            this_msg.do_api()
+            this_msg.do_api(control_queue=control_queue)
 
     def set_msg_emoji_like(target_event, message_id, emoji_id, is_set=True, group_id=None):
         model = target_event.bot_info.platform['model']
 
         if model in lagrangeModelMap:
             # Lagrange 用 set_group_reaction
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.set_group_reaction(get_SDK_bot_info_from_Event(target_event))
             if group_id is None:
                 raise ValueError("Lagrange model requires group_id parameter")
@@ -1426,31 +1627,43 @@ class event_action(object):
             this_msg.data.message_id = int(message_id)
             this_msg.data.code = str(emoji_id)
             this_msg.data.is_add = is_set
-            this_msg.do_api()
+            this_msg.do_api(control_queue=control_queue)
 
         elif model in napcatModelMap:
             # NapCat 用 set_msg_emoji_like
+            control_queue = target_event.plugin_info['control_queue']
             this_msg = api.set_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
             this_msg.data.message_id = int(message_id)
             this_msg.data.emoji_id = int(emoji_id)
             this_msg.data.set = is_set
-            this_msg.do_api()
+            this_msg.do_api(control_queue=control_queue)
 
         elif model in llonebotModelMap:
             # LLOneBot 用 set_msg_emoji_like，根据 is_set 使用不同的 API
             if is_set:
+                control_queue = target_event.plugin_info['control_queue']
                 this_msg = api.set_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
                 this_msg.data.message_id = int(message_id)
                 this_msg.data.emoji_id = int(emoji_id)
-                this_msg.do_api()
+                this_msg.do_api(control_queue=control_queue)
             else:
+                control_queue = target_event.plugin_info['control_queue']
                 this_msg = api.unset_msg_emoji_like(get_SDK_bot_info_from_Event(target_event))
                 this_msg.data.message_id = int(message_id)
                 this_msg.data.emoji_id = int(emoji_id)
-                this_msg.do_api()
+                this_msg.do_api(control_queue=control_queue)
 
 
-def init_api_json(raw_str):
+def init_api(raw: str | dict) -> dict:
+    res_data = None
+    if isinstance(raw, str):
+        res_data = init_api_json_str(raw)
+    elif isinstance(raw, dict):
+        res_data = init_api_json_obj(raw)
+    return res_data
+
+
+def init_api_json_str(raw_str: str) -> dict | None:
     res_data = None
     tmp_obj = None
     flag_is_active = False
@@ -1458,26 +1671,47 @@ def init_api_json(raw_str):
         tmp_obj = json.loads(raw_str)
     except Exception:
         tmp_obj = None
-    if type(tmp_obj) is dict:
+    if isinstance(tmp_obj, dict):
         if 'status' in tmp_obj:
-            if type(tmp_obj['status']) is str:
+            if isinstance(tmp_obj['status'], str):
                 if tmp_obj['status'] == 'ok':
                     flag_is_active = True
         if 'retcode' in tmp_obj:
-            if type(tmp_obj['retcode']) is int:
+            if isinstance(tmp_obj['retcode'], int):
                 if tmp_obj['retcode'] == 0:
                     flag_is_active = True
     if flag_is_active:
         if 'data' in tmp_obj:
-            if type(tmp_obj['data']) is dict:
-                res_data = tmp_obj['data'].copy()
-            elif type(tmp_obj['data']) is list:
-                res_data = tmp_obj['data'].copy()
+            if isinstance(tmp_obj['data'], dict):
+                res_data = tmp_obj['data']
+            elif isinstance(tmp_obj['data'], list):
+                res_data = tmp_obj['data']
+    return res_data
+
+
+def init_api_json_obj(raw_obj: dict) -> dict | None:
+    tmp_obj = raw_obj
+    res_data = None
+    flag_is_active = False
+    if 'status' in tmp_obj:
+        if isinstance(tmp_obj['status'], str):
+            if tmp_obj['status'] == 'ok':
+                flag_is_active = True
+    if 'retcode' in tmp_obj:
+        if isinstance(tmp_obj['retcode'], int):
+            if tmp_obj['retcode'] == 0:
+                flag_is_active = True
+    if flag_is_active:
+        if 'data' in tmp_obj:
+            if isinstance(tmp_obj['data'], dict):
+                res_data = tmp_obj['data']
+            elif isinstance(tmp_obj['data'], list):
+                res_data = tmp_obj['data']
     return res_data
 
 
 def init_api_do_mapping(src_type, src_data):
-    if type(src_data) is src_type:
+    if isinstance(src_data, src_type):
         return src_data
 
 
@@ -1485,7 +1719,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
     res_data = None
     tmp_src_data = src_data
     for path_list_this in path_list:
-        if type(tmp_src_data) is dict:
+        if isinstance(tmp_src_data, dict):
             if path_list_this in tmp_src_data:
                 tmp_src_data = tmp_src_data[path_list_this]
             else:
@@ -1690,7 +1924,7 @@ class api(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
-                self.rehect_add_request = False
+                self.reject_add_request = False
 
     class set_group_ban(api_templet):
         def __init__(self, bot_info=None):
@@ -2235,6 +2469,7 @@ class api(object):
 
     class rename_group_file_folder(api_templet):
         """LLOneBot 和 Lagrange 支持"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2250,6 +2485,7 @@ class api(object):
 
     class rename_group_file(api_templet):
         """NapCat 支持"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2266,6 +2502,7 @@ class api(object):
 
     class set_group_file_forever(api_templet):
         """LLOneBot 支持 (群文件转永久)"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2280,6 +2517,7 @@ class api(object):
 
     class trans_group_file(api_templet):
         """NapCat 支持 (转存为永久文件)"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2387,6 +2625,7 @@ class api(object):
 
     class del_group_notice(api_templet):
         """删除群公告（支持 Lagrange、NapCat 和 LLOneBot）"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2401,6 +2640,7 @@ class api(object):
 
     class set_group_reaction(api_templet):
         """Lagrange 贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2417,6 +2657,7 @@ class api(object):
 
     class set_msg_emoji_like(api_templet):
         """NapCat/LLOneBot 贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2432,6 +2673,7 @@ class api(object):
 
     class unset_msg_emoji_like(api_templet):
         """LLOneBot 取消贴表情"""
+
         def __init__(self, bot_info=None):
             api_templet.__init__(self)
             self.bot_info = bot_info
@@ -2443,3 +2685,29 @@ class api(object):
             def __init__(self):
                 self.message_id = -1
                 self.emoji_id = -1
+
+
+def waitForResSet(echo: str, data):
+    if echo in gResReg:
+        gResReg[echo] = data
+
+
+def waitForResReady(echo: str):
+    gResReg[echo] = None
+
+
+def waitForRes(echo: str):
+    res = None
+    interval = 0.1
+    limit = 30
+    index_limit = int(limit / interval)
+    for i in range(index_limit):
+        time.sleep(interval)
+        if (
+            echo in gResReg
+            and gResReg[echo] is not None
+        ):
+            res = gResReg[echo]
+            gResReg.pop(echo)
+            break
+    return res
