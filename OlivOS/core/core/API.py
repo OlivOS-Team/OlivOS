@@ -2124,7 +2124,9 @@ class Event(object):
                 tmp_host_id = self.data.host_id
             OlivOS.xiaoheiheSDK.event_action.set_group_kick(self, tmp_host_id, user_id)
         elif self.platform['sdk'] == 'qqGuildv2_link':
-            # QQ 频道踢人使用 guild_id；QQ 群没有对应的官方踢人接口。
+            # QQ 频道踢人使用 guild_id;QQ 群走官方 batch_remove_members(内邀能力,
+            # 单次上限 20 个,此处单踢一个,批量能力见 adapter 的
+            # set_qq_group_batch_remove_members)。
             tmp_host_id = host_id
             if tmp_host_id is None and hasattr(self.data, 'host_id'):
                 tmp_host_id = self.data.host_id
@@ -2135,6 +2137,19 @@ class Event(object):
                     user_id,
                     reject_add_request
                 )
+            elif (
+                hasattr(self.data, 'extend')
+                and self.data.extend.get('flag_from_qq', False)
+                and not self.data.extend.get('flag_from_direct', False)
+                and group_id is not None
+            ):
+                # QQ 群踢人:reject_add_request 映射为同时加入群黑名单。
+                OlivOS.qqGuildv2SDK.event_action.set_qq_group_batch_remove_members(
+                    self,
+                    group_id,
+                    [user_id],
+                    add_to_member_blacklist=bool(reject_add_request)
+                )
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         elif self.platform['sdk'] == 'milky':
@@ -2144,7 +2159,7 @@ class Event(object):
                 )
 
     def set_group_kick(self, group_id: 'str|int', user_id: 'str|int', host_id: 'str|int|None' = None,
-                       rehect_add_request: bool = False, flag_log: bool = True, remote: bool = False):
+                       reject_add_request: bool = False, flag_log: bool = True, remote: bool = False):
         """踢出群成员
 
         用于踢出群成员
@@ -2153,12 +2168,12 @@ class Event(object):
             group_id: 群对象ID
             user_id: 群成员对象ID
             host_id: 发送目标的所属HOST ID (default: None)
-            rehect_add_request: 是否拉黑对象 (default: False)
+            reject_add_request: 是否拉黑对象 (default: False)
         """
         if remote:
             pass
         else:
-            self.__set_group_kick(group_id, user_id, host_id, rehect_add_request, flag_log=True)
+            self.__set_group_kick(group_id, user_id, host_id, reject_add_request, flag_log=True)
 
     @callbackLogger('set_group_ban')
     def __set_group_ban(self, group_id, user_id, host_id, duration, flag_log=True):
@@ -3016,7 +3031,8 @@ class Event(object):
                 and self.data.extend.get('flag_from_qq', False)
                 and not self.data.extend.get('flag_from_direct', False)
             ):
-                res_data = OlivOS.qqGuildv2SDK.event_action.get_qq_group_member_list_standard(self, group_id)
+                # QQ 群成员列表:本地缓存优先(大群全量需 60 次请求,不能每次实时翻页)。
+                res_data = OlivOS.qqGuildv2SDK.event_action.get_group_member_list(self, group_id)
         elif self.platform['sdk'] == 'telegram_poll':
             pass
         return res_data
