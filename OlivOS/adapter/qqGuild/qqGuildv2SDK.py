@@ -249,6 +249,38 @@ sdkUserInfoLock = threading.Lock()
 sdkUserInfoLastCleanup = 0.0
 sdkUserInfoTTL = 7 * 86400.0
 sdkUserInfoMaxSize = 50000
+# QQ 群成员本地持久化缓存(JSON 原子写,member_openid 为主键):
+# username=None 标记「待补全」;三级来源 Tier0 消息登记/Tier1 入群补全/Tier2 定期校准。
+sdkGroupMemberCacheInfo = {}
+sdkGroupMemberCacheLock = threading.Lock()
+sdkGroupMemberCacheLoadedKeys = set()
+sdkGroupMemberCacheFlushInterval = 5.0
+sdkGroupMemberCacheMaxMembersPerGroup = 20000
+sdkGroupMemberCacheDirRel = os.path.join('data', 'qqGuildv2', 'group_members')
+# 群管理接口滑动窗口限流:各接口独立配额(QPM),不与消息/撤回等共享池子互抢。
+sdkQQGroupApiRateInfo = {}
+sdkQQGroupApiRateInfoLock = threading.Lock()
+qqGroupApiRateLimitMap = {
+    'group_member_list': 60,
+    'group_member_info': 30,
+    'group_batch_remove_members': 30,
+    'group_member_blacklist_get': 30,
+    'group_member_blacklist_set': 60
+}
+qqGroupApiRateWindow = 60.0
+# 11253(应用无接口访问权限,内邀白名单能力)优雅降级:
+# 命中后该接口进入冷却期,冷却期内直接本地失败返回,不再消耗共享 QPM。
+sdkQQGroupApiDeniedUntil = {}
+qqGroupApiDeniedCooldown = 600.0
+qqGroupApiDeniedCode = 11253
+# Tier 2 定期全量错峰校准:低频兜底从不发言的潜水成员。
+sdkQQGroupCalibrationGroups = {}
+sdkQQGroupCalibrationBotInfo = {}
+sdkQQGroupCalibrationLock = threading.Lock()
+sdkQQGroupCalibrationThread = None
+sdkQQGroupCalibrationCheckInterval = 1800.0
+sdkQQGroupCalibrateMaxAge = 24 * 3600.0
+sdkQQGroupCalibrateGroupSpacing = 2.0
 
 
 class bot_info_T(object):
@@ -1319,6 +1351,24 @@ def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_i
                 sdkUserInfo.pop(key, None)
         for user_id in user_ids:
             sdkUserInfo[(str(bot_hash), user_id)] = record
+    # Tier 0(0 QPM):群消息事件的 author/mentions 自带昵称与角色,顺手写入
+    # 群成员持久化缓存,这是零成本的补全来源。
+    if chat_type == 'qq_group':
+        member_openid = user_obj.get('member_openid', None)
+        if member_openid is None:
+            member_openid = user_obj.get('id', None)
+        member_role = role
+        if member_role is None:
+            member_role = user_obj.get('member_role', None)
+        _qq_group_member_cache_record(
+            bot_hash,
+            chat_id,
+            member_openid,
+            username=username,
+            member_role=member_role,
+            bot=user_obj.get('bot', None),
+            union_openid=user_obj.get('union_openid', None)
+        )
     return record
 
 
@@ -1375,6 +1425,442 @@ def _get_qq_author_name_cached(bot_hash, author, fallback_user_id=None):
         if cached_name is not None:
             return cached_name
     return '用户'
+
+
+# ============ QQ 群成员持久化缓存(JSON 原子写) ============
+def _get_qq_group_member_cache_path(bot_hash, group_openid):
+    safe_name = re.sub(
+        r'[^A-Za-z0-9_-]',
+        '_',
+        '%s_%s' % (str(bot_hash), str(group_openid))
+    )
+    return os.path.join(sdkGroupMemberCacheDirRel, safe_name + '.json')
+
+
+def _load_qq_group_member_cache_locked(cache_key):
+    # 调用方需持有 sdkGroupMemberCacheLock;磁盘文件只加载一次。
+    if cache_key in sdkGroupMemberCacheLoadedKeys:
+        return
+    sdkGroupMemberCacheLoadedKeys.add(cache_key)
+    file_path = _get_qq_group_member_cache_path(*cache_key)
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as file_obj:
+                raw_obj = json.load(file_obj)
+            if isinstance(raw_obj, dict) and isinstance(raw_obj.get('members', None), dict):
+                entry = sdkGroupMemberCacheInfo.setdefault(
+                    cache_key,
+                    {'members': {}, 'dirty': False, 'last_flush': 0.0, 'last_full_sync': 0.0}
+                )
+                merged = entry['members']
+                for member_id, member_data in raw_obj['members'].items():
+                    if isinstance(member_data, dict):
+                        merged.setdefault(str(member_id), copy.deepcopy(member_data))
+                loaded_sync = raw_obj.get('last_full_sync', 0.0)
+                if isinstance(loaded_sync, (int, float)) and loaded_sync > 0:
+                    entry['last_full_sync'] = max(entry.get('last_full_sync', 0.0), loaded_sync)
+    except (OSError, ValueError):
+        # 缓存损坏时按空缓存处理,不阻塞消息主流程。
+        pass
+
+
+def _flush_qq_group_member_cache_locked(cache_key, force=False):
+    # 调用方需持有 sdkGroupMemberCacheLock;防抖落盘,临时文件 + os.replace 原子替换。
+    entry = sdkGroupMemberCacheInfo.get(cache_key, None)
+    if entry is None or not entry.get('dirty', False):
+        return
+    now = time.monotonic()
+    if not force and now - entry.get('last_flush', 0.0) < sdkGroupMemberCacheFlushInterval:
+        return
+    try:
+        OlivOS.contentAPI.releaseDir(sdkGroupMemberCacheDirRel)
+        file_path = _get_qq_group_member_cache_path(*cache_key)
+        tmp_path = file_path + '.tmp'
+        dump_obj = {
+            'version': 1,
+            'updated_at': int(time.time()),
+            'last_full_sync': entry.get('last_full_sync', 0.0),
+            'members': entry['members']
+        }
+        with open(tmp_path, 'w', encoding='utf-8') as file_obj:
+            json.dump(dump_obj, file_obj, ensure_ascii=False)
+        os.replace(tmp_path, file_path)
+        entry['dirty'] = False
+        entry['last_flush'] = now
+    except OSError:
+        # 磁盘异常时保留内存缓存,下次变更重试落盘。
+        pass
+
+
+def _qq_group_member_cache_record(
+    bot_hash,
+    group_openid,
+    member_openid,
+    username=None,
+    member_role=None,
+    bot=None,
+    joined_at=None,
+    union_openid=None,
+    flag_full_sync=False
+):
+    # 统一入缓存口:Tier0 消息登记/Tier1 入群占位/Tier2 全量校准都走这里。
+    # 只合并非空字段,绝不把已知昵称冲成 None;union_openid 不可靠,仅作参考字段保留。
+    if group_openid is None or str(group_openid) == '':
+        return
+    if member_openid is None or str(member_openid) == '':
+        return
+    if member_role not in ['member', 'admin', 'owner']:
+        member_role = None
+    if isinstance(username, str) and username.strip() in ['', '用户', 'Nobody']:
+        username = None
+    cache_key = (str(bot_hash), str(group_openid))
+    now_monotonic = time.monotonic()
+    with sdkGroupMemberCacheLock:
+        _load_qq_group_member_cache_locked(cache_key)
+        entry = sdkGroupMemberCacheInfo.setdefault(
+            cache_key,
+            {'members': {}, 'dirty': False, 'last_flush': 0.0, 'last_full_sync': 0.0}
+        )
+        members = entry['members']
+        member_id = str(member_openid)
+        record = members.get(member_id, None)
+        if record is None:
+            if len(members) >= sdkGroupMemberCacheMaxMembersPerGroup:
+                return
+            record = {
+                'username': None,
+                'member_role': None,
+                'bot': None,
+                'joined_at': None,
+                'union_openid': None,
+                'updated_at': 0
+            }
+            members[member_id] = record
+        if username is not None:
+            record['username'] = str(username)
+        if member_role is not None:
+            record['member_role'] = str(member_role)
+        if bot is not None:
+            record['bot'] = bool(bot)
+        if joined_at is not None and str(joined_at) != '':
+            record['joined_at'] = str(joined_at)
+        if union_openid is not None and str(union_openid) != '':
+            record['union_openid'] = str(union_openid)
+        record['updated_at'] = int(time.time())
+        if flag_full_sync:
+            entry['last_full_sync'] = now_monotonic
+        entry['dirty'] = True
+        _flush_qq_group_member_cache_locked(cache_key)
+
+
+def _qq_group_member_cache_record_members(bot_hash, group_openid, member_list):
+    if not isinstance(member_list, list):
+        return
+    for member_data in member_list:
+        if not isinstance(member_data, dict):
+            continue
+        _qq_group_member_cache_record(
+            bot_hash,
+            group_openid,
+            member_data.get('member_openid', None),
+            username=member_data.get('username', None),
+            member_role=member_data.get('member_role', None),
+            bot=member_data.get('bot', None),
+            joined_at=member_data.get('joined_at', None),
+            union_openid=member_data.get('union_openid', None),
+            flag_full_sync=True
+        )
+
+
+def _qq_group_member_cache_remove_member(bot_hash, group_openid, member_openid):
+    # GROUP_MEMBER_REMOVE 事件零成本删缓存,不补全。
+    if group_openid is None or member_openid is None:
+        return
+    cache_key = (str(bot_hash), str(group_openid))
+    with sdkGroupMemberCacheLock:
+        _load_qq_group_member_cache_locked(cache_key)
+        entry = sdkGroupMemberCacheInfo.get(cache_key, None)
+        if entry is None:
+            return
+        if str(member_openid) in entry['members']:
+            entry['members'].pop(str(member_openid), None)
+            entry['dirty'] = True
+            _flush_qq_group_member_cache_locked(cache_key, force=True)
+
+
+def _qq_group_member_cache_clear_group(bot_hash, group_openid):
+    # GROUP_DEL_ROBOT 事件清掉整个群的缓存(内存 + 磁盘)。
+    if group_openid is None or str(group_openid) == '':
+        return
+    cache_key = (str(bot_hash), str(group_openid))
+    with sdkGroupMemberCacheLock:
+        sdkGroupMemberCacheInfo.pop(cache_key, None)
+        file_path = _get_qq_group_member_cache_path(*cache_key)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            pass
+
+
+def _get_qq_group_member_cache_members(bot_hash, group_openid):
+    if group_openid is None or str(group_openid) == '':
+        return {}
+    cache_key = (str(bot_hash), str(group_openid))
+    with sdkGroupMemberCacheLock:
+        _load_qq_group_member_cache_locked(cache_key)
+        entry = sdkGroupMemberCacheInfo.get(cache_key, None)
+        if entry is None:
+            return {}
+        return copy.deepcopy(entry['members'])
+
+
+# ============ 群管理接口滑动窗口限流与 11253 降级 ============
+def _acquire_qq_group_api_rate(op_key, wait=False, wait_timeout=90.0):
+    # 每个接口独立滑动窗口;wait=True 时短暂阻塞等额(全量翻页场景),超时放弃。
+    limit = qqGroupApiRateLimitMap.get(op_key, 30)
+    window = qqGroupApiRateWindow
+    deadline = time.monotonic() + wait_timeout
+    while True:
+        now = time.monotonic()
+        with sdkQQGroupApiRateInfoLock:
+            history = sdkQQGroupApiRateInfo.setdefault(op_key, deque())
+            while history and now - history[0] >= window:
+                history.popleft()
+            if len(history) < limit:
+                history.append(now)
+                return True
+            wait_time = window - (now - history[0])
+        if not wait or time.monotonic() + wait_time > deadline:
+            return False
+        time.sleep(min(max(wait_time, 0.05), 1.0))
+
+
+def _mark_qq_group_api_denied(op_key):
+    sdkQQGroupApiDeniedUntil[op_key] = time.monotonic() + qqGroupApiDeniedCooldown
+
+
+def _check_qq_group_api_denied(op_key):
+    deadline = sdkQQGroupApiDeniedUntil.get(op_key, None)
+    if deadline is None:
+        return False
+    if time.monotonic() >= deadline:
+        sdkQQGroupApiDeniedUntil.pop(op_key, None)
+        return False
+    return True
+
+
+def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
+    # 统一请求入口:限流 -> 发请求 -> 解析;11253 触发冷却期降级。
+    if _check_qq_group_api_denied(op_key):
+        return {
+            'active': False,
+            'http_status': None,
+            'error_code': qqGroupApiDeniedCode,
+            'error': (
+                'QQ official API %d denied: this API requires invitation whitelist, '
+                'cooldown before retry' % qqGroupApiDeniedCode
+            ),
+            'response': None,
+            'denied': True,
+            'rate_limited': False
+        }
+    if not _acquire_qq_group_api_rate(op_key, wait=wait):
+        return {
+            'active': False,
+            'http_status': None,
+            'error_code': None,
+            'error': 'QQ group API rate limit reached (%s)' % op_key,
+            'response': None,
+            'denied': False,
+            'rate_limited': True
+        }
+    api_obj.do_api(req_type)
+    raw_obj = None
+    if api_obj.res is not None:
+        try:
+            raw_obj = json.loads(api_obj.res)
+        except Exception:
+            raw_obj = None
+    api_code = None
+    error_message = None
+    if type(raw_obj) is dict:
+        api_code = raw_obj.get('err_code', raw_obj.get('code', None))
+        if isinstance(api_code, str):
+            try:
+                api_code = int(api_code.strip())
+            except (TypeError, ValueError):
+                pass
+        error_message = raw_obj.get('message', raw_obj.get('msg', None))
+    flag_success = (
+        api_obj.res_code is not None
+        and 200 <= api_obj.res_code < 300
+        and api_code in [None, 0]
+    )
+    if api_code == qqGroupApiDeniedCode:
+        _mark_qq_group_api_denied(op_key)
+        error_message = (
+            'QQ official API %d: application has no access permission '
+            '(invitation whitelist required)' % qqGroupApiDeniedCode
+        )
+    return {
+        'active': flag_success,
+        'http_status': api_obj.res_code,
+        'error_code': api_code,
+        'error': None if flag_success else error_message,
+        'response': raw_obj,
+        'denied': api_code == qqGroupApiDeniedCode,
+        'rate_limited': False
+    }
+
+
+# ============ Tier 2:定期全量错峰校准 ============
+def _register_qq_group_for_calibration(bot_hash, bot_info, group_openid):
+    if group_openid is None or str(group_openid) == '':
+        return
+    bot_hash = str(bot_hash)
+    with sdkQQGroupCalibrationLock:
+        sdkQQGroupCalibrationBotInfo[bot_hash] = bot_info
+        sdkQQGroupCalibrationGroups.setdefault(bot_hash, {})
+        sdkQQGroupCalibrationGroups[bot_hash].setdefault(str(group_openid), 0.0)
+    _ensure_qq_group_calibration_thread()
+
+
+def _qq_group_fetch_member_pages(
+    bot_info,
+    group_openid,
+    bot_hash=None,
+    wait=True,
+    max_pages=500
+):
+    # 全量翻页拉取(每页≤30,cursor 分页),逐页写入持久化缓存。
+    result = {
+        'ok': False,
+        'error': None,
+        'denied': False,
+        'rate_limited': False,
+        'pages': 0,
+        'members': 0
+    }
+    if bot_info is None or group_openid is None or str(group_openid) == '':
+        result['error'] = 'invalid bot_info or group_openid'
+        return result
+    if bot_hash is None:
+        bot_hash = OlivOS.API.getBotHash(
+            bot_id=bot_info.id,
+            platform_sdk='qqGuildv2_link',
+            platform_platform='qqGuild',
+            platform_model='default'
+        )
+    cursor = ''
+    while result['pages'] < max_pages:
+        api_obj = API.getQQGroupMembers(bot_info)
+        api_obj.metadata.group_openid = str(group_openid)
+        api_obj.query = {'cursor': cursor} if cursor != '' else None
+        api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_member_list', wait=wait)
+        result['pages'] += 1
+        if not api_res.get('active', False):
+            result['error'] = api_res.get('error', 'api request failed')
+            result['denied'] = api_res.get('denied', False)
+            result['rate_limited'] = api_res.get('rate_limited', False)
+            return result
+        response = api_res.get('response', None)
+        member_list = response.get('members', None) if isinstance(response, dict) else None
+        if isinstance(member_list, list) and len(member_list) > 0:
+            _qq_group_member_cache_record_members(bot_hash, group_openid, member_list)
+            result['members'] += len(member_list)
+        next_cursor = response.get('next_cursor', '') if isinstance(response, dict) else ''
+        if not isinstance(next_cursor, str) or next_cursor == '':
+            result['ok'] = True
+            with sdkGroupMemberCacheLock:
+                cache_key = (str(bot_hash), str(group_openid))
+                entry = sdkGroupMemberCacheInfo.get(cache_key, None)
+                if entry is not None:
+                    entry['last_full_sync'] = time.monotonic()
+                    entry['dirty'] = True
+                    _flush_qq_group_member_cache_locked(cache_key, force=True)
+            return result
+        cursor = next_cursor
+    # 达到页数保护上限:已拉到的部分仍然有效。
+    result['ok'] = True
+    return result
+
+
+def _qq_group_calibration_loop():
+    while True:
+        time.sleep(sdkQQGroupCalibrationCheckInterval)
+        try:
+            now = time.monotonic()
+            with sdkQQGroupCalibrationLock:
+                task_list = []
+                for bot_hash, groups in sdkQQGroupCalibrationGroups.items():
+                    bot_info = sdkQQGroupCalibrationBotInfo.get(bot_hash, None)
+                    if bot_info is None:
+                        continue
+                    for group_openid, last_sync in list(groups.items()):
+                        if now - last_sync < sdkQQGroupCalibrateMaxAge:
+                            continue
+                        groups[group_openid] = now
+                        task_list.append((bot_hash, bot_info, group_openid))
+            for bot_hash, bot_info, group_openid in task_list:
+                # 错峰:群与群之间留间隔,翻页内部再由限流器按 60 QPM 匀速。
+                time.sleep(sdkQQGroupCalibrateGroupSpacing)
+                _qq_group_fetch_member_pages(bot_info, group_openid, bot_hash=bot_hash)
+        except Exception:
+            traceback.print_exc()
+
+
+def _ensure_qq_group_calibration_thread():
+    global sdkQQGroupCalibrationThread
+    if sdkQQGroupCalibrationThread is not None:
+        return
+    with sdkQQGroupCalibrationLock:
+        if sdkQQGroupCalibrationThread is not None:
+            return
+        sdkQQGroupCalibrationThread = threading.Thread(
+            target=_qq_group_calibration_loop,
+            daemon=True
+        )
+        sdkQQGroupCalibrationThread.start()
+
+
+def _qq_group_member_tier1_complete(bot_hash, bot_info, group_openid, member_openid):
+    # Tier 1 补全:调一次单成员接口(30 QPM,不等待),成功后回填昵称/角色。
+    try:
+        _register_qq_group_for_calibration(bot_hash, bot_info, group_openid)
+        api_obj = API.getQQGroupMemberInfo(bot_info)
+        api_obj.metadata.group_openid = str(group_openid)
+        api_obj.metadata.member_openid = str(member_openid)
+        api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_member_info')
+        response = api_res.get('response', None)
+        if not api_res.get('active', False) or not isinstance(response, dict):
+            # 无权限/限流/失败时保持占位记录,等待 Tier 2 校准兜底。
+            return
+        member_role = response.get('member_role', None)
+        _qq_group_member_cache_record(
+            bot_hash,
+            group_openid,
+            response.get('member_openid', member_openid),
+            username=response.get('username', None),
+            member_role=member_role,
+            bot=response.get('bot', None),
+            joined_at=response.get('joined_at', None),
+            union_openid=response.get('union_openid', None)
+        )
+        _register_qq_user_info(
+            bot_hash,
+            {
+                'member_openid': response.get('member_openid', member_openid),
+                'username': response.get('username', None),
+                'bot': response.get('bot', None),
+                'union_openid': response.get('union_openid', None)
+            },
+            role=member_role,
+            chat_type='qq_group',
+            chat_id=str(group_openid)
+        )
+    except Exception:
+        traceback.print_exc()
 
 
 def _parse_qq_message_scene_ext(message_scene):
@@ -2202,6 +2688,12 @@ def get_Event_from_SDK(target_event):
         event_data = target_event.sdk_event.payload.data.d
         operator_openid = str(event_data.get('op_member_openid', ''))
         flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT'
+        if not flag_increase:
+            # 机器人退群/被移出群:清掉整个群的成员缓存(零成本)。
+            _qq_group_member_cache_clear_group(
+                plugin_event_bot_hash,
+                event_data.get('group_openid', None)
+            )
         _set_qq_group_member_event(
             target_event,
             event_data,
@@ -2217,6 +2709,38 @@ def get_Event_from_SDK(target_event):
         event_data = target_event.sdk_event.payload.data.d
         member_openid = str(event_data.get('member_openid', ''))
         flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_MEMBER_ADD'
+        tmp_group_openid = event_data.get('group_openid', None)
+        if flag_increase:
+            # Tier 1(1 QPM):入群事件只带 member_openid,先占位登记
+            # (username=None 标记待补全),再后台调单成员接口补全。
+            _qq_group_member_cache_record(
+                plugin_event_bot_hash,
+                tmp_group_openid,
+                member_openid,
+                union_openid=event_data.get('union_openid', None)
+            )
+            if member_openid != '' and tmp_group_openid is not None:
+                threading.Thread(
+                    target=_qq_group_member_tier1_complete,
+                    args=(
+                        plugin_event_bot_hash,
+                        bot_info_T(
+                            id=target_event.sdk_event.base_info['self_id'],
+                            access_token=target_event.sdk_event.base_info['token'],
+                            model=target_event.platform.get('model', 'default')
+                        ),
+                        tmp_group_openid,
+                        member_openid
+                    ),
+                    daemon=True
+                ).start()
+        else:
+            # GROUP_MEMBER_REMOVE 直接删缓存即可,不需要补全(零成本)。
+            _qq_group_member_cache_remove_member(
+                plugin_event_bot_hash,
+                tmp_group_openid,
+                member_openid
+            )
         _set_qq_group_member_event(
             target_event,
             event_data,
@@ -4655,9 +5179,9 @@ class event_action(object):
             fallback_group_id=guild_id
         )
 
-    def get_qq_group_member_list_standard(target_event, group_openid, limit=None, start_index=None):
+    def get_qq_group_member_list_standard(target_event, group_openid, cursor=None):
         return event_action._standard_group_member_list(
-            event_action.get_qq_group_member_list(target_event, group_openid, limit, start_index),
+            event_action.get_qq_group_member_list(target_event, group_openid, cursor),
             fallback_group_id=group_openid
         )
 
@@ -5050,11 +5574,370 @@ class event_action(object):
         return event_action._run_raw_api(this_msg, 'set_interaction_callback', 'PUT')
 
     # ============ QQ 群 ============
-    def get_qq_group_member_list(target_event, group_openid, limit=None, start_index=None):
+    def get_qq_group_member_list(target_event, group_openid, cursor=None):
+        # 官方文档:GET /v2/groups/{group_openid}/members,60 QPM,每页最多 30 条,
+        # cursor 分页(首页不传或空串,后续传上一页响应的 next_cursor)。
+        # 旧实现的 limit/start_index 参数平台不识别(始终返回第一页),已修正。
         this_msg = API.getQQGroupMembers(get_SDK_bot_info_from_Event(target_event))
         this_msg.metadata.group_openid = str(group_openid)
-        this_msg.query = {'limit': limit, 'start_index': start_index}
+        this_msg.query = {'cursor': cursor} if cursor else None
         return event_action._run_raw_api(this_msg, 'get_qq_group_member_list', 'GET')
+
+    # ---- QQ 群管理接口(内邀白名单能力,统一走滑动窗口限流与 11253 降级) ----
+    def _run_qq_group_member_api(api_obj, operation, op_key, req_type='GET',
+                                 wait=False, group_openid=None):
+        api_res = _do_qq_group_api_request(
+            api_obj.bot_info,
+            api_obj,
+            req_type,
+            op_key,
+            wait=wait
+        )
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['active'] = api_res.get('active', False)
+        res_data['data'].update({
+            'chat_type': 'qq_group',
+            'chat_id': None if group_openid is None else str(group_openid),
+            'operation': str(operation),
+            'http_status': api_res.get('http_status', None),
+            'error_code': api_res.get('error_code', None),
+            'error': api_res.get('error', None),
+            'response': api_res.get('response', None)
+        })
+        return res_data
+
+    def _request_qq_group_member_info(target_event, group_openid, member_openid):
+        this_msg = API.getQQGroupMemberInfo(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.metadata.member_openid = str(member_openid)
+        return event_action._run_qq_group_member_api(
+            this_msg,
+            'get_qq_group_member_info',
+            'group_member_info',
+            'GET',
+            group_openid=group_openid
+        )
+
+    def _request_qq_group_member_blacklist_page(
+        target_event,
+        group_openid,
+        limit=None,
+        cursor=None
+    ):
+        this_msg = API.getQQGroupMemberBlacklist(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.query = {'cursor': cursor, 'limit': limit}
+        return event_action._run_qq_group_member_api(
+            this_msg,
+            'get_qq_group_member_blacklist_page',
+            'group_member_blacklist_get',
+            'GET',
+            group_openid=group_openid
+        )
+
+    def _request_qq_group_member_blacklist_set_page(
+        target_event,
+        group_openid,
+        op,
+        member_openids
+    ):
+        this_msg = API.setQQGroupMemberBlacklist(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.data.op = str(op)
+        this_msg.data.member_openids = [str(item) for item in member_openids]
+        return event_action._run_qq_group_member_api(
+            this_msg,
+            'set_qq_group_member_blacklist_page',
+            'group_member_blacklist_set',
+            'POST',
+            group_openid=group_openid
+        )
+
+    def _request_qq_group_batch_remove_members_page(
+        target_event,
+        group_openid,
+        member_openids,
+        add_to_member_blacklist=None
+    ):
+        this_msg = API.setQQGroupBatchRemoveMembers(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.group_openid = str(group_openid)
+        this_msg.data.member_openids = [str(item) for item in member_openids]
+        this_msg.data.add_to_member_blacklist = add_to_member_blacklist
+        return event_action._run_qq_group_member_api(
+            this_msg,
+            'set_qq_group_batch_remove_members_page',
+            'group_batch_remove_members',
+            'POST',
+            group_openid=group_openid
+        )
+
+    def get_qq_group_member_blacklist(target_event, group_openid, limit=None):
+        """群黑名单查询(SDK 级)
+
+        支持 cursor 分页与 limit,自动翻页到末页。
+        limit 单页数量(默认 20,最大 100);内邀白名单能力,无权限时优雅降级。
+        """
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data'].update({
+            'chat_type': 'qq_group',
+            'chat_id': None if group_openid is None else str(group_openid),
+            'operation': 'get_qq_group_member_blacklist',
+            'blacklist': [],
+            'total': 0,
+            'page_size': None,
+            'pages': 0,
+            'batches': []
+        })
+        try:
+            page_limit = min(100, max(1, int(limit)))
+        except (TypeError, ValueError):
+            page_limit = 20
+        res_data['data']['page_size'] = page_limit
+        cursor = ''
+        page_res = None
+        while res_data['data']['pages'] < 500:
+            page_res = event_action._request_qq_group_member_blacklist_page(
+                target_event,
+                group_openid,
+                limit=page_limit,
+                cursor=cursor if cursor != '' else None
+            )
+            res_data['data']['batches'].append(copy.deepcopy(page_res))
+            res_data['data']['pages'] += 1
+            if not page_res.get('active', False):
+                if res_data['data']['total'] == 0:
+                    res_data['data']['error'] = page_res['data'].get('error', None)
+                    res_data['data']['error_code'] = page_res['data'].get('error_code', None)
+                    return res_data
+                # 后续页失败时保留已成功页的数据,并附错误说明。
+                res_data['data']['error'] = page_res['data'].get('error', None)
+                res_data['data']['error_code'] = page_res['data'].get('error_code', None)
+                return res_data
+            response = event_action._raw_response(page_res)
+            users = response.get('users', None) if isinstance(response, dict) else None
+            if isinstance(users, list):
+                res_data['data']['blacklist'].extend(copy.deepcopy(users))
+                res_data['data']['total'] = len(res_data['data']['blacklist'])
+            next_cursor = response.get('next_cursor', '') if isinstance(response, dict) else ''
+            if not isinstance(next_cursor, str) or next_cursor == '':
+                break
+            cursor = next_cursor
+        res_data['active'] = True
+        return res_data
+
+    def set_qq_group_member_blacklist(target_event, group_openid, member_openids, op='add'):
+        """群黑名单操作(SDK 级)
+
+        op 支持 add(加入)/del(移出);单次接口上限 20 个,超出自动分批。
+        内邀白名单能力,无权限时优雅降级(active=False + 明确错误信息)。
+        """
+        op = str(op)
+        if op not in ['add', 'del']:
+            return event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'set_qq_group_member_blacklist',
+                'op must be add or del'
+            )
+        valid_ids = []
+        if isinstance(member_openids, (list, tuple, set)):
+            for member_id in member_openids:
+                member_id = str(member_id)
+                if member_id != '' and member_id not in valid_ids:
+                    valid_ids.append(member_id)
+        if len(valid_ids) == 0:
+            return event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'set_qq_group_member_blacklist',
+                'no valid member_openid provided'
+            )
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data'].update({
+            'chat_type': 'qq_group',
+            'chat_id': None if group_openid is None else str(group_openid),
+            'operation': 'set_qq_group_member_blacklist',
+            'op': op,
+            'requested': len(valid_ids),
+            'batches': 0,
+            'batch_size': 20,
+            'fail_openids': [],
+            'results': []
+        })
+        batch_size = 20
+        flag_all_ok = True
+        last_error = None
+        last_error_code = None
+        for start in range(0, len(valid_ids), batch_size):
+            page_res = event_action._request_qq_group_member_blacklist_set_page(
+                target_event,
+                group_openid,
+                op,
+                valid_ids[start:start + batch_size]
+            )
+            res_data['data']['batches'] += 1
+            res_data['data']['results'].append(copy.deepcopy(page_res))
+            if page_res.get('active', False):
+                response = event_action._raw_response(page_res)
+                fail_list = response.get('fail_openids', None) if isinstance(response, dict) else None
+                if isinstance(fail_list, list):
+                    res_data['data']['fail_openids'].extend(copy.deepcopy(fail_list))
+            else:
+                flag_all_ok = False
+                last_error = page_res['data'].get('error', None)
+                last_error_code = page_res['data'].get('error_code', None)
+        res_data['active'] = flag_all_ok
+        res_data['data']['error'] = last_error
+        res_data['data']['error_code'] = last_error_code
+        return res_data
+
+    def set_qq_group_batch_remove_members(
+        target_event,
+        group_openid,
+        member_openids,
+        add_to_member_blacklist=False
+    ):
+        """群成员批量移除(SDK 级)
+
+        底层走 batch_remove_members,单次接口上限 20 个,超出自动分批。
+        成功移除的成员同步从本地群成员缓存中删除。
+        内邀白名单能力,无权限时优雅降级(active=False + 明确错误信息)。
+        """
+        valid_ids = []
+        if isinstance(member_openids, (list, tuple, set)):
+            for member_id in member_openids:
+                member_id = str(member_id)
+                if member_id != '' and member_id not in valid_ids:
+                    valid_ids.append(member_id)
+        if len(valid_ids) == 0:
+            return event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'set_qq_group_batch_remove_members',
+                'no valid member_openid provided'
+            )
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data'].update({
+            'chat_type': 'qq_group',
+            'chat_id': None if group_openid is None else str(group_openid),
+            'operation': 'set_qq_group_batch_remove_members',
+            'requested': len(valid_ids),
+            'batches': 0,
+            'batch_size': 20,
+            'removed_openids': [],
+            'add_to_member_blacklist_fail_openids': [],
+            'results': []
+        })
+        batch_size = 20
+        flag_all_ok = True
+        last_error = None
+        last_error_code = None
+        bot_hash = target_event.bot_info.hash
+        for start in range(0, len(valid_ids), batch_size):
+            batch_ids = valid_ids[start:start + batch_size]
+            page_res = event_action._request_qq_group_batch_remove_members_page(
+                target_event,
+                group_openid,
+                batch_ids,
+                add_to_member_blacklist=bool(add_to_member_blacklist)
+            )
+            res_data['data']['batches'] += 1
+            res_data['data']['results'].append(copy.deepcopy(page_res))
+            if page_res.get('active', False):
+                # 移除成功即同步删本地缓存(GROUP_MEMBER_REMOVE 事件之外的一致性兜底)。
+                for member_id in batch_ids:
+                    _qq_group_member_cache_remove_member(bot_hash, group_openid, member_id)
+                res_data['data']['removed_openids'].extend(batch_ids)
+                response = event_action._raw_response(page_res)
+                fail_list = (
+                    response.get('add_to_member_blacklist_fail_openids', None)
+                    if isinstance(response, dict) else None
+                )
+                if isinstance(fail_list, list):
+                    res_data['data']['add_to_member_blacklist_fail_openids'].extend(
+                        copy.deepcopy(fail_list)
+                    )
+            else:
+                flag_all_ok = False
+                last_error = page_res['data'].get('error', None)
+                last_error_code = page_res['data'].get('error_code', None)
+        res_data['active'] = flag_all_ok
+        res_data['data']['error'] = last_error
+        res_data['data']['error_code'] = last_error_code
+        return res_data
+
+    def refresh_qq_group_member_list(target_event, group_openid):
+        """全量刷新群成员列表(SDK 级,Tier 2 手动入口)
+
+        分页拉取全量成员(每页 30 条,60 QPM 限速),逐页写入本地缓存。
+        """
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        bot_info = get_SDK_bot_info_from_Event(target_event)
+        bot_hash = str(target_event.bot_info.hash)
+        _register_qq_group_for_calibration(bot_hash, bot_info, group_openid)
+        fetch_result = _qq_group_fetch_member_pages(
+            bot_info,
+            group_openid,
+            bot_hash=bot_hash
+        )
+        res_data['active'] = fetch_result.get('ok', False)
+        res_data['data'].update({
+            'chat_type': 'qq_group',
+            'chat_id': None if group_openid is None else str(group_openid),
+            'operation': 'refresh_qq_group_member_list',
+            'pages': fetch_result.get('pages', 0),
+            'member_count': fetch_result.get('members', 0),
+            'error': fetch_result.get('error', None),
+            'error_code': qqGroupApiDeniedCode if fetch_result.get('denied', False) else None
+        })
+        return res_data
+
+    def get_group_member_list(target_event, group_id):
+        """群成员列表(统一层入口,本地缓存优先)
+
+        大群全量需 60 次请求(30 条/页),正好吃满 60 QPM,因此优先读本地缓存:
+        缓存为空时才全量拉取并落盘;缓存命中时 username=None 的成员即「待补全」。
+        """
+        res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+        bot_hash = str(target_event.bot_info.hash)
+        members = _get_qq_group_member_cache_members(bot_hash, group_id)
+        if len(members) == 0:
+            # 缓存为空才走网络全量(错峰限速,wait=True 分页匀速)。
+            bot_info = get_SDK_bot_info_from_Event(target_event)
+            _register_qq_group_for_calibration(bot_hash, bot_info, group_id)
+            fetch_result = _qq_group_fetch_member_pages(
+                bot_info,
+                group_id,
+                bot_hash=bot_hash
+            )
+            if fetch_result.get('ok', False):
+                members = _get_qq_group_member_cache_members(bot_hash, group_id)
+        if len(members) == 0:
+            # 全量拉取失败(无权限/限流):缓存与网络均无数据,优雅返回 inactive。
+            return res_data
+        res_data['active'] = True
+        for member_id in sorted(members.keys()):
+            record = members[member_id]
+            member = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+            member['id'] = str(member_id)
+            member['user_id'] = str(member_id)
+            member['group_id'] = str(group_id)
+            # username=None 表示「待补全」,调用方可据此区分已知昵称与占位成员。
+            member['name'] = record.get('username', None)
+            member['card'] = record.get('username', None)
+            member['role'] = record.get('member_role', None)
+            member['times']['join_time'] = _parse_qq_message_timestamp(
+                record.get('joined_at', None),
+                default=0
+            )
+            member['extra'] = {
+                'cached': True,
+                'bot': record.get('bot', None),
+                'union_openid': record.get('union_openid', None),
+                'updated_at': record.get('updated_at', 0)
+            }
+            res_data['data'].append(member)
+        return res_data
 
     def get_qq_group_bot_state(target_event, group_openid):
         this_msg = API.getQQGroupBotState(get_SDK_bot_info_from_Event(target_event))
@@ -5453,7 +6336,52 @@ class event_action(object):
 
     def get_group_member_info(target_event, group_id, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
-        record = _get_qq_user_info(target_event.bot_info.hash, user_id)
+        bot_hash = target_event.bot_info.hash
+        target_data = getattr(target_event, 'data', None)
+        extend_data = getattr(target_data, 'extend', None)
+        flag_from_group_event = (
+            isinstance(extend_data, dict)
+            and extend_data.get('flag_from_qq', False)
+            and not extend_data.get('flag_from_direct', False)
+            and group_id is not None
+        )
+        record = _get_qq_user_info(bot_hash, user_id)
+        if (record is None or no_cache) and flag_from_group_event:
+            # 兜底/刷新:调用真实的单成员接口(30 QPM 限速,11253 优雅降级)。
+            # 缓存命中的高频热路径(no_cache=False)完全不触发网络请求。
+            api_member_openid = user_id
+            if record is not None and record.get('member_openid', None):
+                api_member_openid = record['member_openid']
+            raw_result = event_action._request_qq_group_member_info(
+                target_event,
+                group_id,
+                api_member_openid
+            )
+            if raw_result.get('active', False):
+                response = event_action._raw_response(raw_result)
+                if isinstance(response, dict):
+                    member_role = response.get('member_role', None)
+                    if member_role not in ['member', 'admin', 'owner']:
+                        member_role = None
+                    _register_qq_user_info(
+                        bot_hash,
+                        {
+                            'member_openid': response.get('member_openid', api_member_openid),
+                            'username': response.get('username', None),
+                            'bot': response.get('bot', None),
+                            'union_openid': response.get('union_openid', None)
+                        },
+                        role=member_role,
+                        chat_type='qq_group',
+                        chat_id=str(group_id)
+                    )
+                    res_data['data']['qq_member'] = copy.deepcopy(response)
+                    res_data['data']['qq_api_refreshed'] = True
+                    record = _get_qq_user_info(bot_hash, api_member_openid)
+            else:
+                # 无权限(11253)/限流:不抛异常,错误信息附在结果里,继续走缓存。
+                res_data['data']['qq_error'] = raw_result['data'].get('error', None)
+                res_data['data']['qq_error_code'] = raw_result['data'].get('error_code', None)
         if record is not None:
             res_data['active'] = True
             res_data['data']['name'] = record.get('name', None)
@@ -6907,6 +7835,76 @@ class API(object):
             def __init__(self):
                 self.group_openid = '-1'
 
+    # GET /v2/groups/{group_openid}/members/{member_openid} 获取群成员信息(内邀,30 QPM)
+    class getQQGroupMemberInfo(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = (
+                sdkAPIRoute['qq_groups']
+                + '/{group_openid}/members/{member_openid}'
+            )
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+                self.member_openid = '-1'
+
+    # GET /v2/groups/{group_openid}/member_blacklist 群黑名单查询(内邀,30 QPM,query: cursor/limit)
+    class getQQGroupMemberBlacklist(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/member_blacklist'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+    # POST /v2/groups/{group_openid}/member_blacklist 群黑名单操作(内邀,60 QPM,单次≤20)
+    class setQQGroupMemberBlacklist(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/member_blacklist'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.op = None            # str: 'add' 加入黑名单 / 'del' 移出黑名单
+                self.member_openids = None  # list[str],单次最多 20 个
+
+    # POST /v2/groups/{group_openid}/batch_remove_members 群成员批量移除(内邀,30 QPM,单次≤20)
+    class setQQGroupBatchRemoveMembers(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_groups'] + '/{group_openid}/batch_remove_members'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.group_openid = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.member_openids = None          # list[str],单次最多 20 个
+                self.add_to_member_blacklist = None  # bool,默认 False
+
     # 获取指定消息(仅频道):GET /channels/{channel_id}/messages/{message_id}
     class getMessage(api_templet):
         def __init__(self, bot_info=None):
@@ -7763,7 +8761,7 @@ class API(object):
                 self.code = None  # int
 
     # ============ QQ 群 ============
-    # GET /v2/groups/{group_openid}/members 获取群成员列表(query: limit/start_index,需相应权限)
+    # GET /v2/groups/{group_openid}/members 获取群成员列表(query: cursor,内邀,60 QPM,每页≤30)
     class getQQGroupMembers(api_templet):
         def __init__(self, bot_info=None):
             api_templet.__init__(self)

@@ -833,12 +833,12 @@ class event_action(object):
         this_msg.data.group_id = int(group_id)
         this_msg.do_api(control_queue=control_queue)
 
-    def set_group_kick(target_event, group_id, user_id, rehect_add_request=False):
+    def set_group_kick(target_event, group_id, user_id, reject_add_request=False):
         control_queue = target_event.plugin_info['control_queue']
         this_msg = api.set_group_kick(get_SDK_bot_info_from_Event(target_event))
         this_msg.data.group_id = int(group_id)
         this_msg.data.user_id = int(user_id)
-        this_msg.data.rehect_add_request = rehect_add_request
+        this_msg.data.reject_add_request = reject_add_request
         this_msg.do_api(control_queue=control_queue)
 
     def set_group_ban(target_event, group_id, user_id, duration=1800):
@@ -1924,7 +1924,7 @@ class api(object):
             def __init__(self):
                 self.group_id = -1
                 self.user_id = -1
-                self.rehect_add_request = False
+                self.reject_add_request = False
 
     class set_group_ban(api_templet):
         def __init__(self, bot_info=None):
