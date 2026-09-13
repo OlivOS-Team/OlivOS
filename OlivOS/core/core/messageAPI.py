@@ -59,6 +59,7 @@ dictMessageType = {
             'napcat_hide': 'old_string',
             'napcat_show': 'old_string',
             'napcat_show_new': 'old_string',
+            'napcat_show_new_9_9_19': 'old_string',
             'napcat_show_old': 'old_string',
             'napcat_default': 'old_string',
             'llonebot_default': 'old_string',

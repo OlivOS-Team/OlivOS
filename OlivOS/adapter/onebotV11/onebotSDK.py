@@ -34,6 +34,7 @@ napcatModelMap = [
     'napcat_hide',
     'napcat_show',
     'napcat_show_new',
+    'napcat_show_new_9_9_19',
     'napcat_show_old',
     'napcat_default',
 ]
