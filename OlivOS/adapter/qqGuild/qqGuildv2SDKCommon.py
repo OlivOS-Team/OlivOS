@@ -27,7 +27,7 @@ import traceback
 import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import IntEnum
 from urllib import parse
 
@@ -37,6 +37,8 @@ from requests_toolbelt import MultipartEncoder
 import OlivOS
 
 modelName = 'qqGuildv2SDK'
+event_action = None
+API = None
 
 
 class intents_T(IntEnum):
@@ -3391,6 +3393,7 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['event_id'] = str(event_id)
             target_event.data.extend['qq_payload_id'] = str(event_id)
 
+
 class event_action_common(object):
     def _normalize_outgoing_message(target_event, message):
         if isinstance(message, OlivOS.messageAPI.Message_templet):
@@ -5407,6 +5410,7 @@ class event_action_common(object):
         except Exception:
             traceback.print_exc()
 
+
 class inde_interface(OlivOS.API.inde_interface_T):
     @OlivOS.API.Event.callbackLogger(
         'qqGuildv2:send_message',
@@ -6267,6 +6271,7 @@ def init_api_do_mapping_for_dict(src_data, path_list, src_type):
             return None
     res_data = init_api_do_mapping(src_type, tmp_src_data)
     return res_data
+
 
 class API_common(object):
     class getAppAccessToken(api_templet):

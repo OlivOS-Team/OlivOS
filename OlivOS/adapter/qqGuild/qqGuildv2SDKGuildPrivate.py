@@ -19,6 +19,7 @@ from .qqGuildv2SDKCommon import *
 event_action = None
 API = None
 
+
 class event_action_guild_private(object):
     def send_guild_private_msg(
         target_event,
@@ -77,6 +78,7 @@ class event_action_guild_private(object):
         this_msg.data.recipient_id = str(recipient_id)
         this_msg.data.source_guild_id = str(source_guild_id)
         return event_action._run_raw_api(this_msg, 'create_dms_session', 'POST')
+
 
 class API_guild_private(object):
     # POST /users/@me/dms 创建私信会话

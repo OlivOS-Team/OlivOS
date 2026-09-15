@@ -19,6 +19,7 @@ from .qqGuildv2SDKCommon import *
 event_action = None
 API = None
 
+
 class event_action_group(object):
     def _get_qq_message_send_chunks(message, flag_direct=False):
         media_types = (
@@ -1077,6 +1078,7 @@ class event_action_group(object):
             })
             res_data['data']['join_requests'].append(request_item)
         return res_data
+
 
 class API_group(object):
     class getQQGroupBotState(api_templet):

@@ -19,6 +19,7 @@ from .qqGuildv2SDKCommon import *
 event_action = None
 API = None
 
+
 class event_action_guild(object):
     def _normalize_guild_markdown(markdown, allow_at_all=True):
         markdown_obj = copy.deepcopy(markdown)
@@ -572,6 +573,7 @@ class event_action_guild(object):
         this_msg.data.api_identify = {'path': str(api_path), 'method': str(api_method)}
         this_msg.data.desc = str(desc)
         return event_action._run_raw_api(this_msg, 'demand_guild_api_permission', 'POST')
+
 
 class API_guild(object):
     # 获取指定消息(仅频道):GET /channels/{channel_id}/messages/{message_id}

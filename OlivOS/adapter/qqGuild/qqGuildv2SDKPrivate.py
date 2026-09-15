@@ -19,6 +19,7 @@ from .qqGuildv2SDKCommon import *
 event_action = None
 API = None
 
+
 class event_action_private(object):
     def upload_private_file(target_event, user_id, file, name):
         context_error = event_action._get_qq_upload_context_error(
@@ -41,6 +42,7 @@ class event_action_private(object):
         return event_action._make_resource_upload_result(
             'qq_private', user_id, file_info, 'upload_private_file'
         )
+
 
 class API_private(object):
     class sendQQDirectMessage(api_templet):
