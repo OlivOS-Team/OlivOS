@@ -73,6 +73,8 @@ sdkAPIRoute = {
     'interactions': '/interactions',
     'qq_users': '/v2/users',
     'qq_groups': '/v2/groups',
+    'menu': '/v2/menu',
+    'panels': '/v2/panels',
     'getAppAccessToken': '/app/getAppAccessToken'
 }
 
@@ -84,7 +86,8 @@ sdkAPIRouteTemp = {
     'group_openid': '-1',
     'message_id': '-1',
     'member_openid': '-1',
-    'strategy_id': '-1'
+    'strategy_id': '-1',
+    'panel_id': '-1'
 }
 
 sdkSubSelfInfo = {}
@@ -6463,6 +6466,146 @@ class event_action(object):
         res_data['data']['events'] = copy.deepcopy(event_list)
         return res_data
 
+    def _make_menu_panel_local_error(operation, error):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data'].update({
+            'operation': str(operation),
+            'http_status': None,
+            'error_code': None,
+            'error': str(error),
+            'response': None
+        })
+        return res_data
+
+    # ============ 自定义菜单 / 指令面板 ============
+    # 官方文档: https://bot.q.qq.com/wiki/develop/api-v2/server-inter/menu-panel/
+    def get_qq_global_menu(target_event):
+        this_msg = API.getGlobalMenu(get_SDK_bot_info_from_Event(target_event))
+        return event_action._run_raw_api(this_msg, 'get_qq_global_menu', 'GET')
+
+    def set_qq_global_menu(target_event, menu=None):
+        this_msg = API.setGlobalMenu(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.menu = menu
+        return event_action._run_raw_api(this_msg, 'set_qq_global_menu', 'PUT')
+
+    def get_qq_command_panel_list(target_event, scope, cursor=None, limit=None):
+        if scope not in ['c2c', 'group', 'channel', 'dm']:
+            return event_action._make_menu_panel_local_error(
+                'get_qq_command_panel_list',
+                'scope must be c2c/group/channel/dm'
+            )
+        this_msg = API.getCommandPanels(get_SDK_bot_info_from_Event(target_event))
+        this_msg.query = {
+            'scope': str(scope),
+            'cursor': cursor,
+            'limit': limit
+        }
+        return event_action._run_raw_api(
+            this_msg,
+            'get_qq_command_panel_list',
+            'GET'
+        )
+
+    def create_qq_command_panel(
+        target_event,
+        scope,
+        panel,
+        target_type=None,
+        user_openids=None,
+        group_openids=None
+    ):
+        if scope not in ['c2c', 'group', 'channel', 'dm']:
+            return event_action._make_menu_panel_local_error(
+                'create_qq_command_panel',
+                'scope must be c2c/group/channel/dm'
+            )
+        if type(panel) is not dict:
+            return event_action._make_menu_panel_local_error(
+                'create_qq_command_panel',
+                'panel must be a dict'
+            )
+        this_msg = API.createCommandPanel(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.scope = str(scope)
+        this_msg.data.target_type = target_type
+        this_msg.data.user_openids = user_openids
+        this_msg.data.group_openids = group_openids
+        this_msg.data.panel = panel
+        return event_action._run_raw_api(
+            this_msg,
+            'create_qq_command_panel',
+            'POST'
+        )
+
+    def get_qq_command_panel(target_event, panel_id):
+        if panel_id is None or str(panel_id) == '':
+            return event_action._make_menu_panel_local_error(
+                'get_qq_command_panel',
+                'panel_id is required'
+            )
+        this_msg = API.getCommandPanel(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.panel_id = str(panel_id)
+        return event_action._run_raw_api(this_msg, 'get_qq_command_panel', 'GET')
+
+    def set_qq_command_panel(target_event, panel_id, panel):
+        if panel_id is None or str(panel_id) == '':
+            return event_action._make_menu_panel_local_error(
+                'set_qq_command_panel',
+                'panel_id is required'
+            )
+        if type(panel) is not dict:
+            return event_action._make_menu_panel_local_error(
+                'set_qq_command_panel',
+                'panel must be a dict'
+            )
+        this_msg = API.setCommandPanel(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.panel_id = str(panel_id)
+        this_msg.data.panel = panel
+        return event_action._run_raw_api(this_msg, 'set_qq_command_panel', 'PUT')
+
+    def delete_qq_command_panel(target_event, panel_id):
+        if panel_id is None or str(panel_id) == '':
+            return event_action._make_menu_panel_local_error(
+                'delete_qq_command_panel',
+                'panel_id is required'
+            )
+        this_msg = API.deleteCommandPanel(get_SDK_bot_info_from_Event(target_event))
+        this_msg.metadata.panel_id = str(panel_id)
+        return event_action._run_raw_api(
+            this_msg,
+            'delete_qq_command_panel',
+            'DELETE'
+        )
+
+    def set_qq_command_panel_target(
+        target_event,
+        panel_id,
+        op,
+        user_openids=None,
+        group_openids=None
+    ):
+        if panel_id is None or str(panel_id) == '':
+            return event_action._make_menu_panel_local_error(
+                'set_qq_command_panel_target',
+                'panel_id is required'
+            )
+        if op not in ['add', 'del']:
+            return event_action._make_menu_panel_local_error(
+                'set_qq_command_panel_target',
+                'op must be add/del'
+            )
+        this_msg = API.setCommandPanelTarget(
+            get_SDK_bot_info_from_Event(target_event)
+        )
+        this_msg.metadata.panel_id = str(panel_id)
+        this_msg.data.op = str(op)
+        this_msg.data.user_openids = user_openids
+        this_msg.data.group_openids = group_openids
+        return event_action._run_raw_api(
+            this_msg,
+            'set_qq_command_panel_target',
+            'PUT'
+        )
+
     # 富媒体优先使用 URL；自定义音乐使用 audio 字段中的实际音频资源。
     def _get_message_resource(message_para):
         if message_para.data is None:
@@ -7468,6 +7611,109 @@ class inde_interface(OlivOS.API.inde_interface_T):
         return self._call_qq_group_api(
             'update_qq_join_approval_strategy_whitelist',
             (strategy_id, op, whitelist_users),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def get_qq_global_menu(self, flag_log=True, remote=False):
+        return self._call_qq_group_api(
+            'get_qq_global_menu',
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def set_qq_global_menu(self, menu=None, flag_log=True, remote=False):
+        return self._call_qq_group_api(
+            'set_qq_global_menu',
+            action_kwargs={'menu': menu},
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def get_qq_command_panel_list(
+        self,
+        scope,
+        cursor=None,
+        limit=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'get_qq_command_panel_list',
+            (scope,),
+            {'cursor': cursor, 'limit': limit},
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def create_qq_command_panel(
+        self,
+        scope,
+        panel,
+        target_type=None,
+        user_openids=None,
+        group_openids=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'create_qq_command_panel',
+            (scope, panel),
+            {
+                'target_type': target_type,
+                'user_openids': user_openids,
+                'group_openids': group_openids
+            },
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def get_qq_command_panel(self, panel_id, flag_log=True, remote=False):
+        return self._call_qq_group_api(
+            'get_qq_command_panel',
+            (panel_id,),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def set_qq_command_panel(
+        self,
+        panel_id,
+        panel,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'set_qq_command_panel',
+            (panel_id, panel),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def delete_qq_command_panel(self, panel_id, flag_log=True, remote=False):
+        return self._call_qq_group_api(
+            'delete_qq_command_panel',
+            (panel_id,),
+            flag_log=flag_log,
+            remote=remote
+        )
+
+    def set_qq_command_panel_target(
+        self,
+        panel_id,
+        op,
+        user_openids=None,
+        group_openids=None,
+        flag_log=True,
+        remote=False
+    ):
+        return self._call_qq_group_api(
+            'set_qq_command_panel_target',
+            (panel_id, op),
+            {
+                'user_openids': user_openids,
+                'group_openids': group_openids
+            },
             flag_log=flag_log,
             remote=remote
         )
@@ -8962,6 +9208,125 @@ class API(object):
             def __init__(self):
                 self.op = None
                 self.whitelist_users = None
+
+    # ============ 自定义菜单 / 指令面板 ============
+    # GET /v2/menu 查询全局自定义菜单(仅 C2C,30 QPM)
+    class getGlobalMenu(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['menu']
+
+    # PUT /v2/menu 修改全局自定义菜单(仅 C2C,5 QPM,覆盖完整菜单)
+    class setGlobalMenu(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['menu']
+
+        class data_T(object):
+            def __init__(self):
+                self.menu = None  # Menu {items:[MenuItem]}
+
+    # GET /v2/panels 查询指令面板列表(query: scope/cursor/limit,30 QPM)
+    class getCommandPanels(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels']
+
+    # POST /v2/panels 创建指令面板(10 QPM,每机器人最多 20 个)
+    class createCommandPanel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels']
+
+        class data_T(object):
+            def __init__(self):
+                self.scope = None          # c2c/group/channel/dm
+                self.target_type = None    # all/specific
+                self.user_openids = None   # list[str], 仅 c2c+specific
+                self.group_openids = None  # list[str], 仅 group+specific
+                self.panel = None          # Panel {items, remark, version}
+
+    # GET /v2/panels/{panel_id} 查询指令面板详情(30 QPM)
+    class getCommandPanel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels'] + '/{panel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.panel_id = '-1'
+
+    # PUT /v2/panels/{panel_id} 修改指令面板(10 QPM,不影响关联对象)
+    class setCommandPanel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels'] + '/{panel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.panel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.panel = None  # Panel {items, remark, version}
+
+    # DELETE /v2/panels/{panel_id} 删除指令面板(10 QPM)
+    class deleteCommandPanel(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels'] + '/{panel_id}'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.panel_id = '-1'
+
+    # PUT /v2/panels/{panel_id}/target 修改指令面板关联对象(60 QPM)
+    class setCommandPanelTarget(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['panels'] + '/{panel_id}/target'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.panel_id = '-1'
+
+        class data_T(object):
+            def __init__(self):
+                self.op = None             # add/del
+                self.user_openids = None   # list[str], 仅 c2c
+                self.group_openids = None  # list[str], 仅 group
 
     # ============ 消息发送 ============
     class sendMessage(api_templet):
