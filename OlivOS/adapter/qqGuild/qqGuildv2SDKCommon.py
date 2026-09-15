@@ -2628,6 +2628,65 @@ def _parse_qq_join_request_flag(flag):
     return result
 
 
+def _build_incoming_message_obj(
+    target_event,
+    event_data,
+    plugin_event_bot_hash,
+    message_mode,
+    strip_leading=False,
+    strip_before_check=False
+):
+    message_content, face_data = _get_qq_message_content(event_data)
+    structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
+    if strip_before_check and isinstance(message_content, str):
+        message_content = message_content.lstrip(' ')
+    if structured_message_para is not None:
+        message_obj = OlivOS.messageAPI.Message_templet(
+            'olivos_para',
+            [structured_message_para]
+        )
+    elif message_content is not None:
+        if message_content != '':
+            if strip_leading:
+                message_content = message_content.lstrip(' ')
+            message_obj = OlivOS.messageAPI.Message_templet(
+                message_mode,
+                message_content
+            )
+            message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
+            message_obj.data_raw = message_obj.data.copy()
+        else:
+            message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
+    else:
+        message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
+    _append_qq_message_attachments(
+        message_obj,
+        event_data.get('attachments', None),
+        face_data=face_data,
+        skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
+    )
+    return message_obj, face_data
+
+
+def _apply_incoming_message_payload(target_event, message_obj, event_data):
+    target_event.data.message_sdk = message_obj
+    target_event.data.message_id = str(event_data.get('id', ''))
+    target_event.data.raw_message = message_obj
+    target_event.data.raw_message_sdk = message_obj
+    target_event.data.font = None
+
+
+def _apply_incoming_sender(target_event, user_id, nickname, role='member'):
+    user_id_text = str(user_id)
+    target_event.data.sender['user_id'] = user_id_text
+    target_event.data.sender['nickname'] = nickname
+    target_event.data.sender['id'] = user_id_text
+    target_event.data.sender['name'] = nickname
+    target_event.data.sender['sex'] = 'unknown'
+    target_event.data.sender['age'] = 0
+    target_event.data.sender['role'] = role
+
+
 def get_Event_from_SDK(target_event):
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info['self_id'])
@@ -2825,43 +2884,13 @@ def get_Event_from_SDK(target_event):
         'GROUP_MESSAGE_CREATE'
     ]:
         author = event_data.get('author', {})
-        message_obj = None
-        message_content, face_data = _get_qq_message_content(event_data)
-        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
         # 群 AT 事件会移除机器人自身的 @，但保留其后的前导空格。
-        if (
-            event_type == 'GROUP_AT_MESSAGE_CREATE'
-            and isinstance(message_content, str)
-        ):
-            message_content = message_content.lstrip(' ')
-        if structured_message_para is not None:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                [structured_message_para]
-            )
-        elif message_content is not None:
-            if message_content != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuildv2_string',
-                    message_content
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
-        _append_qq_message_attachments(
-            message_obj,
-            event_data.get('attachments', None),
-            face_data=face_data,
-            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
+        message_obj, face_data = _build_incoming_message_obj(
+            target_event,
+            event_data,
+            plugin_event_bot_hash,
+            'qqGuildv2_string',
+            strip_before_check=(event_type == 'GROUP_AT_MESSAGE_CREATE')
         )
         if message_obj.active:
             # QQ 新版事件使用 group_openid/member_openid，保留旧字段作为兼容回退。
@@ -2934,20 +2963,15 @@ def get_Event_from_SDK(target_event):
                 message_obj,
                 'group'
             )
-            target_event.data.message_sdk = message_obj
-            target_event.data.message_id = str(event_data.get('id', ''))
-            target_event.data.raw_message = message_obj
-            target_event.data.raw_message_sdk = message_obj
-            target_event.data.font = None
-            target_event.data.sender['user_id'] = str(member_openid)
-            target_event.data.sender['nickname'] = _get_qq_author_name_cached(
-                plugin_event_bot_hash, author, member_openid
+            _apply_incoming_message_payload(target_event, message_obj, event_data)
+            _apply_incoming_sender(
+                target_event,
+                member_openid,
+                _get_qq_author_name_cached(
+                    plugin_event_bot_hash, author, member_openid
+                ),
+                _get_qq_sender_role(author)
             )
-            target_event.data.sender['id'] = target_event.data.sender['user_id']
-            target_event.data.sender['name'] = target_event.data.sender['nickname']
-            target_event.data.sender['sex'] = 'unknown'
-            target_event.data.sender['age'] = 0
-            target_event.data.sender['role'] = _get_qq_sender_role(author)
             target_event.data.host_id = None
             target_event.data.extend['group_id'] = str(group_openid)
             target_event.data.extend['host_group_id'] = None
@@ -2979,37 +3003,11 @@ def get_Event_from_SDK(target_event):
             )
     elif target_event.sdk_event.payload.data.t == 'C2C_MESSAGE_CREATE':
         author = event_data.get('author', {})
-        message_obj = None
-        message_content, face_data = _get_qq_message_content(event_data)
-        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if structured_message_para is not None:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                [structured_message_para]
-            )
-        elif message_content is not None:
-            if message_content != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuildv2_string',
-                    message_content
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
-        _append_qq_message_attachments(
-            message_obj,
-            event_data.get('attachments', None),
-            face_data=face_data,
-            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
+        message_obj, face_data = _build_incoming_message_obj(
+            target_event,
+            event_data,
+            plugin_event_bot_hash,
+            'qqGuildv2_string'
         )
         if message_obj.active:
             tmp_self_ids = {str(target_event.sdk_event.base_info['self_id'])}
@@ -3053,20 +3051,14 @@ def get_Event_from_SDK(target_event):
                 message_obj,
                 'friend'
             )
-            target_event.data.message_sdk = message_obj
-            target_event.data.message_id = str(event_data.get('id', ''))
-            target_event.data.raw_message = message_obj
-            target_event.data.raw_message_sdk = message_obj
-            target_event.data.font = None
-            target_event.data.sender['user_id'] = str(user_openid)
-            target_event.data.sender['nickname'] = _get_qq_author_name_cached(
-                plugin_event_bot_hash, author, user_openid
+            _apply_incoming_message_payload(target_event, message_obj, event_data)
+            _apply_incoming_sender(
+                target_event,
+                user_openid,
+                _get_qq_author_name_cached(
+                    plugin_event_bot_hash, author, user_openid
+                )
             )
-            target_event.data.sender['id'] = target_event.data.sender['user_id']
-            target_event.data.sender['name'] = target_event.data.sender['nickname']
-            target_event.data.sender['sex'] = 'unknown'
-            target_event.data.sender['age'] = 0
-            target_event.data.sender['role'] = 'member'
             target_event.data.extend['flag_from_direct'] = True
             target_event.data.extend['flag_from_qq'] = True
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
@@ -3096,37 +3088,12 @@ def get_Event_from_SDK(target_event):
         'AT_MESSAGE_CREATE'
     ]:
         author = event_data.get('author', {})
-        message_content, face_data = _get_qq_message_content(event_data)
-        message_obj = None
-        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if structured_message_para is not None:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                [structured_message_para]
-            )
-        elif message_content is not None:
-            if message_content != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    message_content.lstrip(' ')
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
-        _append_qq_message_attachments(
-            message_obj,
-            event_data.get('attachments', None),
-            face_data=face_data,
-            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
+        message_obj, face_data = _build_incoming_message_obj(
+            target_event,
+            event_data,
+            plugin_event_bot_hash,
+            'qqGuild_string',
+            strip_leading=True
         )
         if message_obj.active:
             author_id = author.get('id', None)
@@ -3168,19 +3135,12 @@ def get_Event_from_SDK(target_event):
                 message_obj,
                 'group'
             )
-            target_event.data.message_sdk = message_obj
-            target_event.data.message_id = str(event_data.get('id', ''))
-            target_event.data.raw_message = message_obj
-            target_event.data.raw_message_sdk = message_obj
-            target_event.data.font = None
-            target_event.data.sender['user_id'] = str(author_id)
-            target_event.data.sender['nickname'] = _get_qq_author_name(author)
-            target_event.data.sender['id'] = str(author_id)
-            target_event.data.sender['name'] = target_event.data.sender['nickname']
-            target_event.data.sender['sex'] = 'unknown'
-            target_event.data.sender['age'] = 0
-            target_event.data.sender['role'] = _get_qq_guild_sender_role(
-                event_data.get('member', None)
+            _apply_incoming_message_payload(target_event, message_obj, event_data)
+            _apply_incoming_sender(
+                target_event,
+                author_id,
+                _get_qq_author_name(author),
+                _get_qq_guild_sender_role(event_data.get('member', None))
             )
             target_event.data.host_id = event_data.get('guild_id', None)
             target_event.data.extend['group_id'] = str(event_data.get('channel_id', ''))
@@ -3209,37 +3169,12 @@ def get_Event_from_SDK(target_event):
             )
     elif target_event.sdk_event.payload.data.t == 'DIRECT_MESSAGE_CREATE':
         author = event_data.get('author', {})
-        message_obj = None
-        message_content, face_data = _get_qq_message_content(event_data)
-        structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
-        if structured_message_para is not None:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                [structured_message_para]
-            )
-        elif message_content is not None:
-            if message_content != '':
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'qqGuild_string',
-                    message_content.lstrip(' ')
-                )
-                message_obj.mode_rx = target_event.plugin_info['message_mode_rx']
-                message_obj.data_raw = message_obj.data.copy()
-            else:
-                message_obj = OlivOS.messageAPI.Message_templet(
-                    'olivos_para',
-                    []
-                )
-        else:
-            message_obj = OlivOS.messageAPI.Message_templet(
-                'olivos_para',
-                []
-            )
-        _append_qq_message_attachments(
-            message_obj,
-            event_data.get('attachments', None),
-            face_data=face_data,
-            skip=isinstance(structured_message_para, OlivOS.messageAPI.PARA.forward)
+        message_obj, face_data = _build_incoming_message_obj(
+            target_event,
+            event_data,
+            plugin_event_bot_hash,
+            'qqGuild_string',
+            strip_leading=True
         )
         if message_obj.active:
             author_id = author.get('id', None)
@@ -3274,18 +3209,12 @@ def get_Event_from_SDK(target_event):
                 message_obj,
                 'friend'
             )
-            target_event.data.message_sdk = message_obj
-            target_event.data.message_id = str(event_data.get('id', ''))
-            target_event.data.raw_message = message_obj
-            target_event.data.raw_message_sdk = message_obj
-            target_event.data.font = None
-            target_event.data.sender['user_id'] = str(author_id)
-            target_event.data.sender['nickname'] = _get_qq_author_name(author)
-            target_event.data.sender['id'] = str(author_id)
-            target_event.data.sender['name'] = target_event.data.sender['nickname']
-            target_event.data.sender['sex'] = 'unknown'
-            target_event.data.sender['age'] = 0
-            target_event.data.sender['role'] = 'member'
+            _apply_incoming_message_payload(target_event, message_obj, event_data)
+            _apply_incoming_sender(
+                target_event,
+                author_id,
+                _get_qq_author_name(author)
+            )
             target_event.data.extend['group_id'] = str(event_data.get('channel_id', ''))
             target_event.data.extend['host_group_id'] = str(event_data.get('guild_id', ''))
             target_event.data.extend['flag_from_direct'] = True
