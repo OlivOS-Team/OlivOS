@@ -20,13 +20,22 @@ from flask import current_app
 from flask import request
 from flask import Response
 
+import http.client
 import json
 import os
+import ssl
 import threading
+import time
 
 import OlivOS
 
 modelName = 'qqGuildv2WebhookServerAPI'
+
+# 存活心跳与自探活间隔(秒)。服务一旦假死, 日志会彻底静默、外部只能看到超时,
+# 排查时毫无线索; 因此定期打一行存活记录, 并用真实 HTTP(S) 请求自探活,
+# 连续失败按错误级别记录, 让"静默假死"变得可见。
+qqGuildv2WebhookHeartbeatInterval = 300.0
+qqGuildv2WebhookSelfProbeTimeout = 5.0
 
 
 def get_qqGuildv2_webhook_server_conf():
@@ -423,6 +432,79 @@ class server(OlivOS.API.Proc_templet):
             for tmp_appid in tmp_appid_list
         ])
 
+    def _self_probe(self):
+        # 必须做应用层探测: 服务假死时内核仍会替它完成 TCP 握手(连接 backlog),
+        # 只探端口是发现不了的, 所以这里真发一次 HTTP(S) 请求并要求拿到响应。
+        tmp_host = str(self.Proc_config['Flask_server_host'])
+        if tmp_host in ['0.0.0.0', '::', '']:
+            tmp_host = '127.0.0.1'
+        tmp_port = int(self.Proc_config['Flask_server_port'])
+        tmp_xpath = str(self.Proc_config['Flask_server_xpath'])
+        tmp_scheme = get_qqGuildv2_webhook_listen_scheme(self._get_cert_pairs())
+        tmp_conn = None
+        try:
+            if tmp_scheme == 'https':
+                tmp_ctx = ssl.create_default_context()
+                tmp_ctx.check_hostname = False
+                tmp_ctx.verify_mode = ssl.CERT_NONE
+                tmp_conn = http.client.HTTPSConnection(
+                    tmp_host, tmp_port,
+                    timeout=qqGuildv2WebhookSelfProbeTimeout,
+                    context=tmp_ctx
+                )
+            else:
+                tmp_conn = http.client.HTTPConnection(
+                    tmp_host, tmp_port,
+                    timeout=qqGuildv2WebhookSelfProbeTimeout
+                )
+            tmp_conn.request('GET', tmp_xpath)
+            tmp_conn.getresponse()
+            return True
+        except Exception:
+            return False
+        finally:
+            if tmp_conn is not None:
+                try:
+                    tmp_conn.close()
+                except Exception:
+                    pass
+
+    def _run_watchdog(self):
+        # 跑在独立线程里(未 monkey patch 的 gevent 下是真实线程): 即使服务线程的
+        # hub 被阻塞, 这里仍能完成探测并经 logger 进程把日志写出去。
+        tmp_start_time = time.monotonic()
+        tmp_fail_count = 0
+        while True:
+            time.sleep(qqGuildv2WebhookHeartbeatInterval)
+            if self._self_probe():
+                tmp_fail_count = 0
+                self.log(
+                    2,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS qqGuildv2 webhook server [{0}] alive [{1}]s handled [{2}] request(s)',
+                        [
+                            self.Proc_config['Flask_name'],
+                            int(time.monotonic() - tmp_start_time),
+                            int(self.Proc_data.get('rx_count', 0))
+                        ],
+                        modelName
+                    )
+                )
+            else:
+                tmp_fail_count += 1
+                self.log(
+                    3,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS qqGuildv2 webhook server [{0}] self check failed [{1}] time(s), '
+                        'the service may be stuck',
+                        [
+                            self.Proc_config['Flask_name'],
+                            tmp_fail_count
+                        ],
+                        modelName
+                    )
+                )
+
     def _json_response(self, payload_obj, status=200):
         return Response(
             json.dumps(obj=payload_obj),
@@ -490,6 +572,10 @@ class server(OlivOS.API.Proc_templet):
                 return self._handle_webhook_request(path_appid=appid)
 
     def _handle_webhook_request(self, path_appid=None):
+        try:
+            self.Proc_data['rx_count'] = int(self.Proc_data.get('rx_count', 0)) + 1
+        except Exception:
+            pass
         try:
             raw_body = request.get_data(cache=False)
         except Exception as error:
@@ -687,6 +773,12 @@ class server(OlivOS.API.Proc_templet):
                 modelName
             )
         )
+        tmp_watchdog = threading.Thread(
+            target=self._run_watchdog,
+            args=(),
+            daemon=True
+        )
+        tmp_watchdog.start()
         if self.Proc_config['config'].debug_mode:
             self.Proc_config['Flask_app'].run(
                 host=self.Proc_config['Flask_server_host'],

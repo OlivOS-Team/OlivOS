@@ -148,6 +148,11 @@ dictL10NSTR = {
         'qqGuildv2WebhookServerAPI_0005': 'OlivOS qqGuildv2 webhook server [{0}] auth ACK',
         'qqGuildv2WebhookServerAPI_0006': 'OlivOS qqGuildv2 webhook server [{0}] missing HTTPS cert [{1}] [{2}]',
         'qqGuildv2WebhookServerAPI_0007': 'OlivOS qqGuildv2 webhook server [{0}] loaded HTTPS certs [{1}]',
+        'qqGuildv2WebhookServerAPI_0008': 'OlivOS qqGuildv2 webhook server [{0}] alive [{1}]s handled [{2}] request(s)',
+        'qqGuildv2WebhookServerAPI_0009': (
+            'OlivOS qqGuildv2 webhook server [{0}] self check failed [{1}] time(s), '
+            'the service may be stuck'
+        ),
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -278,5 +283,7 @@ dictL10NSTR = {
         'qqGuildv2WebhookServerAPI_0005': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 鉴权 ACK',
         'qqGuildv2WebhookServerAPI_0006': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 缺少 HTTPS 证书 [{1}] [{2}]',
         'qqGuildv2WebhookServerAPI_0007': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 已加载 HTTPS 证书 [{1}]',
+        'qqGuildv2WebhookServerAPI_0008': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 存活检测: 已运行 [{1}] 秒, 累计处理 [{2}] 次回调',
+        'qqGuildv2WebhookServerAPI_0009': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 自检失败 [{1}] 次, 服务可能已无响应(假死)',
     }
 }
