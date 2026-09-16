@@ -740,6 +740,12 @@ class HostUI(object):
         self.res = True
         if type(self.callbackData) is dict:
             self.callbackData['res'] = self.res
+        try:
+            OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dirs(
+                self.UIData['Account_data']
+            )
+        except Exception:
+            pass
         sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
 
@@ -789,6 +795,7 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_host_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Server_port_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Server_access_token_StringVar': tkinter.StringVar(),
+            'edit_root_Entry_Webhook_callback_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend2_StringVar': tkinter.StringVar(),
@@ -835,10 +842,14 @@ class TreeEditUI(object):
                     'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
                     'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ',
                     'QQ官方/公域/V2': '请确保已经添加IP白名单',
+                    'QQ官方/公域/V2/Webhook': '请确保此BOT接入方式为Webhook',
                     'QQ官方/公域/V2/纯频道': '请确保已经添加IP白名单',
+                    'QQ官方/公域/V2/纯频道/Webhook': '请确保此BOT接入方式为Webhook',
                     'QQ官方/公域/V2/指定intents': '请确保已经添加IP白名单',
                     'QQ官方/私域/V2': '请确保已经添加IP白名单',
-                    'QQ官方/私域/V2/指定intents': '请确保已经添加IP白名单'
+                    'QQ官方/私域/V2/Webhook': '请确保此BOT接入方式为Webhook',
+                    'QQ官方/私域/V2/指定intents': '请确保已经添加IP白名单',
+                    'QQ官方/沙盒/V2/Webhook': '请确保此BOT接入方式为Webhook'
                 },
                 'type_clear_note_list': {
                     'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
@@ -1159,7 +1170,15 @@ class TreeEditUI(object):
                         'AppID': 'edit_root_Entry_ID',
                         'AppSecret': 'edit_root_Entry_Server_access_token'
                     },
+                    'QQ官方/公域/V2/Webhook': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
                     'QQ官方/公域/V2/纯频道': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/公域/V2/纯频道/Webhook': {
                         'AppID': 'edit_root_Entry_ID',
                         'AppSecret': 'edit_root_Entry_Server_access_token'
                     },
@@ -1172,12 +1191,20 @@ class TreeEditUI(object):
                         'AppID': 'edit_root_Entry_ID',
                         'AppSecret': 'edit_root_Entry_Server_access_token'
                     },
+                    'QQ官方/私域/V2/Webhook': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
                     'QQ官方/私域/V2/指定intents': {
                         'AppID': 'edit_root_Entry_ID',
                         'AppSecret': 'edit_root_Entry_Server_access_token',
                         'intents': 'edit_root_Entry_Server_port'
                     },
                     'QQ官方/沙盒/V2': {
+                        'AppID': 'edit_root_Entry_ID',
+                        'AppSecret': 'edit_root_Entry_Server_access_token'
+                    },
+                    'QQ官方/沙盒/V2/Webhook': {
                         'AppID': 'edit_root_Entry_ID',
                         'AppSecret': 'edit_root_Entry_Server_access_token'
                     },
@@ -1650,6 +1677,10 @@ class TreeEditUI(object):
                     self.hash_key,
                     tmp_res_bot_info
                 ]
+                if OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(tmp_res_bot_info):
+                    OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dir(
+                        tmp_res_bot_info.id
+                    )
             else:
                 miss_key_list = []
                 tmp_check_list = [
@@ -1798,6 +1829,10 @@ class TreeEditUI(object):
             self.UIObject[obj_name].configure(
                 show='●'
             )
+        if mode == 'READONLY':
+            self.UIObject[obj_name].configure(
+                state='readonly'
+            )
         self.UIObject[obj_name].place(
             x=x,
             y=y,
@@ -1848,6 +1883,40 @@ class TreeEditUI(object):
         elif target == 'edit_root_Combobox_qsign_protocal':
             self.tree_edit_UI_Combobox_update(action, 'qsign_protocal')
 
+    def tree_edit_UI_webhook_callback_refresh(self, event=None):
+        try:
+            tmp_appid = self.UIData['edit_root_Entry_ID_StringVar'].get()
+            self.UIData['edit_root_Entry_Webhook_callback_StringVar'].set(
+                OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_listen_url(tmp_appid)
+            )
+        except Exception:
+            pass
+        try:
+            tmp_certdir = './conf/ssl'
+            tmp_conf = OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_server_conf()
+            if tmp_conf.get('certdir', None) not in [None, '']:
+                tmp_certdir = str(tmp_conf.get('certdir'))
+            tmp_appid = self.UIData['edit_root_Entry_ID_StringVar'].get()
+            tmp_show_appid = '{AppID}'
+            if tmp_appid is not None and str(tmp_appid).strip() != '':
+                tmp_show_appid = str(tmp_appid).strip()
+            if 'edit_root_Label_type_note_3' in self.UIObject:
+                self.UIObject['edit_root_Label_type_note_3'].configure(
+                    text='请将证书放到 %s/%s/' % (str(tmp_certdir), tmp_show_appid)
+                )
+        except Exception:
+            pass
+
+    def tree_edit_UI_webhook_copy(self):
+        try:
+            self.tree_edit_UI_webhook_callback_refresh()
+            tmp_url = self.UIData['edit_root_Entry_Webhook_callback_StringVar'].get()
+            self.UIObject['edit_root'].clipboard_clear()
+            self.UIObject['edit_root'].clipboard_append(tmp_url)
+            self.UIObject['edit_root'].update()
+        except Exception:
+            pass
+
     def tree_edit_UI_type_clear_note_GEN(self, tmp_type: str):
         def tree_edit_UI_type_clear_note():
             if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
@@ -1878,6 +1947,11 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_host',
             'edit_root_Entry_Server_port',
             'edit_root_Entry_Server_access_token',
+            'edit_root_Entry_Webhook_callback',
+            'edit_root_Button_Webhook_copy',
+            'edit_root_Label_type_note_2',
+            'edit_root_Label_type_note_3',
+            'edit_root_Label_type_note_4',
             'edit_root_Combobox_platform',
             'edit_root_Combobox_sdk',
             'edit_root_Combobox_model',
@@ -1994,6 +2068,47 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
+                if tmp_type.startswith('QQ官方/') and tmp_type.endswith('/Webhook'):
+                    tmp_webhook_y = 40 + count * (24 + 6)
+                    self.tree_edit_UI_webhook_callback_refresh()
+                    self.tree_edit_UI_Entry_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Entry_Webhook_callback',
+                        str_name='edit_root_Entry_Webhook_callback_StringVar',
+                        x=100,
+                        y=tmp_webhook_y,
+                        width=200,
+                        height=24,
+                        action=self.action,
+                        title='回调',
+                        mode='READONLY'
+                    )
+                    self.tree_UI_Button_init(
+                        name='edit_root_Button_Webhook_copy',
+                        text='复制',
+                        command=self.tree_edit_UI_webhook_copy,
+                        x=310,
+                        y=tmp_webhook_y,
+                        width=70,
+                        height=24
+                    )
+                    if 'edit_root_Entry_ID' in self.UIObject:
+                        self.UIObject['edit_root_Entry_ID'].bind(
+                            '<KeyRelease>',
+                            self.tree_edit_UI_webhook_callback_refresh
+                        )
+                        self.UIObject['edit_root_Entry_ID'].bind(
+                            '<FocusOut>',
+                            self.tree_edit_UI_webhook_callback_refresh
+                        )
+                    if not getattr(self, '_webhook_id_trace', False):
+                        self.UIData['edit_root_Entry_ID_StringVar'].trace(
+                            'w',
+                            lambda *args: self.tree_edit_UI_webhook_callback_refresh()
+                        )
+                        self._webhook_id_trace = True
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
                 if (
                     tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_note_list']
                     and tmp_type in self.UIData['edit_root_Combobox_dict']['type_extends_name_note_list']
@@ -2037,6 +2152,49 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
+                if tmp_type.startswith('QQ官方/') and tmp_type.endswith('/Webhook'):
+                    tmp_certdir = './conf/ssl'
+                    try:
+                        tmp_certdir = OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_server_conf().get(
+                            'certdir',
+                            tmp_certdir
+                        )
+                    except Exception:
+                        pass
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_2',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='请将0.0.0.0改为公网服务器地址'
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_3',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='请将证书放到 %s/{AppID}/' % str(tmp_certdir)
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_4',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='建议使用域名并自动续期'
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_webhook_callback_refresh()
                 if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
                     self.tree_UI_Button_init(
                         name='edit_root_Button_type_clear_note',

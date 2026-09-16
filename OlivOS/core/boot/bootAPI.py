@@ -542,12 +542,22 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     elif basic_conf_models_this['type'] == 'qqGuildv2_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link':
+                            if (
+                                plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link'
+                                and not OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(
+                                    plugin_bot_info_dict[bot_info_key]
+                                )
+                            ):
                                 flag_need_enable = True
                         if not flag_need_enable:
                             continue
                         for bot_info_key in plugin_bot_info_dict:
-                            if plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link':
+                            if (
+                                plugin_bot_info_dict[bot_info_key].platform['sdk'] == 'qqGuildv2_link'
+                                and not OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(
+                                    plugin_bot_info_dict[bot_info_key]
+                                )
+                            ):
                                 tmp_Proc_name = basic_conf_models_this['name'] + '=' + bot_info_key
                                 Proc_dict[tmp_Proc_name] = OlivOS.qqGuildv2LinkServerAPI.server(
                                     Proc_name=tmp_Proc_name,
@@ -561,6 +571,44 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 )
                                 Proc_Proc_dict[tmp_Proc_name] = Proc_dict[tmp_Proc_name].start_unity(
                                     tmp_proc_mode)
+                    elif basic_conf_models_this['type'] == 'qqGuildv2_webhook':
+                        webhook_bot_info_dict = {}
+                        for bot_info_key in plugin_bot_info_dict:
+                            if OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(
+                                plugin_bot_info_dict[bot_info_key]
+                            ):
+                                webhook_bot_info_dict[bot_info_key] = plugin_bot_info_dict[bot_info_key]
+                        if len(webhook_bot_info_dict) == 0:
+                            continue
+                        tmp_server = basic_conf_models_this['server']
+                        tmp_ssl_cert = None
+                        tmp_ssl_key = None
+                        tmp_ssl_dir = None
+                        if 'cert' in tmp_server:
+                            tmp_ssl_cert = tmp_server['cert']
+                        if 'key' in tmp_server:
+                            tmp_ssl_key = tmp_server['key']
+                        if 'certdir' in tmp_server:
+                            tmp_ssl_dir = tmp_server['certdir']
+                        Proc_dict[basic_conf_models_this['name']] = OlivOS.qqGuildv2WebhookServerAPI.server(
+                            Proc_name=basic_conf_models_this['name'],
+                            scan_interval=basic_conf_models_this['interval'],
+                            dead_interval=basic_conf_models_this['dead_interval'],
+                            Flask_namespace='OlivOS_qqGuildv2_webhook',
+                            Flask_server_methods=['POST'],
+                            Flask_host=tmp_server['host'],
+                            Flask_port=tmp_server['port'],
+                            Flask_server_xpath=tmp_server['xpath'],
+                            Flask_ssl_cert=tmp_ssl_cert,
+                            Flask_ssl_key=tmp_ssl_key,
+                            Flask_ssl_dir=tmp_ssl_dir,
+                            tx_queue=multiprocessing_dict[basic_conf_models_this['tx_queue']],
+                            debug_mode=basic_conf_models_this['debug'],
+                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                            bot_info_dict=webhook_bot_info_dict
+                        )
+                        Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[
+                            basic_conf_models_this['name']].start_unity(tmp_proc_mode)
                     elif basic_conf_models_this['type'] == 'discord_link':
                         flag_need_enable = False
                         for bot_info_key in plugin_bot_info_dict:

@@ -141,6 +141,13 @@ dictL10NSTR = {
         'bootAPI_0005': 'OlivOS model [{0}] stopped',
         'bootAPI_0006': 'OlivOS model [{0}] will stop',
         'qqGuildv2SDK_0001': 'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
+        'qqGuildv2WebhookServerAPI_0001': 'OlivOS qqGuildv2 webhook server [{0}] is running on [{1}]',
+        'qqGuildv2WebhookServerAPI_0002': 'OlivOS qqGuildv2 webhook server [{0}] auth failed [{1}]',
+        'qqGuildv2WebhookServerAPI_0003': 'OlivOS qqGuildv2 webhook server [{0}] payload error [{1}: {2}]',
+        'qqGuildv2WebhookServerAPI_0004': 'OlivOS qqGuildv2 webhook server [{0}] callback verified',
+        'qqGuildv2WebhookServerAPI_0005': 'OlivOS qqGuildv2 webhook server [{0}] auth ACK',
+        'qqGuildv2WebhookServerAPI_0006': 'OlivOS qqGuildv2 webhook server [{0}] missing HTTPS cert [{1}] [{2}]',
+        'qqGuildv2WebhookServerAPI_0007': 'OlivOS qqGuildv2 webhook server [{0}] loaded HTTPS certs [{1}]',
     },
     'zh-CN': {
         'diagnoseAPI_0001': '欢迎使用 青果核心交互栈 OlivOS {0}',
@@ -264,5 +271,12 @@ dictL10NSTR = {
         'bootAPI_0005': 'OlivOS 组件 [{0}] 已被停止',
         'bootAPI_0006': 'OlivOS 组件 [{0}] 即将停止',
         'qqGuildv2SDK_0001': 'OlivOS QQ官方开放平台 [{0}] 刷新 TOKEN [{1}]',
+        'qqGuildv2WebhookServerAPI_0001': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 正在运作于 [{1}]',
+        'qqGuildv2WebhookServerAPI_0002': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 鉴权失败 [{1}]',
+        'qqGuildv2WebhookServerAPI_0003': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 回调数据异常 [{1}: {2}]',
+        'qqGuildv2WebhookServerAPI_0004': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 回调地址验证完成',
+        'qqGuildv2WebhookServerAPI_0005': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 鉴权 ACK',
+        'qqGuildv2WebhookServerAPI_0006': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 缺少 HTTPS 证书 [{1}] [{2}]',
+        'qqGuildv2WebhookServerAPI_0007': 'OlivOS QQ官方开放平台 Webhook 服务组件 [{0}] 已加载 HTTPS 证书 [{1}]',
     }
 }

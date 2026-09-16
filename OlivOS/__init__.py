@@ -57,6 +57,7 @@ from .adapter.qqGuild import qqGuildSDK
 from .adapter.qqGuild import qqGuildLinkServerAPI
 from .adapter.qqGuild import qqGuildv2SDK
 from .adapter.qqGuild import qqGuildv2LinkServerAPI
+from .adapter.qqGuild import qqGuildv2WebhookServerAPI
 from .adapter.red import qqRedSDK
 from .adapter.red import qqRedLinkServerAPI
 from .adapter.OPQBot import OPQBotSDK

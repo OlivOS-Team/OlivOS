@@ -38,6 +38,7 @@ setuptools.setup(
         'websocket-client',
         'pillow==9.3.0',
         'rsa',
+        'cryptography',
         'requests_toolbelt',
         'pystray',
         'aiohttp',
