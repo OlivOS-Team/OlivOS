@@ -257,14 +257,14 @@ class api_templet(object):
                     send_url,
                     headers=headers,
                     data=payload,
-                    proxies=OlivOS.webTool.get_system_proxy()
+                    proxies=OlivOS.webTool.get_system_proxy(), timeout=OlivOS.webTool.OlivOS_http_timeout
                 )
             elif req_type == 'GET':
                 msg_res = req.request(
                     "GET",
                     send_url,
                     headers=headers,
-                    proxies=OlivOS.webTool.get_system_proxy()
+                    proxies=OlivOS.webTool.get_system_proxy(), timeout=OlivOS.webTool.OlivOS_http_timeout
                 )
 
             self.res = msg_res.text
@@ -347,9 +347,13 @@ class API(object):
                 msg_res = None
                 if req_type == 'POST':
                     msg_res = req.request("POST", send_url, headers=headers, data=payload,
-                                          proxies=OlivOS.webTool.get_system_proxy())
+                                          proxies=OlivOS.webTool.get_system_proxy(),
+                                          timeout=OlivOS.webTool.OlivOS_http_timeout)
                 elif req_type == 'GET':
-                    msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
+                    msg_res = req.request(
+                        "GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy(),
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -625,7 +629,7 @@ class event_action(object):
                             msg_res = req.request(
                                 "GET", send_url,
                                 headers=headers,
-                                proxies=OlivOS.webTool.get_system_proxy()
+                                proxies=OlivOS.webTool.get_system_proxy(), timeout=OlivOS.webTool.OlivOS_http_timeout
                             )
                             pic_file = msg_res.content
                         else:

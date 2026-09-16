@@ -256,5 +256,5 @@ def send_ff14_post(plugin_event, message: str):
         'Content-Type': 'text/plain'
     }
     data = message.encode('UTF-8')
-    msg_res = req.request("POST", send_url, headers=headers, data=data)
+    msg_res = req.request("POST", send_url, headers=headers, data=data, timeout=OlivOS.webTool.OlivOS_http_timeout)
     return msg_res

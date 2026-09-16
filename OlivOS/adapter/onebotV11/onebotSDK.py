@@ -159,7 +159,10 @@ class send_onebot_post_json_T(object):
                     'Content-Type': 'application/json'
                 }
                 headers.update(token_dict)
-                msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'))
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'),
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
 
                 if self.bot_info.debug_mode:
                     if self.bot_info.debug_logger is not None:
@@ -285,7 +288,7 @@ class api_templet(object):
                     self.bot_info.debug_logger.log(0, self.node_ext + ': GET request')
             headers = {}
             headers.update(token_dict)
-            msg_res = req.request("GET", send_url, headers=headers)
+            msg_res = req.request("GET", send_url, headers=headers, timeout=OlivOS.webTool.OlivOS_http_timeout)
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ' - GET succeed: ' + msg_res.text)
