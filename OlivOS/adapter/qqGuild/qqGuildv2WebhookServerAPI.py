@@ -56,13 +56,27 @@ def get_qqGuildv2_webhook_xpath_prefix(xpath=None):
     return tmp_xpath
 
 
+def get_qqGuildv2_webhook_listen_scheme(cert_pairs=None):
+    # 监听协议必须由「是否真的找到可用证书」决定,不能写死:
+    # 否则证书缺失时会对外给出 https 地址,而服务端实际只提供 http。
+    if type(cert_pairs) is list and len(cert_pairs) > 0:
+        return 'https'
+    return 'http'
+
+
 def get_qqGuildv2_webhook_listen_url(appid=None):
     tmp_server = get_qqGuildv2_webhook_server_conf()
     tmp_xpath = get_qqGuildv2_webhook_xpath_prefix(tmp_server.get('xpath', None))
     tmp_appid = '{AppID}'
     if appid is not None and str(appid).strip() != '':
         tmp_appid = str(appid).strip()
-    return 'https://%s:%s%s/%s' % (
+    tmp_pairs = get_qqGuildv2_webhook_cert_pairs(
+        certdir=tmp_server.get('certdir', None),
+        fallback_cert=tmp_server.get('cert', None),
+        fallback_key=tmp_server.get('key', None)
+    )
+    return '%s://%s:%s%s/%s' % (
+        get_qqGuildv2_webhook_listen_scheme(tmp_pairs),
         tmp_server['host'],
         tmp_server['port'],
         tmp_xpath,
@@ -395,12 +409,8 @@ class server(OlivOS.API.Proc_templet):
         return tmp_appid_list
 
     def _get_listen_url(self):
-        tmp_pairs = self._get_cert_pairs()
-        tmp_scheme = 'http'
-        if type(tmp_pairs) is list and len(tmp_pairs) > 0:
-            tmp_scheme = 'https'
         tmp_prefix = '%s://%s:%s%s' % (
-            tmp_scheme,
+            get_qqGuildv2_webhook_listen_scheme(self._get_cert_pairs()),
             str(self.Proc_config['Flask_server_host']),
             str(self.Proc_config['Flask_server_port']),
             str(self.Proc_config['Flask_server_xpath'])
