@@ -607,9 +607,15 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request(
+                    "GET", send_url, headers=headers,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
 
             self.res = msg_res.text
             self.res_code = msg_res.status_code
@@ -644,20 +650,38 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request(
+                    "GET", send_url, headers=headers,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'DELETE':
                 # 部分 DELETE 接口(如删除频道成员)带请求体,无 data 时不发 body。
                 if self.data is not None:
-                    msg_res = req.request("DELETE", send_url, headers=headers, data=payload)
+                    msg_res = req.request(
+                        "DELETE", send_url, headers=headers, data=payload,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
                 else:
-                    msg_res = req.request("DELETE", send_url, headers=headers)
+                    msg_res = req.request(
+                        "DELETE", send_url, headers=headers,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
             elif req_type in ['PUT', 'PATCH']:
                 if self.data is not None:
-                    msg_res = req.request(req_type, send_url, headers=headers, data=payload)
+                    msg_res = req.request(
+                        req_type, send_url, headers=headers, data=payload,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
                 else:
-                    msg_res = req.request(req_type, send_url, headers=headers)
+                    msg_res = req.request(
+                        req_type, send_url, headers=headers,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
 
             self.res = msg_res.text
             self.res_code = msg_res.status_code
@@ -700,7 +724,10 @@ def _send_channel_multipart(bot_info, metadata, data, host, port, route, req_typ
         }
         msg_res = None
         if req_type == 'POST':
-            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+            msg_res = req.request(
+                "POST", send_url, headers=headers, data=payload,
+                timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+            )
         return msg_res
     except Exception:
         traceback.print_exc()
