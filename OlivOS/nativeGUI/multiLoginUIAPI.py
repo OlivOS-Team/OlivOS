@@ -831,6 +831,7 @@ class TreeEditUI(object):
                     'QQ/OPQ/指定端口': '已弃用',
                     'QQ/OPQ/指定端口/旧': '已弃用',
                     'QQ/NapCat/默认': '需要已经安装不低于9.9.22版本QQ',
+                    'QQ/NapCat/9.9.19': '需要已经安装不低于9.9.19版本QQ',
                     'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
                     'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ',
                     'QQ官方/公域/V2': '请确保已经添加IP白名单',
@@ -855,6 +856,7 @@ class TreeEditUI(object):
                     'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
                     'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}',
                     'QQ/NapCat/默认': './conf/napcat/{bothash}',
+                    'QQ/NapCat/9.9.19': './conf/napcat/{bothash}',
                     'QQ/NapCat/9.9.11': './conf/napcat/{bothash}',
                     'QQ/NapCat/旧': './conf/napcat/{bothash}'
                 },
@@ -1041,6 +1043,9 @@ class TreeEditUI(object):
                         'TOKEN': 'edit_root_Entry_Server_access_token',
                     },
                     'QQ/NapCat/默认': {
+                        'QQ号': 'edit_root_Entry_ID',
+                    },
+                    'QQ/NapCat/9.9.19': {
                         'QQ号': 'edit_root_Entry_ID',
                     },
                     'QQ/NapCat/9.9.11': {

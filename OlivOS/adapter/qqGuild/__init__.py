@@ -19,4 +19,9 @@ from . import (
     qqGuildSDK,
     qqGuildv2LinkServerAPI,
     qqGuildv2SDK,
+    qqGuildv2SDKCommon,
+    qqGuildv2SDKGroup,
+    qqGuildv2SDKGuild,
+    qqGuildv2SDKGuildPrivate,
+    qqGuildv2SDKPrivate,
 )

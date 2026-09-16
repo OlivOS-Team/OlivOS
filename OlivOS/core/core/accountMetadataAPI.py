@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 accountTypeList = [
     'QQ/NapCat/默认',
+    'QQ/NapCat/9.9.19',
     'QQ/NapCat/9.9.11',
     'KOOK',
     'KOOK/消息兼容',
@@ -114,6 +115,7 @@ accountTypeMappingList = {
     'QQ/OPQ/指定端口': ['qq', 'onebot', 'opqbot_port', 'True', 'websocket'],
     'QQ/OPQ/指定端口/旧': ['qq', 'onebot', 'opqbot_port_old', 'True', 'websocket'],
     'QQ/NapCat/默认': ['qq', 'onebot', 'napcat_show_new', 'True', 'post'],
+    'QQ/NapCat/9.9.19': ['qq', 'onebot', 'napcat_show_new_9_9_19', 'True', 'post'],
     'QQ/NapCat/9.9.11': ['qq', 'onebot', 'napcat_show', 'True', 'post'],
     'QQ/NapCat/旧': ['qq', 'onebot', 'napcat_show_old', 'True', 'post'],
     'QQ/GoCq/默认': ['qq', 'onebot', 'gocqhttp_show', 'True', 'post'],
@@ -271,6 +273,7 @@ accountTypeDataList_platform_sdk_model = {
             # 'napcat_hide',
             'napcat_show',
             'napcat_show_new',
+            'napcat_show_new_9_9_19',
             'napcat_show_old',
             'napcat_default',
             'llonebot_default',
