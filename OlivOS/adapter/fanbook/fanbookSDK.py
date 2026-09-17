@@ -88,7 +88,10 @@ class api_templet(object):
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
 
-            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+            msg_res = req.request(
+                "POST", send_url, headers=headers, data=payload,
+                timeout=OlivOS.webTool.OlivOS_http_timeout
+            )
 
             self.res = msg_res.text
             return msg_res.text

@@ -295,7 +295,10 @@ def GETHttpFile(url, path):
         'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
     }
     try:
-        msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
+        msg_res = req.request(
+            "GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy(),
+            timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+        )
         releaseToDirForFile(path)
         with open(path, 'wb+') as tmp:
             tmp.write(msg_res.content)

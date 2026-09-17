@@ -351,6 +351,7 @@ class api_templet(object):
                     headers=headers,
                     data=payload,
                     proxies=OlivOS.webTool.get_system_proxy(),
+                    timeout=OlivOS.webTool.OlivOS_http_timeout,
                     **request_args
                 )
             elif req_type == 'GET':
@@ -359,6 +360,7 @@ class api_templet(object):
                     send_url,
                     headers=headers,
                     proxies=OlivOS.webTool.get_system_proxy(),
+                    timeout=OlivOS.webTool.OlivOS_http_timeout,
                     **request_args
                 )
 
@@ -970,7 +972,10 @@ def _download_file(target_event, downloadCode, file_ext=".png", file_type="image
         url = _get_file_url(target_event, downloadCode)
         if url is None:
             return
-        req_obj = req.request("GET", url, proxies=OlivOS.webTool.get_system_proxy())
+        req_obj = req.request(
+            "GET", url, proxies=OlivOS.webTool.get_system_proxy(),
+            timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+        )
         if req_obj.status_code == 200:
 
             file_path = OlivOS.contentAPI.resourcePathTransform(
@@ -1011,7 +1016,10 @@ def _set_image_upload_fast(target_event, url: str):
                     'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
                 }
                 msg_res = None
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request(
+                    "GET", send_url, headers=headers,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+                )
                 pic_file = msg_res.content
             else:
                 file_path = url_parsed.path

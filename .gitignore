@@ -10,3 +10,5 @@ flake8_output.log
 build
 dist
 .vscode/settings.json
+*.opk
+.workbuddy

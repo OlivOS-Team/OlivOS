@@ -76,6 +76,13 @@ class Account(object):
                 bot_info_tmp.enable = account_conf_account_this['enable']
             bot_info_tmp.debug_mode = account_conf_account_this['debug']
             plugin_bot_info_dict[bot_info_tmp.hash] = bot_info_tmp
+            if OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(bot_info_tmp):
+                try:
+                    OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dir(
+                        bot_info_tmp.id
+                    )
+                except Exception:
+                    pass
             logger_proc.log(2, OlivOS.L10NAPI.getTrans('generate [{0}] account [{1}] as [{2}] ... done', [
                 str(account_conf_account_this['platform_type']),
                 str(account_conf_account_this['id']),
@@ -105,6 +112,13 @@ class Account(object):
             tmp_this_account_data['enable'] = getattr(Account_data_this, 'enable', True)
             tmp_this_account_data['debug'] = Account_data_this.debug_mode
             tmp_total_account_data['account'].append(tmp_this_account_data)
+            if OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(Account_data_this):
+                try:
+                    OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dir(
+                        Account_data_this.id
+                    )
+                except Exception:
+                    pass
         with open(path, 'w', encoding='utf-8') as account_conf_f:
             account_conf_f.write(json.dumps(tmp_total_account_data, indent=4))
 

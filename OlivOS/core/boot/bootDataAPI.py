@@ -44,6 +44,7 @@ default_Conf = {
             "OlivOS_milky_auto",
             "OlivOS_qqGuild_link",
             "OlivOS_qqGuildv2_link",
+            "OlivOS_qqGuildv2_webhook",
             "OlivOS_discord_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
@@ -94,6 +95,7 @@ default_Conf = {
                 "OlivOS_onebotV12_link",
                 "OlivOS_qqGuild_link",
                 "OlivOS_qqGuildv2_link",
+                "OlivOS_qqGuildv2_webhook",
                 "OlivOS_discord_link",
                 "OlivOS_telegram_poll",
                 "OlivOS_fanbook_poll",
@@ -124,6 +126,7 @@ default_Conf = {
                 "onebotV12_link",
                 "qqGuild_link",
                 "qqGuildv2_link",
+                "qqGuildv2_webhook",
                 "discord_link",
                 "telegram_poll",
                 "fanbook_poll",
@@ -368,6 +371,26 @@ default_Conf = {
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False
+        },
+        "OlivOS_qqGuildv2_webhook": {
+            "enable": True,
+            "name": "OlivOS_qqGuildv2_webhook",
+            "type": "qqGuildv2_webhook",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": None,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False,
+            "server": {
+                "auto": False,
+                "host": "0.0.0.0",
+                "port": 8080,
+                "xpath": "/OlivOSQQGuildv2Webhook",
+                "certdir": "./conf/ssl",
+                "cert": "./conf/ssl/cert.pem",
+                "key": "./conf/ssl/key.pem"
+            }
         },
         "OlivOS_discord_link": {
             "enable": True,

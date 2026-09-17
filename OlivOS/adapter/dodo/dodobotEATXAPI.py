@@ -50,7 +50,8 @@ class server(OlivOS.API.Proc_templet):
                 'User-Agent': 'OlivOS/0.0.1'
             }
             msg_res = req.request("GET", OlivOS.dodobotEASDK.post_host + ':' + str(
-                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='')
+                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='',
+                timeout=OlivOS.webTool.OlivOS_http_timeout)
             try:
                 msg_res_obj = json.loads(msg_res.text)
                 if 'Code' in msg_res_obj:

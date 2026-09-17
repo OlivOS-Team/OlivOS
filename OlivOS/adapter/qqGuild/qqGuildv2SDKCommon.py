@@ -32,6 +32,7 @@ from enum import IntEnum
 from urllib import parse
 
 import requests as req
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from requests_toolbelt import MultipartEncoder
 
 import OlivOS
@@ -314,6 +315,94 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
+def is_qqGuildv2_webhook_account(bot_info):
+    try:
+        if bot_info is None:
+            return False
+        if bot_info.platform.get('sdk', None) != 'qqGuildv2_link':
+            return False
+        tmp_type = None
+        if getattr(bot_info, 'post_info', None) is not None:
+            tmp_type = bot_info.post_info.type
+        return str(tmp_type) == 'post'
+    except Exception:
+        return False
+
+
+def _get_qqGuildv2_ed25519_seed_bytes(secret):
+    if secret is None:
+        return None
+    seed = str(secret)
+    if seed == '':
+        return None
+    while len(seed) < 32:
+        seed = seed + seed
+    return seed[:32].encode('utf-8')
+
+
+def _get_qqGuildv2_ed25519_private_key(secret):
+    try:
+        seed = _get_qqGuildv2_ed25519_seed_bytes(secret)
+        if seed is None:
+            return None
+        return Ed25519PrivateKey.from_private_bytes(seed)
+    except Exception:
+        return None
+
+
+def sign_qqGuildv2_webhook_validation(secret, event_ts, plain_token):
+    try:
+        private_key = _get_qqGuildv2_ed25519_private_key(secret)
+        if private_key is None:
+            return None
+        msg = ('%s%s' % (str(event_ts), str(plain_token))).encode('utf-8')
+        return private_key.sign(msg).hex()
+    except Exception:
+        return None
+
+
+def verify_qqGuildv2_webhook_signature(secret, timestamp, body, signature):
+    try:
+        if timestamp is None or signature is None or body is None:
+            return False
+        tmp_timestamp = str(timestamp)
+        tmp_signature = str(signature).strip()
+        if tmp_timestamp == '' or tmp_signature == '':
+            return False
+        if type(body) is str:
+            body = body.encode('utf-8')
+        sig = bytes.fromhex(tmp_signature)
+        if len(sig) != 64 or sig[63] & 224 != 0:
+            return False
+        private_key = _get_qqGuildv2_ed25519_private_key(secret)
+        if private_key is None:
+            return False
+        public_key = private_key.public_key()
+        msg = tmp_timestamp.encode('utf-8') + body
+        public_key.verify(sig, msg)
+        return True
+    except Exception:
+        return False
+
+
+def get_qqGuildv2_webhook_validation(payload_obj):
+    try:
+        if type(payload_obj) is not dict:
+            return None, None
+        if payload_obj.get('op', None) != 13:
+            return None, None
+        data = payload_obj.get('d', None)
+        if type(data) is not dict:
+            return None, None
+        plain_token = data.get('plain_token', None)
+        event_ts = data.get('event_ts', None)
+        if plain_token is None or event_ts is None:
+            return None, None
+        return str(plain_token), str(event_ts)
+    except Exception:
+        return None, None
+
+
 '''
 对于WEBSOCKET接口的PAYLOAD实现
 '''
@@ -454,6 +543,11 @@ class PAYLOAD(object):
             res = json.dumps(obj=res_obj)
             return res
 
+    class sendWebhookAck(payload_template):
+        def __init__(self):
+            payload_template.__init__(self)
+            self.data.op = 12
+
 
 '''
 对于POST接口的实现
@@ -513,9 +607,15 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request(
+                    "GET", send_url, headers=headers,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
 
             self.res = msg_res.text
             self.res_code = msg_res.status_code
@@ -550,20 +650,38 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request(
+                    "GET", send_url, headers=headers,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'DELETE':
                 # 部分 DELETE 接口(如删除频道成员)带请求体,无 data 时不发 body。
                 if self.data is not None:
-                    msg_res = req.request("DELETE", send_url, headers=headers, data=payload)
+                    msg_res = req.request(
+                        "DELETE", send_url, headers=headers, data=payload,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
                 else:
-                    msg_res = req.request("DELETE", send_url, headers=headers)
+                    msg_res = req.request(
+                        "DELETE", send_url, headers=headers,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
             elif req_type in ['PUT', 'PATCH']:
                 if self.data is not None:
-                    msg_res = req.request(req_type, send_url, headers=headers, data=payload)
+                    msg_res = req.request(
+                        req_type, send_url, headers=headers, data=payload,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
                 else:
-                    msg_res = req.request(req_type, send_url, headers=headers)
+                    msg_res = req.request(
+                        req_type, send_url, headers=headers,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
 
             self.res = msg_res.text
             self.res_code = msg_res.status_code
@@ -606,7 +724,10 @@ def _send_channel_multipart(bot_info, metadata, data, host, port, route, req_typ
         }
         msg_res = None
         if req_type == 'POST':
-            msg_res = req.request("POST", send_url, headers=headers, data=payload)
+            msg_res = req.request(
+                "POST", send_url, headers=headers, data=payload,
+                timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+            )
         return msg_res
     except Exception:
         traceback.print_exc()
