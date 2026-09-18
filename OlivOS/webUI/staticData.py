@@ -14,7 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-"""免构建前端的内嵌资源；由 script/embed_webui.py 同步。"""
+# 免构建前端的内嵌资源；由 script/embed_webui.py 同步。
 
 import base64
 from pathlib import Path

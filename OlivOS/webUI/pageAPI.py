@@ -14,7 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-"""账号、日志、终端与插件页面；业务写入统一交给 Control 主循环。"""
+# 账号、日志、终端与插件页面；业务写入统一交给 Control 主循环。
 
 import copy
 import hashlib
@@ -213,10 +213,12 @@ def parse_accounts(body, previous):
             account_id = int(account_id)
         except ValueError:
             pass
-        bot = OlivOS.API.bot_info_T(id=account_id, password=fields['password'],
-                                   server_auto=connection.get('auto', False), server_type=connection['type'],
-                                   host=fields['host'], port=port, access_token=fields['access_token'],
-                                   platform_sdk=sdk, platform_platform=platform, platform_model=model)
+        bot = OlivOS.API.bot_info_T(
+            id=account_id, password=fields['password'],
+            server_auto=connection.get('auto', False), server_type=connection['type'],
+            host=fields['host'], port=port, access_token=fields['access_token'],
+            platform_sdk=sdk, platform_platform=platform, platform_model=model,
+        )
         bot.extends = row.get('extends', {})
         if not isinstance(bot.extends, dict):
             raise ValueError('extends 必须为 JSON 对象')

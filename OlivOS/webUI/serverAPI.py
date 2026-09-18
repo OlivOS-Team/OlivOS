@@ -14,7 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-"""Control 总线订阅者；Flask REST 与 WebSocket 共用一个监听端口。"""
+# Control 总线订阅者；Flask REST 与 WebSocket 共用一个监听端口。
 
 import asyncio
 import copy
@@ -205,8 +205,10 @@ class server(OlivOS.API.Proc_templet):
                     if pageAPI.safe_url(data.get('url', '')):
                         terminal['qrcode_url'] = data['url']
             if event == 'log':
-                self.publish(f'{action}/{bot_hash}', {'type': 'log', 'text': str(data.get('data', '')),
-                                                     'name': data.get('name'), 'time': time.time()})
+                self.publish(f'{action}/{bot_hash}', {
+                    'type': 'log', 'text': str(data.get('data', '')),
+                    'name': data.get('name'), 'time': time.time(),
+                })
             elif event in ('qrcode', 'qrcode_url', 'init'):
                 self.publish('events', {'type': event, 'model': action, 'hash': bot_hash,
                                         'url': terminal.get('qrcode_url')})
@@ -257,8 +259,9 @@ class server(OlivOS.API.Proc_templet):
                 if self.account_path.exists():
                     backup = self.account_path.with_name(self.account_path.name + '.webui-backup')
                     backup.write_bytes(self.account_path.read_bytes())
-                descriptor, temporary = tempfile.mkstemp(prefix='.webui-', suffix='.json',
-                                                          dir=str(self.account_path.parent))
+                descriptor, temporary = tempfile.mkstemp(
+                    prefix='.webui-', suffix='.json', dir=str(self.account_path.parent),
+                )
                 os.close(descriptor)
                 try:
                     OlivOS.accountAPI.Account.save(temporary, self, accounts)
@@ -325,8 +328,9 @@ class server(OlivOS.API.Proc_templet):
                 if items or first:
                     if items:
                         cursor = items[-1]['sequence']
-                    await asyncio.wait_for(socket.send_json({'type': 'history' if first else 'batch',
-                                                               'items': items, 'limit': self.limit}), 10)
+                    await asyncio.wait_for(socket.send_json({
+                        'type': 'history' if first else 'batch', 'items': items, 'limit': self.limit,
+                    }), 10)
                     first = False
                 await asyncio.sleep(0.05)
 

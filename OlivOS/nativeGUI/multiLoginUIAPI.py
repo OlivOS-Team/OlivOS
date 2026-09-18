@@ -17,10 +17,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import base64
 import copy
 import hashlib
-import json
 import os
 import platform
-import random
 import shutil
 import tkinter
 import traceback

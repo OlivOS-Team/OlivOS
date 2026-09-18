@@ -14,6 +14,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-"""OlivOS 跨平台浏览器管理端。"""
+# OlivOS 跨平台浏览器管理端。
 
 from . import pageAPI, serverAPI, staticData
