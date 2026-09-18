@@ -149,6 +149,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
         preLoadPrint('basic init done!')
         setSplashClose()
+        webui_only = basic_conf['system'].get('proc_mode') == 'webUI'
 
         while True:
             if main_control.control_queue.empty():
@@ -172,6 +173,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 if 'proc_mode' in basic_conf_models_this:
                     tmp_proc_mode_raw = basic_conf['system']['proc_mode']
                 tmp_proc_mode = tmp_proc_mode_raw
+                if tmp_proc_mode_raw == 'webUI':
+                    tmp_proc_mode = 'threading'
                 if 'auto' == tmp_proc_mode_raw:
                     tmp_proc_mode = 'threading'
                 if basic_conf_models_this['enable']:
@@ -235,7 +238,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             bot_info_dict=plugin_bot_info_dict,
                             treading_mode=basic_conf_models_this['treading_mode'],
                             restart_gate=basic_conf_models_this['restart_gate'],
-                            enable_auto_restart=basic_conf_models_this['enable_auto_restart']
+                            enable_auto_restart=basic_conf_models_this['enable_auto_restart'],
+                            enable_gui=not webui_only
                         )
                         if True or 'auto' == tmp_proc_mode_raw:
                             tmp_proc_mode = 'processing'
@@ -879,7 +883,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         )
                         Proc_Proc_dict[basic_conf_models_this['name']] = Proc_dict[
                             basic_conf_models_this['name']].start_unity(tmp_proc_mode)
-                    elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock:
+                    elif basic_conf_models_this['type'] == 'multiLoginUI' and not flag_noblock and not webui_only:
                         if platform.system() == 'Windows':
                             tmp_callbackData = {'res': False}
                             HostUI_obj = OlivOS.multiLoginUIAPI.HostUI(
@@ -896,7 +900,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
                                     account_bot_info_dict
                                 )
-                    elif basic_conf_models_this['type'] == 'multiLoginUI_asayc':
+                    elif basic_conf_models_this['type'] == 'multiLoginUI_asayc' and not webui_only:
                         if platform.system() == 'Windows':
                             main_control.control_queue.put(
                                 main_control.packet(
@@ -914,7 +918,23 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 ),
                                 block=False
                             )
-                    elif basic_conf_models_this['type'] == 'nativeWinUI':
+                    elif basic_conf_models_this['type'] == 'webUI':
+                        model_name = basic_conf_models_this['name']
+                        if model_name not in Proc_dict:
+                            Proc_dict[model_name] = OlivOS.webUI.serverAPI.server(
+                                Proc_name=model_name,
+                                scan_interval=basic_conf_models_this['interval'],
+                                dead_interval=basic_conf_models_this['dead_interval'],
+                                rx_queue=multiprocessing_dict[basic_conf_models_this['rx_queue']],
+                                control_queue=main_control.control_queue,
+                                logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                bot_info_dict=account_bot_info_dict,
+                                server_conf=basic_conf_models_this['server'],
+                                account_path=basic_conf_models['OlivOS_account_config']['data']['path'],
+                                runtime=Proc_dict
+                            )
+                            Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('threading')
+                    elif basic_conf_models_this['type'] == 'nativeWinUI' and not webui_only:
                         if platform.system() == 'Windows':
                             if basic_conf_models_this['name'] not in Proc_dict:
                                 Proc_dict[basic_conf_models_this['name']] = OlivOS.nativeWinUIAPI.dock(
@@ -1054,6 +1074,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 block=False
                             )
             elif rx_packet_data.action == 'send':
+                OlivOS.webUI.serverAPI.forward_packet(rx_packet_data, Proc_dict)
                 if type(rx_packet_data.key) is dict:
                     if 'target' in rx_packet_data.key:
                         if 'type' in rx_packet_data.key['target']:
@@ -1093,6 +1114,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                             except Exception:
                                                 traceback.print_exc()
             elif rx_packet_data.action == 'init_type_open_webview_page':
+                if isinstance(rx_packet_data.key, dict):
+                    page_data = rx_packet_data.key.get('data', {})
+                    for web_proc in list(Proc_dict.values()):
+                        if web_proc.Proc_type == 'webUI':
+                            web_proc.consume(OlivOS.API.Control.packet('send', {
+                                'data': dict(page_data, action='webui_open_page')
+                            }))
                 if platform.system() == 'Windows':
                     if (
                         type(rx_packet_data.key) is dict
@@ -1194,6 +1222,11 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     main_control.packet('stop_type', model_this),
                                     block=False
                                 )
+            elif rx_packet_data.action == 'webui_accounts':
+                if isinstance(rx_packet_data.key, dict):
+                    web_proc = Proc_dict.get(rx_packet_data.key.get('name'))
+                    if web_proc is not None and web_proc.Proc_type == 'webUI':
+                        web_proc.commit_accounts(rx_packet_data.key.get('request_id'), basic_conf_models)
             elif rx_packet_data.action == 'call_account_update':
                 if (
                     type(rx_packet_data.key) is dict

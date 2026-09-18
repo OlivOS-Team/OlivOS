@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>OlivOS · WebUI</title>
+    <link rel="icon" href="/static/logo.png" type="image/png" />
+    <script src="/static/theme.js"></script>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <section id="login" class="login">
+      <form id="login-form" class="panel login-card">
+        <div class="brand">
+          <img class="brand-logo" src="/static/logo.png" alt="" width="64" height="64" />
+          <div class="brand-text">
+            <strong>OlivOS</strong>
+            <span>青果核心交互栈</span>
+          </div>
+        </div>
+        <h1>登录 WebUI</h1>
+        <p>请输入服务器 <code>conf/webui_token.txt</code> 文件中的令牌。</p>
+        <label>访问令牌<input id="token" type="password" autocomplete="off" required /></label>
+        <button type="submit" class="primary">登录</button>
+        <p id="login-error" role="alert"></p>
+        <label class="theme-control">
+          <span>外观</span>
+          <select data-theme-select aria-label="外观">
+            <option value="system">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </label>
+      </form>
+    </section>
+    <div id="shell" hidden>
+      <aside>
+        <div class="brand">
+          <img class="brand-logo" src="/static/logo.png" alt="" width="44" height="44" />
+          <div class="brand-text">
+            <strong>OlivOS</strong>
+            <span>青果核心交互栈</span>
+          </div>
+        </div>
+        <nav id="navigation" aria-label="主导航">
+          <button data-page="dashboard">仪表盘</button>
+          <button data-page="accounts">账号</button>
+          <button data-page="logs">日志</button>
+          <button data-page="terminals">终端</button>
+          <button data-page="plugins">插件</button>
+        </nav>
+        <nav id="plugin-navigation" aria-label="插件页面">
+          <h2>插件页面</h2>
+          <div id="plugin-links"></div>
+        </nav>
+        <div class="sidebar-footer">
+          <label class="theme-control">
+            <span>外观</span>
+            <select data-theme-select aria-label="外观">
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </label>
+          <button id="logout">退出登录</button>
+        </div>
+      </aside>
+      <main>
+        <header>
+          <h1 id="page-title">仪表盘</h1>
+          <span id="connection" role="status">正在连接…</span>
+        </header>
+        <div id="notice" role="status" hidden></div>
+        <section id="dashboard" class="page">
+          <div id="status-cards" class="cards"></div>
+          <div class="runtime-summary">
+            <h2>运行状态</h2>
+            <p id="runtime"></p>
+            <div id="unknown-status" hidden>
+              <p id="online-note"></p>
+              <ul id="unknown-accounts" class="account-status-list"></ul>
+            </div>
+            <p id="update-status"></p>
+            <div class="toolbar">
+              <button id="check-update">检查更新</button>
+              <button id="dashboard-reload-plugins">重载插件</button>
+              <a
+                id="community-forum"
+                class="button-link"
+                href="https://forum.olivos.run/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >社区论坛</a
+              >
+              <button id="exit" class="danger">退出 OlivOS</button>
+            </div>
+          </div>
+        </section>
+        <section id="accounts" class="page" hidden>
+          <div class="toolbar">
+            <button id="add-account">新增账号</button
+            ><button id="refresh-accounts">刷新</button
+            ><button id="save-accounts" class="primary">保存并应用</button
+            ><span id="accounts-dirty"></span>
+          </div>
+          <div class="panel table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>启用</th>
+                  <th>账号</th>
+                  <th>平台</th>
+                  <th>SDK / 型号</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="account-rows"></tbody>
+            </table>
+          </div>
+        </section>
+        <section id="logs" class="page" hidden>
+          <div class="toolbar">
+            <label
+              >日志级别<select id="log-level">
+                <option value="">全部</option>
+                <option value="-1">TRACE</option>
+                <option value="0">DEBUG</option>
+                <option value="1">NOTE</option>
+                <option value="2" selected>INFO</option>
+                <option value="3">WARN</option>
+                <option value="4">ERROR</option>
+                <option value="5">FATAL</option>
+              </select></label
+            >
+            <label class="check"><input id="log-scroll" type="checkbox" checked />自动滚动</label
+            ><span id="log-count"></span>
+          </div>
+          <div id="log-output" class="output panel" role="log" aria-label="OlivOS 日志"></div>
+        </section>
+        <section id="terminals" class="page" hidden>
+          <div id="terminal-tabs" class="tabs" role="tablist" aria-label="账号终端"></div>
+          <p id="terminal-empty">暂无已启动的终端。</p>
+          <div id="terminal-content" hidden>
+            <div class="toolbar">
+              <label class="check"
+                ><input id="terminal-scroll" type="checkbox" checked />自动滚动</label
+              ><button id="terminal-qr" hidden>登录二维码</button><span id="terminal-state"></span>
+            </div>
+            <div
+              id="terminal-output"
+              class="output terminal panel"
+              role="log"
+              aria-label="终端输出"
+            ></div>
+            <details id="virtual-options" hidden>
+              <summary>虚拟终端用户配置</summary>
+              <div class="form-grid">
+                <label>用户 ID<input id="virtual-user" value="88888888" /></label
+                ><label>用户名<input id="virtual-name" value="用户" /></label
+                ><label
+                  >消息类型<select id="virtual-type">
+                    <option value="private">私聊</option>
+                    <option value="group">群聊</option>
+                  </select></label
+                ><label>群 ID<input id="virtual-group" value="88888888" /></label>
+              </div>
+            </details>
+            <form id="terminal-form" class="toolbar terminal-input">
+              <input
+                id="terminal-input"
+                aria-label="终端输入"
+                autocomplete="off"
+                maxlength="8192"
+                required
+              /><button type="submit" class="primary">发送</button>
+            </form>
+          </div>
+        </section>
+        <section id="plugins" class="page" hidden>
+          <div class="toolbar">
+            <button id="toggle-path">显示路径</button
+            ><button id="reload-plugins" class="primary">重载插件</button>
+          </div>
+          <div class="panel table-wrap">
+            <table>
+              <thead id="plugin-head"></thead>
+              <tbody id="plugin-rows"></tbody>
+            </table>
+          </div>
+          <p>双击插件或点击菜单按钮执行插件菜单事件。</p>
+        </section>
+        <section id="plugin-page" class="page" hidden>
+          <div id="plugin-frame-container"></div>
+        </section>
+      </main>
+    </div>
+    <dialog id="account-info-dialog" aria-labelledby="account-info-title">
+      <div class="dialog-title">
+        <h2 id="account-info-title">账号信息</h2>
+        <button type="button" data-close="account-info-dialog" aria-label="关闭">×</button>
+      </div>
+      <dl id="account-details" class="account-details"></dl>
+      <p id="account-info-note" hidden>有未应用的修改</p>
+      <div class="dialog-actions">
+        <button type="button" data-close="account-info-dialog">关闭</button>
+      </div>
+    </dialog>
+    <dialog id="account-dialog">
+      <form id="account-form">
+        <div class="dialog-title">
+          <h2 id="account-title">新增账号</h2>
+          <button type="button" data-close="account-dialog" aria-label="关闭">×</button>
+        </div>
+        <div class="form-grid">
+          <label class="wide">账号类型<select id="account-preset"></select></label
+          ><label>SDK<select id="account-sdk"></select></label
+          ><label>平台<select id="account-platform"></select></label
+          ><label>型号<select id="account-model"></select></label
+          ><label>连接类型<select id="account-server-type"></select></label
+          ><label class="check"><input id="account-auto" type="checkbox" />自动配置服务器</label
+          ><label class="check"><input id="account-debug" type="checkbox" />调试模式</label>
+        </div>
+        <p id="account-note"></p>
+        <div id="account-fields" class="form-grid"></div>
+        <section id="webhook-fields" hidden>
+          <label>Webhook 回调地址<input id="webhook-url" readonly /></label>
+          <div class="toolbar">
+            <button id="webhook-refresh" type="button">刷新地址</button
+            ><button id="webhook-copy" type="button">复制地址</button>
+          </div>
+          <p id="webhook-cert"></p>
+        </section>
+        <section id="qsign-fields" hidden>
+          <h3>签名服务器</h3>
+          <label>签名协议<select id="qsign-protocol"></select></label>
+          <p id="qsign-local-note" hidden>OlivOS 将同步为你自动配置本地 AstralQsign 服务。</p>
+          <div id="qsign-rows"></div>
+          <button type="button" id="qsign-add">添加签名服务器</button>
+        </section>
+        <details>
+          <summary>服务字段与扩展配置</summary>
+          <div id="account-extra-fields" class="form-grid"></div>
+          <label
+            >extends（JSON 对象）<textarea
+              id="account-extends"
+              rows="5"
+              spellcheck="false"
+            ></textarea>
+          </label>
+        </details>
+        <p id="account-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" data-close="account-dialog">取消</button
+          ><button type="submit" class="primary">确定</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="menu-dialog">
+      <div class="dialog-title">
+        <h2 id="menu-title">插件菜单</h2>
+        <button data-close="menu-dialog" aria-label="关闭">×</button>
+      </div>
+      <p id="menu-info"></p>
+      <div id="menu-items"></div>
+    </dialog>
+    <dialog id="qr-dialog">
+      <div class="dialog-title">
+        <h2 id="qr-title">扫码登录</h2>
+        <button data-close="qr-dialog" aria-label="关闭">×</button>
+      </div>
+      <img id="qr-image" alt="账号登录二维码" /><a
+        id="qr-link"
+        target="_blank"
+        rel="noopener noreferrer"
+        hidden
+        >打开扫码登录页面</a
+      >
+    </dialog>
+  </body>
+</html>

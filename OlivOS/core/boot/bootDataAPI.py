@@ -25,6 +25,7 @@ default_Conf = {
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
+            "OlivOS_webUI",
             "OlivOS_astralqsign_lib_exe_model",
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_walleq_lib_exe_model",
@@ -147,6 +148,7 @@ default_Conf = {
         "OlivOS_logger_queue",
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
+        "OlivOS_webUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
         "OlivOS_walleq_lib_rx_queue",
         "OlivOS_cwcb_lib_rx_queue",
@@ -164,6 +166,26 @@ default_Conf = {
         "OlivOS_dingtalk_queue"
     ],
     "models": {
+        "OlivOS_webUI": {
+            "enable": True,
+            "name": "OlivOS_webUI",
+            "type": "webUI",
+            "interval": 0.02,
+            "dead_interval": 1,
+            "proc_mode": "threading",
+            "rx_queue": "OlivOS_webUI_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "server": {
+                "auto": False,
+                "type": "http",
+                "host": "127.0.0.1",
+                "port": 20480,
+                "token_path": "./conf/webui_token.txt",
+                "static_path": "./data/webui/static",
+                "buffer_limit": 128
+            }
+        },
         "OlivOS_sleep": {
             "enable": True,
             "name": "OlivOS_sleep",
@@ -255,7 +277,8 @@ default_Conf = {
             "mode": [
                 "console_color",
                 "logfile",
-                "native"
+                "native",
+                "web"
             ],
             "fliter": [2, 3, 4, 5]
         },

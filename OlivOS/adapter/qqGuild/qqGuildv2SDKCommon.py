@@ -76,6 +76,7 @@ sdkAPIRoute = {
     'interactions': '/interactions',
     'qq_users': '/v2/users',
     'qq_groups': '/v2/groups',
+    'generate_url_link': '/v2/generate_url_link',
     'menu': '/v2/menu',
     'panels': '/v2/panels',
     'getAppAccessToken': '/app/getAppAccessToken'
@@ -1015,21 +1016,10 @@ def _get_qq_forward_element_content(element):
                 'type': 'text',
                 'data': {'text': content_text}
             })
-    ark_data = element.get('ark_data', None)
-    if isinstance(ark_data, dict):
-        try:
-            content.append({
-                'type': 'json',
-                'data': {
-                    'data': json.dumps(
-                        ark_data,
-                        ensure_ascii=False,
-                        separators=(',', ':')
-                    )
-                }
-            })
-        except (TypeError, ValueError):
-            pass
+    if isinstance(element.get('ark_data', None), dict):
+        ark_para = _get_qq_structured_message_para(element)
+        if ark_para is not None:
+            content.append({'type': ark_para.type, 'data': copy.deepcopy(ark_para.data)})
     for attachment in element.get('attachments', []):
         segment = _get_qq_attachment_message_segment(attachment)
         if segment is not None:
@@ -1350,6 +1340,26 @@ def _get_qq_structured_message_para(event_data):
             structured_data = {'embeds': copy.deepcopy(embeds)}
     if not isinstance(structured_data, dict):
         return None
+    # 2026-09-16: ARKData.ark_type 新增 picture。附件优先，preview 仅作图片回退；
+    # 原始卡片仍由 qq_ark_data / qq_msg_elements 保留，其他卡片继续使用 JSON 消息段。
+    if structured_data.get('ark_type', None) == 'picture':
+        if any(
+            isinstance(attachment, OlivOS.messageAPI.PARA.image)
+            for attachment in _get_message_attachments(event_data.get('attachments', None))
+        ):
+            return None
+        fields = structured_data.get('fields', None)
+        preview = fields.get('preview', None) if isinstance(fields, dict) else None
+        if isinstance(preview, str):
+            preview = preview.strip()
+            if preview.startswith('//'):
+                preview = 'https:' + preview
+            try:
+                preview_url = parse.urlparse(preview)
+                if preview_url.scheme in ['http', 'https'] and preview_url.netloc:
+                    return OlivOS.messageAPI.PARA.image(file=preview, url=preview)
+            except ValueError:
+                pass
     try:
         structured_json = json.dumps(
             structured_data,
@@ -2763,7 +2773,8 @@ def _build_incoming_message_obj(
     structured_message_para = _get_qq_message_para(event_data, plugin_event_bot_hash)
     if strip_before_check and isinstance(message_content, str):
         message_content = message_content.lstrip(' ')
-    if structured_message_para is not None:
+    is_picture = isinstance(structured_message_para, OlivOS.messageAPI.PARA.image)
+    if structured_message_para is not None and not is_picture:
         message_obj = OlivOS.messageAPI.Message_templet(
             'olivos_para',
             [structured_message_para]
@@ -2782,6 +2793,9 @@ def _build_incoming_message_obj(
             message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
     else:
         message_obj = OlivOS.messageAPI.Message_templet('olivos_para', [])
+    if is_picture:
+        message_obj.data.append(structured_message_para)
+        message_obj.data_raw.append(copy.deepcopy(structured_message_para))
     _append_qq_message_attachments(
         message_obj,
         event_data.get('attachments', None),
@@ -4837,6 +4851,18 @@ class event_action_common(object):
         })
         return res_data
 
+    def generate_url_link(target_event, callback_data=None):
+        """生成添加机器人好友的分享链接，官方响应保留在 data.response（链接为 data.url）。"""
+        # https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_generate_url_link.post.html
+        if callback_data is not None and (not isinstance(callback_data, str) or len(callback_data) > 32):
+            return event_action._make_menu_panel_local_error(
+                'generate_url_link',
+                'callback_data must be a string of at most 32 characters'
+            )
+        this_msg = API.generateUrlLink(get_SDK_bot_info_from_Event(target_event))
+        this_msg.data.callback_data = callback_data
+        return event_action._run_raw_api(this_msg, 'generate_url_link', 'POST')
+
     # ============ 自定义菜单 / 指令面板 ============
     # 官方文档: https://bot.q.qq.com/wiki/develop/api-v2/server-inter/menu-panel/
     def get_qq_global_menu(target_event):
@@ -5975,6 +6001,15 @@ class inde_interface(OlivOS.API.inde_interface_T):
             remote=remote
         )
 
+    def generate_url_link(self, callback_data=None, flag_log=True, remote=False):
+        """callback_data 可省略，最长 32 字符；链接位于返回值 ['data']['response']['data']['url']。"""
+        return self._call_qq_group_api(
+            'generate_url_link',
+            action_kwargs={'callback_data': callback_data},
+            flag_log=flag_log,
+            remote=remote
+        )
+
     def get_qq_global_menu(self, flag_log=True, remote=False):
         return self._call_qq_group_api(
             'get_qq_global_menu',
@@ -6426,6 +6461,20 @@ class API_common(object):
             self.metadata = None
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['users'] + '/@me'
+
+    # POST /v2/generate_url_link (50 QPS)，响应为 {"data": {"url": "..."}}。
+    class generateUrlLink(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['generate_url_link']
+
+        class data_T(object):
+            def __init__(self):
+                self.callback_data = None  # 可选，最长 32 字符，添加好友时透传。
 
     # ============ 互动回调应答 ============
     # PUT /interactions/{interaction_id} 对 INTERACTION_CREATE 的应答(code: 0成功 1操作失败 2操作频繁 3重复操作 4没有权限 5仅管理员操作)

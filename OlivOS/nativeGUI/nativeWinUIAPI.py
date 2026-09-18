@@ -1203,6 +1203,11 @@ class dock(OlivOS.API.Proc_templet):
     def setOlivOSExit(self):
         self.sendControlEvent('exit_total')
 
+    def openWebUI(self):
+        url = OlivOS.webUI.serverAPI.browser_url()
+        if url:
+            webbrowser.open(url)
+
     def sendPluginControlEventFunc(self, pluginNameSpace, eventName):
         def resFunc():
             self.sendPluginControlEvent(pluginNameSpace, eventName)
@@ -2223,6 +2228,8 @@ class shallow(object):
             return data
         else:
             list_new = []
+            if data is self.UIData.get('shallow_menu_list') and OlivOS.webUI.serverAPI.browser_url():
+                list_new.append(pystray.MenuItem('打开 WebUI', lambda: self.root.openWebUI(), default=True))
             for item_this in data:
                 if not type(item_this) is list:
                     pass
@@ -2255,8 +2262,7 @@ class shallow(object):
                         pystray.MenuItem(
                             item_this[0],
                             tmp_sub_menu,
-                            enabled=(tmp_sub_menu not in [None, False]),
-                            default=(item_this[0] in ['打开终端'])
+                            enabled=(tmp_sub_menu not in [None, False])
                         )
                     )
                 elif (

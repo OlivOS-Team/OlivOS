@@ -245,3 +245,306 @@ def getToken(src: str):
     hash_tmp.update(str(src).encode(encoding='UTF-8'))
     hash_tmp.update(str(114514666).encode(encoding='UTF-8'))
     return hash_tmp.hexdigest()
+
+
+def normalizeAccountFields(fields):
+    """沿用 TreeEditUI 的平台默认值，不写文件、不创建窗口。"""
+    tmp_id = fields['id']
+    tmp_password = fields['password']
+    tmp_server_auto = fields['server_auto']
+    tmp_server_type = fields['server_type']
+    tmp_host = fields['host']
+    tmp_port = fields['port']
+    tmp_access_token = fields['access_token']
+    tmp_platform_sdk = fields['platform_sdk']
+    tmp_platform_platform = fields['platform_platform']
+    tmp_platform_model = fields['platform_model']
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.onebotV11HostServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = 'ws://127.0.0.1'
+        if tmp_port == '':
+            tmp_port = '58001'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.onebotV11LinkServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = 'ws://127.0.0.1'
+        if tmp_port == '':
+            tmp_port = '0'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = 'http://127.0.0.1'
+        if tmp_port == '':
+            tmp_port = '58000'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform in ['qq', 'wechat']
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = 'ws://127.0.0.1'
+        if tmp_port == '':
+            tmp_port = '58001'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.milkyAutoServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = '127.0.0.1'
+        if tmp_port == '':
+            tmp_port = '58001'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
+        and tmp_server_auto == 'False'
+    ):
+        if tmp_host == '':
+            tmp_host = '127.0.0.1'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'qq'
+        and tmp_platform_sdk == 'onebot'
+        and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
+        and tmp_server_auto == 'True'
+    ):
+        if tmp_host == '':
+            tmp_host = '127.0.0.1'
+        if tmp_platform_model in [
+            'opqbot_auto'
+        ]:
+            if tmp_port == '':
+                tmp_port = '8086'
+    if (
+        tmp_platform_platform == 'qqGuild'
+        and tmp_platform_sdk == 'qqGuild_link'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'qqGuild'
+        and tmp_platform_sdk == 'qqGuildv2_link'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_platform_model not in [
+            'public_intents',
+            'private_intents',
+            'sandbox_intents'
+        ]:
+            if tmp_port == '':
+                tmp_port = '0'
+    if (
+        tmp_platform_platform == 'mhyVila'
+        and tmp_platform_sdk == 'mhyVila_link'
+    ):
+        tmp_id = tmp_id.strip('\n')
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+        if tmp_platform_model in ['public', 'private']:
+            tmp_port = '0'
+        try:
+            tmp_access_token_new = json.loads(tmp_access_token)
+            if type(tmp_access_token_new) is str:
+                tmp_access_token = tmp_access_token_new
+        except Exception:
+            pass
+            # traceback.print_exc()
+    if (
+        tmp_platform_platform == 'telegram'
+        and tmp_platform_sdk == 'telegram_poll'
+    ):
+        if tmp_id == '':
+            if len(tmp_access_token.split('.')) > 0:
+                tmp_id = tmp_access_token.split('.')[0]
+            if len(tmp_id) <= 0 or not tmp_id.isdigit():
+                tmp_id = int(hashlib.md5(str(tmp_access_token).encode('utf-8')).hexdigest(), 16)
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'https://api.telegram.org'
+        if tmp_port == '':
+            tmp_port = '443'
+    if (
+        tmp_platform_platform == 'discord'
+        and tmp_platform_sdk == 'discord_link'
+    ):
+        if tmp_id == '':
+            tmp_id = int(hashlib.md5(str(tmp_access_token).encode('utf-8')).hexdigest(), 16)
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_platform_model not in [
+            'intents'
+        ]:
+            if tmp_port == '':
+                tmp_port = '0'
+    if (
+        tmp_platform_platform == 'kaiheila'
+        and tmp_platform_sdk == 'kaiheila_link'
+    ):
+        if tmp_id == '':
+            tmp_id = int(hashlib.md5(str(tmp_access_token).encode('utf-8')).hexdigest(), 16)
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'xiaoheihe'
+        and tmp_platform_sdk == 'xiaoheihe_link'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'biliLive'
+        and tmp_platform_sdk == 'biliLive_link'
+    ):
+        if tmp_id == '':
+            tmp_id = int(hashlib.md5(str(tmp_access_token).encode('utf-8')).hexdigest(), 16) % 100000000000000
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'fanbook'
+        and tmp_platform_sdk == 'fanbook_poll'
+    ):
+        if tmp_id == '':
+            tmp_id = int(hashlib.md5(str(tmp_access_token).encode('utf-8')).hexdigest(), 16)
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'dodo'
+        and tmp_platform_sdk == 'dodo_poll'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'dodo'
+        and tmp_platform_sdk == 'dodo_link'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'terminal'
+        and tmp_platform_sdk == 'terminal_link'
+        and tmp_platform_model == 'default'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'terminal'
+        and tmp_platform_sdk == 'terminal_link'
+        and tmp_platform_model == 'postapi'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    if (
+        tmp_platform_platform == 'terminal'
+        and tmp_platform_sdk == 'terminal_link'
+        and tmp_platform_model == 'ff14'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+    if (
+        tmp_platform_platform == 'hackChat'
+        and tmp_platform_sdk == 'hackChat_link'
+        and tmp_platform_model in ['default', 'private']
+    ):
+        if tmp_id == '':
+            tmp_id = random.randint(1000000000, 9999999999)
+        if tmp_port == '':
+            tmp_port = '0'
+    if (
+        tmp_platform_platform == 'dingtalk'
+        and tmp_platform_sdk == 'dingtalk_link'
+        and tmp_platform_model == 'default'
+    ):
+        if tmp_password == '':
+            tmp_password = 'NONEED'
+        if tmp_host == '':
+            tmp_host = 'NONEED'
+        if tmp_port == '':
+            tmp_port = '0'
+        if tmp_access_token == '':
+            tmp_access_token = 'NONEED'
+    return {
+        'id': tmp_id,
+        'password': tmp_password,
+        'server_auto': tmp_server_auto,
+        'server_type': tmp_server_type,
+        'host': tmp_host,
+        'port': tmp_port,
+        'access_token': tmp_access_token,
+        'platform_sdk': tmp_platform_sdk,
+        'platform_platform': tmp_platform_platform,
+        'platform_model': tmp_platform_model,
+    }

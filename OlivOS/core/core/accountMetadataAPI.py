@@ -402,3 +402,460 @@ accountTypeDataList_server_type = [
     'websocket',
     'websocket_host'
 ]
+
+
+accountQsignProtocols = [
+    'AstralQsign', '手动', '9.0.95', '9.0.56', '8.9.85', '8.9.83', '8.9.80',
+    '8.9.73', '8.9.71', '8.9.70', '8.9.68', '8.9.63', '8.9.58'
+]
+
+
+def getAccountEditorMetadata():
+    """原生窗口与 WebUI 共享的字段、标签和联动元数据。"""
+    return {
+        'type_list': accountTypeList,
+        'type_note_list': {
+            'QQ/GoCq/安卓手表': '密码留空即尝试使用扫码登录',
+            'QQ/GoCq/旧': '密码留空即尝试使用扫码登录',
+            'QQ/Wq/安卓手表': '密码留空即尝试使用扫码登录',
+            'QQ/Wq/旧': '密码留空即尝试使用扫码登录',
+            '微信/ComWeChat': '启动后需要再运行特定版本微信',
+            'Hack.Chat': '密码可以留空',
+            'RED协议': 'HTTP可以不填，反正也没实现',
+            'QQ/OPQ/默认': '已弃用',
+            'QQ/OPQ/指定端口': '已弃用',
+            'QQ/OPQ/指定端口/旧': '已弃用',
+            'QQ/NapCat/默认': '需要已经安装不低于9.9.22版本QQ',
+            'QQ/NapCat/9.9.19': '需要已经安装不低于9.9.19版本QQ',
+            'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
+            'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ',
+            'QQ官方/公域/V2': '请确保已经添加IP白名单',
+            'QQ官方/公域/V2/Webhook': '请确保此BOT接入方式为Webhook',
+            'QQ官方/公域/V2/纯频道': '请确保已经添加IP白名单',
+            'QQ官方/公域/V2/纯频道/Webhook': '请确保此BOT接入方式为Webhook',
+            'QQ官方/公域/V2/指定intents': '请确保已经添加IP白名单',
+            'QQ官方/私域/V2': '请确保已经添加IP白名单',
+            'QQ官方/私域/V2/Webhook': '请确保此BOT接入方式为Webhook',
+            'QQ官方/私域/V2/指定intents': '请确保已经添加IP白名单',
+            'QQ官方/沙盒/V2/Webhook': '请确保此BOT接入方式为Webhook'
+        },
+        'type_clear_note_list': {
+            'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/安卓手机': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/安卓平板': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/安卓手表': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/iPad': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/iMac': './conf/gocqhttp/{bothash}',
+            'QQ/GoCq/旧': './conf/gocqhttp/{bothash}',
+            'QQ/Wq/安卓手表': './conf/walleq/{bothash}',
+            'QQ/Wq/安卓手机': './conf/walleq/{bothash}',
+            'QQ/Wq/安卓平板': './conf/walleq/{bothash}',
+            'QQ/Wq/旧': './conf/walleq/{bothash}',
+            'QQ/OPQ/默认': './conf/OPQBot/{bothash}',
+            'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
+            'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}',
+            'QQ/NapCat/默认': './conf/napcat/{bothash}',
+            'QQ/NapCat/9.9.19': './conf/napcat/{bothash}',
+            'QQ/NapCat/9.9.11': './conf/napcat/{bothash}',
+            'QQ/NapCat/旧': './conf/napcat/{bothash}'
+        },
+        'type_extend_note_list': {
+            # 'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
+            # 'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
+            # 'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
+            # 'QQ/GoCq/旧': ['签名服务器', 'sign-server']
+            'RED协议': ['HTTP地址'],
+            '钉钉': ["AppKey", "AppSecret"],
+            'Hack.Chat/私有': ["WS地址"]
+        },
+        'type_extends_name_note_list': {
+            # 'QQ/GoCq/默认': ['签名服务器', 'KEY'],
+            # 'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
+            # 'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
+            # 'QQ/GoCq/旧': ['签名服务器', 'KEY']
+            'RED协议': ['HTTP地址'],
+            '钉钉': ["AppKey", "AppSecret"],
+            'Hack.Chat/私有': ["WS地址"]
+        },
+        'type_extends_note_list': {
+            # 'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
+            # 'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
+            # 'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
+            # 'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
+            'RED协议': {'HTTP地址': 'http-path'},
+            '钉钉': {"AppKey": 'app_key', "AppSecret": "app_secret"},
+            'Hack.Chat/私有': {"WS地址": 'ws_path'}
+        },
+        'type_qsign_array_note_list': {
+            'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
+            'QQ/GoCq/安卓手机': {'地址': 'sign-server', 'KEY': 'key'},
+            'QQ/GoCq/安卓平板': {'地址': 'sign-server', 'KEY': 'key'},
+            'QQ/GoCq/旧': {'地址': 'sign-server', 'KEY': 'key'}
+        },
+        # 各类账号组合的匹配与注册表
+        # 原本为合并格式，并在此处维护
+        # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
+        # 现拆分为两个表，使用时合并，以便于维护
+        # type: [platform, sdk, model, server_auto, server_type] + [{data_dict}]
+        # 前半位于 OlivOS.accountMetadataAPI
+        # 后半位于此处
+        'type_mapping_list': {},
+        'type_mapping_list_Entry_slot': {
+            'onebotV11/正向WS': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/正向WS/NapCat': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/正向WS/LLOneBot': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/正向WS/Lagrange': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/正向WS/Shamrock': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/反向WS': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/反向WS/NapCat': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/反向WS/LLOneBot': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/反向WS/Lagrange': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/反向WS/Shamrock': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/Http': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/Http/NapCat': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/Http/LLOneBot': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/Http/Lagrange': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV11/Http/Shamrock': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'onebotV12/正向WS': {
+                '账号': 'edit_root_Entry_ID',
+                '地址': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'Milky/自动': {
+                '账号': 'edit_root_Entry_ID',
+                '主机': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'Milky/自动/Yogurt': {
+                '账号': 'edit_root_Entry_ID',
+                '主机': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'Milky/自动/LLOneBot': {
+                '账号': 'edit_root_Entry_ID',
+                '主机': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'Milky/自动/Lagrange': {
+                '账号': 'edit_root_Entry_ID',
+                '主机': 'edit_root_Entry_Server_host',
+                '端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'RED协议': {
+                '账号': 'edit_root_Entry_ID',
+                'WS地址': 'edit_root_Entry_Server_host',
+                'WS端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'OPQBot/正向WS': {
+                'QQ号': 'edit_root_Entry_ID',
+                '服务地址': 'edit_root_Entry_Server_host',
+                '服务端口': 'edit_root_Entry_Server_port',
+            },
+            'QQ/OPQ/默认': {
+                'QQ号': 'edit_root_Entry_ID',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'QQ/OPQ/指定端口': {
+                'QQ号': 'edit_root_Entry_ID',
+                '服务端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'QQ/OPQ/指定端口/旧': {
+                'QQ号': 'edit_root_Entry_ID',
+                '服务端口': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+            },
+            'QQ/NapCat/默认': {
+                'QQ号': 'edit_root_Entry_ID',
+            },
+            'QQ/NapCat/9.9.19': {
+                'QQ号': 'edit_root_Entry_ID',
+            },
+            'QQ/NapCat/9.9.11': {
+                'QQ号': 'edit_root_Entry_ID',
+            },
+            'QQ/NapCat/旧': {
+                'QQ号': 'edit_root_Entry_ID',
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+                '服务端口': 'edit_root_Entry_Server_port',
+            },
+            'QQ/GoCq/默认': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/安卓手机': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/安卓平板': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/安卓手表': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/iPad': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/iMac': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/GoCq/旧': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/默认': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/安卓手机': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/安卓平板': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/安卓手表': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/iPad': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/iMac': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            'QQ/Wq/旧': {
+                '账号': 'edit_root_Entry_ID',
+                '密码': 'edit_root_Entry_Password',
+            },
+            '微信/ComWeChat': {
+                '微信号': 'edit_root_Entry_ID'
+            },
+            'KOOK': {
+                'Token': 'edit_root_Entry_Server_access_token'
+            },
+            'KOOK/消息兼容': {
+                'Token': 'edit_root_Entry_Server_access_token'
+            },
+            '黑盒语音': {
+                '机器人ID': 'edit_root_Entry_ID',
+                '机器人令牌': 'edit_root_Entry_Server_access_token'
+            },
+            '米游社/大别野/公域': {
+                'Bot_Id': 'edit_root_Entry_ID',
+                'Secret': 'edit_root_Entry_Password',
+                'Pub_Key': 'edit_root_Entry_Server_access_token'
+            },
+            '米游社/大别野/私域': {
+                'Bot_Id': 'edit_root_Entry_ID',
+                'Secret': 'edit_root_Entry_Password',
+                'Pub_Key': 'edit_root_Entry_Server_access_token'
+            },
+            '米游社/大别野/沙盒': {
+                'Bot_Id': 'edit_root_Entry_ID',
+                'Secret': 'edit_root_Entry_Password',
+                'Pub_Key': 'edit_root_Entry_Server_access_token',
+                '别野号': 'edit_root_Entry_Server_port'
+            },
+            'B站直播间/游客': {
+                '直播间ID': 'edit_root_Entry_Server_access_token'
+            },
+            'B站直播间/登录': {
+                '直播间ID': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V1': {
+                'AppID': 'edit_root_Entry_ID',
+                '机器人令牌': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/私域/V1': {
+                'AppID': 'edit_root_Entry_ID',
+                '机器人令牌': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V2': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V2/Webhook': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V2/纯频道': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V2/纯频道/Webhook': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/公域/V2/指定intents': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token',
+                'intents': 'edit_root_Entry_Server_port'
+            },
+            'QQ官方/私域/V2': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/私域/V2/Webhook': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/私域/V2/指定intents': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token',
+                'intents': 'edit_root_Entry_Server_port'
+            },
+            'QQ官方/沙盒/V2': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/沙盒/V2/Webhook': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token'
+            },
+            'QQ官方/沙盒/V2/指定intents': {
+                'AppID': 'edit_root_Entry_ID',
+                'AppSecret': 'edit_root_Entry_Server_access_token',
+                'intents': 'edit_root_Entry_Server_port'
+            },
+            'Telegram': {
+                'TOKEN': 'edit_root_Entry_Server_access_token'
+            },
+            'Discord': {
+                'TOKEN': 'edit_root_Entry_Server_access_token'
+            },
+            'Discord/指定intents': {
+                'TOKEN': 'edit_root_Entry_Server_access_token',
+                'intents': 'edit_root_Entry_Server_port'
+            },
+            '渡渡语音/Dodo/V2': {
+                'BotID': 'edit_root_Entry_ID',
+                'Bot私钥': 'edit_root_Entry_Server_access_token'
+            },
+            '渡渡语音/Dodo/V1': {
+                'BotID': 'edit_root_Entry_ID',
+                'Bot私钥': 'edit_root_Entry_Server_access_token'
+            },
+            'Fanbook': {
+                'Token': 'edit_root_Entry_Server_access_token'
+            },
+            'Hack.Chat': {
+                '房间名称': 'edit_root_Entry_Server_host',
+                'Bot名称': 'edit_root_Entry_Server_access_token',
+                '密码': 'edit_root_Entry_Password'
+            },
+            'Hack.Chat/私有': {
+                '房间名称': 'edit_root_Entry_Server_host',
+                'Bot名称': 'edit_root_Entry_Server_access_token',
+                '密码': 'edit_root_Entry_Password'
+            },
+            '虚拟终端': {
+                '账号': 'edit_root_Entry_ID'
+            },
+            '接口终端': {
+                '账号': 'edit_root_Entry_ID',
+                '端口': 'edit_root_Entry_Server_port'
+            },
+            'FF14终端': {
+                '账号': 'edit_root_Entry_ID',
+                '端口': 'edit_root_Entry_Server_port',
+                '回调端口': 'edit_root_Entry_Server_access_token'
+            },
+            "钉钉": {
+                "Robot Code": 'edit_root_Entry_ID'
+            },
+            '自定义': {
+                'ID': 'edit_root_Entry_ID',
+                'PASSWORD': 'edit_root_Entry_Password',
+                'HOST': 'edit_root_Entry_Server_host',
+                'PORT': 'edit_root_Entry_Server_port',
+                'TOKEN': 'edit_root_Entry_Server_access_token'
+            },
+        },
+        'platform_list': accountTypeDataList_platform,
+        'platform_sdk_list': accountTypeDataList_platform_sdk,
+        'platform_sdk_model_list': accountTypeDataList_platform_sdk_model,
+    }

@@ -111,6 +111,9 @@ def getMenuEvent(target_event):
                             namespace=target_event.sdk_event.key['data']['namespace'],
                             event=target_event.sdk_event.key['data']['event']
                         )
+                        if isinstance(target_event.sdk_event.key['data'].get('webui'), dict):
+                            target_event.data.webui = target_event.sdk_event.key['data']['webui']
+                            target_event.data.payload = target_event.data.webui.get('payload')
     pass
 
 
@@ -1328,6 +1331,21 @@ class Event(object):
         """
         if remote:
             return None
+        if send_type == 'webui':
+            context = getattr(self.data, 'webui', None)
+            if (not context or self.plugin_info.get('func_type') != 'menu'
+                    or self.plugin_info.get('namespace') != self.data.namespace
+                    or str(target_id) != str(context.get('request_id'))):
+                return None
+            control_queue = self.plugin_info.get('control_queue')
+            if control_queue is None:
+                return None
+            control_queue.put(Control.packet('send', {
+                'target': {'type': 'webUI', 'fliter': 'rx_only'},
+                'data': {'action': 'webui_reply', 'namespace': self.data.namespace,
+                         'session': context['session'], 'request_id': context['request_id'], 'payload': message}
+            }), block=False)
+            return True
         return self.__send(
             send_type,
             target_id,
