@@ -1,0 +1,963 @@
+'use strict';
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  token: '',
+  session: '',
+  page: 'dashboard',
+  accounts: [],
+  revision: '',
+  schema: null,
+  plugins: {},
+  pages: [],
+  terminals: [],
+  selected: null,
+  logs: [],
+  terminalLogs: [],
+  limit: 128,
+  dirty: false,
+  showPath: false,
+  editing: null,
+  draft: null,
+  streams: new Map(),
+  frame: null,
+  frameNamespace: null,
+  requests: new Set(),
+  seenEvents: new Set(),
+  qrURL: null,
+  timer: null,
+};
+const titles = {
+  dashboard: '仪表盘',
+  accounts: '账号',
+  logs: '日志',
+  terminals: '终端',
+  plugins: '插件',
+};
+const levels = {
+  '-1': 'TRACE',
+  0: 'DEBUG',
+  1: 'NOTE',
+  2: 'INFO',
+  3: 'WARN',
+  4: 'ERROR',
+  5: 'FATAL',
+};
+const terminalNames = {
+  napcat: 'NapCat',
+  gocqhttp: 'GoCqhttp',
+  walleq: 'WalleQ',
+  cwcb: 'ComWeChat',
+  opqbot: 'OPQBot',
+  virtual_terminal: '虚拟终端',
+};
+const clone = (value) => JSON.parse(JSON.stringify(value));
+
+function element(tag, text, attrs = {}) {
+  const node = document.createElement(tag);
+  if (text !== null && text !== undefined) node.textContent = text;
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
+}
+function button(text, action, className = '') {
+  const node = element('button', text, { type: 'button', class: className });
+  node.addEventListener('click', () => Promise.resolve().then(action).catch(notifyError));
+  return node;
+}
+function notify(message) {
+  $('notice').textContent = message;
+  $('notice').hidden = false;
+}
+function notifyError(error) {
+  notify(error.message || String(error));
+}
+async function api(path, options = {}) {
+  const headers = { 'X-Auth-Token': state.token, ...options.headers };
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(options.body);
+  }
+  const response = await fetch(path, { ...options, headers });
+  const data = await response.json().catch(() => ({ error: `请求失败 (${response.status})` }));
+  if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
+  return data;
+}
+function bind(id, action, event = 'click') {
+  $(id).addEventListener(event, async (ev) => {
+    try {
+      await action(ev);
+    } catch (error) {
+      notifyError(error);
+    }
+  });
+}
+function closeStream(name) {
+  const entry = state.streams.get(name);
+  if (entry) {
+    entry.closed = true;
+    clearTimeout(entry.timer);
+    if (entry.socket) entry.socket.close();
+  }
+  state.streams.delete(name);
+}
+function stream(name, path, onBatch, onStatus = () => {}) {
+  closeStream(name);
+  const entry = { closed: false, attempts: 0, socket: null, timer: null };
+  state.streams.set(name, entry);
+  const connect = () => {
+    if (entry.closed || !state.token) return;
+    const url = new URL(path, location.href);
+    url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(url, ['olivos', `token.${state.token}`]);
+    entry.socket = socket;
+    socket.onopen = () => {
+      entry.attempts = 0;
+      onStatus('已连接');
+    };
+    socket.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'error') {
+          notify(data.error);
+          return;
+        }
+        state.limit = data.limit || state.limit;
+        onBatch(data.items || [], data.type === 'history');
+      } catch (error) {
+        notifyError(error);
+      }
+    };
+    socket.onclose = () => {
+      if (entry.closed) return;
+      onStatus('连接断开，正在重连…');
+      entry.timer = setTimeout(connect, Math.min(1000 * 2 ** entry.attempts++, 15000));
+    };
+    socket.onerror = () => onStatus('连接失败');
+  };
+  connect();
+  return entry;
+}
+
+async function login(ev) {
+  ev.preventDefault();
+  $('login-error').textContent = '';
+  const submit = $('login-form').querySelector('button');
+  submit.disabled = true;
+  try {
+    state.token = $('token').value.trim();
+    const result = await api('/api/login', { method: 'POST' });
+    state.session = result.session;
+    state.schema = await api('/api/accounts/schema');
+    $('token').value = '';
+    $('login').hidden = true;
+    $('shell').hidden = false;
+    await Promise.all([loadAccounts(), loadPlugins(), loadTerminals(), refreshStatus()]);
+    stream(
+      'events',
+      `/ws/events?session=${encodeURIComponent(state.session)}`,
+      eventBatch,
+      (text) => {
+        $('connection').textContent = text;
+      },
+    );
+    clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      if (state.page === 'dashboard') refreshStatus().catch(notifyError);
+    }, 10000);
+    await navigate('dashboard');
+  } catch (error) {
+    state.token = '';
+    $('shell').hidden = true;
+    $('login').hidden = false;
+    $('login-error').textContent = error.message;
+  } finally {
+    submit.disabled = false;
+  }
+}
+async function logout() {
+  await api('/api/logout', { method: 'POST', body: { session: state.session } }).catch(() => {});
+  for (const name of [...state.streams.keys()]) closeStream(name);
+  clearInterval(state.timer);
+  state.token = '';
+  state.session = '';
+  state.accounts = [];
+  state.logs = [];
+  state.terminalLogs = [];
+  state.seenEvents.clear();
+  state.dirty = false;
+  clearFrame();
+  $('shell').hidden = true;
+  $('login').hidden = false;
+  for (const dialog of document.querySelectorAll('dialog')) dialog.close();
+  $('account-form').reset();
+  $('account-rows').replaceChildren();
+  $('notice').hidden = true;
+}
+async function navigate(page) {
+  state.page = page;
+  document.querySelectorAll('.page').forEach((node) => {
+    node.hidden = node.id !== page;
+  });
+  document
+    .querySelectorAll('[data-page]')
+    .forEach((node) => node.classList.toggle('active', node.dataset.page === page));
+  $('page-title').textContent = titles[page] || '插件页面';
+  if (page !== 'plugin-page') clearFrame();
+  if (page !== 'logs') closeStream('logs');
+  if (page !== 'terminals') closeStream('terminal');
+  if (page === 'dashboard') await refreshStatus();
+  if (page === 'accounts' && !state.dirty) await loadAccounts();
+  if (page === 'plugins') await loadPlugins();
+  if (page === 'logs') await openLogs();
+  if (page === 'terminals') {
+    await loadTerminals();
+    if (state.selected) openTerminal(state.selected);
+  }
+}
+async function refreshStatus() {
+  const status = await api('/api/status');
+  $('status-cards').replaceChildren();
+  for (const [label, value] of [
+    ['版本', status.version],
+    ['账号', status.accounts],
+    ['启用', status.enabled],
+    ['在线', status.online],
+  ]) {
+    const card = element('div', null, { class: 'panel card' });
+    card.append(element('span', label), element('strong', value));
+    $('status-cards').append(card);
+  }
+  const seconds = status.uptime;
+  $('runtime').textContent =
+    `运行时长：${Math.floor(seconds / 86400)} 天 ${Math.floor(seconds / 3600) % 24} 时 ${Math.floor(seconds / 60) % 60} 分 ${seconds % 60} 秒`;
+  $('online-note').textContent = status.unknown
+    ? `${status.unknown} 个启用账号尚无可用的连接状态。`
+    : '';
+  $('update-status').textContent = status.update_available
+    ? '发现可用更新。'
+    : '当前未收到新版本通知。';
+}
+
+function dirty() {
+  state.dirty = true;
+  $('accounts-dirty').textContent = '有未应用的修改';
+}
+async function loadAccounts() {
+  const result = await api('/api/accounts');
+  state.accounts = result.account;
+  state.revision = result.revision;
+  state.dirty = false;
+  $('accounts-dirty').textContent = '';
+  renderAccounts();
+}
+function renderAccounts() {
+  const rows = $('account-rows');
+  rows.replaceChildren();
+  if (!state.accounts.length) {
+    const row = element('tr');
+    row.append(element('td', '暂无账号，请新增账号。', { colspan: 5 }));
+    rows.append(row);
+  }
+  state.accounts.forEach((account, index) => {
+    const row = element('tr');
+    const enabled = element('input', null, {
+      type: 'checkbox',
+      class: 'switch',
+      role: 'switch',
+      'aria-label': `启用账号 ${account.id}`,
+    });
+    enabled.checked = account.enable;
+    enabled.onchange = () => {
+      account.enable = enabled.checked;
+      dirty();
+    };
+    const cell = element('td');
+    cell.append(enabled);
+    row.append(cell);
+    row.append(
+      element('td', account.id),
+      element('td', account.platform_type),
+      element('td', `${account.sdk_type} / ${account.model_type}`),
+    );
+    const actions = element('div', null, { class: 'actions' });
+    actions.append(
+      button('编辑', () => editAccount(index)),
+      button(
+        '删除',
+        () => {
+          if (confirm(`删除账号 ${account.id}？保存并应用后生效。`)) {
+            state.accounts.splice(index, 1);
+            dirty();
+            renderAccounts();
+          }
+        },
+        'danger',
+      ),
+    );
+    const last = element('td');
+    last.append(actions);
+    row.append(last);
+    row.ondblclick = () => editAccount(index);
+    rows.append(row);
+  });
+}
+function valueAt(object, path) {
+  return path.split('.').reduce((value, key) => value?.[key], object);
+}
+function setAt(object, path, value) {
+  const parts = path.split('.');
+  const key = parts.pop();
+  let target = object;
+  for (const part of parts) target = target[part] ||= {};
+  target[key] = value;
+}
+function options(select, values, selected) {
+  select.replaceChildren();
+  for (const value of values) select.append(element('option', value, { value }));
+  if (selected !== undefined && values.includes(selected)) select.value = selected;
+}
+function presetFor(row) {
+  return state.schema.presets.find(
+    (p) =>
+      p.sdk_type === row.sdk_type &&
+      p.platform_type === row.platform_type &&
+      p.model_type === row.model_type &&
+      p.server.auto === row.server.auto &&
+      p.server.type === row.server.type,
+  );
+}
+function editAccount(index) {
+  state.editing = index;
+  state.draft =
+    index === null
+      ? {
+          id: '',
+          password: '',
+          sdk_type: 'onebot',
+          platform_type: 'qq',
+          model_type: 'napcat_show_new',
+          server: { auto: true, type: 'post', host: '', port: '', access_token: '' },
+          extends: {},
+          enable: true,
+          debug: false,
+        }
+      : clone(state.accounts[index]);
+  const row = state.draft;
+  (row.extends['qsign-server'] || []).forEach((item, i) => {
+    item._source_index = i;
+  });
+  $('account-title').textContent = index === null ? '新增账号' : '编辑账号';
+  $('account-error').textContent = '';
+  options(
+    $('account-preset'),
+    [...state.schema.presets.map((p) => p.title), '自定义'],
+    presetFor(row)?.title || '自定义',
+  );
+  options($('account-server-type'), state.schema.server_types, row.server.type);
+  $('account-auto').checked = row.server.auto;
+  $('account-debug').checked = row.debug;
+  syncHierarchy();
+  renderAccountFields();
+  $('account-dialog').showModal();
+}
+function syncHierarchy() {
+  const row = state.draft;
+  const hierarchy = state.schema.hierarchy;
+  // 保留已有的历史型号，即使新版本元数据已不再列出。
+  const sdks = [...new Set([...Object.keys(hierarchy), row.sdk_type])];
+  options($('account-sdk'), sdks, row.sdk_type);
+  const platforms = [
+    ...new Set([...Object.keys(hierarchy[row.sdk_type] || {}), row.platform_type]),
+  ];
+  options($('account-platform'), platforms, row.platform_type);
+  const models = [
+    ...new Set([...(hierarchy[row.sdk_type]?.[row.platform_type] || []), row.model_type]),
+  ];
+  options($('account-model'), models, row.model_type);
+}
+function collectFields() {
+  const row = state.draft;
+  document
+    .querySelectorAll('#account-form [data-field]')
+    .forEach((input) => setAt(row, input.dataset.field, input.value));
+  row.server.type = $('account-server-type').value;
+  row.server.auto = $('account-auto').checked;
+  row.debug = $('account-debug').checked;
+  const extra = JSON.parse($('account-extends').value || '{}');
+  if (!extra || typeof extra !== 'object' || Array.isArray(extra))
+    throw new Error('extends 必须是 JSON 对象');
+  row.extends = { ...row.extends, ...extra };
+  document.querySelectorAll('#account-form [data-extend]').forEach((input) => {
+    row.extends[input.dataset.extend] = input.value;
+  });
+  if (!$('qsign-fields').hidden) {
+    row.extends['qsign-server-protocal'] = $('qsign-protocol').value;
+    row.extends['qsign-server'] = [...$('qsign-rows').children]
+      .map((node) => ({
+        addr: node.querySelector('[data-qsign="addr"]').value,
+        key: node.querySelector('[data-qsign="key"]').value,
+        _source_index: Number(node.dataset.source),
+      }))
+      .filter((item) => item.addr || item.key);
+  }
+}
+function fieldInput(field, parent, attribute = 'data-field') {
+  const label = element('label', field.title);
+  const input = element('input', null, { [attribute]: field.name, autocomplete: 'off' });
+  const secret = /password|access_token|secret|key$/i.test(field.name);
+  input.type = secret ? 'password' : 'text';
+  input.value =
+    (attribute === 'data-field'
+      ? valueAt(state.draft, field.name)
+      : state.draft.extends[field.name]) ?? '';
+  if (field.name === 'id')
+    input.addEventListener('input', () => {
+      if (!$('webhook-fields').hidden) refreshWebhook().catch(notifyError);
+    });
+  label.append(input);
+  parent.append(label);
+}
+function renderAccountFields() {
+  const preset = state.schema.presets.find((p) => p.title === $('account-preset').value);
+  const fields = preset?.fields || state.schema.fields;
+  $('account-fields').replaceChildren();
+  $('account-extra-fields').replaceChildren();
+  fields.forEach((field) => fieldInput(field, $('account-fields')));
+  for (const field of state.schema.fields.filter(
+    (field) => !fields.some((visible) => visible.name === field.name),
+  ))
+    fieldInput(field, $('account-extra-fields'));
+  (preset?.extends || []).forEach((field) => fieldInput(field, $('account-fields'), 'data-extend'));
+  $('account-note').textContent = preset?.note || '';
+  const extra = clone(state.draft.extends);
+  for (const field of preset?.extends || []) delete extra[field.name];
+  if (preset?.qsign) {
+    delete extra['qsign-server'];
+    delete extra['qsign-server-protocal'];
+  }
+  $('account-extends').value = JSON.stringify(extra, null, 2);
+  $('webhook-fields').hidden = !(
+    state.draft.sdk_type === 'qqGuildv2_link' && state.draft.server.type === 'post'
+  );
+  if (!$('webhook-fields').hidden) refreshWebhook().catch(notifyError);
+  $('qsign-fields').hidden = !preset?.qsign;
+  options(
+    $('qsign-protocol'),
+    state.schema.qsign_protocols,
+    state.draft.extends['qsign-server-protocal'] || 'AstralQsign',
+  );
+  renderQsign();
+}
+function renderQsign() {
+  const rows = state.draft.extends['qsign-server'] || [];
+  $('qsign-rows').replaceChildren();
+  const local = $('qsign-protocol').value === 'AstralQsign';
+  $('qsign-local-note').hidden = !local;
+  $('qsign-rows').hidden = local;
+  $('qsign-add').hidden = local;
+  rows.forEach((entry, index) => {
+    const row = element('div', null, {
+      class: 'qsign-row',
+      'data-source': entry._source_index ?? -1,
+    });
+    for (const [key, title] of [
+      ['addr', '地址'],
+      ['key', 'KEY'],
+    ]) {
+      const label = element('label', title);
+      const input = element('input', null, {
+        'data-qsign': key,
+        type: key === 'key' ? 'password' : 'text',
+        autocomplete: 'off',
+      });
+      input.value = entry[key] || '';
+      label.append(input);
+      row.append(label);
+    }
+    row.append(
+      button('移除', () => {
+        collectFields();
+        state.draft.extends['qsign-server'].splice(index, 1);
+        renderQsign();
+      }),
+    );
+    $('qsign-rows').append(row);
+  });
+  $('qsign-add').disabled = rows.length >= state.schema.qsign_limit;
+}
+let webhookGeneration = 0;
+async function refreshWebhook() {
+  const generation = ++webhookGeneration;
+  const accountId = document.querySelector('#account-form [data-field="id"]')?.value || '';
+  const data = await api(`/api/accounts/webhook?id=${encodeURIComponent(accountId)}`);
+  if (generation !== webhookGeneration) return;
+  $('webhook-url').value = data.url;
+  $('webhook-cert').textContent = `请将证书放到 ${data.certdir}/${accountId || '{AppID}'}/`;
+}
+async function copyWebhook() {
+  await refreshWebhook();
+  try {
+    await navigator.clipboard.writeText($('webhook-url').value);
+  } catch {
+    $('webhook-url').select();
+    if (!document.execCommand('copy')) throw new Error('复制失败，请手动复制回调地址');
+  }
+  notify('回调地址已复制');
+}
+async function saveAccounts() {
+  if (!state.dirty) return;
+  const submit = $('save-accounts');
+  submit.disabled = true;
+  try {
+    const accounts = clone(state.accounts);
+    for (const row of accounts) {
+      if (row.password === '********') delete row.password;
+      if (row.server.access_token === '********') delete row.server.access_token;
+    }
+    const result = await api('/api/accounts', {
+      method: 'POST',
+      body: { account: accounts, revision: state.revision },
+    });
+    state.accounts = result.account;
+    state.revision = result.revision;
+    state.dirty = false;
+    $('accounts-dirty').textContent = '';
+    renderAccounts();
+    notify('账号已保存，连接配置正在热更新。');
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+function appendBounded(target, items) {
+  target.push(...items);
+  if (target.length > state.limit) target.splice(0, target.length - state.limit);
+}
+function renderOutput(container, lines, follow, logMode = false) {
+  const scrollTop = container.scrollTop;
+  container.replaceChildren();
+  for (const line of lines) {
+    let text = line.text ?? '';
+    if (logMode) {
+      const timestamp =
+        typeof line.time === 'number'
+          ? new Date(line.time * 1000).toLocaleString()
+          : line.time || '';
+      text = `${timestamp ? `[${timestamp}] ` : ''}[${levels[line.level] || 'INFO'}] ${text}`;
+    } else if (line.name) text = `${line.name}：${text}`;
+    text = String(text).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
+    container.append(
+      element('div', text, {
+        class: `log-line ${logMode ? `level-${String(line.level).replace('-', 'n')}` : ''}`,
+      }),
+    );
+  }
+  container.scrollTop = follow ? container.scrollHeight : scrollTop;
+}
+function renderLogs() {
+  const filter = $('log-level').value;
+  const lines = state.logs.filter((line) => filter === '' || line.level >= Number(filter));
+  renderOutput($('log-output'), lines, $('log-scroll').checked, true);
+  $('log-count').textContent = `${lines.length} / ${state.limit} 条`;
+}
+async function openLogs() {
+  const result = await api(`/api/logs?tail=${state.limit}`);
+  state.logs = result.items;
+  renderLogs();
+  if (state.page !== 'logs') return;
+  stream('logs', '/ws/logs', (items, history) => {
+    if (history && items.length) state.logs = [];
+    appendBounded(state.logs, items);
+    renderLogs();
+  });
+}
+async function loadTerminals() {
+  const result = await api('/api/terminals');
+  state.terminals = result.items;
+  state.selected =
+    state.terminals.find(
+      (item) => item.hash === state.selected?.hash && item.model === state.selected?.model,
+    ) ||
+    state.terminals[0] ||
+    null;
+  renderTerminals();
+}
+function renderTerminals() {
+  $('terminal-tabs').replaceChildren();
+  for (const terminal of state.terminals) {
+    const tab = button(`${terminalNames[terminal.model] || terminal.model} · ${terminal.id}`, () =>
+      openTerminal(terminal),
+    );
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', terminal === state.selected ? 'true' : 'false');
+    $('terminal-tabs').append(tab);
+  }
+  $('terminal-empty').hidden = !!state.selected;
+  $('terminal-content').hidden = !state.selected;
+  if (!state.selected) closeStream('terminal');
+}
+function openTerminal(terminal) {
+  state.selected = terminal;
+  state.terminalLogs = [];
+  renderTerminals();
+  $('terminal-output').replaceChildren();
+  $('terminal-state').textContent = '正在连接…';
+  $('terminal-qr').hidden = !(terminal.qrcode || terminal.qrcode_url);
+  $('virtual-options').hidden = terminal.model !== 'virtual_terminal';
+  stream(
+    'terminal',
+    `/ws/terminal/${encodeURIComponent(terminal.model)}/${encodeURIComponent(terminal.hash)}`,
+    (items, history) => {
+      if (history) state.terminalLogs = [];
+      appendBounded(state.terminalLogs, items);
+      renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
+    },
+    (text) => {
+      $('terminal-state').textContent = text;
+    },
+  );
+}
+async function showQRCode(terminal) {
+  $('qr-title').textContent = `请使用账号 ${terminal.id || terminal.hash} 扫码`;
+  if (state.qrURL) URL.revokeObjectURL(state.qrURL);
+  $('qr-image').hidden = !terminal.qrcode;
+  $('qr-link').hidden = !terminal.qrcode_url;
+  if (terminal.qrcode) {
+    const response = await fetch(
+      `/api/terminal/${encodeURIComponent(terminal.model)}/${encodeURIComponent(terminal.hash)}/qrcode`,
+      { headers: { 'X-Auth-Token': state.token } },
+    );
+    if (!response.ok) throw new Error('二维码已失效或不可读取');
+    state.qrURL = URL.createObjectURL(await response.blob());
+    $('qr-image').src = state.qrURL;
+  }
+  if (terminal.qrcode_url && safeURL(terminal.qrcode_url)) $('qr-link').href = terminal.qrcode_url;
+  if (!$('qr-dialog').open) $('qr-dialog').showModal();
+}
+
+function safeURL(value) {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username;
+  } catch {
+    return false;
+  }
+}
+async function loadPlugins() {
+  const result = await api('/api/plugins');
+  state.plugins = result.shallow_plugin_data_dict;
+  state.pages = result.shallow_plugin_webui_list;
+  renderPlugins();
+  renderPluginNavigation();
+}
+function renderPlugins() {
+  const header = element('tr');
+  for (const text of [...(state.showPath ? ['路径'] : []), '插件', '版本', '作者', '操作'])
+    header.append(element('th', text));
+  $('plugin-head').replaceChildren(header);
+  $('plugin-rows').replaceChildren();
+  const plugins = Object.entries(state.plugins).sort((a, b) => (a[1][6] || 0) - (b[1][6] || 0));
+  for (const [namespace, plugin] of plugins) {
+    const row = element('tr');
+    if (state.showPath)
+      row.append(
+        element('td', `/${plugin[5] ? `${plugin[5].replaceAll('\\', '/')}/` : ''}${namespace}`),
+      );
+    row.append(element('td', plugin[0]), element('td', plugin[1]), element('td', plugin[2]));
+    const cell = element('td');
+    cell.append(button('菜单', () => pluginMenu(namespace)));
+    row.append(cell);
+    row.ondblclick = () => pluginMenu(namespace);
+    $('plugin-rows').append(row);
+  }
+  if (!plugins.length) {
+    const row = element('tr');
+    row.append(element('td', '暂无已加载的插件。', { colspan: state.showPath ? 5 : 4 }));
+    $('plugin-rows').append(row);
+  }
+  $('toggle-path').textContent = state.showPath ? '隐藏路径' : '显示路径';
+}
+function pluginMenu(namespace) {
+  const plugin = state.plugins[namespace];
+  $('menu-title').textContent = plugin[0];
+  $('menu-info').textContent = plugin[4];
+  $('menu-items').replaceChildren();
+  for (const item of plugin[3] || [])
+    $('menu-items').append(
+      button(item[0], async () => {
+        await api('/api/plugin_event', { method: 'POST', body: { namespace, event: item[2] } });
+        $('menu-dialog').close();
+        notify(`已执行：${item[0]}`);
+      }),
+    );
+  if (!plugin[3]?.length) $('menu-items').append(element('p', '此插件没有声明菜单。'));
+  $('menu-dialog').showModal();
+}
+function renderPluginNavigation() {
+  $('plugin-links').replaceChildren();
+  for (const page of state.pages) {
+    if (page.type === 'link' && safeURL(page.url))
+      $('plugin-links').append(
+        element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
+      );
+    else if (
+      page.type === 'iframe' &&
+      typeof page.path === 'string' &&
+      page.path.startsWith('webui/') &&
+      !page.path.split('/').includes('..')
+    )
+      $('plugin-links').append(button(page.title, () => openPluginPage(page)));
+  }
+  if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
+  if (state.frameNamespace && !state.plugins[state.frameNamespace]) {
+    clearFrame();
+    notify('插件页面已卸载。');
+  }
+}
+function clearFrame() {
+  $('plugin-frame-container').replaceChildren();
+  state.frame = null;
+  state.frameNamespace = null;
+  state.requests.clear();
+}
+async function openPluginPage(page) {
+  await navigate('plugin-page');
+  clearFrame();
+  $('page-title').textContent = page.title;
+  state.frameNamespace = page.namespace;
+  const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
+  const frame = element('iframe', null, {
+    title: page.title,
+    src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
+    sandbox: 'allow-scripts',
+  });
+  state.frame = frame;
+  $('plugin-frame-container').append(frame);
+}
+window.addEventListener('message', async (ev) => {
+  if (!state.frame || ev.source !== state.frame.contentWindow || ev.origin !== 'null') return;
+  const data = ev.data;
+  if (
+    !data ||
+    data.type !== 'olivos:plugin_event' ||
+    typeof data.event !== 'string' ||
+    typeof data.request_id !== 'string' ||
+    data.request_id.length > 128
+  )
+    return;
+  if (state.requests.size >= 128) {
+    notify('插件页面等待回包过多，请刷新页面。');
+    return;
+  }
+  const namespace = state.frameNamespace;
+  const frame = state.frame;
+  try {
+    state.requests.add(data.request_id);
+    await api('/api/plugin_event', {
+      method: 'POST',
+      body: {
+        namespace,
+        event: data.event,
+        payload: data.payload,
+        request_id: data.request_id,
+        session: state.session,
+      },
+    });
+  } catch (error) {
+    state.requests.delete(data.request_id);
+    frame.contentWindow.postMessage(
+      { type: 'olivos:plugin_reply', request_id: data.request_id, error: error.message },
+      '*',
+    );
+  }
+});
+async function handleEvent(item) {
+  if (item.type === 'plugins') await loadPlugins();
+  else if (item.type === 'accounts') {
+    if (!state.dirty) await loadAccounts();
+    await loadTerminals();
+  } else if (item.type === 'init') await loadTerminals();
+  else if (item.type === 'qrcode' || item.type === 'qrcode_url') {
+    await loadTerminals();
+    const terminal = state.terminals.find((t) => t.hash === item.hash && t.model === item.model);
+    if (terminal) await showQRCode(terminal);
+  } else if (item.type === 'update') {
+    notify('发现可用的 OlivOS 更新。');
+    await refreshStatus();
+  } else if (
+    item.type === 'plugin_reply' &&
+    state.frame &&
+    state.frameNamespace === item.namespace &&
+    state.requests.has(item.request_id)
+  ) {
+    state.requests.delete(item.request_id);
+    state.frame.contentWindow.postMessage(
+      { type: 'olivos:plugin_reply', request_id: item.request_id, payload: item.payload },
+      '*',
+    );
+  } else if (item.type === 'open_page' && safeURL(item.url)) {
+    await navigate('plugin-page');
+    clearFrame();
+    $('page-title').textContent = item.title || '插件页面';
+    $('plugin-frame-container').append(
+      element('iframe', null, {
+        src: item.url,
+        title: item.title || '插件页面',
+        sandbox: 'allow-scripts allow-forms',
+      }),
+    );
+  }
+}
+function eventBatch(items) {
+  for (const item of items) {
+    if (state.seenEvents.has(item.sequence)) continue;
+    state.seenEvents.add(item.sequence);
+    if (state.seenEvents.size > state.limit * 2)
+      state.seenEvents.delete(state.seenEvents.values().next().value);
+    handleEvent(item).catch(notifyError);
+  }
+}
+
+$('login-form').addEventListener('submit', login);
+bind('logout', logout);
+document
+  .querySelectorAll('[data-page]')
+  .forEach((node) =>
+    node.addEventListener('click', () => navigate(node.dataset.page).catch(notifyError)),
+  );
+document
+  .querySelectorAll('[data-close]')
+  .forEach((node) => node.addEventListener('click', () => $(node.dataset.close).close()));
+bind('add-account', () => editAccount(null));
+bind('refresh-accounts', () => {
+  if (!state.dirty || confirm('放弃尚未应用的修改并刷新？')) return loadAccounts();
+});
+bind('save-accounts', saveAccounts);
+bind(
+  'account-preset',
+  () => {
+    collectFields();
+    const preset = state.schema.presets.find((p) => p.title === $('account-preset').value);
+    if (preset) {
+      Object.assign(state.draft, {
+        sdk_type: preset.sdk_type,
+        platform_type: preset.platform_type,
+        model_type: preset.model_type,
+      });
+      Object.assign(state.draft.server, preset.server);
+    }
+    syncHierarchy();
+    $('account-auto').checked = state.draft.server.auto;
+    $('account-server-type').value = state.draft.server.type;
+    renderAccountFields();
+  },
+  'change',
+);
+for (const [id, key] of [
+  ['account-sdk', 'sdk_type'],
+  ['account-platform', 'platform_type'],
+  ['account-model', 'model_type'],
+])
+  bind(
+    id,
+    () => {
+      collectFields();
+      state.draft[key] = $(id).value;
+      const h = state.schema.hierarchy;
+      if (key === 'sdk_type') state.draft.platform_type = Object.keys(h[state.draft.sdk_type])[0];
+      if (key !== 'model_type')
+        state.draft.model_type = h[state.draft.sdk_type][state.draft.platform_type][0];
+      $('account-preset').value = '自定义';
+      syncHierarchy();
+      renderAccountFields();
+    },
+    'change',
+  );
+for (const id of ['account-auto', 'account-server-type'])
+  bind(
+    id,
+    () => {
+      collectFields();
+      $('account-preset').value = presetFor(state.draft)?.title || '自定义';
+      renderAccountFields();
+    },
+    'change',
+  );
+$('account-form').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  try {
+    collectFields();
+    if (state.editing === null) state.accounts.push(clone(state.draft));
+    else state.accounts[state.editing] = clone(state.draft);
+    dirty();
+    renderAccounts();
+    $('account-dialog').close();
+  } catch (error) {
+    $('account-error').textContent = error.message;
+  }
+});
+bind('qsign-add', () => {
+  collectFields();
+  const rows = (state.draft.extends['qsign-server'] ||= []);
+  if (rows.length < 10) rows.push({ addr: '', key: '', _source_index: -1 });
+  renderQsign();
+});
+bind(
+  'qsign-protocol',
+  () => {
+    collectFields();
+    renderQsign();
+  },
+  'change',
+);
+bind('webhook-refresh', refreshWebhook);
+bind('webhook-copy', copyWebhook);
+bind('log-level', renderLogs, 'change');
+bind('log-scroll', renderLogs, 'change');
+bind('terminal-qr', () => showQRCode(state.selected));
+bind(
+  'terminal-form',
+  (ev) => {
+    ev.preventDefault();
+    const socket = state.streams.get('terminal')?.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error('终端未连接，请稍后重试');
+    const packet = { data: $('terminal-input').value };
+    if (state.selected.model === 'virtual_terminal')
+      packet.user_conf = {
+        user_id: $('virtual-user').value,
+        user_name: $('virtual-name').value,
+        flag_group: $('virtual-type').value === 'group',
+        target_id: $('virtual-group').value,
+        group_role: 'member',
+      };
+    socket.send(JSON.stringify(packet));
+    $('terminal-input').value = '';
+  },
+  'submit',
+);
+bind('toggle-path', () => {
+  state.showPath = !state.showPath;
+  renderPlugins();
+});
+bind('reload-plugins', async () => {
+  if (confirm('重载全部插件？')) {
+    await api('/api/plugins/reload', { method: 'POST' });
+    notify('正在重载插件…');
+  }
+});
+bind('check-update', async () => {
+  await api('/api/update/check', { method: 'POST' });
+  notify('正在检查更新…');
+});
+bind('exit', async () => {
+  if (confirm('退出 OlivOS 将停止所有账号与插件，确定退出？')) {
+    await api('/api/exit', { method: 'POST' });
+    notify('正在退出 OlivOS…');
+  }
+});
+window.addEventListener('beforeunload', (ev) => {
+  if (state.dirty) {
+    ev.preventDefault();
+    ev.returnValue = '';
+  }
+});

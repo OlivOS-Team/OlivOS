@@ -103,3 +103,6 @@ if platform.system() == 'Windows':
     from .libBooter import libAstralQsignEXEModelAPI
 
 from . import userModule
+
+from . import webUI
+from .webUI import serverAPI, pageAPI

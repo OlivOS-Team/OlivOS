@@ -413,14 +413,13 @@ class logger(API.Proc_templet):
                         self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
                         if flag_need_refresh:
                             self.save_logfile()
-        if (
-            type(self.Proc_config['logger_mode']) is list
-            and 'native' in self.Proc_config['logger_mode']
-        ):
+        for mode, target in [('native', 'nativeWinUI'), ('web', 'webUI')]:
+            if mode not in self.Proc_config['logger_mode']:
+                continue
             self.__sendControlEventSend(
                 'send', {
                     'target': {
-                        'type': 'nativeWinUI'
+                        'type': target
                     },
                     'data': {
                         'action': 'logger',

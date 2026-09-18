@@ -12,3 +12,8 @@ dist
 .vscode/settings.json
 *.opk
 .workbuddy
+data/webui_token
+data/webui/
+conf/*.webui-backup
+tests/
+tmp/

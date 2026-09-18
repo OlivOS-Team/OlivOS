@@ -30,6 +30,7 @@ from PIL import Image
 from PIL import ImageTk
 
 from tkinter import ttk
+from .trayMenuAPI import TrayIcon, BoldMenuItem
 
 dictColorContext = {
     'color_001': '#00A0EA',
@@ -1203,6 +1204,11 @@ class dock(OlivOS.API.Proc_templet):
     def setOlivOSExit(self):
         self.sendControlEvent('exit_total')
 
+    def openWebUI(self):
+        url = OlivOS.webUI.serverAPI.browser_url()
+        if url:
+            webbrowser.open(url)
+
     def sendPluginControlEventFunc(self, pluginNameSpace, eventName):
         def resFunc():
             self.sendPluginControlEvent(pluginNameSpace, eventName)
@@ -2223,6 +2229,8 @@ class shallow(object):
             return data
         else:
             list_new = []
+            if data is self.UIData.get('shallow_menu_list') and OlivOS.webUI.serverAPI.browser_url():
+                list_new.append(BoldMenuItem('打开 WebUI', lambda: self.root.openWebUI()))
             for item_this in data:
                 if not type(item_this) is list:
                     pass
@@ -2341,7 +2349,7 @@ class shallow(object):
     def start(self):
         image = Image.open(self.image)
         self.refreshData()
-        self.UIObject['shallow_root'] = pystray.Icon(
+        self.UIObject['shallow_root'] = TrayIcon(
             name=self.name,
             icon=image,
             title=self.name,

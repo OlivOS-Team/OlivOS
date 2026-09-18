@@ -70,7 +70,7 @@ sys.path.append('./lib/DLLs')
 class shallow(API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
-                 treading_mode='full', restart_gate=10000, enable_auto_restart=False):
+                 treading_mode='full', restart_gate=10000, enable_auto_restart=False, enable_gui=True):
         API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -87,6 +87,7 @@ class shallow(API.Proc_templet):
         if plugin_func_dict is None:
             plugin_func_dict = {}
         self.Proc_config['debug_mode'] = debug_mode
+        self.Proc_config['enable_gui'] = enable_gui
         self.Proc_config['treading_mode'] = treading_mode
         self.Proc_config['shallow_dict'] = {}
         self.Proc_config['ready_for_restart'] = False
@@ -177,7 +178,8 @@ class shallow(API.Proc_templet):
         releaseDir('./data/videos')
         releaseDir('./data/audios')
         releaseDir('./data/files')
-        threading.Thread(target=self.__init_GUI).start()
+        if self.Proc_config['enable_gui']:
+            threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.database = (
@@ -215,7 +217,11 @@ class shallow(API.Proc_templet):
                         # 在运行过 save 指令后，将配置数据库关闭
                         self.database.stop()
                     elif rx_packet_data.action == 'send':
-                        self.menu_queue.append(rx_packet_data)
+                        webui_event = rx_packet_data.key.get('data', {}).get('webui')
+                        if webui_event or platform.system() != 'Windows' or not self.Proc_config['enable_gui']:
+                            self.run_plugin(rx_packet_data)
+                        else:
+                            self.menu_queue.append(rx_packet_data)
                 else:
                     if self.Proc_config['treading_mode'] == 'none':
                         self.run_plugin(rx_packet_data.sdk_event)
@@ -517,9 +523,20 @@ class shallow(API.Proc_templet):
     def sendPluginList(self):
         tmp_plugin_list_send = []
         tmp_plugin_dict_send = {}
+        tmp_plugin_webui_send = []
+        tmp_plugin_webui_roots = {}
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
                 plugin_models_this = self.plugin_models_dict[plugin_models_index_this]
+                webui_config = plugin_models_this.get('webui_config')
+                if isinstance(webui_config, list):
+                    for entry in webui_config:
+                        if not isinstance(entry, dict) or not isinstance(entry.get('title'), str):
+                            continue
+                        if entry.get('type') not in ('iframe', 'link'):
+                            continue
+                        tmp_plugin_webui_send.append(dict(entry, namespace=plugin_models_this['namespace']))
+                    tmp_plugin_webui_roots[plugin_models_this['namespace']] = plugin_models_this.get('webui_root', '')
                 tmp_plugin_list_this = None
                 if plugin_models_this['menu_config'] is not None:
                     plugin_models_this_menu = plugin_models_this['menu_config']
@@ -563,7 +580,9 @@ class shallow(API.Proc_templet):
                 'action': 'update_data',
                 'data': {
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
-                    'shallow_plugin_data_dict': tmp_plugin_dict_send
+                    'shallow_plugin_data_dict': tmp_plugin_dict_send,
+                    'shallow_plugin_webui_list': tmp_plugin_webui_send,
+                    'shallow_plugin_webui_roots': tmp_plugin_webui_roots
                 }
             }
         }
@@ -733,6 +752,8 @@ class shallow(API.Proc_templet):
                             }
                             if 'menu_config' in plugin_models_app_conf:
                                 plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
+                            plugin_models_dict_this['webui_config'] = plugin_models_app_conf.get('webui_config')
+                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.dirname(app_json_path))
                             if 'message_mode' in plugin_models_app_conf:
                                 plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
                             else:
