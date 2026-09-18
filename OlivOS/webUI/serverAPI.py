@@ -18,6 +18,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import asyncio
 import copy
+import errno
 import hmac
 import io
 import json
@@ -83,6 +84,7 @@ class server(OlivOS.API.Proc_templet):
         self.stop_event = threading.Event()
         self.ready = threading.Event()
         self.error = None
+        self.listen_path = self.root / 'data/webui/listen.json'
         self.loop = None
         self.sockets = set()
         token_path = self.root / self.config['token_path']
@@ -381,8 +383,26 @@ class server(OlivOS.API.Proc_templet):
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
         try:
-            site = web.TCPSite(runner, self.config['host'], int(self.config['port']))
-            await site.start()
+            requested_port = int(self.config['port'])
+            if not 0 <= requested_port <= 65535:
+                raise ValueError('WebUI 端口必须在 0–65535 之间')
+            for port in range(requested_port, 65536):
+                site = web.TCPSite(runner, self.config['host'], port)
+                try:
+                    await site.start()
+                    break
+                except OSError as error:
+                    if site in runner.sites:
+                        await site.stop()
+                    if error.errno not in (errno.EADDRINUSE, 10048) or port == 65535:
+                        raise
+            self.config['port'] = runner.addresses[0][1]
+            self.listen_path.parent.mkdir(parents=True, exist_ok=True)
+            self.listen_path.write_text(json.dumps({
+                'host': self.config['host'], 'port': self.config['port'], 'pid': os.getpid(),
+            }), encoding='utf-8')
+            if requested_port != self.config['port']:
+                self.log(2, f"WebUI 监听端口由 {requested_port} 调整为 {self.config['port']}")
             self.ready.set()
             self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；"
                         f"认证文件：{self.config['token_path']}")
@@ -398,11 +418,15 @@ class server(OlivOS.API.Proc_templet):
             for socket in list(self.sockets):
                 await socket.close()
             await runner.cleanup()
+            try:
+                current = json.loads(self.listen_path.read_text(encoding='utf-8'))
+                if current.get('pid') == os.getpid() and current.get('port') == self.config['port']:
+                    self.listen_path.unlink()
+            except (OSError, ValueError):
+                pass
 
     def run(self):
         try:
-            if OlivOS.accountAPI.isInuse(self.config['host'], int(self.config['port'])):
-                raise OSError('WebUI 监听端口已占用')
             asyncio.run(self.serve())
         except (OSError, ValueError) as error:
             self.error = str(error)
@@ -434,6 +458,11 @@ def browser_url():
             enabled = model.get('enable', enabled)
         except (OSError, ValueError, KeyError):
             pass
+    try:
+        active = json.loads(Path('./data/webui/listen.json').read_text(encoding='utf-8'))
+        config.update(host=active['host'], port=int(active['port']))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     host = config['host']
     if host in ('0.0.0.0', '::'):
         host = '127.0.0.1'
