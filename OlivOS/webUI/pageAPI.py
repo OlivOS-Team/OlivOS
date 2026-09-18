@@ -264,6 +264,16 @@ def runtime_status(host):
     online = set()
     known = set()
     for proc in list(host.runtime.values()):
+        if getattr(proc, 'Proc_type', None) == 'qqGuildv2_webhook':
+            for bot in proc.Proc_data.get('bot_info_dict', {}).values():
+                if not isinstance(bot, OlivOS.API.bot_info_T) or not bot.enable:
+                    continue
+                if not OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(bot):
+                    continue
+                known.add(bot.hash)
+                if proc.webhook_online:
+                    online.add(bot.hash)
+            continue
         bot = getattr(proc, 'bot_info', None)
         if bot is None:
             bot = getattr(proc, 'Proc_data', {}).get('bot_info_dict')
@@ -286,8 +296,20 @@ def runtime_status(host):
                 online.add(bot.hash)
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
+    unknown = enabled - known
+    unknown_accounts = [
+        {'id': str(bot.id), 'platform_type': bot.platform['platform'],
+         'sdk_type': bot.platform['sdk'], 'model_type': bot.platform['model']}
+        for key, bot in accounts.items() if key in unknown
+    ]
+    account_connections = {
+        key: ('disabled' if not bot.enable else 'online' if key in online
+              else 'offline' if key in known else 'unknown')
+        for key, bot in accounts.items()
+    }
     return {'version': OlivOS.infoAPI.OlivOS_Version_Short, 'accounts': len(accounts),
-            'enabled': len(enabled), 'online': len(online & enabled), 'unknown': len(enabled - known),
+            'enabled': len(enabled), 'online': len(online & enabled), 'unknown': len(unknown),
+            'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
             'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available}
 
 
@@ -345,7 +367,7 @@ def register_routes(host):
 
     @app.get('/static/<name>')
     def assets(name):
-        if name not in ('app.js', 'style.css'):
+        if name not in ('app.js', 'theme.js', 'style.css', 'logo.png'):
             abort(404)
         return send_from_directory(str(host.static_path), name)
 

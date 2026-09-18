@@ -2,18 +2,5 @@
     "system": {
         "name": "OlivOS"
     },
-    "models": {
-        "OlivOS_webUI": {
-            "enable": true,
-            "server": {
-                "auto": false,
-                "type": "http",
-                "host": "127.0.0.1",
-                "port": 20480,
-                "token_path": "./data/webui_token",
-                "static_path": "./data/webui/static",
-                "buffer_limit": 128
-            }
-        }
-    }
+    "models": {}
 }

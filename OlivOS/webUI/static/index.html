@@ -5,23 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title>OlivOS · WebUI</title>
+    <link rel="icon" href="/static/logo.png" type="image/png" />
+    <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css" />
     <script src="/static/app.js" defer></script>
   </head>
   <body>
     <section id="login" class="login">
       <form id="login-form" class="panel login-card">
-        <span class="brand">OlivOS</span>
+        <div class="brand">
+          <img class="brand-logo" src="/static/logo.png" alt="" width="64" height="64" />
+          <div class="brand-text">
+            <strong>OlivOS</strong>
+            <span>青果核心交互栈</span>
+          </div>
+        </div>
         <h1>登录 WebUI</h1>
-        <p>请输入服务器 <code>data/webui_token</code> 文件中的令牌。</p>
+        <p>请输入服务器 <code>conf/webui_token.txt</code> 文件中的令牌。</p>
         <label>访问令牌<input id="token" type="password" autocomplete="off" required /></label>
         <button type="submit" class="primary">登录</button>
         <p id="login-error" role="alert"></p>
+        <label class="theme-control">
+          <span>外观</span>
+          <select data-theme-select aria-label="外观">
+            <option value="system">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </label>
       </form>
     </section>
     <div id="shell" hidden>
       <aside>
-        <div class="brand">OlivOS<small>青果核心交互栈</small></div>
+        <div class="brand">
+          <img class="brand-logo" src="/static/logo.png" alt="" width="44" height="44" />
+          <div class="brand-text">
+            <strong>OlivOS</strong>
+            <span>青果核心交互栈</span>
+          </div>
+        </div>
         <nav id="navigation" aria-label="主导航">
           <button data-page="dashboard">仪表盘</button>
           <button data-page="accounts">账号</button>
@@ -33,7 +55,17 @@
           <h2>插件页面</h2>
           <div id="plugin-links"></div>
         </nav>
-        <button id="logout">退出登录</button>
+        <div class="sidebar-footer">
+          <label class="theme-control">
+            <span>外观</span>
+            <select data-theme-select aria-label="外观">
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </label>
+          <button id="logout">退出登录</button>
+        </div>
       </aside>
       <main>
         <header>
@@ -43,20 +75,32 @@
         <div id="notice" role="status" hidden></div>
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
-          <div class="panel">
-            <h2>OlivOS</h2>
+          <div class="runtime-summary">
+            <h2>运行状态</h2>
             <p id="runtime"></p>
-            <p id="online-note"></p>
+            <div id="unknown-status" hidden>
+              <p id="online-note"></p>
+              <ul id="unknown-accounts" class="account-status-list"></ul>
+            </div>
             <p id="update-status"></p>
             <div class="toolbar">
-              <button id="check-update">检查更新</button
-              ><button id="exit" class="danger">退出 OlivOS</button>
+              <button id="check-update">检查更新</button>
+              <button id="dashboard-reload-plugins">重载插件</button>
+              <a
+                id="community-forum"
+                class="button-link"
+                href="https://forum.olivos.run/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >社区论坛</a
+              >
+              <button id="exit" class="danger">退出 OlivOS</button>
             </div>
           </div>
         </section>
         <section id="accounts" class="page" hidden>
           <div class="toolbar">
-            <button id="add-account" class="primary">新增账号</button
+            <button id="add-account">新增账号</button
             ><button id="refresh-accounts">刷新</button
             ><button id="save-accounts" class="primary">保存并应用</button
             ><span id="accounts-dirty"></span>
@@ -152,6 +196,17 @@
         </section>
       </main>
     </div>
+    <dialog id="account-info-dialog" aria-labelledby="account-info-title">
+      <div class="dialog-title">
+        <h2 id="account-info-title">账号信息</h2>
+        <button type="button" data-close="account-info-dialog" aria-label="关闭">×</button>
+      </div>
+      <dl id="account-details" class="account-details"></dl>
+      <p id="account-info-note" hidden>有未应用的修改</p>
+      <div class="dialog-actions">
+        <button type="button" data-close="account-info-dialog">关闭</button>
+      </div>
+    </dialog>
     <dialog id="account-dialog">
       <form id="account-form">
         <div class="dialog-title">

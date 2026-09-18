@@ -22,6 +22,7 @@ from flask import Response
 
 import http.client
 import json
+import multiprocessing
 import os
 import ssl
 import threading
@@ -379,6 +380,19 @@ class server(OlivOS.API.Proc_templet):
         if bot_info_dict is None:
             bot_info_dict = {}
         self.Proc_data['bot_info_dict'] = bot_info_dict
+        # WebUI 位于主进程，监听状态需要在线程和子进程模式下都可见。
+        self._webhook_last_ready = multiprocessing.Value('d', 0.0)
+        self._webhook_stopped = multiprocessing.Event()
+
+    @property
+    def webhook_online(self):
+        last_ready = self._webhook_last_ready.value
+        max_age = qqGuildv2WebhookHeartbeatInterval + qqGuildv2WebhookSelfProbeTimeout + 5
+        return not self._webhook_stopped.is_set() and last_ready > 0 and time.monotonic() - last_ready <= max_age
+
+    def on_terminate(self):
+        self._webhook_stopped.set()
+        self._webhook_last_ready.value = 0.0
 
     class config_T(object):
         def __init__(self, debug_mode):
@@ -474,9 +488,12 @@ class server(OlivOS.API.Proc_templet):
         # hub 被阻塞, 这里仍能完成探测并经 logger 进程把日志写出去。
         tmp_start_time = time.monotonic()
         tmp_fail_count = 0
-        while True:
-            time.sleep(qqGuildv2WebhookHeartbeatInterval)
-            if self._self_probe():
+        while not self._webhook_stopped.wait(qqGuildv2WebhookHeartbeatInterval):
+            healthy = self._self_probe()
+            if self._webhook_stopped.is_set():
+                return
+            self._webhook_last_ready.value = time.monotonic() if healthy else 0.0
+            if self.webhook_online:
                 tmp_fail_count = 0
                 self.log(
                     2,
@@ -572,6 +589,7 @@ class server(OlivOS.API.Proc_templet):
                 return self._handle_webhook_request(path_appid=appid)
 
     def _handle_webhook_request(self, path_appid=None):
+        self._webhook_last_ready.value = time.monotonic()
         try:
             self.Proc_data['rx_count'] = int(self.Proc_data.get('rx_count', 0)) + 1
         except Exception:
@@ -722,6 +740,8 @@ class server(OlivOS.API.Proc_templet):
         return self._ack_response()
 
     def run(self):
+        self._webhook_stopped.clear()
+        self._webhook_last_ready.value = 0.0
         self.app()
         self.set_config()
         self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
@@ -778,13 +798,16 @@ class server(OlivOS.API.Proc_templet):
             args=(),
             daemon=True
         )
-        tmp_watchdog.start()
         if self.Proc_config['config'].debug_mode:
-            self.Proc_config['Flask_app'].run(
-                host=self.Proc_config['Flask_server_host'],
-                port=self.Proc_config['Flask_server_port'],
-                ssl_context=tmp_ssl_context
-            )
+            try:
+                tmp_watchdog.start()
+                self.Proc_config['Flask_app'].run(
+                    host=self.Proc_config['Flask_server_host'],
+                    port=self.Proc_config['Flask_server_port'],
+                    ssl_context=tmp_ssl_context
+                )
+            finally:
+                self.on_terminate()
         else:
             tmp_listen = (
                 self.Proc_config['Flask_server_host'],
@@ -816,4 +839,10 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_config['Flask_app'],
                     **tmp_wsgi_kwargs
                 )
-            server.serve_forever()
+            try:
+                server.start()
+                self._webhook_last_ready.value = time.monotonic()
+                tmp_watchdog.start()
+                server.serve_forever()
+            finally:
+                self.on_terminate()

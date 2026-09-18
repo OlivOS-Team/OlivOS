@@ -25,7 +25,7 @@ text = target.read_text(encoding='utf-8')
 start = text.index('FILES = {')
 end = text.index('\n\n\ndef releaseBase64Data', start)
 lines = ['FILES = {']
-for name in ('index.html', 'app.js', 'style.css'):
+for name in ('index.html', 'app.js', 'theme.js', 'style.css', 'logo.png'):
     encoded = base64.b64encode((root / 'static' / name).read_bytes()).decode('ascii')
     lines.append(f'    {name!r}: (')
     lines.extend(f'        {encoded[i:i + 100]!r}' for i in range(0, len(encoded), 100))

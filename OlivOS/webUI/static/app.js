@@ -1,11 +1,24 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
+const tokenStorageKey = 'olivos.webui.token';
+
+function cachedToken(value) {
+  try {
+    if (value === undefined) return localStorage.getItem(tokenStorageKey) || '';
+    if (value) localStorage.setItem(tokenStorageKey, value);
+    else localStorage.removeItem(tokenStorageKey);
+  } catch {
+    // 浏览器禁用本地存储时，仍允许手动登录。
+  }
+  return '';
+}
 const state = {
   token: '',
   session: '',
   page: 'dashboard',
   accounts: [],
+  savedAccounts: [],
   revision: '',
   schema: null,
   plugins: {},
@@ -79,7 +92,11 @@ async function api(path, options = {}) {
   }
   const response = await fetch(path, { ...options, headers });
   const data = await response.json().catch(() => ({ error: `请求失败 (${response.status})` }));
-  if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.error || `请求失败 (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 function bind(id, action, event = 'click') {
@@ -138,14 +155,15 @@ function stream(name, path, onBatch, onStatus = () => {}) {
   return entry;
 }
 
-async function login(ev) {
-  ev.preventDefault();
+async function login(ev, token = null) {
+  ev?.preventDefault();
   $('login-error').textContent = '';
   const submit = $('login-form').querySelector('button');
   submit.disabled = true;
   try {
-    state.token = $('token').value.trim();
+    state.token = token ?? $('token').value.trim();
     const result = await api('/api/login', { method: 'POST' });
+    cachedToken(state.token);
     state.session = result.session;
     state.schema = await api('/api/accounts/schema');
     $('token').value = '';
@@ -166,7 +184,11 @@ async function login(ev) {
     }, 10000);
     await navigate('dashboard');
   } catch (error) {
+    if (error.status === 401 || error.status === 403) cachedToken('');
+    for (const name of [...state.streams.keys()]) closeStream(name);
+    clearInterval(state.timer);
     state.token = '';
+    state.session = '';
     $('shell').hidden = true;
     $('login').hidden = false;
     $('login-error').textContent = error.message;
@@ -175,12 +197,14 @@ async function login(ev) {
   }
 }
 async function logout() {
+  cachedToken('');
   await api('/api/logout', { method: 'POST', body: { session: state.session } }).catch(() => {});
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
   state.token = '';
   state.session = '';
   state.accounts = [];
+  state.savedAccounts = [];
   state.logs = [];
   state.terminalLogs = [];
   state.seenEvents.clear();
@@ -217,22 +241,32 @@ async function navigate(page) {
 async function refreshStatus() {
   const status = await api('/api/status');
   $('status-cards').replaceChildren();
-  for (const [label, value] of [
-    ['版本', status.version],
+  for (const [label, value, valueClass = ''] of [
+    ['版本', status.version, 'version-value'],
     ['账号', status.accounts],
     ['启用', status.enabled],
     ['在线', status.online],
   ]) {
     const card = element('div', null, { class: 'panel card' });
-    card.append(element('span', label), element('strong', value));
+    card.append(element('span', label), element('strong', value, { class: valueClass }));
     $('status-cards').append(card);
   }
   const seconds = status.uptime;
   $('runtime').textContent =
     `运行时长：${Math.floor(seconds / 86400)} 天 ${Math.floor(seconds / 3600) % 24} 时 ${Math.floor(seconds / 60) % 60} 分 ${seconds % 60} 秒`;
   $('online-note').textContent = status.unknown
-    ? `${status.unknown} 个启用账号尚无可用的连接状态。`
+    ? `${status.unknown} 个启用账号尚无可用的连接状态：`
     : '';
+  $('unknown-status').hidden = !status.unknown;
+  $('unknown-accounts').replaceChildren();
+  for (const account of status.unknown_accounts) {
+    const item = element('li');
+    item.append(
+      element('strong', account.id),
+      element('span', `${account.platform_type} / ${account.sdk_type} / ${account.model_type}`),
+    );
+    $('unknown-accounts').append(item);
+  }
   $('update-status').textContent = status.update_available
     ? '发现可用更新。'
     : '当前未收到新版本通知。';
@@ -245,6 +279,7 @@ function dirty() {
 async function loadAccounts() {
   const result = await api('/api/accounts');
   state.accounts = result.account;
+  state.savedAccounts = clone(result.account);
   state.revision = result.revision;
   state.dirty = false;
   $('accounts-dirty').textContent = '';
@@ -281,6 +316,7 @@ function renderAccounts() {
     );
     const actions = element('div', null, { class: 'actions' });
     actions.append(
+      button('查看', () => viewAccount(index)),
       button('编辑', () => editAccount(index)),
       button(
         '删除',
@@ -297,9 +333,59 @@ function renderAccounts() {
     const last = element('td');
     last.append(actions);
     row.append(last);
-    row.ondblclick = () => editAccount(index);
+    row.ondblclick = (ev) => {
+      if (!ev.target.closest('button, input')) editAccount(index);
+    };
     rows.append(row);
   });
+}
+async function viewAccount(index) {
+  const account = state.accounts[index];
+  const saved = state.savedAccounts.find((row) => row.hash === account.hash);
+  const sameIdentity = saved && ['id', 'sdk_type', 'platform_type'].every(
+    (key) => saved[key] === account[key],
+  );
+  const details = $('account-details');
+  details.replaceChildren();
+  for (const [label, value] of [
+    ['账号 ID', account.id],
+    ['账号类型', presetFor(account)?.title || '自定义'],
+    ['启用状态', account.enable ? '已启用' : '已停用'],
+    ['连接状态', sameIdentity ? '正在读取…' : '待应用'],
+    ['平台', account.platform_type],
+    ['SDK', account.sdk_type],
+    ['型号', account.model_type],
+    ['连接类型', account.server.type],
+    ['自动配置服务器', account.server.auto ? '是' : '否'],
+    ['调试模式', account.debug ? '开启' : '关闭'],
+    ['bot_hash', sameIdentity ? account.hash : '保存并应用后生成'],
+  ]) {
+    const valueNode = element('dd');
+    if (label === 'bot_hash' && sameIdentity) valueNode.append(element('code', value));
+    else valueNode.textContent = value;
+    if (label === '连接状态') {
+      valueNode.id = 'account-connection';
+      valueNode.setAttribute('role', 'status');
+    }
+    details.append(element('dt', label), valueNode);
+  }
+  $('account-info-note').hidden = !state.dirty;
+  $('account-info-dialog').showModal();
+  if (sameIdentity) {
+    const connection = $('account-connection');
+    try {
+      const status = await api('/api/status');
+      connection.textContent = {
+        online: '在线',
+        offline: '离线',
+        unknown: '状态未知',
+        disabled: '未启用',
+      }[status.account_connections[account.hash]] || '状态未知';
+    } catch (error) {
+      connection.textContent = '读取失败';
+      throw error;
+    }
+  }
 }
 function valueAt(object, path) {
   return path.split('.').reduce((value, key) => value?.[key], object);
@@ -519,6 +605,7 @@ async function saveAccounts() {
       body: { account: accounts, revision: state.revision },
     });
     state.accounts = result.account;
+    state.savedAccounts = clone(result.account);
     state.revision = result.revision;
     state.dirty = false;
     $('accounts-dirty').textContent = '';
@@ -914,6 +1001,11 @@ bind('webhook-refresh', refreshWebhook);
 bind('webhook-copy', copyWebhook);
 bind('log-level', renderLogs, 'change');
 bind('log-scroll', renderLogs, 'change');
+bind(
+  'terminal-scroll',
+  () => renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked),
+  'change',
+);
 bind('terminal-qr', () => showQRCode(state.selected));
 bind(
   'terminal-form',
@@ -939,12 +1031,14 @@ bind('toggle-path', () => {
   state.showPath = !state.showPath;
   renderPlugins();
 });
-bind('reload-plugins', async () => {
-  if (confirm('重载全部插件？')) {
-    await api('/api/plugins/reload', { method: 'POST' });
-    notify('正在重载插件…');
-  }
-});
+for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
+  bind(id, async () => {
+    if (confirm('重载全部插件？')) {
+      await api('/api/plugins/reload', { method: 'POST' });
+      notify('正在重载插件…');
+    }
+  });
+}
 bind('check-update', async () => {
   await api('/api/update/check', { method: 'POST' });
   notify('正在检查更新…');
@@ -961,3 +1055,7 @@ window.addEventListener('beforeunload', (ev) => {
     ev.returnValue = '';
   }
 });
+{
+  const savedToken = cachedToken();
+  if (savedToken) login(null, savedToken);
+}

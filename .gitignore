@@ -13,6 +13,8 @@ dist
 *.opk
 .workbuddy
 data/webui_token
+data/webui_token.txt
+conf/webui_token.txt
 data/webui/
 conf/*.webui-backup
 tests/

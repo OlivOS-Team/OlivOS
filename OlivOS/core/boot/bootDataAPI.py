@@ -181,7 +181,7 @@ default_Conf = {
                 "type": "http",
                 "host": "127.0.0.1",
                 "port": 20480,
-                "token_path": "./data/webui_token",
+                "token_path": "./conf/webui_token.txt",
                 "static_path": "./data/webui/static",
                 "buffer_limit": 128
             }

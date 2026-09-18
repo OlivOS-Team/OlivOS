@@ -51,7 +51,7 @@ TERMINAL_TYPES = {
 }
 DEFAULT_SERVER = {
     'auto': False, 'type': 'http', 'host': '127.0.0.1', 'port': 20480,
-    'token_path': './data/webui_token', 'static_path': './data/webui/static', 'buffer_limit': BUFFER_LIMIT,
+    'token_path': './conf/webui_token.txt', 'static_path': './data/webui/static', 'buffer_limit': BUFFER_LIMIT,
 }
 
 
@@ -380,7 +380,8 @@ class server(OlivOS.API.Proc_templet):
             site = web.TCPSite(runner, self.config['host'], int(self.config['port']))
             await site.start()
             self.ready.set()
-            self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；认证文件：data/webui_token")
+            self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；"
+                        f"认证文件：{self.config['token_path']}")
             while not self.stop_event.is_set():
                 for _ in range(256):
                     try:
