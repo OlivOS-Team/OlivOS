@@ -389,6 +389,9 @@ header h1 {
 .toolbar select {
   width: auto;
 }
+#webhook-fields .toolbar {
+  margin-top: 12px;
+}
 .table-wrap {
   padding: 0;
   overflow-x: auto;
