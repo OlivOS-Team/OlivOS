@@ -183,7 +183,8 @@ p {
   object-fit: contain;
   flex-shrink: 0;
 }
-.login {
+.login,
+.loading {
   min-height: 100dvh;
   display: grid;
   place-items: center;

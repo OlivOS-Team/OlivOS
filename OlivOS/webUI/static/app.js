@@ -190,11 +190,16 @@ async function login(ev, token = null) {
     state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
     state.schema = await api('/api/accounts/schema');
-    $('token').value = '';
-    $('login').hidden = true;
-    $('shell').hidden = false;
     await Promise.all([loadAccounts(), loadPlugins(), loadTerminals(), refreshStatus()]);
     await restorePage();
+    $('token').value = '';
+    $('login').hidden = true;
+    $('loading').hidden = true;
+    $('shell').hidden = false;
+    if (state.page === 'logs') renderLogs();
+    else if (state.page === 'terminals') {
+      renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
+    }
     stream(
       'events',
       `/ws/events?session=${encodeURIComponent(state.session)}&since=${result.cursor}`,
@@ -219,6 +224,7 @@ async function login(ev, token = null) {
     $('login').hidden = false;
     $('login-error').textContent = error.message;
   } finally {
+    $('loading').hidden = true;
     submit.disabled = false;
   }
 }
@@ -248,6 +254,7 @@ function resetLogin(message = '') {
   state.selected = null;
   for (const kind of Object.keys(state.actions)) clearAction(kind);
   clearFrame();
+  $('loading').hidden = true;
   $('shell').hidden = true;
   $('login').hidden = false;
   for (const dialog of document.querySelectorAll('dialog')) dialog.close();
@@ -1312,4 +1319,8 @@ window.addEventListener('pageshow', (ev) => {
   });
   const savedToken = cachedToken();
   if (savedToken) login(null, savedToken);
+  else {
+    $('loading').hidden = true;
+    $('login').hidden = false;
+  }
 }
