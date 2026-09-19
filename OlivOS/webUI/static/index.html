@@ -81,7 +81,10 @@
           <h1 id="page-title">仪表盘</h1>
           <span id="connection" role="status">正在连接…</span>
         </header>
-        <div id="notice" role="status" hidden></div>
+        <div id="notice" hidden>
+          <span id="notice-message" role="status"></span>
+          <button id="notice-close" type="button" aria-label="关闭提示" title="关闭提示">×</button>
+        </div>
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
           <div class="runtime-summary">
@@ -209,6 +212,16 @@
         </section>
       </main>
     </div>
+    <dialog id="operation-dialog" aria-labelledby="operation-title">
+      <div class="dialog-title">
+        <h2 id="operation-title">操作结果</h2>
+        <button type="button" data-close="operation-dialog" aria-label="关闭">×</button>
+      </div>
+      <p id="operation-message"></p>
+      <div class="dialog-actions">
+        <button type="button" data-close="operation-dialog">确定</button>
+      </div>
+    </dialog>
     <dialog id="account-info-dialog" aria-labelledby="account-info-title">
       <div class="dialog-title">
         <h2 id="account-info-title">账号信息</h2>

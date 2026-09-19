@@ -116,6 +116,16 @@ def account_response(accounts):
             'revision': account_revision(accounts)}
 
 
+class _AccountReadLogger:
+    def __init__(self, host):
+        self.host = host
+
+    def log(self, level, message, *args):
+        # 网页读取配置不属于账号初始化，仍保留警告和错误。
+        if level != 2:
+            self.host.log(level, message, *args)
+
+
 def load_accounts(host):
     # Account.load 对坏文件回落空列表，WebUI 必须阻止随后覆盖损坏的用户文件。
     if host.account_path.exists():
@@ -125,7 +135,7 @@ def load_accounts(host):
                 raise ValueError
         except (ValueError, AttributeError) as error:
             raise ValueError('账号文件格式错误，请先修复原文件') from error
-        return OlivOS.accountAPI.Account.load(str(host.account_path), host)
+        return OlivOS.accountAPI.Account.load(str(host.account_path), _AccountReadLogger(host))
     return copy.deepcopy(host.accounts)
 
 
@@ -393,8 +403,9 @@ def register_routes(host):
 
     @app.post('/api/login')
     def login():
-        session = host.new_session()
-        response = jsonify(session=session)
+        with host.lock:
+            session = host.new_session()
+            response = jsonify(session=session, cursor=host.sequence)
         response.set_cookie('olivos_webui', session, httponly=True, samesite='Strict',
                             secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
         return response
@@ -476,8 +487,9 @@ def register_routes(host):
 
     @app.post('/api/plugins/reload')
     def reload_plugins():
+        started_at = time.time()
         host.send_control('restart_send', 'plugin')
-        return jsonify(ok=True), 202
+        return jsonify(ok=True, started_at=started_at), 202
 
     @app.post('/api/plugin_event')
     def plugin_event():
@@ -517,8 +529,9 @@ def register_routes(host):
 
     @app.post('/api/update/check')
     def update_check():
+        started_at = time.time()
         host.send_control('init_type', 'update_check')
-        return jsonify(ok=True), 202
+        return jsonify(ok=True, started_at=started_at), 202
 
     @app.post('/api/exit')
     def exit_total():

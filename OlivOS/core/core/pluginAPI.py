@@ -164,6 +164,7 @@ class shallow(API.Proc_templet):
 
     def run(self):
         OlivOS.pluginAPI.gProc = self
+        self.Proc_data['webui_load_started'] = time.time()
         self.sendPluginList()
         releaseDir('./plugin')
         releaseDir('./plugin/app')
@@ -189,7 +190,7 @@ class shallow(API.Proc_templet):
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS plugin shallow [{0}] is running', [self.Proc_name], modelName))
-        self.sendPluginList()
+        self.sendPluginList(ready=True)
         rx_count = 0
         while True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
@@ -520,7 +521,7 @@ class shallow(API.Proc_templet):
                 ))
         return
 
-    def sendPluginList(self):
+    def sendPluginList(self, ready=False):
         tmp_plugin_list_send = []
         tmp_plugin_dict_send = {}
         tmp_plugin_webui_send = []
@@ -579,6 +580,8 @@ class shallow(API.Proc_templet):
             'data': {
                 'action': 'update_data',
                 'data': {
+                    'ready': ready,
+                    'load_started': self.Proc_data.get('webui_load_started', 0),
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
                     'shallow_plugin_data_dict': tmp_plugin_dict_send,
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,

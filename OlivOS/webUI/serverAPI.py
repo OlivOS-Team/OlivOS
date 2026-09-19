@@ -201,7 +201,8 @@ class server(OlivOS.API.Proc_templet):
                 self.plugins = copy.deepcopy(update.get('shallow_plugin_data_dict', {}))
                 self.plugin_pages = copy.deepcopy(update.get('shallow_plugin_webui_list', []))
                 self.plugin_roots = copy.deepcopy(update.get('shallow_plugin_webui_roots', {}))
-            self.publish('events', {'type': 'plugins'})
+            self.publish('events', {'type': 'plugins', 'ready': update.get('ready', False),
+                                    'started_at': update.get('load_started', 0)})
         elif action in TERMINAL_TYPES and data.get('hash'):
             bot_hash = data['hash']
             with self.lock:
@@ -230,6 +231,12 @@ class server(OlivOS.API.Proc_templet):
         elif action == 'show_update':
             self.update_available = True
             self.publish('events', {'type': 'update'})
+        elif action == 'update_check_result':
+            status = data.get('status')
+            if status in ('available', 'latest'):
+                self.update_available = status == 'available'
+            self.publish('events', {'type': 'update_check_result', 'status': status,
+                                    'started_at': data.get('started_at', 0)})
         elif action == 'webui_reply' and self.session_valid(data.get('session')):
             self.publish('events', {'type': 'plugin_reply', 'namespace': data.get('namespace'),
                                     'request_id': data.get('request_id'), 'payload': data.get('payload'),
@@ -322,14 +329,16 @@ class server(OlivOS.API.Proc_templet):
         parts = request.path.strip('/').split('/')
         session = request.query.get('session')
         level = None
-        cursor = 0
+        try:
+            cursor = int(request.query.get('since', '0'))
+            if cursor < 0:
+                raise ValueError
+        except ValueError:
+            return web.json_response({'error': '订阅游标无效'}, status=400)
         if parts == ['ws', 'logs']:
             stream = 'logs'
             try:
                 level = pageAPI.parse_log_levels(request.query.get('level', ''))
-                cursor = int(request.query.get('since', '0'))
-                if cursor < 0:
-                    raise ValueError
             except ValueError:
                 return web.json_response({'error': '日志级别或游标无效'}, status=400)
         elif parts == ['ws', 'events'] and self.session_valid(session):
@@ -461,7 +470,25 @@ class server(OlivOS.API.Proc_templet):
 
     def run(self):
         try:
-            asyncio.run(self.serve())
+            if os.name == 'nt':
+                # 仅 WebUI 使用 Selector，避开 Proactor 在浏览器刷新断连时的 shutdown 异常。
+                # 不修改全局事件循环策略，其他协议端继续使用自己的事件循环。
+                loop = asyncio.SelectorEventLoop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self.serve())
+                finally:
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                    if hasattr(loop, 'shutdown_default_executor'):
+                        loop.run_until_complete(loop.shutdown_default_executor())
+                    asyncio.set_event_loop(None)
+                    loop.close()
+            else:
+                asyncio.run(self.serve())
         except (OSError, ValueError) as error:
             self.error = str(error)
             self.log(4, f'WebUI 启动失败：{self.error}')
