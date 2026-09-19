@@ -54,7 +54,8 @@ class dock(OlivOS.API.Proc_templet):
             tx_queue=None,
             logger_proc=None,
             control_queue=None,
-            bot_info_dict=None
+            bot_info_dict=None,
+            root_path=None
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -68,6 +69,7 @@ class dock(OlivOS.API.Proc_templet):
             logger_proc=logger_proc
         )
         self.Proc_config['ready_for_restart'] = False
+        self.webui_root = os.path.abspath(root_path or os.getcwd())
         self.bot_info = bot_info_dict
         self.busy = False
         self.UIObject = {}
@@ -1204,7 +1206,7 @@ class dock(OlivOS.API.Proc_templet):
         self.sendControlEvent('exit_total')
 
     def openWebUI(self):
-        url = OlivOS.webUI.serverAPI.browser_url()
+        url = OlivOS.webUI.serverAPI.browser_url(self.webui_root)
         if url:
             webbrowser.open(url)
 
@@ -2228,7 +2230,9 @@ class shallow(object):
             return data
         else:
             list_new = []
-            if data is self.UIData.get('shallow_menu_list') and OlivOS.webUI.serverAPI.browser_url():
+            if data is self.UIData.get('shallow_menu_list') and OlivOS.webUI.serverAPI.browser_url(
+                self.root.webui_root
+            ):
                 list_new.append(pystray.MenuItem('打开 WebUI', lambda: self.root.openWebUI(), default=True))
             for item_this in data:
                 if not type(item_this) is list:

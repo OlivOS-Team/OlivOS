@@ -39,6 +39,9 @@ const state = {
   seenEvents: new Set(),
   qrURL: null,
   timer: null,
+  authGeneration: 0,
+  cachedLogin: false,
+  checkingAuth: false,
 };
 const titles = {
   dashboard: '仪表盘',
@@ -85,6 +88,7 @@ function notifyError(error) {
   notify(error.message || String(error));
 }
 async function api(path, options = {}) {
+  const generation = state.authGeneration;
   const headers = { 'X-Auth-Token': state.token, ...options.headers };
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
@@ -92,7 +96,11 @@ async function api(path, options = {}) {
   }
   const response = await fetch(path, { ...options, headers });
   const data = await response.json().catch(() => ({ error: `请求失败 (${response.status})` }));
+  if (generation !== state.authGeneration) throw new Error('登录状态已改变');
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      resetLogin('登录已失效，请重新输入 Token。');
+    }
     const error = new Error(data.error || `请求失败 (${response.status})`);
     error.status = response.status;
     throw error;
@@ -132,6 +140,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
       onStatus('已连接');
     };
     socket.onmessage = (ev) => {
+      if (entry.closed) return;
       try {
         const data = JSON.parse(ev.data);
         if (data.type === 'error') {
@@ -146,6 +155,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
     };
     socket.onclose = () => {
       if (entry.closed) return;
+      checkAuthentication();
       onStatus('连接断开，正在重连…');
       entry.timer = setTimeout(connect, Math.min(1000 * 2 ** entry.attempts++, 15000));
     };
@@ -164,6 +174,7 @@ async function login(ev, token = null) {
     state.token = token ?? $('token').value.trim();
     const result = await api('/api/login', { method: 'POST' });
     cachedToken(state.token);
+    state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
     state.schema = await api('/api/accounts/schema');
     $('token').value = '';
@@ -181,6 +192,8 @@ async function login(ev, token = null) {
     clearInterval(state.timer);
     state.timer = setInterval(() => {
       if (state.page === 'dashboard') refreshStatus().catch(notifyError);
+      else checkAuthentication();
+      checkCachedLogin();
     }, 10000);
     await navigate('dashboard');
   } catch (error) {
@@ -197,8 +210,14 @@ async function login(ev, token = null) {
   }
 }
 async function logout() {
+  const pending = api('/api/logout', { method: 'POST', body: { session: state.session } }).catch(() => {});
+  resetLogin();
+  await pending;
+}
+function resetLogin(message = '') {
+  state.authGeneration++;
   cachedToken('');
-  await api('/api/logout', { method: 'POST', body: { session: state.session } }).catch(() => {});
+  state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
   state.token = '';
@@ -209,6 +228,11 @@ async function logout() {
   state.terminalLogs = [];
   state.seenEvents.clear();
   state.dirty = false;
+  state.draft = null;
+  state.schema = null;
+  state.plugins = {};
+  state.terminals = [];
+  state.selected = null;
   clearFrame();
   $('shell').hidden = true;
   $('login').hidden = false;
@@ -216,7 +240,37 @@ async function logout() {
   $('account-form').reset();
   $('account-rows').replaceChildren();
   $('notice').hidden = true;
+  $('token').value = '';
+  $('login-error').textContent = message;
 }
+function checkCachedLogin() {
+  if (!state.token || !state.cachedLogin) return;
+  try {
+    if (localStorage.getItem(tokenStorageKey) !== state.token) {
+      resetLogin('登录缓存已清除或改变，请重新登录。');
+    }
+  } catch {
+    // 存储暂不可用不等同于凭据失效。
+  }
+}
+async function checkAuthentication() {
+  if (!state.token || state.checkingAuth) return;
+  state.checkingAuth = true;
+  try {
+    await api('/api/status');
+  } catch {
+    // 认证失败由 api 统一退出；网络中断保留登录状态。
+  } finally {
+    state.checkingAuth = false;
+  }
+}
+window.addEventListener('storage', (ev) => {
+  if (ev.key === tokenStorageKey || ev.key === null) checkCachedLogin();
+});
+window.addEventListener('focus', () => {
+  checkCachedLogin();
+  checkAuthentication();
+});
 async function navigate(page) {
   state.page = page;
   document.querySelectorAll('.page').forEach((node) => {
@@ -1056,6 +1110,20 @@ window.addEventListener('beforeunload', (ev) => {
   }
 });
 {
+  const group = $('plugin-navigation-group');
+  const storageKey = 'olivos.webui.pluginsCollapsed';
+  try {
+    group.open = localStorage.getItem(storageKey) !== 'true';
+  } catch {
+    // 禁用存储时仍可展开和收起。
+  }
+  group.addEventListener('toggle', () => {
+    try {
+      localStorage.setItem(storageKey, String(!group.open));
+    } catch {
+      // 折叠状态只在当前页面生效。
+    }
+  });
   const savedToken = cachedToken();
   if (savedToken) login(null, savedToken);
 }

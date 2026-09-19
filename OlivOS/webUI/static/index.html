@@ -21,7 +21,7 @@
           </div>
         </div>
         <h1>登录 WebUI</h1>
-        <p>请输入服务器 <code>conf/webui_token.txt</code> 文件中的令牌。</p>
+        <p>请输入 <code>conf/webui_token.txt</code> 文件中的令牌。</p>
         <label>访问令牌<input id="token" type="password" autocomplete="off" required /></label>
         <button type="submit" class="primary">登录</button>
         <p id="login-error" role="alert"></p>
@@ -52,8 +52,10 @@
           <button data-page="plugins">插件</button>
         </nav>
         <nav id="plugin-navigation" aria-label="插件页面">
-          <h2>插件页面</h2>
-          <div id="plugin-links"></div>
+          <details id="plugin-navigation-group" open>
+            <summary>插件页面</summary>
+            <div id="plugin-links"></div>
+          </details>
         </nav>
         <div class="sidebar-footer">
           <label class="theme-control">
