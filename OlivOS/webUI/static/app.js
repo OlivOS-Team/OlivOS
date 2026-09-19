@@ -1110,6 +1110,20 @@ window.addEventListener('beforeunload', (ev) => {
   }
 });
 {
+  const group = $('plugin-navigation-group');
+  const storageKey = 'olivos.webui.pluginsCollapsed';
+  try {
+    group.open = localStorage.getItem(storageKey) !== 'true';
+  } catch {
+    // 禁用存储时仍可展开和收起。
+  }
+  group.addEventListener('toggle', () => {
+    try {
+      localStorage.setItem(storageKey, String(!group.open));
+    } catch {
+      // 折叠状态只在当前页面生效。
+    }
+  });
   const savedToken = cachedToken();
   if (savedToken) login(null, savedToken);
 }

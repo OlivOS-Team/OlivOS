@@ -264,6 +264,23 @@ nav h2 {
   margin: 8px 14px;
   font-size: 13px;
 }
+#plugin-navigation-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+#plugin-navigation-group > summary {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  user-select: none;
+}
+#plugin-navigation-group > summary:hover {
+  background: var(--hover);
+}
 .sidebar-footer {
   display: flex;
   flex-direction: column;
