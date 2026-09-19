@@ -235,10 +235,24 @@ def parse_accounts(body, previous):
     return result
 
 
+def parse_log_levels(value):
+    if not value:
+        return None
+    try:
+        selected = tuple(sorted({int(item) for item in value.split(',')}))
+    except (ValueError, AttributeError) as error:
+        raise ValueError('日志级别无效') from error
+    if any(level not in OlivOS.diagnoseAPI.level_dict for level in selected):
+        raise ValueError('日志级别无效')
+    return selected
+
+
 def log_tail(path, limit, level):
     if not path.exists():
         return []
     # 从尾部按块读取，避免日志文件变大后每次请求扫描整个文件。
+    selected = (level,) if isinstance(level, int) else level
+    markers = [f' - [{OlivOS.diagnoseAPI.level_dict[item]}] - '.encode() for item in selected] if selected else [b'\n']
     with path.open('rb') as source:
         source.seek(0, 2)
         position, chunks, lines = source.tell(), [], 0
@@ -248,15 +262,15 @@ def log_tail(path, limit, level):
             source.seek(position)
             chunk = source.read(size)
             chunks.append(chunk)
-            lines += chunk.count(b'\n')
+            lines += sum(chunk.count(marker) for marker in markers)
     output = deque(maxlen=limit)
-    current_level = 2
+    current_level = None
     levels = {name: number for number, name in OlivOS.diagnoseAPI.level_dict.items()}
     for line in b''.join(reversed(chunks)).decode('utf-8', errors='replace').splitlines():
         match = re.match(r'^\[([^\]]+)\] - \[(TRACE|DEBUG|NOTE|INFO|WARN|ERROR|FATAL)\] - (.*)', line)
         if match:
             current_level = levels[match[2]]
-        if level is None or current_level >= level:
+        if current_level is not None and (selected is None or current_level in selected):
             output.append({'level': current_level, 'time': match[1] if match else None,
                            'text': match[3] if match else line})
     return list(output)
@@ -425,13 +439,15 @@ def register_routes(host):
     def logs():
         try:
             limit = max(1, min(int(request.args.get('tail', host.limit)), host.limit))
-            level = request.args.get('level', '')
-            level = int(level) if level else None
+            level = parse_log_levels(request.args.get('level', ''))
         except ValueError as error:
             raise ValueError('日志级别与条数必须为整数') from error
-        if level is not None and level not in OlivOS.diagnoseAPI.level_dict:
-            raise ValueError('日志级别无效')
-        return jsonify(items=log_tail(host.root / 'logfile/OlivOS_logfile_unity.log', limit, level), limit=host.limit)
+        with host.lock:
+            items = host.snapshot('logs', level=level)[-limit:]
+            cursor = host.sequence
+        if not items:
+            items = log_tail(host.root / 'logfile/OlivOS_logfile_unity.log', limit, level)
+        return jsonify(items=items, cursor=cursor, limit=host.limit)
 
     @app.get('/api/terminals')
     def terminals():

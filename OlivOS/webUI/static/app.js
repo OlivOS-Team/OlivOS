@@ -27,7 +27,7 @@ const state = {
   selected: null,
   logs: [],
   terminalLogs: [],
-  limit: 128,
+  limit: 500,
   dirty: false,
   showPath: false,
   editing: null,
@@ -35,6 +35,7 @@ const state = {
   streams: new Map(),
   frame: null,
   frameNamespace: null,
+  framePath: null,
   requests: new Set(),
   seenEvents: new Set(),
   qrURL: null,
@@ -695,20 +696,46 @@ function renderOutput(container, lines, follow, logMode = false) {
   }
   container.scrollTop = follow ? container.scrollHeight : scrollTop;
 }
+function selectedLogLevels() {
+  return [...$('log-level-options').querySelectorAll('input[value]:checked')].map(
+    (input) => Number(input.value),
+  );
+}
+function updateLogFilter() {
+  const selected = selectedLogLevels();
+  const all = selected.length === Object.keys(levels).length;
+  $('log-all').checked = all;
+  $('log-all').indeterminate = selected.length > 0 && !all;
+  const title = all ? '全部' : selected.map((level) => levels[level]).join('、') || '未选择';
+  $('log-level').textContent = title;
+  $('log-level').setAttribute('aria-label', `日志级别：${title}`);
+}
 function renderLogs() {
-  const filter = $('log-level').value;
-  const lines = state.logs.filter((line) => filter === '' || line.level >= Number(filter));
+  const selected = selectedLogLevels();
+  const lines = state.logs.filter((line) => selected.includes(line.level));
   renderOutput($('log-output'), lines, $('log-scroll').checked, true);
   $('log-count').textContent = `${lines.length} / ${state.limit} 条`;
 }
+let logGeneration = 0;
 async function openLogs() {
-  const result = await api(`/api/logs?tail=${state.limit}`);
+  const generation = ++logGeneration;
+  closeStream('logs');
+  state.logs = [];
+  renderLogs();
+  const selected = selectedLogLevels();
+  if (!selected.length) return;
+  const query = `level=${encodeURIComponent(selected.length === Object.keys(levels).length ? '' : selected.join(','))}`;
+  const result = await api(`/api/logs?${query}`);
+  if (generation !== logGeneration || state.page !== 'logs') return;
+  state.limit = result.limit;
   state.logs = result.items;
   renderLogs();
-  if (state.page !== 'logs') return;
-  stream('logs', '/ws/logs', (items, history) => {
-    if (history && items.length) state.logs = [];
-    appendBounded(state.logs, items);
+  let cursor = result.cursor;
+  stream('logs', `/ws/logs?${query}&since=${result.cursor}`, (items) => {
+    const fresh = items.filter((item) => item.sequence > cursor);
+    if (!fresh.length) return;
+    cursor = fresh[fresh.length - 1].sequence;
+    appendBounded(state.logs, fresh);
     renderLogs();
   });
 }
@@ -846,26 +873,44 @@ function renderPluginNavigation() {
       typeof page.path === 'string' &&
       page.path.startsWith('webui/') &&
       !page.path.split('/').includes('..')
-    )
-      $('plugin-links').append(button(page.title, () => openPluginPage(page)));
+    ) {
+      const entry = button(page.title, () => openPluginPage(page));
+      entry.dataset.pluginNamespace = page.namespace;
+      entry.dataset.pluginPath = page.path;
+      $('plugin-links').append(entry);
+    }
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
   if (state.frameNamespace && !state.plugins[state.frameNamespace]) {
     clearFrame();
     notify('插件页面已卸载。');
   }
+  syncPluginSelection();
+}
+function syncPluginSelection() {
+  $('plugin-links').querySelectorAll('button').forEach((entry) => {
+    const active = entry.dataset.pluginNamespace === state.frameNamespace &&
+      entry.dataset.pluginPath === state.framePath;
+    entry.classList.toggle('active', active);
+    if (active) entry.setAttribute('aria-current', 'page');
+    else entry.removeAttribute('aria-current');
+  });
 }
 function clearFrame() {
   $('plugin-frame-container').replaceChildren();
   state.frame = null;
   state.frameNamespace = null;
+  state.framePath = null;
   state.requests.clear();
+  syncPluginSelection();
 }
 async function openPluginPage(page) {
   await navigate('plugin-page');
   clearFrame();
   $('page-title').textContent = page.title;
   state.frameNamespace = page.namespace;
+  state.framePath = page.path;
+  syncPluginSelection();
   const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
   const frame = element('iframe', null, {
     title: page.title,
@@ -1053,7 +1098,25 @@ bind(
 );
 bind('webhook-refresh', refreshWebhook);
 bind('webhook-copy', copyWebhook);
-bind('log-level', renderLogs, 'change');
+bind('log-level-options', async (ev) => {
+  if (ev.target.id === 'log-all') {
+    $('log-level-options').querySelectorAll('input[value]').forEach((input) => {
+      input.checked = $('log-all').checked;
+    });
+  }
+  updateLogFilter();
+  await openLogs();
+}, 'change');
+updateLogFilter();
+document.addEventListener('click', (ev) => {
+  if (!$('log-filter').contains(ev.target)) $('log-filter').open = false;
+});
+$('log-filter').addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') {
+    $('log-filter').open = false;
+    $('log-level').focus();
+  }
+});
 bind('log-scroll', renderLogs, 'change');
 bind(
   'terminal-scroll',
@@ -1110,16 +1173,22 @@ window.addEventListener('beforeunload', (ev) => {
   }
 });
 {
-  const group = $('plugin-navigation-group');
+  const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
+  function setCollapsed(collapsed) {
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    $('plugin-links').hidden = collapsed;
+  }
   try {
-    group.open = localStorage.getItem(storageKey) !== 'true';
+    setCollapsed(localStorage.getItem(storageKey) === 'true');
   } catch {
     // 禁用存储时仍可展开和收起。
   }
-  group.addEventListener('toggle', () => {
+  toggle.addEventListener('click', () => {
+    const collapsed = toggle.getAttribute('aria-expanded') === 'true';
+    setCollapsed(collapsed);
     try {
-      localStorage.setItem(storageKey, String(!group.open));
+      localStorage.setItem(storageKey, String(collapsed));
     } catch {
       // 折叠状态只在当前页面生效。
     }

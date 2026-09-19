@@ -52,10 +52,17 @@
           <button data-page="plugins">插件</button>
         </nav>
         <nav id="plugin-navigation" aria-label="插件页面">
-          <details id="plugin-navigation-group" open>
-            <summary>插件页面</summary>
+          <div id="plugin-navigation-group">
+            <button
+              id="plugin-navigation-toggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="plugin-links"
+            >
+              <span class="disclosure-arrow" aria-hidden="true">▾</span>插件页面
+            </button>
             <div id="plugin-links"></div>
-          </details>
+          </div>
         </nav>
         <div class="sidebar-footer">
           <label class="theme-control">
@@ -124,18 +131,22 @@
         </section>
         <section id="logs" class="page" hidden>
           <div class="toolbar">
-            <label
-              >日志级别<select id="log-level">
-                <option value="">全部</option>
-                <option value="-1">TRACE</option>
-                <option value="0">DEBUG</option>
-                <option value="1">NOTE</option>
-                <option value="2" selected>INFO</option>
-                <option value="3">WARN</option>
-                <option value="4">ERROR</option>
-                <option value="5">FATAL</option>
-              </select></label
-            >
+            <div class="log-filter-control">
+              <span>日志级别</span>
+              <details id="log-filter">
+                <summary id="log-level" aria-label="日志级别：INFO、WARN、ERROR、FATAL">INFO、WARN、ERROR、FATAL</summary>
+                <div id="log-level-options" role="group" aria-label="选择日志级别">
+                  <label class="check"><input id="log-all" type="checkbox" />全部</label>
+                  <label class="check"><input type="checkbox" value="-1" />TRACE</label>
+                  <label class="check"><input type="checkbox" value="0" />DEBUG</label>
+                  <label class="check"><input type="checkbox" value="1" />NOTE</label>
+                  <label class="check"><input type="checkbox" value="2" checked />INFO</label>
+                  <label class="check"><input type="checkbox" value="3" checked />WARN</label>
+                  <label class="check"><input type="checkbox" value="4" checked />ERROR</label>
+                  <label class="check"><input type="checkbox" value="5" checked />FATAL</label>
+                </div>
+              </details>
+            </div>
             <label class="check"><input id="log-scroll" type="checkbox" checked />自动滚动</label
             ><span id="log-count"></span>
           </div>

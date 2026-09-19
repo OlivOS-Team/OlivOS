@@ -183,7 +183,7 @@ default_Conf = {
                 "port": 20480,
                 "token_path": "./conf/webui_token.txt",
                 "static_path": "./data/webui/static",
-                "buffer_limit": 128
+                "buffer_limit": 500
             }
         },
         "OlivOS_sleep": {

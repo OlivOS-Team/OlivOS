@@ -42,7 +42,7 @@ import OlivOS
 
 from . import pageAPI, staticData
 
-BUFFER_LIMIT = 128
+BUFFER_LIMIT = 500
 TERMINAL_TYPES = {
     'napcat': 'napcat_lib_exe_model',
     'gocqhttp': 'gocqhttp_lib_exe_model',
@@ -74,6 +74,7 @@ class server(OlivOS.API.Proc_templet):
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
         self.streams = {'logs': deque(maxlen=self.limit), 'events': deque(maxlen=self.limit)}
+        self.log_levels = {level: deque(maxlen=self.limit) for level in OlivOS.diagnoseAPI.level_dict}
         self.sequence = 0
         self.terminals = {}
         self.plugins = {}
@@ -155,10 +156,20 @@ class server(OlivOS.API.Proc_templet):
             self.sequence += 1
             item = dict(item, sequence=self.sequence)
             self.streams.setdefault(stream, deque(maxlen=self.limit)).append(item)
+            if stream == 'logs' and item.get('level', 2) in self.log_levels:
+                self.log_levels[item.get('level', 2)].append(item)
 
-    def snapshot(self, stream, since=0, session=None):
+    def snapshot(self, stream, since=0, session=None, level=None):
         with self.lock:
-            return [copy.deepcopy(item) for item in self.streams.get(stream, ())
+            if stream == 'logs' and level is not None:
+                selected = (level,) if isinstance(level, int) else level
+                source = sorted(
+                    (item for value in selected for item in self.log_levels.get(value, ())),
+                    key=lambda item: item['sequence'],
+                )[-self.limit:]
+            else:
+                source = self.streams.get(stream, ())
+            return [copy.deepcopy(item) for item in source
                     if item['sequence'] > since and (not item.get('session') or item['session'] == session)]
 
     def send_control(self, action, key=None):
@@ -310,8 +321,17 @@ class server(OlivOS.API.Proc_templet):
             return web.json_response({'error': '认证失败' if status != 429 else '尝试过多，请稍后重试'}, status=status)
         parts = request.path.strip('/').split('/')
         session = request.query.get('session')
+        level = None
+        cursor = 0
         if parts == ['ws', 'logs']:
             stream = 'logs'
+            try:
+                level = pageAPI.parse_log_levels(request.query.get('level', ''))
+                cursor = int(request.query.get('since', '0'))
+                if cursor < 0:
+                    raise ValueError
+            except ValueError:
+                return web.json_response({'error': '日志级别或游标无效'}, status=400)
         elif parts == ['ws', 'events'] and self.session_valid(session):
             stream = 'events'
         elif len(parts) == 4 and parts[:2] == ['ws', 'terminal'] and tuple(parts[2:]) in self.terminals:
@@ -321,14 +341,13 @@ class server(OlivOS.API.Proc_templet):
         socket = web.WebSocketResponse(protocols=['olivos'], heartbeat=30, max_msg_size=16384)
         await socket.prepare(request)
         self.sockets.add(socket)
-        cursor = 0
 
         async def push():
             nonlocal cursor
             # 第一帧为历史，随后每 50ms 批量发送；慢客户端不会积累无界队列。
             first = True
             while not socket.closed:
-                items = self.snapshot(stream, cursor, session)
+                items = self.snapshot(stream, cursor, session, level)
                 if items or first:
                     if items:
                         cursor = items[-1]['sequence']
