@@ -33,6 +33,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
+import psutil
 from flask import Flask
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Response
@@ -54,6 +55,7 @@ DEFAULT_SERVER = {
     'auto': False, 'type': 'http', 'host': '127.0.0.1', 'port': 20480,
     'token_path': './conf/webui_token.txt', 'static_path': './data/webui/static', 'buffer_limit': BUFFER_LIMIT,
 }
+ACTIVE_LISTENERS = {}
 
 
 class server(OlivOS.API.Proc_templet):
@@ -382,6 +384,7 @@ class server(OlivOS.API.Proc_templet):
         app.router.add_route('*', '/{path:.*}', self.http)
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
+        listener = None
         try:
             requested_port = int(self.config['port'])
             if not 0 <= requested_port <= 65535:
@@ -398,9 +401,19 @@ class server(OlivOS.API.Proc_templet):
                         raise
             self.config['port'] = runner.addresses[0][1]
             self.listen_path.parent.mkdir(parents=True, exist_ok=True)
-            self.listen_path.write_text(json.dumps({
+            listener = {
                 'host': self.config['host'], 'port': self.config['port'], 'pid': os.getpid(),
-            }), encoding='utf-8')
+                'created': psutil.Process().create_time(),
+            }
+            descriptor, temporary = tempfile.mkstemp(prefix='.listen-', suffix='.json', dir=self.listen_path.parent)
+            try:
+                with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
+                    json.dump(listener, output)
+                os.replace(temporary, self.listen_path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            ACTIVE_LISTENERS[self.root] = listener
             if requested_port != self.config['port']:
                 self.log(2, f"WebUI 监听端口由 {requested_port} 调整为 {self.config['port']}")
             self.ready.set()
@@ -415,12 +428,14 @@ class server(OlivOS.API.Proc_templet):
                     self.consume(packet)
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
+            if listener is not None and ACTIVE_LISTENERS.get(self.root) == listener:
+                ACTIVE_LISTENERS.pop(self.root, None)
             for socket in list(self.sockets):
                 await socket.close()
             await runner.cleanup()
             try:
                 current = json.loads(self.listen_path.read_text(encoding='utf-8'))
-                if current.get('pid') == os.getpid() and current.get('port') == self.config['port']:
+                if listener is not None and current == listener:
                     self.listen_path.unlink()
             except (OSError, ValueError):
                 pass
@@ -448,19 +463,41 @@ def forward_packet(packet, proc_dict):
             proc.Proc_info.rx_queue.put(packet, block=False)
 
 
-def browser_url():
+def listener_valid(active, root):
+    """只查询本机进程与监听信息，不在托盘线程发起网络请求。"""
+    try:
+        if not isinstance(active, dict) or not isinstance(active.get('host'), str):
+            return False
+        pid, port = active['pid'], active['port']
+        if type(pid) is not int or type(port) is not int or not 1 <= port <= 65535:
+            return False
+        process = psutil.Process(pid)
+        if process.create_time() != active['created']:
+            return False
+        if pid == os.getpid():
+            return ACTIVE_LISTENERS.get(root) == active
+        # 子进程中的原生界面通过操作系统确认端口仍由该进程监听。
+        return any(connection.status == psutil.CONN_LISTEN and connection.laddr.port == port
+                   for connection in process.connections(kind='tcp'))
+    except (OSError, ValueError, KeyError, TypeError, psutil.Error):
+        return False
+
+
+def browser_url(root_path=None):
+    root = Path(root_path or os.getcwd()).resolve()
     config = dict(DEFAULT_SERVER)
     enabled = True
     for path in ('./conf/basic.json', './conf/config.json'):
         try:
-            model = json.loads(Path(path).read_text(encoding='utf-8'))['models']['OlivOS_webUI']
+            model = json.loads((root / path).read_text(encoding='utf-8'))['models']['OlivOS_webUI']
             config.update(model.get('server', {}))
             enabled = model.get('enable', enabled)
         except (OSError, ValueError, KeyError):
             pass
     try:
-        active = json.loads(Path('./data/webui/listen.json').read_text(encoding='utf-8'))
-        config.update(host=active['host'], port=int(active['port']))
+        active = json.loads((root / 'data/webui/listen.json').read_text(encoding='utf-8'))
+        if listener_valid(active, root):
+            config.update(host=active['host'], port=active['port'])
     except (OSError, ValueError, KeyError, TypeError):
         pass
     host = config['host']
