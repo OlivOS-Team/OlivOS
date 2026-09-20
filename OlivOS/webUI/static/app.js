@@ -1034,10 +1034,8 @@ function clearAction(kind) {
   for (const id of buttons) $(id).disabled = false;
 }
 function showActionResult(kind, message) {
-  hideNotice();
-  $('operation-title').textContent = kind === 'reload' ? '重载插件' : '检查更新';
-  $('operation-message').textContent = message;
-  if (!$('operation-dialog').open) $('operation-dialog').showModal();
+  // 结果用非阻塞提示条呈现，避免重载这类高频操作反复弹出模态窗口。
+  notify(`${kind === 'reload' ? '重载插件' : '检查更新'}：${message}`);
 }
 function finishAction(kind, result) {
   const pending = state.actions[kind];

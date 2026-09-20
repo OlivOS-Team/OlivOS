@@ -711,8 +711,7 @@ dialog::backdrop {
   justify-content: flex-end;
   margin: 20px 0 0;
 }
-#account-info-dialog,
-#operation-dialog {
+#account-info-dialog {
   width: min(560px, calc(100vw - 30px));
 }
 .account-details {
