@@ -1649,11 +1649,11 @@ class BaseTerminalUI:
         """添加一行日志，子类可按需覆盖"""
         res_data = re.sub(r'\033\[[\d;]*m?', '', data)
         res_data = res_data.encode(encoding='gb2312', errors='replace').decode(encoding='gb2312', errors='replace')
-        res_data_1 = res_data
-        res_data = res_data.replace('\\', '\\\\').replace(' ', '\\ ')
-        if len(res_data.replace('\\ ', '')) > 0:
+        # Treeview 的 DATA 列直接渲染 values，无需对空格与反斜杠做转义，
+        # 否则日志中的空格会显示为 '\ '（例如 'Active code page: 65001'）
+        if len(res_data.replace(' ', '')) > 0:
             try:
-                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data_1, values=(res_data,))
+                iid = self.UIObject['tree'].insert('', tkinter.END, text=res_data, values=(res_data,))
                 keep_tree_thin(self.UIObject['tree'])
                 if self.UIData.get('flag_tree_is_bottom', True):
                     self.UIObject['tree'].see(iid)
