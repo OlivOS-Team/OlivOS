@@ -314,7 +314,16 @@ def runtime_status(host):
         elif 'ws_obj' in getattr(proc, 'Proc_data', {}).get('extend_data', {}):
             known.add(bot.hash)
             connection = proc.Proc_data['extend_data']['ws_obj']
-            if getattr(getattr(connection, 'sock', None), 'connected', False):
+            # aiohttp 连接用 closed 表示状态，旧实现的 sock.connected 仅覆盖部分适配器。
+            if connection is not None and (
+                getattr(connection, 'closed', None) is False
+                or getattr(getattr(connection, 'sock', None), 'connected', False)
+            ):
+                online.add(bot.hash)
+        elif hasattr(proc, 'active_links'):
+            # 反向 WebSocket 由 OlivOS 侧监听，连接数即为在线状态。
+            known.add(bot.hash)
+            if proc.active_links > 0:
                 online.add(bot.hash)
         elif proc.Proc_type == 'terminal_link' and bot.platform['model'] == 'default':
             known.add(bot.hash)
