@@ -146,6 +146,8 @@ class server(OlivOS.API.Proc_templet):
         self.running_event.set()
         self.debug_mode = debug_mode
         self.Proc_name_short = f"OlivOS_milky_auto={self.bot_info.hash[:6]}"
+        # 供 WebUI 判断事件推送连接是否在线。
+        self.Proc_data['extend_data'] = {'ws_obj': None}
 
     def start(self) -> threading.Thread:
         proc_this = threading.Thread(
@@ -190,6 +192,7 @@ class server(OlivOS.API.Proc_templet):
                 ) as ws_conn:
                     self.on_open()
                     is_open = True
+                    self.Proc_data['extend_data']['ws_obj'] = ws_conn
                     async for msg in ws_conn:
                         if msg.type != aiohttp.WSMsgType.TEXT:
                             continue
@@ -209,6 +212,7 @@ class server(OlivOS.API.Proc_templet):
                     self.on_close()
                 self.on_error(Exception(traceback.format_exc()))
             finally:
+                self.Proc_data['extend_data']['ws_obj'] = None
                 await asyncio.sleep(self.extra_conf.retry_interval)
 
     async def tx(self) -> None:

@@ -17,6 +17,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import OlivOS
 
 import asyncio
+import multiprocessing
 from aiohttp.client import ClientSession
 from aiohttp import cookiejar
 import qrcode
@@ -42,6 +43,16 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['platform_bot_info_dict'] = None
+        self._active_links = multiprocessing.Value('i', 0)
+
+    @property
+    def active_links(self):
+        return self._active_links.value
+
+    def mark_live_link(self, connected):
+        """由弹幕客户端回调：更新直播间连接状态，供 WebUI 判断在线。"""
+        with self._active_links.get_lock():
+            self._active_links.value = 1 if connected else 0
 
     def run(self):
         self.log(2, 'OlivOS biliLive Link server [' + self.Proc_name + '] is running')

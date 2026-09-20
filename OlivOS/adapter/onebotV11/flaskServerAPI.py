@@ -14,9 +14,6 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-import multiprocessing
-import time
-
 from gevent import pywsgi
 from flask import Flask
 from flask import current_app
@@ -81,33 +78,28 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_server_port'] = Flask_port
         self.Proc_config['config'] = self.config_T(debug_mode)
         # 记录各 HTTP 上报账号最近活动时间，供 WebUI 判断在线状态。
-        self._post_slots = {}
-        self._post_index = {}
-        for bot_hash, bot in (bot_info_dict or {}).items():
-            if not isinstance(bot, OlivOS.API.bot_info_T):
-                continue
-            if bot.platform['sdk'] != 'onebot' or bot.post_info.type != 'post':
-                continue
-            key = (bot.platform['sdk'], bot.platform['platform'], bot.platform['model'], str(bot.id))
-            self._post_index[bot_hash] = len(self._post_slots)
-            self._post_slots[key] = len(self._post_slots)
-        self._post_last_seen = multiprocessing.Array('d', max(len(self._post_index), 1))
+        post_accounts = {
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T)
+            and bot.platform['sdk'] == 'onebot' and bot.post_info.type == 'post'
+        }
+        self.activity = OlivOS.API.accountActivity(post_accounts)
 
     def mark_post_seen(self, sdk_event):
         """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
-        if not self._post_slots or not sdk_event.active:
+        if not sdk_event.active:
             return
         self_id = str(sdk_event.base_info.get('self_id', ''))
         platform = sdk_event.platform
-        slot = self._post_slots.get(
-            (platform.get('sdk'), platform.get('platform'), platform.get('model'), self_id)
-        )
-        if slot is not None:
-            self._post_last_seen[slot] = time.monotonic()
+        self.activity.mark(OlivOS.API.getBotHash(
+            bot_id=self_id,
+            platform_sdk=platform.get('sdk'),
+            platform_platform=platform.get('platform'),
+        ))
 
-    def post_last_seen(self):
+    def account_activity(self):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
-        return {bot_hash: self._post_last_seen[slot] for bot_hash, slot in self._post_index.items()}
+        return self.activity.snapshot()
 
     class config_T(object):
         def __init__(self, debug_mode):

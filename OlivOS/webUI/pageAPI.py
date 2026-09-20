@@ -30,8 +30,8 @@ from flask import abort, jsonify, request, send_file, send_from_directory
 import OlivOS
 
 MASK = '********'
-# HTTP 上报没有长连接，超过该时间未收到心跳或消息即视为离线。
-POST_ONLINE_WINDOW = 180
+# 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
+ACTIVITY_ONLINE_WINDOW = 180
 SECRET_KEY = re.compile(r'password|token|secret|(?:^|_)key$|cookie|authorization', re.I)
 ENTRY_FIELDS = {
     'edit_root_Entry_ID': 'id', 'edit_root_Entry_Password': 'password',
@@ -302,45 +302,54 @@ def runtime_status(host):
                 if proc.webhook_online:
                     online.add(bot.hash)
             continue
-        if hasattr(proc, 'post_last_seen'):
+        if hasattr(proc, 'account_activity'):
             now = time.monotonic()
-            for bot_hash, last_seen in proc.post_last_seen().items():
+            for bot_hash, last_seen in proc.account_activity().items():
                 bot = host.accounts.get(bot_hash)
                 if bot is None or not bot.enable:
                     continue
                 known.add(bot_hash)
-                if last_seen > 0 and now - last_seen <= POST_ONLINE_WINDOW:
+                if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
                     online.add(bot_hash)
             continue
-        bot = getattr(proc, 'bot_info', None)
-        if bot is None:
-            bot = getattr(proc, 'Proc_data', {}).get('bot_info_dict')
-        if not isinstance(bot, OlivOS.API.bot_info_T) or not bot.enable:
-            continue
-        if hasattr(proc, 'ws_conn'):
-            known.add(bot.hash)
-            connection = proc.ws_conn
-            if connection is not None and (getattr(connection, 'open', False)
-                                           or getattr(getattr(connection, 'state', None), 'name', '') == 'OPEN'):
-                online.add(bot.hash)
-        elif 'ws_obj' in getattr(proc, 'Proc_data', {}).get('extend_data', {}):
-            known.add(bot.hash)
-            connection = proc.Proc_data['extend_data']['ws_obj']
-            # aiohttp 连接用 closed 表示状态，旧实现的 sock.connected 仅覆盖部分适配器。
-            if connection is not None and (
-                getattr(connection, 'closed', None) is False
-                or getattr(getattr(connection, 'sock', None), 'connected', False)
-            ):
-                online.add(bot.hash)
-        elif hasattr(proc, 'active_links'):
-            # 反向 WebSocket 由 OlivOS 侧监听，连接数即为在线状态。
-            known.add(bot.hash)
-            if proc.active_links > 0:
-                online.add(bot.hash)
-        elif proc.Proc_type == 'terminal_link' and bot.platform['model'] == 'default':
-            known.add(bot.hash)
-            if ('virtual_terminal', bot.hash) in host.terminals:
-                online.add(bot.hash)
+        bot_info = getattr(proc, 'bot_info', None)
+        if bot_info is None:
+            bot_info = getattr(proc, 'status_bot_info', None)
+        if bot_info is None:
+            bot_info = getattr(proc, 'Proc_data', {}).get('bot_info_dict')
+        if isinstance(bot_info, OlivOS.API.bot_info_T):
+            bots = [bot_info]
+        elif isinstance(bot_info, dict):
+            bots = list(bot_info.values())
+        else:
+            bots = []
+        for bot in bots:
+            if not isinstance(bot, OlivOS.API.bot_info_T) or not bot.enable:
+                continue
+            if hasattr(proc, 'ws_conn'):
+                known.add(bot.hash)
+                connection = proc.ws_conn
+                if connection is not None and (getattr(connection, 'open', False)
+                                               or getattr(getattr(connection, 'state', None), 'name', '') == 'OPEN'):
+                    online.add(bot.hash)
+            elif 'ws_obj' in getattr(proc, 'Proc_data', {}).get('extend_data', {}):
+                known.add(bot.hash)
+                connection = proc.Proc_data['extend_data']['ws_obj']
+                # websocket-client 用 sock.connected 表示状态，aiohttp 用 closed。
+                if connection is not None and (
+                    getattr(getattr(connection, 'sock', None), 'connected', False)
+                    or getattr(connection, 'closed', None) is False
+                ):
+                    online.add(bot.hash)
+            elif hasattr(proc, 'active_links'):
+                # 反向 WebSocket 或共享长连接，连接数大于零即为在线。
+                known.add(bot.hash)
+                if proc.active_links > 0:
+                    online.add(bot.hash)
+            elif proc.Proc_type == 'terminal_link' and bot.platform['model'] == 'default':
+                known.add(bot.hash)
+                if ('virtual_terminal', bot.hash) in host.terminals:
+                    online.add(bot.hash)
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
     unknown = enabled - known
