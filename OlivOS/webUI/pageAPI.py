@@ -30,6 +30,8 @@ from flask import abort, jsonify, request, send_file, send_from_directory
 import OlivOS
 
 MASK = '********'
+# HTTP 上报没有长连接，超过该时间未收到心跳或消息即视为离线。
+POST_ONLINE_WINDOW = 180
 SECRET_KEY = re.compile(r'password|token|secret|(?:^|_)key$|cookie|authorization', re.I)
 ENTRY_FIELDS = {
     'edit_root_Entry_ID': 'id', 'edit_root_Entry_Password': 'password',
@@ -299,6 +301,16 @@ def runtime_status(host):
                 known.add(bot.hash)
                 if proc.webhook_online:
                     online.add(bot.hash)
+            continue
+        if hasattr(proc, 'post_last_seen'):
+            now = time.monotonic()
+            for bot_hash, last_seen in proc.post_last_seen().items():
+                bot = host.accounts.get(bot_hash)
+                if bot is None or not bot.enable:
+                    continue
+                known.add(bot_hash)
+                if last_seen > 0 and now - last_seen <= POST_ONLINE_WINDOW:
+                    online.add(bot_hash)
             continue
         bot = getattr(proc, 'bot_info', None)
         if bot is None:
