@@ -1267,6 +1267,10 @@ bind('toggle-path', () => {
   state.showPath = !state.showPath;
   renderPlugins();
 });
+bind('open-plugin-folder', async () => {
+  const result = await api('/api/plugins/open', { method: 'POST' });
+  notify(`已在文件管理器中打开插件目录：${result.path}`);
+});
 for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
   bind(id, async () => {
     if (confirm('重载全部插件？')) {

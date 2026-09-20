@@ -19,7 +19,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import copy
 import hashlib
 import json
+import os
 import re
+import subprocess
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -46,6 +49,16 @@ def within(path, root):
         return True
     except ValueError:
         return False
+
+
+def open_directory(path):
+    # 交给运行 OlivOS 的机器上的文件管理器打开，浏览器无法直接访问本地目录。
+    if os.name == 'nt':
+        os.startfile(str(path))
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', str(path)])
+    else:
+        subprocess.Popen(['xdg-open', str(path)])
 
 
 def safe_url(value):
@@ -514,6 +527,15 @@ def register_routes(host):
     def plugins():
         with host.lock:
             return jsonify(shallow_plugin_data_dict=host.plugins, shallow_plugin_webui_list=host.plugin_pages)
+
+    @app.post('/api/plugins/open')
+    def open_plugins():
+        # 固定打开插件目录，不接受客户端路径，避免越界读取宿主文件系统。
+        directory = (host.root / 'plugin/app').resolve()
+        if not directory.is_dir():
+            raise ValueError('插件目录不存在')
+        open_directory(directory)
+        return jsonify(ok=True, path=str(directory))
 
     @app.post('/api/plugins/reload')
     def reload_plugins():
