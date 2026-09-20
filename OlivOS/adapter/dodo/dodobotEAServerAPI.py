@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import time
 import json
+import multiprocessing
 import websockets
 import asyncio
 import requests as req
@@ -39,6 +40,22 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['platform_bot_info_dict'] = None
+        self._active_links = multiprocessing.Value('i', 0)
+
+    @property
+    def active_links(self):
+        return self._active_links.value
+
+    @property
+    def status_bot_info(self):
+        """供 WebUI 使用：只统计由本适配器负责的账号。"""
+        bot_info_dict = self.Proc_data['bot_info_dict']
+        if type(bot_info_dict) is not dict:
+            return {}
+        return {
+            bot_hash: bot for bot_hash, bot in bot_info_dict.items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'dodobot_ea'
+        }
 
     def run(self):
         if type(self.Proc_data['bot_info_dict']) is not dict or not any(
@@ -73,17 +90,19 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
-                asyncio.get_event_loop().run_until_complete(self.run_websockets_rx_connect())
+                asyncio.run(self.run_websockets_rx_connect())
             time.sleep(self.Proc_info.scan_interval)
 
     def run_websockets_rx_connect_start(self):
-        asyncio.get_event_loop().run_until_complete(self.run_websockets_rx_connect())
+        asyncio.run(self.run_websockets_rx_connect())
 
     async def run_websockets_rx_connect(self):
         while True:
             try:
                 async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(
                         OlivOS.dodobotEASDK.websocket_port)) as websocket:
+                    with self._active_links.get_lock():
+                        self._active_links.value += 1
                     while True:
                         tmp_recv_pkg = None
                         tmp_recv_pkg_data = None
@@ -121,3 +140,6 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 time.sleep(self.Proc_info.scan_interval)
                 tmp_recv_pkg_data = None
+            finally:
+                with self._active_links.get_lock():
+                    self._active_links.value = max(0, self._active_links.value - 1)

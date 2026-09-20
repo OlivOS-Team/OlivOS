@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import multiprocessing
 import queue
 import socket
 import asyncio
@@ -130,8 +131,15 @@ class server(OlivOS.API.Proc_templet):
         self.bot_info = bot_info_dict
         self.conf = ServerConf.init_conf_from_post_info(self.bot_info.post_info)
         self.extra_info = {'id': self.bot_info.id, 'token': self.conf.token, 'type': 'websocket_host'}
+        # 供 WebUI 状态查询读取；多进程模式下也能反映真实连接数。
+        self._active_links = multiprocessing.Value('i', 0)
         self.running_event = threading.Event()
         self.running_event.set()
+
+    @property
+    def active_links(self):
+        """当前保持的 WebSocket 连接数。"""
+        return self._active_links.value
 
     def start(self) -> threading.Thread:
         """启动入口
@@ -292,6 +300,8 @@ class server(OlivOS.API.Proc_templet):
         Args:
             ws_conn: WebSocket连接对象, 用于传给rx和tx接收和发送消息
         """
+        with self._active_links.get_lock():
+            self._active_links.value += 1
         self.on_open()
         rx_task = asyncio.create_task(self.rx(ws_conn))
         tx_task = asyncio.create_task(self.tx(ws_conn))
@@ -305,6 +315,8 @@ class server(OlivOS.API.Proc_templet):
                 task.cancel()
             if pending:
                 await asyncio.gather(*pending, return_exceptions=True)
+            with self._active_links.get_lock():
+                self._active_links.value = max(0, self._active_links.value - 1)
             self.on_close()
 
     def on_run(self) -> None:

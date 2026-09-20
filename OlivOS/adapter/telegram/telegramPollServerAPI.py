@@ -36,6 +36,13 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['bot_info_update_id'] = {}
+        self.activity = OlivOS.API.accountActivity({
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'telegram_poll'
+        })
+
+    def account_activity(self):
+        return self.activity.snapshot()
 
     def run(self):
         self.log(2, 'OlivOS telegram poll server [' + self.Proc_name + '] is running')
@@ -61,6 +68,8 @@ class server(OlivOS.API.Proc_templet):
                     sdk_api_tmp.do_api()
                 except Exception:
                     flag_not_attach = True
+                else:
+                    self.activity.mark(bot_info_this)
                 if not flag_not_attach:
                     try:
                         res_obj = json.loads(sdk_api_tmp.res.text)

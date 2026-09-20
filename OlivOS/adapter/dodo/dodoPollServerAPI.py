@@ -40,6 +40,13 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_token_life_counter'] = 1000
         self.Proc_data['bot_info_token_life'] = {}
         self.Proc_data['bot_info_island_list'] = {}
+        self.activity = OlivOS.API.accountActivity({
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'dodo_poll'
+        })
+
+    def account_activity(self):
+        return self.activity.snapshot()
 
     def run(self):
         if type(self.Proc_data['bot_info_dict']) is not dict or not any(
@@ -120,6 +127,8 @@ class server(OlivOS.API.Proc_templet):
                         sdk_api_res_2 = sdk_api_tmp_2.do_api()
                     except Exception:
                         flag_not_attach_2 = True
+                    else:
+                        self.activity.mark(bot_info_this)
                     if not flag_not_attach_2:
                         try:
                             res_obj_2 = json.loads(sdk_api_res_2)

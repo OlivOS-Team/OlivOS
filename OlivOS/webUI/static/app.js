@@ -2,6 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
+const pageStorageKey = 'olivos.webui.page';
 
 function cachedToken(value) {
   try {
@@ -27,7 +28,7 @@ const state = {
   selected: null,
   logs: [],
   terminalLogs: [],
-  limit: 128,
+  limit: 500,
   dirty: false,
   showPath: false,
   editing: null,
@@ -35,6 +36,8 @@ const state = {
   streams: new Map(),
   frame: null,
   frameNamespace: null,
+  framePath: null,
+  externalPage: null,
   requests: new Set(),
   seenEvents: new Set(),
   qrURL: null,
@@ -42,6 +45,7 @@ const state = {
   authGeneration: 0,
   cachedLogin: false,
   checkingAuth: false,
+  actions: { reload: null, update: null },
 };
 const titles = {
   dashboard: '仪表盘',
@@ -80,9 +84,18 @@ function button(text, action, className = '') {
   node.addEventListener('click', () => Promise.resolve().then(action).catch(notifyError));
   return node;
 }
+let noticeTimer = null;
+function hideNotice() {
+  clearTimeout(noticeTimer);
+  noticeTimer = null;
+  $('notice').hidden = true;
+  $('notice-message').textContent = '';
+}
 function notify(message) {
-  $('notice').textContent = message;
+  hideNotice();
+  $('notice-message').textContent = message;
   $('notice').hidden = false;
+  noticeTimer = setTimeout(hideNotice, 5000);
 }
 function notifyError(error) {
   notify(error.message || String(error));
@@ -177,13 +190,19 @@ async function login(ev, token = null) {
     state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
     state.schema = await api('/api/accounts/schema');
+    await Promise.all([loadAccounts(), loadPlugins(), loadTerminals(), refreshStatus()]);
+    await restorePage();
     $('token').value = '';
     $('login').hidden = true;
+    $('loading').hidden = true;
     $('shell').hidden = false;
-    await Promise.all([loadAccounts(), loadPlugins(), loadTerminals(), refreshStatus()]);
+    if (state.page === 'logs') renderLogs();
+    else if (state.page === 'terminals') {
+      renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
+    }
     stream(
       'events',
-      `/ws/events?session=${encodeURIComponent(state.session)}`,
+      `/ws/events?session=${encodeURIComponent(state.session)}&since=${result.cursor}`,
       eventBatch,
       (text) => {
         $('connection').textContent = text;
@@ -195,7 +214,6 @@ async function login(ev, token = null) {
       else checkAuthentication();
       checkCachedLogin();
     }, 10000);
-    await navigate('dashboard');
   } catch (error) {
     if (error.status === 401 || error.status === 403) cachedToken('');
     for (const name of [...state.streams.keys()]) closeStream(name);
@@ -206,6 +224,7 @@ async function login(ev, token = null) {
     $('login').hidden = false;
     $('login-error').textContent = error.message;
   } finally {
+    $('loading').hidden = true;
     submit.disabled = false;
   }
 }
@@ -233,13 +252,15 @@ function resetLogin(message = '') {
   state.plugins = {};
   state.terminals = [];
   state.selected = null;
+  for (const kind of Object.keys(state.actions)) clearAction(kind);
   clearFrame();
+  $('loading').hidden = true;
   $('shell').hidden = true;
   $('login').hidden = false;
   for (const dialog of document.querySelectorAll('dialog')) dialog.close();
   $('account-form').reset();
   $('account-rows').replaceChildren();
-  $('notice').hidden = true;
+  hideNotice();
   $('token').value = '';
   $('login-error').textContent = message;
 }
@@ -271,6 +292,42 @@ window.addEventListener('focus', () => {
   checkCachedLogin();
   checkAuthentication();
 });
+function rememberPage() {
+  const saved = { page: state.page };
+  if (state.page === 'plugin-page') {
+    saved.namespace = state.frameNamespace;
+    saved.path = state.framePath;
+    saved.external = state.externalPage;
+  } else if (state.page === 'terminals' && state.selected) {
+    saved.model = state.selected.model;
+    saved.hash = state.selected.hash;
+  }
+  try {
+    sessionStorage.setItem(pageStorageKey, JSON.stringify(saved));
+  } catch {
+    // 页面位置按标签页保存；浏览器禁用存储时仍可正常导航。
+  }
+}
+async function restorePage() {
+  let saved = null;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(pageStorageKey));
+  } catch {
+    // 无效或不可用的缓存回到仪表盘。
+  }
+  if (saved?.page === 'plugin-page') {
+    if (saved.external && safeURL(saved.external.url)) return openExternalPage(saved.external);
+    const page = state.pages.find((item) =>
+      embeddedPluginPage(item) && item.namespace === saved.namespace && item.path === saved.path,
+    );
+    if (page) return openPluginPage(page);
+    return navigate('plugins');
+  }
+  if (saved?.page === 'terminals') {
+    state.selected = state.terminals.find((item) => item.model === saved.model && item.hash === saved.hash) || null;
+  }
+  await navigate(Object.keys(titles).includes(saved?.page) ? saved.page : 'dashboard');
+}
 async function navigate(page) {
   state.page = page;
   document.querySelectorAll('.page').forEach((node) => {
@@ -283,6 +340,7 @@ async function navigate(page) {
   if (page !== 'plugin-page') clearFrame();
   if (page !== 'logs') closeStream('logs');
   if (page !== 'terminals') closeStream('terminal');
+  if (page !== 'plugin-page') rememberPage();
   if (page === 'dashboard') await refreshStatus();
   if (page === 'accounts' && !state.dirty) await loadAccounts();
   if (page === 'plugins') await loadPlugins();
@@ -695,20 +753,46 @@ function renderOutput(container, lines, follow, logMode = false) {
   }
   container.scrollTop = follow ? container.scrollHeight : scrollTop;
 }
+function selectedLogLevels() {
+  return [...$('log-level-options').querySelectorAll('input[value]:checked')].map(
+    (input) => Number(input.value),
+  );
+}
+function updateLogFilter() {
+  const selected = selectedLogLevels();
+  const all = selected.length === Object.keys(levels).length;
+  $('log-all').checked = all;
+  $('log-all').indeterminate = selected.length > 0 && !all;
+  const title = all ? '全部' : selected.map((level) => levels[level]).join('、') || '未选择';
+  $('log-level').textContent = title;
+  $('log-level').setAttribute('aria-label', `日志级别：${title}`);
+}
 function renderLogs() {
-  const filter = $('log-level').value;
-  const lines = state.logs.filter((line) => filter === '' || line.level >= Number(filter));
+  const selected = selectedLogLevels();
+  const lines = state.logs.filter((line) => selected.includes(line.level));
   renderOutput($('log-output'), lines, $('log-scroll').checked, true);
   $('log-count').textContent = `${lines.length} / ${state.limit} 条`;
 }
+let logGeneration = 0;
 async function openLogs() {
-  const result = await api(`/api/logs?tail=${state.limit}`);
+  const generation = ++logGeneration;
+  closeStream('logs');
+  state.logs = [];
+  renderLogs();
+  const selected = selectedLogLevels();
+  if (!selected.length) return;
+  const query = `level=${encodeURIComponent(selected.length === Object.keys(levels).length ? '' : selected.join(','))}`;
+  const result = await api(`/api/logs?${query}`);
+  if (generation !== logGeneration || state.page !== 'logs') return;
+  state.limit = result.limit;
   state.logs = result.items;
   renderLogs();
-  if (state.page !== 'logs') return;
-  stream('logs', '/ws/logs', (items, history) => {
-    if (history && items.length) state.logs = [];
-    appendBounded(state.logs, items);
+  let cursor = result.cursor;
+  stream('logs', `/ws/logs?${query}&since=${result.cursor}`, (items) => {
+    const fresh = items.filter((item) => item.sequence > cursor);
+    if (!fresh.length) return;
+    cursor = fresh[fresh.length - 1].sequence;
+    appendBounded(state.logs, fresh);
     renderLogs();
   });
 }
@@ -739,6 +823,7 @@ function renderTerminals() {
 }
 function openTerminal(terminal) {
   state.selected = terminal;
+  rememberPage();
   state.terminalLogs = [];
   renderTerminals();
   $('terminal-output').replaceChildren();
@@ -834,6 +919,10 @@ function pluginMenu(namespace) {
   if (!plugin[3]?.length) $('menu-items').append(element('p', '此插件没有声明菜单。'));
   $('menu-dialog').showModal();
 }
+function embeddedPluginPage(page) {
+  return page.type === 'iframe' && typeof page.path === 'string' &&
+    page.path.startsWith('webui/') && !page.path.split('/').includes('..');
+}
 function renderPluginNavigation() {
   $('plugin-links').replaceChildren();
   for (const page of state.pages) {
@@ -841,31 +930,46 @@ function renderPluginNavigation() {
       $('plugin-links').append(
         element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
       );
-    else if (
-      page.type === 'iframe' &&
-      typeof page.path === 'string' &&
-      page.path.startsWith('webui/') &&
-      !page.path.split('/').includes('..')
-    )
-      $('plugin-links').append(button(page.title, () => openPluginPage(page)));
+    else if (embeddedPluginPage(page)) {
+      const entry = button(page.title, () => openPluginPage(page));
+      entry.dataset.pluginNamespace = page.namespace;
+      entry.dataset.pluginPath = page.path;
+      $('plugin-links').append(entry);
+    }
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
   if (state.frameNamespace && !state.plugins[state.frameNamespace]) {
     clearFrame();
     notify('插件页面已卸载。');
   }
+  syncPluginSelection();
+}
+function syncPluginSelection() {
+  $('plugin-links').querySelectorAll('button').forEach((entry) => {
+    const active = entry.dataset.pluginNamespace === state.frameNamespace &&
+      entry.dataset.pluginPath === state.framePath;
+    entry.classList.toggle('active', active);
+    if (active) entry.setAttribute('aria-current', 'page');
+    else entry.removeAttribute('aria-current');
+  });
 }
 function clearFrame() {
   $('plugin-frame-container').replaceChildren();
   state.frame = null;
   state.frameNamespace = null;
+  state.framePath = null;
+  state.externalPage = null;
   state.requests.clear();
+  syncPluginSelection();
 }
 async function openPluginPage(page) {
   await navigate('plugin-page');
   clearFrame();
   $('page-title').textContent = page.title;
   state.frameNamespace = page.namespace;
+  state.framePath = page.path;
+  rememberPage();
+  syncPluginSelection();
   const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
   const frame = element('iframe', null, {
     title: page.title,
@@ -874,6 +978,17 @@ async function openPluginPage(page) {
   });
   state.frame = frame;
   $('plugin-frame-container').append(frame);
+}
+async function openExternalPage(page) {
+  await navigate('plugin-page');
+  clearFrame();
+  const title = page.title || '插件页面';
+  state.externalPage = { url: page.url, title };
+  rememberPage();
+  $('page-title').textContent = title;
+  $('plugin-frame-container').append(element('iframe', null, {
+    src: page.url, title, sandbox: 'allow-scripts allow-forms',
+  }));
 }
 window.addEventListener('message', async (ev) => {
   if (!state.frame || ev.source !== state.frame.contentWindow || ev.origin !== 'null') return;
@@ -912,9 +1027,57 @@ window.addEventListener('message', async (ev) => {
     );
   }
 });
+function clearAction(kind) {
+  clearTimeout(state.actions[kind]?.timer);
+  state.actions[kind] = null;
+  const buttons = kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
+  for (const id of buttons) $(id).disabled = false;
+}
+function showActionResult(kind, message) {
+  hideNotice();
+  $('operation-title').textContent = kind === 'reload' ? '重载插件' : '检查更新';
+  $('operation-message').textContent = message;
+  if (!$('operation-dialog').open) $('operation-dialog').showModal();
+}
+function finishAction(kind, result) {
+  const pending = state.actions[kind];
+  if (!pending || !Number.isFinite(result.started_at)) return;
+  if (!pending.result || result.started_at >= pending.result.started_at) pending.result = result;
+  if (pending.startedAt === null || pending.result.started_at < pending.startedAt) return;
+  const message = pending.result.message;
+  clearAction(kind);
+  showActionResult(kind, message);
+}
+async function runAction(kind, path, progress) {
+  if (state.actions[kind]) return;
+  const pending = { startedAt: null, result: null, timer: null };
+  state.actions[kind] = pending;
+  const buttons = kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
+  for (const id of buttons) $(id).disabled = true;
+  notify(progress);
+  pending.timer = setTimeout(() => {
+    clearAction(kind);
+    showActionResult(kind, '等待操作完成超时，请查看日志确认结果。');
+  }, 90000);
+  try {
+    const result = await api(path, { method: 'POST' });
+    if (state.actions[kind] !== pending) return;
+    pending.startedAt = result.started_at;
+    if (pending.result) finishAction(kind, pending.result);
+  } catch (error) {
+    if (state.actions[kind] !== pending) return;
+    clearAction(kind);
+    if (state.token) showActionResult(kind, error.message || String(error));
+  }
+}
 async function handleEvent(item) {
-  if (item.type === 'plugins') await loadPlugins();
-  else if (item.type === 'accounts') {
+  if (item.type === 'plugins') {
+    await loadPlugins();
+    if (item.ready) finishAction('reload', {
+      started_at: item.started_at,
+      message: `插件重载完成，当前已加载 ${Object.keys(state.plugins).length} 个插件。`,
+    });
+  } else if (item.type === 'accounts') {
     if (!state.dirty) await loadAccounts();
     await loadTerminals();
   } else if (item.type === 'init') await loadTerminals();
@@ -924,6 +1087,15 @@ async function handleEvent(item) {
     if (terminal) await showQRCode(terminal);
   } else if (item.type === 'update') {
     notify('发现可用的 OlivOS 更新。');
+    await refreshStatus();
+  } else if (item.type === 'update_check_result') {
+    const messages = {
+      available: '检查完成，发现可用的 OlivOS 更新。',
+      latest: '检查完成，当前已是最新版本。',
+      error: '检查更新失败，请检查网络连接或稍后重试。',
+      unsupported: '当前平台暂不支持内置更新检查，请前往 GitHub 查看最新版本。',
+    };
+    finishAction('update', { started_at: item.started_at, message: messages[item.status] || messages.error });
     await refreshStatus();
   } else if (
     item.type === 'plugin_reply' &&
@@ -937,16 +1109,7 @@ async function handleEvent(item) {
       '*',
     );
   } else if (item.type === 'open_page' && safeURL(item.url)) {
-    await navigate('plugin-page');
-    clearFrame();
-    $('page-title').textContent = item.title || '插件页面';
-    $('plugin-frame-container').append(
-      element('iframe', null, {
-        src: item.url,
-        title: item.title || '插件页面',
-        sandbox: 'allow-scripts allow-forms',
-      }),
-    );
+    await openExternalPage(item);
   }
 }
 function eventBatch(items) {
@@ -1051,9 +1214,28 @@ bind(
   },
   'change',
 );
+bind('notice-close', hideNotice);
 bind('webhook-refresh', refreshWebhook);
 bind('webhook-copy', copyWebhook);
-bind('log-level', renderLogs, 'change');
+bind('log-level-options', async (ev) => {
+  if (ev.target.id === 'log-all') {
+    $('log-level-options').querySelectorAll('input[value]').forEach((input) => {
+      input.checked = $('log-all').checked;
+    });
+  }
+  updateLogFilter();
+  await openLogs();
+}, 'change');
+updateLogFilter();
+document.addEventListener('click', (ev) => {
+  if (!$('log-filter').contains(ev.target)) $('log-filter').open = false;
+});
+$('log-filter').addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') {
+    $('log-filter').open = false;
+    $('log-level').focus();
+  }
+});
 bind('log-scroll', renderLogs, 'change');
 bind(
   'terminal-scroll',
@@ -1088,14 +1270,12 @@ bind('toggle-path', () => {
 for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
   bind(id, async () => {
     if (confirm('重载全部插件？')) {
-      await api('/api/plugins/reload', { method: 'POST' });
-      notify('正在重载插件…');
+      await runAction('reload', '/api/plugins/reload', '正在重载插件…');
     }
   });
 }
 bind('check-update', async () => {
-  await api('/api/update/check', { method: 'POST' });
-  notify('正在检查更新…');
+  await runAction('update', '/api/update/check', '正在检查更新…');
 });
 bind('exit', async () => {
   if (confirm('退出 OlivOS 将停止所有账号与插件，确定退出？')) {
@@ -1109,21 +1289,38 @@ window.addEventListener('beforeunload', (ev) => {
     ev.returnValue = '';
   }
 });
+window.addEventListener('pagehide', () => {
+  for (const name of [...state.streams.keys()]) closeStream(name);
+  clearInterval(state.timer);
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev.persisted && state.token) login(null, state.token);
+});
 {
-  const group = $('plugin-navigation-group');
+  const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
+  function setCollapsed(collapsed) {
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    $('plugin-links').hidden = collapsed;
+  }
   try {
-    group.open = localStorage.getItem(storageKey) !== 'true';
+    setCollapsed(localStorage.getItem(storageKey) === 'true');
   } catch {
     // 禁用存储时仍可展开和收起。
   }
-  group.addEventListener('toggle', () => {
+  toggle.addEventListener('click', () => {
+    const collapsed = toggle.getAttribute('aria-expanded') === 'true';
+    setCollapsed(collapsed);
     try {
-      localStorage.setItem(storageKey, String(!group.open));
+      localStorage.setItem(storageKey, String(collapsed));
     } catch {
       // 折叠状态只在当前页面生效。
     }
   });
   const savedToken = cachedToken();
   if (savedToken) login(null, savedToken);
+  else {
+    $('loading').hidden = true;
+    $('login').hidden = false;
+  }
 }

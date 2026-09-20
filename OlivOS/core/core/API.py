@@ -92,6 +92,32 @@ def getBotHash(bot_id=None, platform_sdk=None, platform_platform=None, platform_
     return hash_tmp.hexdigest()
 
 
+class accountActivity(object):
+    """记录各账号最近一次确认活动的时间，供 WebUI 等外部只读查询。
+
+    使用共享内存保存时间戳，多进程模式启动的协议端写入后主进程同样可读。
+    """
+
+    def __init__(self, bot_info_dict=None):
+        if isinstance(bot_info_dict, bot_info_T):
+            bot_info_dict = {bot_info_dict.hash: bot_info_dict}
+        self._index = {}
+        for bot_hash, bot in (bot_info_dict or {}).items():
+            if isinstance(bot, bot_info_T):
+                self._index[bot_hash] = len(self._index)
+        self._seen = multiprocessing.Array('d', max(len(self._index), 1))
+
+    def mark(self, bot_hash):
+        slot = self._index.get(bot_hash)
+        if slot is None:
+            return False
+        self._seen[slot] = time.monotonic()
+        return True
+
+    def snapshot(self):
+        return {bot_hash: self._seen[slot] for bot_hash, slot in self._index.items()}
+
+
 def getMenuEvent(target_event):
     target_event.base_info['time'] = int(time.time())
     target_event.base_info['self_id'] = None

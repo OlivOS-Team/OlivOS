@@ -11,7 +11,10 @@
     <script src="/static/app.js" defer></script>
   </head>
   <body>
-    <section id="login" class="login">
+    <section id="loading" class="loading" role="status">
+      <p>正在加载…</p>
+    </section>
+    <section id="login" class="login" hidden>
       <form id="login-form" class="panel login-card">
         <div class="brand">
           <img class="brand-logo" src="/static/logo.png" alt="" width="64" height="64" />
@@ -52,10 +55,17 @@
           <button data-page="plugins">插件</button>
         </nav>
         <nav id="plugin-navigation" aria-label="插件页面">
-          <details id="plugin-navigation-group" open>
-            <summary>插件页面</summary>
+          <div id="plugin-navigation-group">
+            <button
+              id="plugin-navigation-toggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="plugin-links"
+            >
+              <span class="disclosure-arrow" aria-hidden="true">▾</span>插件页面
+            </button>
             <div id="plugin-links"></div>
-          </details>
+          </div>
         </nav>
         <div class="sidebar-footer">
           <label class="theme-control">
@@ -74,7 +84,10 @@
           <h1 id="page-title">仪表盘</h1>
           <span id="connection" role="status">正在连接…</span>
         </header>
-        <div id="notice" role="status" hidden></div>
+        <div id="notice" hidden>
+          <span id="notice-message" role="status"></span>
+          <button id="notice-close" type="button" aria-label="关闭提示" title="关闭提示">×</button>
+        </div>
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
           <div class="runtime-summary">
@@ -124,18 +137,22 @@
         </section>
         <section id="logs" class="page" hidden>
           <div class="toolbar">
-            <label
-              >日志级别<select id="log-level">
-                <option value="">全部</option>
-                <option value="-1">TRACE</option>
-                <option value="0">DEBUG</option>
-                <option value="1">NOTE</option>
-                <option value="2" selected>INFO</option>
-                <option value="3">WARN</option>
-                <option value="4">ERROR</option>
-                <option value="5">FATAL</option>
-              </select></label
-            >
+            <div class="log-filter-control">
+              <span>日志级别</span>
+              <details id="log-filter">
+                <summary id="log-level" aria-label="日志级别：INFO、WARN、ERROR、FATAL">INFO、WARN、ERROR、FATAL</summary>
+                <div id="log-level-options" role="group" aria-label="选择日志级别">
+                  <label class="check"><input id="log-all" type="checkbox" />全部</label>
+                  <label class="check"><input type="checkbox" value="-1" />TRACE</label>
+                  <label class="check"><input type="checkbox" value="0" />DEBUG</label>
+                  <label class="check"><input type="checkbox" value="1" />NOTE</label>
+                  <label class="check"><input type="checkbox" value="2" checked />INFO</label>
+                  <label class="check"><input type="checkbox" value="3" checked />WARN</label>
+                  <label class="check"><input type="checkbox" value="4" checked />ERROR</label>
+                  <label class="check"><input type="checkbox" value="5" checked />FATAL</label>
+                </div>
+              </details>
+            </div>
             <label class="check"><input id="log-scroll" type="checkbox" checked />自动滚动</label
             ><span id="log-count"></span>
           </div>
@@ -198,6 +215,16 @@
         </section>
       </main>
     </div>
+    <dialog id="operation-dialog" aria-labelledby="operation-title">
+      <div class="dialog-title">
+        <h2 id="operation-title">操作结果</h2>
+        <button type="button" data-close="operation-dialog" aria-label="关闭">×</button>
+      </div>
+      <p id="operation-message"></p>
+      <div class="dialog-actions">
+        <button type="button" data-close="operation-dialog">确定</button>
+      </div>
+    </dialog>
     <dialog id="account-info-dialog" aria-labelledby="account-info-title">
       <div class="dialog-title">
         <h2 id="account-info-title">账号信息</h2>

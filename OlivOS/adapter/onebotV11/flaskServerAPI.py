@@ -56,7 +56,8 @@ class server(OlivOS.API.Proc_templet):
         logger_proc=None,
         scan_interval=0.001,
         dead_interval=16,
-        Flask_server_xpath='/OlivOSMsgApi'
+        Flask_server_xpath='/OlivOSMsgApi',
+        bot_info_dict=None
     ):
         OlivOS.API.Proc_templet.__init__(
             self,
@@ -76,6 +77,29 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_server_host'] = Flask_host
         self.Proc_config['Flask_server_port'] = Flask_port
         self.Proc_config['config'] = self.config_T(debug_mode)
+        # 记录各 HTTP 上报账号最近活动时间，供 WebUI 判断在线状态。
+        post_accounts = {
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T)
+            and bot.platform['sdk'] == 'onebot' and bot.post_info.type == 'post'
+        }
+        self.activity = OlivOS.API.accountActivity(post_accounts)
+
+    def mark_post_seen(self, sdk_event):
+        """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
+        if not sdk_event.active:
+            return
+        self_id = str(sdk_event.base_info.get('self_id', ''))
+        platform = sdk_event.platform
+        self.activity.mark(OlivOS.API.getBotHash(
+            bot_id=self_id,
+            platform_sdk=platform.get('sdk'),
+            platform_platform=platform.get('platform'),
+        ))
+
+    def account_activity(self):
+        """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
+        return self.activity.snapshot()
 
     class config_T(object):
         def __init__(self, debug_mode):
@@ -96,6 +120,7 @@ class server(OlivOS.API.Proc_templet):
                 sdk_event.platform['sdk'] = sdk_path
                 sdk_event.platform['platform'] = platform_path
                 sdk_event.platform['model'] = model_path
+                self.mark_post_seen(sdk_event)
                 tx_packet_data = OlivOS.pluginAPI.shallow.rx_packet(sdk_event)
                 try:
                     self.Proc_info.tx_queue.put(tx_packet_data, block=False)

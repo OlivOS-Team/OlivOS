@@ -30,6 +30,8 @@ from flask import abort, jsonify, request, send_file, send_from_directory
 import OlivOS
 
 MASK = '********'
+# 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
+ACTIVITY_ONLINE_WINDOW = 180
 SECRET_KEY = re.compile(r'password|token|secret|(?:^|_)key$|cookie|authorization', re.I)
 ENTRY_FIELDS = {
     'edit_root_Entry_ID': 'id', 'edit_root_Entry_Password': 'password',
@@ -116,6 +118,16 @@ def account_response(accounts):
             'revision': account_revision(accounts)}
 
 
+class _AccountReadLogger:
+    def __init__(self, host):
+        self.host = host
+
+    def log(self, level, message, *args):
+        # 网页读取配置不属于账号初始化，仍保留警告和错误。
+        if level != 2:
+            self.host.log(level, message, *args)
+
+
 def load_accounts(host):
     # Account.load 对坏文件回落空列表，WebUI 必须阻止随后覆盖损坏的用户文件。
     if host.account_path.exists():
@@ -125,7 +137,7 @@ def load_accounts(host):
                 raise ValueError
         except (ValueError, AttributeError) as error:
             raise ValueError('账号文件格式错误，请先修复原文件') from error
-        return OlivOS.accountAPI.Account.load(str(host.account_path), host)
+        return OlivOS.accountAPI.Account.load(str(host.account_path), _AccountReadLogger(host))
     return copy.deepcopy(host.accounts)
 
 
@@ -235,10 +247,24 @@ def parse_accounts(body, previous):
     return result
 
 
+def parse_log_levels(value):
+    if not value:
+        return None
+    try:
+        selected = tuple(sorted({int(item) for item in value.split(',')}))
+    except (ValueError, AttributeError) as error:
+        raise ValueError('日志级别无效') from error
+    if any(level not in OlivOS.diagnoseAPI.level_dict for level in selected):
+        raise ValueError('日志级别无效')
+    return selected
+
+
 def log_tail(path, limit, level):
     if not path.exists():
         return []
     # 从尾部按块读取，避免日志文件变大后每次请求扫描整个文件。
+    selected = (level,) if isinstance(level, int) else level
+    markers = [f' - [{OlivOS.diagnoseAPI.level_dict[item]}] - '.encode() for item in selected] if selected else [b'\n']
     with path.open('rb') as source:
         source.seek(0, 2)
         position, chunks, lines = source.tell(), [], 0
@@ -248,15 +274,15 @@ def log_tail(path, limit, level):
             source.seek(position)
             chunk = source.read(size)
             chunks.append(chunk)
-            lines += chunk.count(b'\n')
+            lines += sum(chunk.count(marker) for marker in markers)
     output = deque(maxlen=limit)
-    current_level = 2
+    current_level = None
     levels = {name: number for number, name in OlivOS.diagnoseAPI.level_dict.items()}
     for line in b''.join(reversed(chunks)).decode('utf-8', errors='replace').splitlines():
         match = re.match(r'^\[([^\]]+)\] - \[(TRACE|DEBUG|NOTE|INFO|WARN|ERROR|FATAL)\] - (.*)', line)
         if match:
             current_level = levels[match[2]]
-        if level is None or current_level >= level:
+        if current_level is not None and (selected is None or current_level in selected):
             output.append({'level': current_level, 'time': match[1] if match else None,
                            'text': match[3] if match else line})
     return list(output)
@@ -276,26 +302,54 @@ def runtime_status(host):
                 if proc.webhook_online:
                     online.add(bot.hash)
             continue
-        bot = getattr(proc, 'bot_info', None)
-        if bot is None:
-            bot = getattr(proc, 'Proc_data', {}).get('bot_info_dict')
-        if not isinstance(bot, OlivOS.API.bot_info_T) or not bot.enable:
+        if hasattr(proc, 'account_activity'):
+            now = time.monotonic()
+            for bot_hash, last_seen in proc.account_activity().items():
+                bot = host.accounts.get(bot_hash)
+                if bot is None or not bot.enable:
+                    continue
+                known.add(bot_hash)
+                if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
+                    online.add(bot_hash)
             continue
-        if hasattr(proc, 'ws_conn'):
-            known.add(bot.hash)
-            connection = proc.ws_conn
-            if connection is not None and (getattr(connection, 'open', False)
-                                           or getattr(getattr(connection, 'state', None), 'name', '') == 'OPEN'):
-                online.add(bot.hash)
-        elif 'ws_obj' in getattr(proc, 'Proc_data', {}).get('extend_data', {}):
-            known.add(bot.hash)
-            connection = proc.Proc_data['extend_data']['ws_obj']
-            if getattr(getattr(connection, 'sock', None), 'connected', False):
-                online.add(bot.hash)
-        elif proc.Proc_type == 'terminal_link' and bot.platform['model'] == 'default':
-            known.add(bot.hash)
-            if ('virtual_terminal', bot.hash) in host.terminals:
-                online.add(bot.hash)
+        bot_info = getattr(proc, 'bot_info', None)
+        if bot_info is None:
+            bot_info = getattr(proc, 'status_bot_info', None)
+        if bot_info is None:
+            bot_info = getattr(proc, 'Proc_data', {}).get('bot_info_dict')
+        if isinstance(bot_info, OlivOS.API.bot_info_T):
+            bots = [bot_info]
+        elif isinstance(bot_info, dict):
+            bots = list(bot_info.values())
+        else:
+            bots = []
+        for bot in bots:
+            if not isinstance(bot, OlivOS.API.bot_info_T) or not bot.enable:
+                continue
+            if hasattr(proc, 'ws_conn'):
+                known.add(bot.hash)
+                connection = proc.ws_conn
+                if connection is not None and (getattr(connection, 'open', False)
+                                               or getattr(getattr(connection, 'state', None), 'name', '') == 'OPEN'):
+                    online.add(bot.hash)
+            elif 'ws_obj' in getattr(proc, 'Proc_data', {}).get('extend_data', {}):
+                known.add(bot.hash)
+                connection = proc.Proc_data['extend_data']['ws_obj']
+                # websocket-client 用 sock.connected 表示状态，aiohttp 用 closed。
+                if connection is not None and (
+                    getattr(getattr(connection, 'sock', None), 'connected', False)
+                    or getattr(connection, 'closed', None) is False
+                ):
+                    online.add(bot.hash)
+            elif hasattr(proc, 'active_links'):
+                # 反向 WebSocket 或共享长连接，连接数大于零即为在线。
+                known.add(bot.hash)
+                if proc.active_links > 0:
+                    online.add(bot.hash)
+            elif proc.Proc_type == 'terminal_link' and bot.platform['model'] == 'default':
+                known.add(bot.hash)
+                if ('virtual_terminal', bot.hash) in host.terminals:
+                    online.add(bot.hash)
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
     unknown = enabled - known
@@ -379,8 +433,9 @@ def register_routes(host):
 
     @app.post('/api/login')
     def login():
-        session = host.new_session()
-        response = jsonify(session=session)
+        with host.lock:
+            session = host.new_session()
+            response = jsonify(session=session, cursor=host.sequence)
         response.set_cookie('olivos_webui', session, httponly=True, samesite='Strict',
                             secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
         return response
@@ -425,13 +480,15 @@ def register_routes(host):
     def logs():
         try:
             limit = max(1, min(int(request.args.get('tail', host.limit)), host.limit))
-            level = request.args.get('level', '')
-            level = int(level) if level else None
+            level = parse_log_levels(request.args.get('level', ''))
         except ValueError as error:
             raise ValueError('日志级别与条数必须为整数') from error
-        if level is not None and level not in OlivOS.diagnoseAPI.level_dict:
-            raise ValueError('日志级别无效')
-        return jsonify(items=log_tail(host.root / 'logfile/OlivOS_logfile_unity.log', limit, level), limit=host.limit)
+        with host.lock:
+            items = host.snapshot('logs', level=level)[-limit:]
+            cursor = host.sequence
+        if not items:
+            items = log_tail(host.root / 'logfile/OlivOS_logfile_unity.log', limit, level)
+        return jsonify(items=items, cursor=cursor, limit=host.limit)
 
     @app.get('/api/terminals')
     def terminals():
@@ -460,8 +517,9 @@ def register_routes(host):
 
     @app.post('/api/plugins/reload')
     def reload_plugins():
+        started_at = time.time()
         host.send_control('restart_send', 'plugin')
-        return jsonify(ok=True), 202
+        return jsonify(ok=True, started_at=started_at), 202
 
     @app.post('/api/plugin_event')
     def plugin_event():
@@ -501,8 +559,9 @@ def register_routes(host):
 
     @app.post('/api/update/check')
     def update_check():
+        started_at = time.time()
         host.send_control('init_type', 'update_check')
-        return jsonify(ok=True), 202
+        return jsonify(ok=True, started_at=started_at), 202
 
     @app.post('/api/exit')
     def exit_total():

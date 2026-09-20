@@ -69,7 +69,7 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
-                asyncio.get_event_loop().run_until_complete(self.run_websockets_tx_connect())
+                asyncio.run(self.run_websockets_tx_connect())
             time.sleep(self.Proc_info.scan_interval)
 
     class rx_packet(object):
@@ -78,7 +78,7 @@ class server(OlivOS.API.Proc_templet):
             self.data = data
 
     def run_websockets_tx_connect_start(self):
-        asyncio.get_event_loop().run_until_complete(self.run_websockets_tx_connect())
+        asyncio.run(self.run_websockets_tx_connect())
 
     async def run_websockets_tx_connect(self):
         while True:

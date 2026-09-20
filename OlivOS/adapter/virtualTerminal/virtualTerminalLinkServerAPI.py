@@ -47,6 +47,11 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['platform_bot_info_dict'] = None
         self.Proc_data['reply_event_pool'] = {}
+        # 记录账号最近活动时间，供 WebUI 判断 http 上报模式是否在线。
+        self.activity = OlivOS.API.accountActivity(bot_info_dict)
+
+    def account_activity(self):
+        return self.activity.snapshot()
 
     def run(self):
         time.sleep(2)
@@ -116,6 +121,7 @@ class server(OlivOS.API.Proc_templet):
                 }
                 flag_active = False
                 rx_packet_data_raw = request.get_data(as_text=True)
+                self.activity.mark(self.Proc_data['bot_info_dict'].hash)
                 try:
                     event_id = str(uuid.uuid4())
                     rx_packet_data = json.loads(rx_packet_data_raw)
@@ -148,6 +154,7 @@ class server(OlivOS.API.Proc_templet):
         server.serve_forever()
 
     def send_init_event(self):
+        self.activity.mark(self.Proc_data['bot_info_dict'].hash)
         self.sendControlEventSend('send', {
             'target': {
                 'type': 'nativeWinUI'
@@ -171,6 +178,7 @@ class server(OlivOS.API.Proc_templet):
             )
 
     def send_log_event(self, data, name, user_conf=None):
+        self.activity.mark(self.Proc_data['bot_info_dict'].hash)
         self.sendControlEventSend('send', {
             'target': {
                 'type': 'nativeWinUI'
