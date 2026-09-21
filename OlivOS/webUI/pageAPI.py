@@ -19,7 +19,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import copy
 import hashlib
 import json
+import os
 import re
+import subprocess
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -40,12 +43,57 @@ ENTRY_FIELDS = {
 }
 
 
+# 插件页 iframe 的沙箱能力，一次配齐「常规浏览器能做的事」，避免缺一个补一个。
+# 刻意不含两个 token：
+#   allow-same-origin —— 插件页与宿主 WebUI 同源，给了它就能读宿主的 token、
+#     localStorage 与 DOM，沙箱会彻底失效；
+#   allow-top-navigation —— 会把宿主 WebUI 整页导航走。
+# 注意：iframe 的 sandbox 属性（webUI/static/app.js 的 pluginSandbox）必须使用同一份
+# 列表 —— CSP 头的 sandbox 指令与 iframe 属性是两套独立机制，浏览器取更严格的那个。
+# 这里只列 iframe sandbox 属性同样合法的 token —— CSP 指令虽然额外接受
+# allow-downloads-without-user-activation，但两处取交集，写进来只会让浏览器报
+# 「is an invalid sandbox flag」且毫无收益。
+PLUGIN_SANDBOX = (
+    'sandbox allow-scripts allow-forms allow-modals allow-downloads '
+    'allow-popups allow-popups-to-escape-sandbox allow-pointer-lock '
+    'allow-orientation-lock allow-presentation '
+    'allow-top-navigation-by-user-activation '
+    'allow-storage-access-by-user-activation; '
+)
+
+
 def within(path, root):
     try:
         Path(path).resolve().relative_to(Path(root).resolve())
         return True
     except ValueError:
         return False
+
+
+def open_directory(path):
+    # 交给运行 OlivOS 的机器上的文件管理器打开，浏览器无法直接访问本地目录。
+    target = str(path)
+    if os.name == 'nt':
+        os.startfile(target)
+        return
+    if sys.platform == 'darwin':
+        command = ['open', target]
+    else:
+        # 没有桌面会话时 xdg-open 必然失败，提前给出原因而不是假装打开成功
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            raise OSError('运行 OlivOS 的环境没有可用的桌面会话，无法打开文件管理器')
+        command = ['xdg-open', target]
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        raise OSError(f'无法调用系统文件管理器：{error}') from error
+    try:
+        # 失败时 opener 会立刻返回非 0；成功时它可能驻留为文件管理器本身，故超时即视为已交付
+        code = process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        return
+    if code != 0:
+        raise OSError(f'系统文件管理器返回 {code}，可能没有可用的桌面环境')
 
 
 def safe_url(value):
@@ -366,7 +414,8 @@ def runtime_status(host):
     return {'version': OlivOS.infoAPI.OlivOS_Version_Short, 'accounts': len(accounts),
             'enabled': len(enabled), 'online': len(online & enabled), 'unknown': len(unknown),
             'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
-            'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available}
+            'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
+            'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
 
 
 def register_routes(host):
@@ -397,9 +446,12 @@ def register_routes(host):
         response.headers['Referrer-Policy'] = 'no-referrer'
         if request.path.startswith('/plugin/'):
             # 插件是独立沙箱，拿不到宿主 token、存储和 DOM。
+            # 沙箱能力集中在 PLUGIN_SANDBOX 里定义，避免出现「缺一个补一个」。
             response.headers['Content-Security-Policy'] = (
-                "sandbox allow-scripts; default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; "
-                "style-src 'self' 'unsafe-inline'; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
+                PLUGIN_SANDBOX +
+                "default-src 'self' data: blob:; "
+                "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                "connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
                 "form-action 'none'"
             )
         else:
@@ -514,6 +566,19 @@ def register_routes(host):
     def plugins():
         with host.lock:
             return jsonify(shallow_plugin_data_dict=host.plugins, shallow_plugin_webui_list=host.plugin_pages)
+
+    @app.post('/api/plugins/open')
+    def open_plugins():
+        # 固定打开插件目录，不接受客户端路径，避免越界读取宿主文件系统。
+        directory = (host.root / 'plugin/app').resolve()
+        if not directory.is_dir():
+            raise ValueError('插件目录不存在')
+        try:
+            open_directory(directory)
+        except OSError as error:
+            # 回传真实原因，避免落到「无法读取文件」这个与打开目录无关的通用处理器
+            return jsonify(error=str(error)), 500
+        return jsonify(ok=True, path=str(directory))
 
     @app.post('/api/plugins/reload')
     def reload_plugins():

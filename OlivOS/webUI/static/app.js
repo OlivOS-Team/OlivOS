@@ -4,6 +4,27 @@ const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 
+// 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
+// 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
+// 刻意不含 allow-same-origin（插件页与宿主 WebUI 同源，给了等于取消沙箱）与
+// allow-top-navigation（会把宿主 WebUI 整页导航走）。
+// 注意 iframe 的 sandbox 属性只认 HTML 规范里的那几个 token：
+// allow-downloads-without-user-activation 只属于 CSP 指令，写在这里浏览器会直接报
+// 「is an invalid sandbox flag」。
+const pluginSandbox = [
+  'allow-scripts', 'allow-forms', 'allow-modals', 'allow-downloads',
+  'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-pointer-lock',
+  'allow-orientation-lock', 'allow-presentation',
+  'allow-top-navigation-by-user-activation', 'allow-storage-access-by-user-activation',
+].join(' ');
+// 外部页面是独立站点，与宿主本就跨源，可以保留真实源而不削弱隔离。
+const externalSandbox = [
+  'allow-scripts', 'allow-forms', 'allow-modals', 'allow-downloads',
+  'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-same-origin',
+  'allow-pointer-lock', 'allow-orientation-lock', 'allow-presentation',
+  'allow-top-navigation-by-user-activation',
+].join(' ');
+
 function cachedToken(value) {
   try {
     if (value === undefined) return localStorage.getItem(tokenStorageKey) || '';
@@ -34,11 +55,15 @@ const state = {
   editing: null,
   draft: null,
   streams: new Map(),
+  frames: new Map(),
+  frameOrder: [],
+  frameCacheLimit: 10,
   frame: null,
   frameNamespace: null,
   framePath: null,
   externalPage: null,
-  requests: new Set(),
+  externalFrame: null,
+  requests: new Map(),
   seenEvents: new Set(),
   qrURL: null,
   timer: null,
@@ -253,7 +278,7 @@ function resetLogin(message = '') {
   state.terminals = [];
   state.selected = null;
   for (const kind of Object.keys(state.actions)) clearAction(kind);
-  clearFrame();
+  destroyFrames();
   $('loading').hidden = true;
   $('shell').hidden = true;
   $('login').hidden = false;
@@ -337,7 +362,7 @@ async function navigate(page) {
     .querySelectorAll('[data-page]')
     .forEach((node) => node.classList.toggle('active', node.dataset.page === page));
   $('page-title').textContent = titles[page] || '插件页面';
-  if (page !== 'plugin-page') clearFrame();
+  if (page !== 'plugin-page') hideFrames();
   if (page !== 'logs') closeStream('logs');
   if (page !== 'terminals') closeStream('terminal');
   if (page !== 'plugin-page') rememberPage();
@@ -352,6 +377,10 @@ async function navigate(page) {
 }
 async function refreshStatus() {
   const status = await api('/api/status');
+  if (Number.isInteger(status.plugin_page_cache)) {
+    state.frameCacheLimit = Math.max(1, status.plugin_page_cache);
+    trimFrames();
+  }
   $('status-cards').replaceChildren();
   for (const [label, value, valueClass = ''] of [
     ['版本', status.version, 'version-value'],
@@ -931,67 +960,195 @@ function renderPluginNavigation() {
         element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
       );
     else if (embeddedPluginPage(page)) {
-      const entry = button(page.title, () => openPluginPage(page));
+      const row = element('div', null, { class: 'plugin-link-row' });
+      const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
       entry.dataset.pluginNamespace = page.namespace;
       entry.dataset.pluginPath = page.path;
-      $('plugin-links').append(entry);
+      // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×
+      const close = button('×', () => closePluginPage(page), 'plugin-link-close');
+      close.title = `关闭：${page.title}`;
+      close.setAttribute('aria-label', `关闭 ${page.title}`);
+      row.append(entry, close);
+      $('plugin-links').append(row);
     }
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
-  if (state.frameNamespace && !state.plugins[state.frameNamespace]) {
-    clearFrame();
-    notify('插件页面已卸载。');
+  let unloaded = false;
+  for (const key of [...state.frames.keys()]) {
+    if (state.plugins[state.frames.get(key).namespace]) continue;
+    destroyFrame(key);
+    unloaded = true;
   }
+  if (unloaded) notify('插件页面已卸载。');
   syncPluginSelection();
 }
 function syncPluginSelection() {
-  $('plugin-links').querySelectorAll('button').forEach((entry) => {
+  $('plugin-links').querySelectorAll('.plugin-link-entry').forEach((entry) => {
     const active = entry.dataset.pluginNamespace === state.frameNamespace &&
       entry.dataset.pluginPath === state.framePath;
+    const cached = state.frames.has(
+      frameKey(entry.dataset.pluginNamespace, entry.dataset.pluginPath),
+    );
     entry.classList.toggle('active', active);
+    entry.classList.toggle('cached', cached && !active);
     if (active) entry.setAttribute('aria-current', 'page');
     else entry.removeAttribute('aria-current');
+    // 单项 × 只在页面还活着时出现；用 visibility 占位，避免出现/消失时行高跳动
+    const close = entry.parentElement.querySelector('.plugin-link-close');
+    if (close) close.style.visibility = cached ? 'visible' : 'hidden';
   });
+  const count = state.frames.size;
+  const close = $('plugin-pages-close');
+  close.hidden = count === 0;
+  close.title = count ? `关闭全部插件页面（当前 ${count} 个）` : '关闭全部插件页面';
 }
-function clearFrame() {
-  $('plugin-frame-container').replaceChildren();
+function closePluginPage(page) {
+  const key = frameKey(page.namespace, page.path);
+  if (!state.frames.has(key)) return;
+  const wasActive = state.frameNamespace === page.namespace && state.framePath === page.path;
+  destroyFrame(key);
+  notify(`已关闭插件页面：${page.title}`);
+  if (wasActive) navigate('plugins').catch(notifyError);
+}
+function closePluginPages() {
+  const count = state.frames.size;
+  if (!count) return;
+  destroyFrames();
+  notify(`已关闭 ${count} 个插件页面。`);
+  if (state.page === 'plugin-page') navigate('plugins').catch(notifyError);
+}
+function frameKey(namespace, path) {
+  return `${namespace}\n${path}`;
+}
+function entryOfWindow(source) {
+  for (const entry of state.frames.values())
+    if (entry.frame.contentWindow === source) return entry;
+  return null;
+}
+function postToFrame(entry, payload) {
+  const target = entry && entry.frame.contentWindow;
+  if (target) target.postMessage(payload, '*');
+}
+// 保活的插件页面即使被隐藏也会继续跑定时器与轮询，用可见性通知让插件能自行暂停
+function postVisibility(entry, visible) {
+  postToFrame(entry, { type: 'olivos:plugin_visibility', visible });
+}
+function touchFrame(key) {
+  const at = state.frameOrder.indexOf(key);
+  if (at >= 0) state.frameOrder.splice(at, 1);
+  state.frameOrder.push(key);
+}
+function destroyFrame(key) {
+  const entry = state.frames.get(key);
+  if (!entry) return;
+  entry.frame.remove();
+  state.frames.delete(key);
+  const at = state.frameOrder.indexOf(key);
+  if (at >= 0) state.frameOrder.splice(at, 1);
+  for (const [id, owner] of [...state.requests]) if (owner === key) state.requests.delete(id);
+  if (state.frame === entry.frame) {
+    state.frame = null;
+    state.frameNamespace = null;
+    state.framePath = null;
+  }
+  syncPluginSelection();
+}
+// 超限时销毁最久未使用的页面：hidden 并不会释放内存，只能真销毁
+function trimFrames() {
+  const limit = Math.max(1, state.frameCacheLimit);
+  let dropped = 0;
+  while (state.frameOrder.length > limit) {
+    const key = state.frameOrder[0];
+    const entry = state.frames.get(key);
+    if (!entry) {
+      state.frameOrder.shift();
+      continue;
+    }
+    if (state.frame === entry.frame) break;
+    destroyFrame(key);
+    dropped += 1;
+  }
+  if (dropped) notify(`插件页面超过保活上限 ${limit} 个，已释放最久未使用的 ${dropped} 个。`);
+}
+function showFrame(entry) {
+  for (const item of state.frames.values()) {
+    item.frame.hidden = item !== entry;
+    postVisibility(item, item === entry);
+  }
+  state.frame = entry ? entry.frame : null;
+  state.frameNamespace = entry ? entry.namespace : null;
+  state.framePath = entry ? entry.path : null;
+  syncPluginSelection();
+}
+function dropExternalFrame() {
+  if (state.externalFrame) state.externalFrame.remove();
+  state.externalFrame = null;
+  state.externalPage = null;
+}
+// 离开插件页签：内嵌页面留驻 DOM 保活，外部临时页面不参与缓存直接销毁
+function hideFrames() {
+  dropExternalFrame();
+  for (const entry of state.frames.values()) {
+    entry.frame.hidden = true;
+    postVisibility(entry, false);
+  }
   state.frame = null;
   state.frameNamespace = null;
   state.framePath = null;
-  state.externalPage = null;
+  syncPluginSelection();
+}
+function destroyFrames() {
+  dropExternalFrame();
+  for (const entry of state.frames.values()) entry.frame.remove();
+  state.frames.clear();
+  state.frameOrder.length = 0;
   state.requests.clear();
+  state.frame = null;
+  state.frameNamespace = null;
+  state.framePath = null;
   syncPluginSelection();
 }
 async function openPluginPage(page) {
   await navigate('plugin-page');
-  clearFrame();
+  dropExternalFrame();
+  const key = frameKey(page.namespace, page.path);
+  let entry = state.frames.get(key);
+  if (!entry) {
+    const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
+    const frame = element('iframe', null, {
+      title: page.title,
+      src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
+      sandbox: pluginSandbox,
+    });
+    entry = { key, frame, namespace: page.namespace, path: page.path };
+    state.frames.set(key, entry);
+    $('plugin-frame-container').append(frame);
+    // 加载完成时补一次可见性，避免刚就绪的页面不知道自己究竟在前台还是后台
+    frame.addEventListener('load', () => postVisibility(entry, state.frame === frame));
+  }
+  entry.frame.title = page.title;
+  touchFrame(key);
+  showFrame(entry);
+  trimFrames();
   $('page-title').textContent = page.title;
-  state.frameNamespace = page.namespace;
-  state.framePath = page.path;
   rememberPage();
-  syncPluginSelection();
-  const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
-  const frame = element('iframe', null, {
-    title: page.title,
-    src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
-    sandbox: 'allow-scripts',
-  });
-  state.frame = frame;
-  $('plugin-frame-container').append(frame);
 }
 async function openExternalPage(page) {
   await navigate('plugin-page');
-  clearFrame();
+  hideFrames();
   const title = page.title || '插件页面';
   state.externalPage = { url: page.url, title };
+  state.externalFrame = element('iframe', null, {
+    src: page.url, title, sandbox: externalSandbox,
+  });
+  $('plugin-frame-container').append(state.externalFrame);
   rememberPage();
   $('page-title').textContent = title;
-  $('plugin-frame-container').append(element('iframe', null, {
-    src: page.url, title, sandbox: 'allow-scripts allow-forms',
-  }));
 }
 window.addEventListener('message', async (ev) => {
-  if (!state.frame || ev.source !== state.frame.contentWindow || ev.origin !== 'null') return;
+  if (ev.origin !== 'null') return;
+  const entry = entryOfWindow(ev.source);
+  if (!entry) return;
   const data = ev.data;
   if (
     !data ||
@@ -1001,18 +1158,18 @@ window.addEventListener('message', async (ev) => {
     data.request_id.length > 128
   )
     return;
+  // 同一 request_id 仍在处理中时丢弃重复投递，避免插件页面重发导致事件被执行多次
+  if (state.requests.has(data.request_id)) return;
   if (state.requests.size >= 128) {
     notify('插件页面等待回包过多，请刷新页面。');
     return;
   }
-  const namespace = state.frameNamespace;
-  const frame = state.frame;
   try {
-    state.requests.add(data.request_id);
+    state.requests.set(data.request_id, entry.key);
     await api('/api/plugin_event', {
       method: 'POST',
       body: {
-        namespace,
+        namespace: entry.namespace,
         event: data.event,
         payload: data.payload,
         request_id: data.request_id,
@@ -1021,10 +1178,7 @@ window.addEventListener('message', async (ev) => {
     });
   } catch (error) {
     state.requests.delete(data.request_id);
-    frame.contentWindow.postMessage(
-      { type: 'olivos:plugin_reply', request_id: data.request_id, error: error.message },
-      '*',
-    );
+    postToFrame(entry, { type: 'olivos:plugin_reply', request_id: data.request_id, error: error.message });
   }
 });
 function clearAction(kind) {
@@ -1034,10 +1188,8 @@ function clearAction(kind) {
   for (const id of buttons) $(id).disabled = false;
 }
 function showActionResult(kind, message) {
-  hideNotice();
-  $('operation-title').textContent = kind === 'reload' ? '重载插件' : '检查更新';
-  $('operation-message').textContent = message;
-  if (!$('operation-dialog').open) $('operation-dialog').showModal();
+  // 结果用非阻塞提示条呈现，避免重载这类高频操作反复弹出模态窗口。
+  notify(`${kind === 'reload' ? '重载插件' : '检查更新'}：${message}`);
 }
 function finishAction(kind, result) {
   const pending = state.actions[kind];
@@ -1072,6 +1224,10 @@ async function runAction(kind, path, progress) {
 }
 async function handleEvent(item) {
   if (item.type === 'plugins') {
+    if (item.ready && state.frames.size) {
+      destroyFrames();
+      notify('插件已重载，插件页面已刷新，请重新打开。');
+    }
     await loadPlugins();
     if (item.ready) finishAction('reload', {
       started_at: item.started_at,
@@ -1097,17 +1253,11 @@ async function handleEvent(item) {
     };
     finishAction('update', { started_at: item.started_at, message: messages[item.status] || messages.error });
     await refreshStatus();
-  } else if (
-    item.type === 'plugin_reply' &&
-    state.frame &&
-    state.frameNamespace === item.namespace &&
-    state.requests.has(item.request_id)
-  ) {
+  } else if (item.type === 'plugin_reply' && state.requests.has(item.request_id)) {
+    const entry = state.frames.get(state.requests.get(item.request_id));
     state.requests.delete(item.request_id);
-    state.frame.contentWindow.postMessage(
-      { type: 'olivos:plugin_reply', request_id: item.request_id, payload: item.payload },
-      '*',
-    );
+    if (entry && entry.namespace === item.namespace)
+      postToFrame(entry, { type: 'olivos:plugin_reply', request_id: item.request_id, payload: item.payload });
   } else if (item.type === 'open_page' && safeURL(item.url)) {
     await openExternalPage(item);
   }
@@ -1124,6 +1274,7 @@ function eventBatch(items) {
 
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
+bind('plugin-pages-close', closePluginPages);
 document
   .querySelectorAll('[data-page]')
   .forEach((node) =>
@@ -1266,6 +1417,10 @@ bind(
 bind('toggle-path', () => {
   state.showPath = !state.showPath;
   renderPlugins();
+});
+bind('open-plugin-folder', async () => {
+  const result = await api('/api/plugins/open', { method: 'POST' });
+  notify(`已在文件管理器中打开插件目录：${result.path}`);
 });
 for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
   bind(id, async () => {
