@@ -107,9 +107,11 @@ def navigation_host(tmp_path):
 def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
     pytest.importorskip('selenium')
     from selenium import webdriver
+    from selenium.common.exceptions import StaleElementReferenceException
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support import expected_conditions as conditions
     from selenium.webdriver.support.ui import WebDriverWait
 
     host = navigation_host
@@ -121,7 +123,7 @@ def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
     driver_path = os.environ.get('OLIVOS_CHROMEDRIVER')
     service = Service(executable_path=driver_path) if driver_path else None
     driver = webdriver.Chrome(service=service, options=options)
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 10, ignored_exceptions=(StaleElementReferenceException,))
     screenshots = Path(os.environ.get('OLIVOS_WEBUI_SCREENSHOTS', tmp_path / 'screenshots'))
     screenshots.mkdir(parents=True, exist_ok=True)
     multi = '.plugin-page-group[data-plugin-namespace="multi"]'
@@ -135,7 +137,10 @@ def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
 
     def click(selector):
         visible(selector)
+        previous_group = find(multi) if selector == '[data-page="plugins"]' else None
         find(selector).click()
+        if previous_group is not None:
+            wait.until(conditions.staleness_of(previous_group))
 
     def select_page(path):
         click(f'{multi} .plugin-link-entry[data-plugin-path="{path}"]')
@@ -168,8 +173,13 @@ def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
         assert find('h1').text == '功能首页'
         driver.switch_to.default_content()
         screenshot('desktop-single.png')
+        assert find(single + ' .plugin-link-close').get_attribute('title') == '关闭：独立插件 / 功能首页'
+        previous_group = find(single)
         click(single + ' .plugin-link-close')
+        wait.until(conditions.staleness_of(previous_group))
         wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe'))
+        assert find('#notice-message').text == '已关闭插件页面：独立插件 / 功能首页'
+        screenshot('close-single.png')
         click('#notice-close')
         assert len(driver.find_elements(By.CSS_SELECTOR, '#navigation [data-page]')) == 5
 
@@ -226,6 +236,30 @@ def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
         assert select_page('webui/tools/index.html') == identities['webui/tools/index.html']
         driver.switch_to.default_content()
         screenshot('desktop-duplicate-names.png')
+        tools = find(multi + ' .plugin-link-entry[data-plugin-path="webui/tools/index.html"]')
+        close = tools.find_element(By.XPATH, '..').find_element(By.CSS_SELECTOR, '.plugin-link-close')
+        label = '多页面插件（multi） / 配置管理（webui/tools/index.html）'
+        assert close.get_attribute('title') == '关闭：' + label
+        assert close.get_attribute('aria-label') == '关闭 ' + label
+        previous_group = find(multi)
+        close.click()
+        wait.until(conditions.staleness_of(previous_group))
+        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 2)
+        assert find('#notice-message').text == '已关闭插件页面：' + label
+        visible('#plugins')
+        screenshot('close-duplicate.png')
+        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+            'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False,
+        })
+        find('#notice').location_once_scrolled_into_view
+        assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
+        screenshot('close-duplicate-mobile.png')
+        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+            'width': 1440, 'height': 1000, 'deviceScaleFactor': 1, 'mobile': False,
+        })
+        identities['webui/tools/index.html'] = select_page('webui/tools/index.html')
+        driver.switch_to.default_content()
+        click('#notice-close')
         with host.lock:
             host.plugins['single'][0] = '独立插件'
             for page in host.plugin_pages:
@@ -255,10 +289,19 @@ def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
         tools = find(multi + ' .plugin-link-entry[data-plugin-path="webui/tools/index.html"]')
         tools.find_element(By.XPATH, '..').find_element(By.CSS_SELECTOR, '.plugin-link-close').click()
         wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 2)
+        assert find('#notice-message').text == '已关闭插件页面：多页面插件 / 工具面板'
+        screenshot('close-child.png')
         assert select_page('webui/settings/index.html') == identities['webui/settings/index.html']
         driver.switch_to.default_content()
+        click(single + ' .plugin-single-entry')
+        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 3)
+        assert find('#plugin-pages-close').get_attribute('title') == '关闭全部插件页面（2 个插件，3 个页面）'
+        previous_group = find(multi)
         click('#plugin-pages-close')
+        wait.until(conditions.staleness_of(previous_group))
         wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe'))
+        assert find('#notice-message').text == '已关闭全部插件页面（2 个插件，共 3 个页面）。'
+        screenshot('close-all.png')
         assert len(driver.find_elements(By.CSS_SELECTOR, f'{multi} .plugin-link-entry')) == 3
         select_page('webui/index.html')
         driver.switch_to.default_content()

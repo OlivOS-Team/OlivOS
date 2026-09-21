@@ -959,6 +959,18 @@ function pluginPagePath(page) {
 function embeddedPluginPage(page) {
   return page.type === 'iframe' && typeof page.path === 'string' && pluginPagePath(page) !== null;
 }
+function pluginPageLabel(page) {
+  const pages = state.pages.filter(item => embeddedPluginPage(item) || (item.type === 'link' && safeURL(item.url)));
+  const name = state.plugins[page.namespace]?.[0] || page.namespace;
+  const duplicateName = pages.some(item => item.namespace !== page.namespace &&
+    (state.plugins[item.namespace]?.[0] || item.namespace) === name);
+  const siblings = pages.filter(item => item.namespace === page.namespace);
+  let label = duplicateName ? `${name}（${page.namespace}）` : name;
+  if (siblings.length > 1 || page.title !== name) label += ` / ${page.title}`;
+  if (siblings.filter(item => item.title === page.title).length > 1)
+    label += `（${page.type === 'iframe' ? page.path : page.url}）`;
+  return label;
+}
 function appendPluginPage(container, page) {
   if (page.type === 'link') {
     const entry = element('a', page.title, {
@@ -973,8 +985,9 @@ function appendPluginPage(container, page) {
   entry.dataset.pluginPath = page.path;
   // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×。
   const close = button('×', () => closePluginPage(page), 'plugin-link-close');
-  close.title = `关闭：${page.title}`;
-  close.setAttribute('aria-label', `关闭 ${page.title}`);
+  const label = pluginPageLabel(page);
+  close.title = `关闭：${label}`;
+  close.setAttribute('aria-label', `关闭 ${label}`);
   row.append(entry, close);
   container.append(row);
   return entry;
@@ -1074,23 +1087,26 @@ function syncPluginSelection() {
     toggle.classList.toggle('contains-cached', !!group.querySelector('.plugin-link-entry.cached'));
   });
   const count = state.frames.size;
+  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
   const close = $('plugin-pages-close');
   close.hidden = count === 0;
-  close.title = count ? `关闭全部插件页面（当前 ${count} 个）` : '关闭全部插件页面';
+  close.title = count ? `关闭全部插件页面（${pluginCount} 个插件，${count} 个页面）` : '关闭全部插件页面';
+  close.setAttribute('aria-label', close.title);
 }
 function closePluginPage(page) {
   const key = frameKey(page.namespace, page.path);
   if (!state.frames.has(key)) return;
   const wasActive = state.frameNamespace === page.namespace && state.framePath === page.path;
   destroyFrame(key);
-  notify(`已关闭插件页面：${page.title}`);
+  notify(`已关闭插件页面：${pluginPageLabel(page)}`);
   if (wasActive) navigate('plugins').catch(notifyError);
 }
 function closePluginPages() {
   const count = state.frames.size;
   if (!count) return;
+  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
   destroyFrames();
-  notify(`已关闭 ${count} 个插件页面。`);
+  notify(`已关闭全部插件页面（${pluginCount} 个插件，共 ${count} 个页面）。`);
   if (state.page === 'plugin-page') navigate('plugins').catch(notifyError);
 }
 function frameKey(namespace, path) {
