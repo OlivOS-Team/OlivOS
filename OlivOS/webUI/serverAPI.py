@@ -40,7 +40,7 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import pageAPI, staticData
+from . import pageAPI, resourceAPI, staticData
 
 BUFFER_LIMIT = 500
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
@@ -108,6 +108,8 @@ class server(OlivOS.API.Proc_templet):
         self.plugins = {}
         self.plugin_pages = []
         self.plugin_roots = {}
+        self.plugin_webui_paths = {}
+        self.retired_plugin_roots = set()
         self.update_available = False
         self.pending = {}
         self.sessions = {}
@@ -213,6 +215,17 @@ class server(OlivOS.API.Proc_templet):
             raise RuntimeError('Control 总线尚未就绪')
         self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, key), block=False)
 
+    def prune_plugin_cache(self):
+        with self.lock:
+            if not self.retired_plugin_roots:
+                return
+            try:
+                resourceAPI.prune_cache(self.root, self.retired_plugin_roots)
+                self.retired_plugin_roots.clear()
+            except (OSError, ValueError) as error:
+                # Windows 正在发送的文件可能暂时占用；响应关闭后再次回收。
+                self.log(3, f'WebUI cache cleanup failed: {error}')
+
     def consume(self, packet):
         if not isinstance(packet, OlivOS.API.Control.packet) or packet.action != 'send':
             return
@@ -236,7 +249,13 @@ class server(OlivOS.API.Proc_templet):
             with self.lock:
                 self.plugins = copy.deepcopy(update.get('shallow_plugin_data_dict', {}))
                 self.plugin_pages = copy.deepcopy(update.get('shallow_plugin_webui_list', []))
-                self.plugin_roots = copy.deepcopy(update.get('shallow_plugin_webui_roots', {}))
+                roots = update.get('shallow_plugin_webui_roots', {})
+                if roots or update.get('ready'):
+                    self.retired_plugin_roots.update(set(self.plugin_roots.values()) - set(roots.values()))
+                    self.retired_plugin_roots.difference_update(roots.values())
+                    self.plugin_roots = copy.deepcopy(roots)
+                    self.plugin_webui_paths = copy.deepcopy(update.get('shallow_plugin_webui_paths', {}))
+                    self.prune_plugin_cache()
             self.publish('events', {'type': 'plugins', 'ready': update.get('ready', False),
                                     'started_at': update.get('load_started', 0)})
         elif action in TERMINAL_TYPES and data.get('hash'):

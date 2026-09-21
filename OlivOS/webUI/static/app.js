@@ -949,9 +949,14 @@ function pluginMenu(namespace) {
   if (!plugin[3]?.length) $('menu-items').append(element('p', '此插件没有声明菜单。'));
   $('menu-dialog').showModal();
 }
+function pluginPagePath(page) {
+  const path = page.path;
+  if (typeof path !== 'string' || /[\\:*?"<>|\u0000-\u001f]/.test(path)) return null;
+  if (path.split('/').some(part => !part || part.startsWith('.') || /[ .]$/.test(part))) return null;
+  return path;
+}
 function embeddedPluginPage(page) {
-  return page.type === 'iframe' && typeof page.path === 'string' &&
-    page.path.startsWith('webui/') && !page.path.split('/').includes('..');
+  return page.type === 'iframe' && typeof page.path === 'string' && pluginPagePath(page) !== null;
 }
 function renderPluginNavigation() {
   $('plugin-links').replaceChildren();
@@ -1110,12 +1115,14 @@ function destroyFrames() {
   syncPluginSelection();
 }
 async function openPluginPage(page) {
+  const routePath = pluginPagePath(page);
+  if (routePath === null) return;
   await navigate('plugin-page');
   dropExternalFrame();
   const key = frameKey(page.namespace, page.path);
   let entry = state.frames.get(key);
   if (!entry) {
-    const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
+    const filename = routePath.split('/').map(encodeURIComponent).join('/');
     const frame = element('iframe', null, {
       title: page.title,
       src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,

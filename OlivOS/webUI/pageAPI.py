@@ -32,6 +32,8 @@ from flask import abort, jsonify, request, send_file, send_from_directory
 
 import OlivOS
 
+from . import resourceAPI
+
 MASK = '********'
 # 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
 ACTIVITY_ONLINE_WINDOW = 180
@@ -613,15 +615,28 @@ def register_routes(host):
     def plugin_file(namespace, filename):
         with host.lock:
             directory = host.plugin_roots.get(namespace)
-        if not directory or not re.fullmatch(r'[\w.-]+', namespace):
-            abort(404)
-        root = Path(directory).resolve() / 'webui'
-        if not within(root, host.root / 'plugin/app') and not within(root, host.root / 'plugin/tmp'):
-            abort(404)
-        path = (root / filename).resolve()
-        if not within(path, root) or not path.is_file() or any(part.startswith('.') for part in Path(filename).parts):
-            abort(404)
-        return send_from_directory(str(root), filename)
+            if not directory or not resourceAPI.valid_namespace(namespace):
+                abort(404)
+            root = Path(directory)
+            allowed_roots = (host.root / 'plugin/app', host.root / resourceAPI.CACHE_PATH / namespace)
+            if not any(within(root, allowed) for allowed in allowed_roots):
+                abort(404)
+            resources = host.plugin_webui_paths.get(namespace, [])
+            try:
+                name = resourceAPI.relative_path(filename)
+                if not resourceAPI.allows(name, resources):
+                    abort(404)
+                resourceAPI.safe_path(host.root, root.relative_to(host.root).as_posix())
+                path = resourceAPI.safe_path(root, name)
+                if not within(path, root) or not path.is_file():
+                    abort(404)
+                # 在切换挂载与回收旧缓存之前打开响应文件。
+                response = send_from_directory(str(root), name)
+                response.direct_passthrough = False
+                response.call_on_close(host.prune_plugin_cache)
+                return response
+            except (OSError, ValueError, RuntimeError):
+                abort(404)
 
     @app.post('/api/update/check')
     def update_check():
