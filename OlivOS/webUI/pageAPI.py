@@ -379,7 +379,8 @@ def runtime_status(host):
     return {'version': OlivOS.infoAPI.OlivOS_Version_Short, 'accounts': len(accounts),
             'enabled': len(enabled), 'online': len(online & enabled), 'unknown': len(unknown),
             'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
-            'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available}
+            'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
+            'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
 
 
 def register_routes(host):

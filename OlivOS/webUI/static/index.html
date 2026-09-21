@@ -56,14 +56,24 @@
         </nav>
         <nav id="plugin-navigation" aria-label="插件页面">
           <div id="plugin-navigation-group">
-            <button
-              id="plugin-navigation-toggle"
-              type="button"
-              aria-expanded="true"
-              aria-controls="plugin-links"
-            >
-              <span class="disclosure-arrow" aria-hidden="true">▾</span>插件页面
-            </button>
+            <div id="plugin-navigation-head">
+              <button
+                id="plugin-navigation-toggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="plugin-links"
+              >
+                <span class="disclosure-arrow" aria-hidden="true">▾</span>插件页面
+              </button>
+              <span id="plugin-pages-status" aria-live="polite"></span>
+              <button
+                id="plugin-pages-close"
+                type="button"
+                title="关闭全部插件页面"
+                aria-label="关闭全部插件页面"
+                hidden
+              >×</button>
+            </div>
             <div id="plugin-links"></div>
           </div>
         </nav>

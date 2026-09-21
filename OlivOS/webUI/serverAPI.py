@@ -43,6 +43,9 @@ import OlivOS
 from . import pageAPI, staticData
 
 BUFFER_LIMIT = 500
+# 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
+PLUGIN_PAGE_CACHE = 10
+PLUGIN_PAGE_CACHE_MAX = 20
 TERMINAL_TYPES = {
     'napcat': 'napcat_lib_exe_model',
     'gocqhttp': 'gocqhttp_lib_exe_model',
@@ -54,6 +57,7 @@ TERMINAL_TYPES = {
 DEFAULT_SERVER = {
     'auto': False, 'type': 'http', 'host': '127.0.0.1', 'port': 20480,
     'token_path': './conf/webui_token.txt', 'static_path': './data/webui/static', 'buffer_limit': BUFFER_LIMIT,
+    'plugin_page_cache': PLUGIN_PAGE_CACHE,
 }
 ACTIVE_LISTENERS = {}
 
@@ -73,6 +77,12 @@ class server(OlivOS.API.Proc_templet):
         self.lock = threading.RLock()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
+        # 配置写坏时退回默认值，避免 WebUI 连带整个实例启动失败
+        try:
+            plugin_page_cache = int(self.config['plugin_page_cache'])
+        except (TypeError, ValueError):
+            plugin_page_cache = PLUGIN_PAGE_CACHE
+        self.plugin_page_cache = max(1, min(plugin_page_cache, PLUGIN_PAGE_CACHE_MAX))
         self.streams = {'logs': deque(maxlen=self.limit), 'events': deque(maxlen=self.limit)}
         self.log_levels = {level: deque(maxlen=self.limit) for level in OlivOS.diagnoseAPI.level_dict}
         self.sequence = 0
