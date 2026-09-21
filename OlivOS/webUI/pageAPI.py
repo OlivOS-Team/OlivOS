@@ -43,6 +43,25 @@ ENTRY_FIELDS = {
 }
 
 
+# 插件页 iframe 的沙箱能力，一次配齐「常规浏览器能做的事」，避免缺一个补一个。
+# 刻意不含两个 token：
+#   allow-same-origin —— 插件页与宿主 WebUI 同源，给了它就能读宿主的 token、
+#     localStorage 与 DOM，沙箱会彻底失效；
+#   allow-top-navigation —— 会把宿主 WebUI 整页导航走。
+# 注意：iframe 的 sandbox 属性（webUI/static/app.js 的 pluginSandbox）必须使用同一份
+# 列表 —— CSP 头的 sandbox 指令与 iframe 属性是两套独立机制，浏览器取更严格的那个。
+# 这里只列 iframe sandbox 属性同样合法的 token —— CSP 指令虽然额外接受
+# allow-downloads-without-user-activation，但两处取交集，写进来只会让浏览器报
+# 「is an invalid sandbox flag」且毫无收益。
+PLUGIN_SANDBOX = (
+    'sandbox allow-scripts allow-forms allow-modals allow-downloads '
+    'allow-popups allow-popups-to-escape-sandbox allow-pointer-lock '
+    'allow-orientation-lock allow-presentation '
+    'allow-top-navigation-by-user-activation '
+    'allow-storage-access-by-user-activation; '
+)
+
+
 def within(path, root):
     try:
         Path(path).resolve().relative_to(Path(root).resolve())
@@ -427,10 +446,10 @@ def register_routes(host):
         response.headers['Referrer-Policy'] = 'no-referrer'
         if request.path.startswith('/plugin/'):
             # 插件是独立沙箱，拿不到宿主 token、存储和 DOM。
-            # allow-downloads：插件页在自身页面内生成 blob 并通过 <a download> 导出
-            # （回复词 JSON、账号 zip、CCPK 等），没有它浏览器会静默拦截全部下载。
+            # 沙箱能力集中在 PLUGIN_SANDBOX 里定义，避免出现「缺一个补一个」。
             response.headers['Content-Security-Policy'] = (
-                "sandbox allow-scripts allow-downloads; default-src 'self' data: blob:; "
+                PLUGIN_SANDBOX +
+                "default-src 'self' data: blob:; "
                 "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                 "connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
                 "form-action 'none'"

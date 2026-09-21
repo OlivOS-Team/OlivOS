@@ -4,6 +4,27 @@ const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 
+// 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
+// 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
+// 刻意不含 allow-same-origin（插件页与宿主 WebUI 同源，给了等于取消沙箱）与
+// allow-top-navigation（会把宿主 WebUI 整页导航走）。
+// 注意 iframe 的 sandbox 属性只认 HTML 规范里的那几个 token：
+// allow-downloads-without-user-activation 只属于 CSP 指令，写在这里浏览器会直接报
+// 「is an invalid sandbox flag」。
+const pluginSandbox = [
+  'allow-scripts', 'allow-forms', 'allow-modals', 'allow-downloads',
+  'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-pointer-lock',
+  'allow-orientation-lock', 'allow-presentation',
+  'allow-top-navigation-by-user-activation', 'allow-storage-access-by-user-activation',
+].join(' ');
+// 外部页面是独立站点，与宿主本就跨源，可以保留真实源而不削弱隔离。
+const externalSandbox = [
+  'allow-scripts', 'allow-forms', 'allow-modals', 'allow-downloads',
+  'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-same-origin',
+  'allow-pointer-lock', 'allow-orientation-lock', 'allow-presentation',
+  'allow-top-navigation-by-user-activation',
+].join(' ');
+
 function cachedToken(value) {
   try {
     if (value === undefined) return localStorage.getItem(tokenStorageKey) || '';
@@ -1086,9 +1107,7 @@ async function openPluginPage(page) {
     const frame = element('iframe', null, {
       title: page.title,
       src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
-      // 下载由 iframe 自己的浏览上下文发起，必须在这里也放行 allow-downloads；
-      // 仅改 CSP 响应头不够（两套 sandbox 取更严格的那个）。
-      sandbox: 'allow-scripts allow-downloads',
+      sandbox: pluginSandbox,
     });
     entry = { key, frame, namespace: page.namespace, path: page.path };
     state.frames.set(key, entry);
@@ -1109,7 +1128,7 @@ async function openExternalPage(page) {
   const title = page.title || '插件页面';
   state.externalPage = { url: page.url, title };
   state.externalFrame = element('iframe', null, {
-    src: page.url, title, sandbox: 'allow-scripts allow-forms',
+    src: page.url, title, sandbox: externalSandbox,
   });
   $('plugin-frame-container').append(state.externalFrame);
   rememberPage();
