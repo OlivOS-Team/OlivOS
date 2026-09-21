@@ -960,10 +960,16 @@ function renderPluginNavigation() {
         element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
       );
     else if (embeddedPluginPage(page)) {
-      const entry = button(page.title, () => openPluginPage(page));
+      const row = element('div', null, { class: 'plugin-link-row' });
+      const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
       entry.dataset.pluginNamespace = page.namespace;
       entry.dataset.pluginPath = page.path;
-      $('plugin-links').append(entry);
+      // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×
+      const close = button('×', () => closePluginPage(page), 'plugin-link-close');
+      close.title = `关闭：${page.title}`;
+      close.setAttribute('aria-label', `关闭 ${page.title}`);
+      row.append(entry, close);
+      $('plugin-links').append(row);
     }
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
@@ -977,7 +983,7 @@ function renderPluginNavigation() {
   syncPluginSelection();
 }
 function syncPluginSelection() {
-  $('plugin-links').querySelectorAll('button').forEach((entry) => {
+  $('plugin-links').querySelectorAll('.plugin-link-entry').forEach((entry) => {
     const active = entry.dataset.pluginNamespace === state.frameNamespace &&
       entry.dataset.pluginPath === state.framePath;
     const cached = state.frames.has(
@@ -987,17 +993,22 @@ function syncPluginSelection() {
     entry.classList.toggle('cached', cached && !active);
     if (active) entry.setAttribute('aria-current', 'page');
     else entry.removeAttribute('aria-current');
+    // 单项 × 只在页面还活着时出现；用 visibility 占位，避免出现/消失时行高跳动
+    const close = entry.parentElement.querySelector('.plugin-link-close');
+    if (close) close.style.visibility = cached ? 'visible' : 'hidden';
   });
   const count = state.frames.size;
-  const limit = Math.max(1, state.frameCacheLimit);
-  const status = $('plugin-pages-status');
-  status.textContent = count ? `${count}/${limit}` : '';
-  status.title = count
-    ? `已保活 ${count} 个插件页面，上限 ${limit} 个`
-    : '';
   const close = $('plugin-pages-close');
   close.hidden = count === 0;
   close.title = count ? `关闭全部插件页面（当前 ${count} 个）` : '关闭全部插件页面';
+}
+function closePluginPage(page) {
+  const key = frameKey(page.namespace, page.path);
+  if (!state.frames.has(key)) return;
+  const wasActive = state.frameNamespace === page.namespace && state.framePath === page.path;
+  destroyFrame(key);
+  notify(`已关闭插件页面：${page.title}`);
+  if (wasActive) navigate('plugins').catch(notifyError);
 }
 function closePluginPages() {
   const count = state.frames.size;

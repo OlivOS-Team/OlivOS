@@ -322,13 +322,9 @@ nav h2 {
   flex-shrink: 0;
   min-width: 0;
 }
-#plugin-pages-status {
-  flex-shrink: 0;
-  color: var(--muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-#plugin-pages-close {
+/* 整体的 × 与每个页面右侧的单项 × 共用外观 */
+#plugin-pages-close,
+#plugin-links .plugin-link-close {
   flex-shrink: 0;
   width: 26px;
   padding: 6px 0;
@@ -339,9 +335,21 @@ nav h2 {
   font-size: 15px;
   line-height: 1;
 }
-#plugin-pages-close:hover {
+#plugin-pages-close:hover,
+#plugin-links .plugin-link-close:hover {
   background: var(--hover);
   color: var(--text);
+}
+#plugin-links .plugin-link-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0;
+}
+#plugin-links .plugin-link-row .plugin-link-entry {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
 }
 #plugin-navigation-toggle {
   flex: 1;
