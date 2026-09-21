@@ -974,7 +974,10 @@ class shallow(API.Proc_templet):
             except (OSError, ValueError, RuntimeError) as error:
                 plugin.update(webui_resources=[], webui_config=[], webui_root='')
                 self.log(4, f'WebUI resources [{namespace}]: {error}')
-        removeDir(plugin_path_tmp)
+        # 只回收本次 OPK 的解包目录，保留 tmp 根目录及其他插件的临时文件。
+        for item in plugin_models_dict.values():
+            if item['isOPK']:
+                removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
         # 插件调用列表按照优先级排序
         plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
                                              key=lambda i: (i['priority'], i['namespace']))

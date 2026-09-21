@@ -93,6 +93,7 @@ def test_assets_survive_loading_and_use_final_root(installation, relative_path):
     expected = host.root / 'plugin/tmp' / NAMESPACE if packed else source
     assert Path(plugin['model'].__file__).parent == expected
     if packed:
+        assert (host.root / 'plugin/tmp').is_dir()
         assert not expected.exists()
         cached = Path(plugin['webui_root'])
         assert cached.parent == host.root / resourceAPI.CACHE_PATH / NAMESPACE
@@ -144,7 +145,29 @@ def test_unused_opk_cache_is_still_removed(installation, registered, broken):
     install(host, NAMESPACE + '.opk', registered=registered, broken=broken)
     loader.load_plugin_list()
     assert (NAMESPACE in loader.plugin_models_dict) is not broken
+    assert (host.root / 'plugin/tmp').is_dir()
     assert not (host.root / 'plugin/tmp' / NAMESPACE).exists()
+
+
+@pytest.mark.parametrize('packed', [False, True])
+def test_cleanup_preserves_tmp_root_and_unrelated_files(installation, packed):
+    host, loader = installation
+    tmp_root = host.root / 'plugin/tmp'
+    original_root = tmp_root.stat()
+    unrelated = tmp_root / 'OtherPlugin' / 'pending.bin'
+    unrelated.parent.mkdir()
+    unrelated.write_bytes(b'ongoing plugin work')
+    root_file = tmp_root / 'pending.txt'
+    root_file.write_bytes(b'pending work')
+    install(host, NAMESPACE + ('.opk' if packed else ''))
+    # 初次加载和重载都保留根目录及与本次解包无关的临时文件。
+    for _ in range(2):
+        loader.load_plugin_list()
+        assert tmp_root.is_dir()
+        assert tmp_root.stat().st_ino == original_root.st_ino
+        assert unrelated.read_bytes() == b'ongoing plugin work'
+        assert root_file.read_bytes() == b'pending work'
+        assert not (tmp_root / NAMESPACE).exists()
 
 
 @pytest.mark.parametrize('packed', [False, True])
@@ -166,7 +189,8 @@ def test_paths_follow_manifest_without_extra_fields(installation, packed, entry,
             assert response.data == data
     assert client.get(f'/plugin/{NAMESPACE}/private.txt').status_code == 404
     if packed:
-        assert not (host.root / 'plugin/tmp').exists()
+        assert (host.root / 'plugin/tmp').is_dir()
+        assert not (host.root / 'plugin/tmp' / NAMESPACE).exists()
         cached = Path(host.plugin_roots[NAMESPACE])
         assert {p.relative_to(cached).as_posix() for p in cached.rglob('*') if p.is_file()} == set(files)
     else:
@@ -200,7 +224,8 @@ def test_init_generated_assets_are_cached_before_tmp_is_removed(installation):
     client = mount(host, loader)
     with client.get(f'/plugin/{NAMESPACE}/webui/index.html') as response:
         assert response.data == b'generated'
-    assert not (host.root / 'plugin/tmp').exists()
+    assert (host.root / 'plugin/tmp').is_dir()
+    assert not (host.root / 'plugin/tmp' / NAMESPACE).exists()
 
 
 def test_startup_reset_clears_cache_only_and_resources_can_be_rebuilt(installation):
@@ -293,7 +318,8 @@ def test_invalid_page_does_not_break_plugin_or_keep_tmp(installation, entry):
     loader.load_plugin_list()
     assert NAMESPACE in loader.plugin_models_dict
     assert not loader.plugin_models_dict[NAMESPACE]['webui_config']
-    assert not (host.root / 'plugin/tmp').exists()
+    assert (host.root / 'plugin/tmp').is_dir()
+    assert not (host.root / 'plugin/tmp' / NAMESPACE).exists()
 
 
 def test_symbolic_links_are_not_copied_or_served(installation):
