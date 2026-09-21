@@ -997,6 +997,10 @@ function postToFrame(entry, payload) {
   const target = entry && entry.frame.contentWindow;
   if (target) target.postMessage(payload, '*');
 }
+// 保活的插件页面即使被隐藏也会继续跑定时器与轮询，用可见性通知让插件能自行暂停
+function postVisibility(entry, visible) {
+  postToFrame(entry, { type: 'olivos:plugin_visibility', visible });
+}
 function touchFrame(key) {
   const at = state.frameOrder.indexOf(key);
   if (at >= 0) state.frameOrder.splice(at, 1);
@@ -1035,7 +1039,10 @@ function trimFrames() {
   if (dropped) notify(`插件页面超过保活上限 ${limit} 个，已释放最久未使用的 ${dropped} 个。`);
 }
 function showFrame(entry) {
-  for (const item of state.frames.values()) item.frame.hidden = item !== entry;
+  for (const item of state.frames.values()) {
+    item.frame.hidden = item !== entry;
+    postVisibility(item, item === entry);
+  }
   state.frame = entry ? entry.frame : null;
   state.frameNamespace = entry ? entry.namespace : null;
   state.framePath = entry ? entry.path : null;
@@ -1049,7 +1056,10 @@ function dropExternalFrame() {
 // 离开插件页签：内嵌页面留驻 DOM 保活，外部临时页面不参与缓存直接销毁
 function hideFrames() {
   dropExternalFrame();
-  for (const entry of state.frames.values()) entry.frame.hidden = true;
+  for (const entry of state.frames.values()) {
+    entry.frame.hidden = true;
+    postVisibility(entry, false);
+  }
   state.frame = null;
   state.frameNamespace = null;
   state.framePath = null;
@@ -1081,6 +1091,8 @@ async function openPluginPage(page) {
     entry = { key, frame, namespace: page.namespace, path: page.path };
     state.frames.set(key, entry);
     $('plugin-frame-container').append(frame);
+    // 加载完成时补一次可见性，避免刚就绪的页面不知道自己究竟在前台还是后台
+    frame.addEventListener('load', () => postVisibility(entry, state.frame === frame));
   }
   entry.frame.title = page.title;
   touchFrame(key);
@@ -1114,6 +1126,8 @@ window.addEventListener('message', async (ev) => {
     data.request_id.length > 128
   )
     return;
+  // 同一 request_id 仍在处理中时丢弃重复投递，避免插件页面重发导致事件被执行多次
+  if (state.requests.has(data.request_id)) return;
   if (state.requests.size >= 128) {
     notify('插件页面等待回包过多，请刷新页面。');
     return;
