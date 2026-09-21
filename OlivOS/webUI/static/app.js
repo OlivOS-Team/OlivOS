@@ -45,6 +45,7 @@ const state = {
   schema: null,
   plugins: {},
   pages: [],
+  collapsedPluginGroups: new Set(),
   terminals: [],
   selected: null,
   logs: [],
@@ -958,25 +959,82 @@ function pluginPagePath(page) {
 function embeddedPluginPage(page) {
   return page.type === 'iframe' && typeof page.path === 'string' && pluginPagePath(page) !== null;
 }
+function appendPluginPage(container, page) {
+  if (page.type === 'link') {
+    const entry = element('a', page.title, {
+      href: page.url, target: '_blank', rel: 'noopener noreferrer', class: 'plugin-link-external',
+    });
+    container.append(entry);
+    return entry;
+  }
+  const row = element('div', null, { class: 'plugin-link-row' });
+  const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
+  entry.dataset.pluginNamespace = page.namespace;
+  entry.dataset.pluginPath = page.path;
+  // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×。
+  const close = button('×', () => closePluginPage(page), 'plugin-link-close');
+  close.title = `关闭：${page.title}`;
+  close.setAttribute('aria-label', `关闭 ${page.title}`);
+  row.append(entry, close);
+  container.append(row);
+  return entry;
+}
 function renderPluginNavigation() {
   $('plugin-links').replaceChildren();
+  const groups = new Map();
   for (const page of state.pages) {
-    if (page.type === 'link' && safeURL(page.url))
-      $('plugin-links').append(
-        element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
-      );
-    else if (embeddedPluginPage(page)) {
-      const row = element('div', null, { class: 'plugin-link-row' });
-      const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
-      entry.dataset.pluginNamespace = page.namespace;
-      entry.dataset.pluginPath = page.path;
-      // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×
-      const close = button('×', () => closePluginPage(page), 'plugin-link-close');
-      close.title = `关闭：${page.title}`;
-      close.setAttribute('aria-label', `关闭 ${page.title}`);
-      row.append(entry, close);
-      $('plugin-links').append(row);
+    if (!embeddedPluginPage(page) && !(page.type === 'link' && safeURL(page.url))) continue;
+    if (!groups.has(page.namespace)) groups.set(page.namespace, []);
+    groups.get(page.namespace).push(page);
+  }
+  for (const namespace of state.collapsedPluginGroups)
+    if ((groups.get(namespace)?.length || 0) < 2) state.collapsedPluginGroups.delete(namespace);
+  const names = new Map();
+  for (const namespace of groups.keys()) {
+    const name = state.plugins[namespace]?.[0] || namespace;
+    names.set(name, (names.get(name) || 0) + 1);
+  }
+  for (const [namespace, pages] of groups) {
+    const group = element('div', null, { class: 'plugin-page-group' });
+    group.dataset.pluginNamespace = namespace;
+    const name = state.plugins[namespace]?.[0] || namespace;
+    const label = element('span', null, { class: 'plugin-group-label' });
+    label.append(element('span', name, { class: 'plugin-group-name' }));
+    if (names.get(name) > 1)
+      label.append(element('span', namespace, { class: 'plugin-group-namespace' }));
+    if (pages.length === 1) {
+      const page = pages[0];
+      const entry = appendPluginPage(group, page);
+      entry.classList.add('plugin-single-entry');
+      if (page.title !== name) label.append(element('span', page.title, { class: 'plugin-single-title' }));
+      entry.replaceChildren(label);
+      $('plugin-links').append(group);
+      continue;
     }
+    const id = `plugin-page-children-${$('plugin-links').children.length}`;
+    const toggle = button(null, () => {
+      setPluginGroupExpanded(group, toggle.getAttribute('aria-expanded') !== 'true');
+    }, 'plugin-group-toggle');
+    toggle.id = `${id}-toggle`;
+    toggle.setAttribute('aria-controls', id);
+    toggle.append(
+      element('span', '▾', { class: 'disclosure-arrow', 'aria-hidden': 'true' }),
+      label,
+      element('span', String(pages.length), { class: 'plugin-group-count', 'aria-label': `${pages.length} 个页面` }),
+    );
+    const children = element('div', null, {
+      id, class: 'plugin-group-children', role: 'group', 'aria-labelledby': toggle.id,
+    });
+    const titles = new Map();
+    for (const page of pages) titles.set(page.title, (titles.get(page.title) || 0) + 1);
+    for (const page of pages) {
+      const entry = appendPluginPage(children, page);
+      if (titles.get(page.title) > 1)
+        entry.append(element('span', page.type === 'iframe' ? page.path : page.url, { class: 'plugin-entry-path' }));
+    }
+    group.append(toggle, children);
+    setPluginGroupExpanded(group, !state.collapsedPluginGroups.has(namespace));
+    $('plugin-links').append(group);
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
   let unloaded = false;
@@ -987,6 +1045,12 @@ function renderPluginNavigation() {
   }
   if (unloaded) notify('插件页面已卸载。');
   syncPluginSelection();
+}
+function setPluginGroupExpanded(group, expanded) {
+  group.querySelector('.plugin-group-toggle').setAttribute('aria-expanded', String(expanded));
+  group.querySelector('.plugin-group-children').hidden = !expanded;
+  if (expanded) state.collapsedPluginGroups.delete(group.dataset.pluginNamespace);
+  else state.collapsedPluginGroups.add(group.dataset.pluginNamespace);
 }
 function syncPluginSelection() {
   $('plugin-links').querySelectorAll('.plugin-link-entry').forEach((entry) => {
@@ -1002,6 +1066,12 @@ function syncPluginSelection() {
     // 单项 × 只在页面还活着时出现；用 visibility 占位，避免出现/消失时行高跳动
     const close = entry.parentElement.querySelector('.plugin-link-close');
     if (close) close.style.visibility = cached ? 'visible' : 'hidden';
+  });
+  $('plugin-links').querySelectorAll('.plugin-page-group').forEach((group) => {
+    const toggle = group.querySelector('.plugin-group-toggle');
+    if (!toggle) return;
+    toggle.classList.toggle('contains-active', !!group.querySelector('.plugin-link-entry.active'));
+    toggle.classList.toggle('contains-cached', !!group.querySelector('.plugin-link-entry.cached'));
   });
   const count = state.frames.size;
   const close = $('plugin-pages-close');
@@ -1137,6 +1207,9 @@ async function openPluginPage(page) {
   entry.frame.title = page.title;
   touchFrame(key);
   showFrame(entry);
+  for (const group of $('plugin-links').querySelectorAll('.plugin-page-group'))
+    if (group.dataset.pluginNamespace === page.namespace && group.querySelector('.plugin-group-toggle'))
+      setPluginGroupExpanded(group, true);
   trimFrames();
   $('page-title').textContent = page.title;
   rememberPage();
