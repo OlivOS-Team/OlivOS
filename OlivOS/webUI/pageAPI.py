@@ -50,9 +50,10 @@ ENTRY_FIELDS = {
 #   allow-top-navigation —— 会把宿主 WebUI 整页导航走。
 # 注意：iframe 的 sandbox 属性（webUI/static/app.js 的 pluginSandbox）必须使用同一份
 # 列表 —— CSP 头的 sandbox 指令与 iframe 属性是两套独立机制，浏览器取更严格的那个。
-# 这里只列 iframe sandbox 属性同样合法的 token —— CSP 指令虽然额外接受
-# allow-downloads-without-user-activation，但两处取交集，写进来只会让浏览器报
-# 「is an invalid sandbox flag」且毫无收益。
+# 只列两套机制都合法的 token。注意不要加 allow-downloads-without-user-activation：
+# `allow-downloads` 本身已允许「无用户手势也能下载」，而那个 token 既不在 CSP sandbox
+# 的合法值列表里、也不是 iframe 的合法 token，写进 iframe 属性浏览器会直接报
+# 「is an invalid sandbox flag」。
 PLUGIN_SANDBOX = (
     'sandbox allow-scripts allow-forms allow-modals allow-downloads '
     'allow-popups allow-popups-to-escape-sandbox allow-pointer-lock '
