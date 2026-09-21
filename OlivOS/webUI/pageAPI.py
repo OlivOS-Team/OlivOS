@@ -53,12 +53,28 @@ def within(path, root):
 
 def open_directory(path):
     # 交给运行 OlivOS 的机器上的文件管理器打开，浏览器无法直接访问本地目录。
+    target = str(path)
     if os.name == 'nt':
-        os.startfile(str(path))
-    elif sys.platform == 'darwin':
-        subprocess.Popen(['open', str(path)])
+        os.startfile(target)
+        return
+    if sys.platform == 'darwin':
+        command = ['open', target]
     else:
-        subprocess.Popen(['xdg-open', str(path)])
+        # 没有桌面会话时 xdg-open 必然失败，提前给出原因而不是假装打开成功
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            raise OSError('运行 OlivOS 的环境没有可用的桌面会话，无法打开文件管理器')
+        command = ['xdg-open', target]
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        raise OSError(f'无法调用系统文件管理器：{error}') from error
+    try:
+        # 失败时 opener 会立刻返回非 0；成功时它可能驻留为文件管理器本身，故超时即视为已交付
+        code = process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        return
+    if code != 0:
+        raise OSError(f'系统文件管理器返回 {code}，可能没有可用的桌面环境')
 
 
 def safe_url(value):
@@ -535,7 +551,11 @@ def register_routes(host):
         directory = (host.root / 'plugin/app').resolve()
         if not directory.is_dir():
             raise ValueError('插件目录不存在')
-        open_directory(directory)
+        try:
+            open_directory(directory)
+        except OSError as error:
+            # 回传真实原因，避免落到「无法读取文件」这个与打开目录无关的通用处理器
+            return jsonify(error=str(error)), 500
         return jsonify(ok=True, path=str(directory))
 
     @app.post('/api/plugins/reload')
