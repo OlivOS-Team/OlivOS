@@ -756,7 +756,6 @@ class shallow(API.Proc_templet):
                             if 'menu_config' in plugin_models_app_conf:
                                 plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
                             plugin_models_dict_this['webui_config'] = plugin_models_app_conf.get('webui_config')
-                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.dirname(app_json_path))
                             if 'message_mode' in plugin_models_app_conf:
                                 plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
                             else:
@@ -821,6 +820,12 @@ class shallow(API.Proc_templet):
                                     )
                                     removeDir(os.path.join(plugin_path_tmp, plugin_dir_this))
                                     plugin_dir_this = plugin_namespace
+                                plugin_models_dict_this['module_name'] = plugin_namespace
+
+                            # OPK 可能已按 namespace 移动，页面必须挂载到最终目录。
+                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.join(
+                                plugin_path_tmp if flag_is_opk else plugin_path, plugin_dir_this
+                            ))
 
                             # 完成配置数据库中对应插件命名空间的表格页初始化
                             self.database._init_namespace(plugin_models_dict_this['namespace'])
@@ -872,7 +877,10 @@ class shallow(API.Proc_templet):
                     plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
                 )
                 # 获取插件所在的父目录
-                plugin_folder_path = plugin_models_dict_this.get('folder_path', '')
+                plugin_folder_path = (
+                    os.path.dirname(plugin_dir_this) if flag_is_opk
+                    else plugin_models_dict_this.get('folder_path', '')
+                )
                 if plugin_folder_path:
                     # 插件在子目录中,需要将父目录添加到 sys.path
                     if flag_is_opk:
@@ -941,11 +949,29 @@ class shallow(API.Proc_templet):
                     [plugin_namespace, self.Proc_name, skip_result]
                 ))
 
-        # 清理opk格式插件缓存
+        # 清理 OPK 导入缓存；已加载插件的 webui/ 需要继续供页面路由读取。
         for plugin_models_dict_this in plugin_models_dict:
             if plugin_models_dict[plugin_models_dict_this]['isOPK']:
                 plugin_dir = plugin_models_dict[plugin_models_dict_this].get('plugin_dir', plugin_models_dict_this)
-                removeDir(os.path.join(plugin_path_tmp, plugin_dir))
+                cache_root = os.path.join(plugin_path_tmp, plugin_dir)
+                loaded_plugin = self.plugin_models_dict.get(plugin_models_dict_this, {})
+                if isinstance(loaded_plugin.get('webui_config'), list):
+                    try:
+                        for name in os.listdir(cache_root):
+                            if name == 'webui':
+                                continue
+                            path = os.path.join(cache_root, name)
+                            if os.path.isdir(path) and not os.path.islink(path):
+                                removeDir(path)
+                            else:
+                                try:
+                                    os.remove(path)
+                                except OSError:
+                                    pass
+                    except OSError:
+                        pass
+                else:
+                    removeDir(cache_root)
         # 插件调用列表按照优先级排序
         plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
                                              key=lambda i: (i['priority'], i['namespace']))
