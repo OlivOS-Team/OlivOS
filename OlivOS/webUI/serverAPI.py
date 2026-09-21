@@ -62,6 +62,23 @@ DEFAULT_SERVER = {
 ACTIVE_LISTENERS = {}
 
 
+def apply_environment_config(config):
+    """环境变量覆盖监听配置，仅影响当前进程，不写回配置文件。"""
+    host = os.environ.get('OLIVOS_WEBUI_HOST')
+    if isinstance(host, str) and host.strip():
+        config['host'] = host.strip()
+
+    port = os.environ.get('OLIVOS_WEBUI_PORT')
+    if port is not None:
+        try:
+            port_value = int(port)
+        except (TypeError, ValueError):
+            port_value = None
+        if port_value is not None and 0 <= port_value <= 65535:
+            config['port'] = port_value
+    return config
+
+
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name='OlivOS_webUI', scan_interval=0.02, dead_interval=1,
                  rx_queue=None, tx_queue=None, control_queue=None, logger_proc=None,
@@ -70,7 +87,7 @@ class server(OlivOS.API.Proc_templet):
         super().__init__(Proc_name, 'webUI', scan_interval, dead_interval, rx_queue, tx_queue,
                          control_queue, logger_proc)
         self.root = Path(root_path or os.getcwd()).resolve()
-        self.config = dict(DEFAULT_SERVER, **(server_conf or {}))
+        self.config = apply_environment_config(dict(DEFAULT_SERVER, **(server_conf or {})))
         self.account_path = self.root / account_path
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
@@ -550,6 +567,7 @@ def browser_url(root_path=None):
             enabled = model.get('enable', enabled)
         except (OSError, ValueError, KeyError):
             pass
+    apply_environment_config(config)
     try:
         active = json.loads((root / 'data/webui/listen.json').read_text(encoding='utf-8'))
         if listener_valid(active, root):
