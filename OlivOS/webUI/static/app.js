@@ -211,6 +211,7 @@ async function login(ev, token = null) {
   try {
     state.token = token ?? $('token').value.trim();
     const result = await api('/api/login', { method: 'POST' });
+    state.token = result.browser_token;
     cachedToken(state.token);
     state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
@@ -1473,7 +1474,9 @@ window.addEventListener('pageshow', (ev) => {
     }
   });
   const savedToken = cachedToken();
-  if (savedToken) login(null, savedToken);
+  if (savedToken?.startsWith('webui.')) login(null, savedToken);
+  // 旧版缓存的是长期 Token，升级后需要手动登录一次才能换成本次运行的凭据。
+  else if (savedToken) resetLogin('登录已失效，请重新输入 Token。');
   else {
     $('loading').hidden = true;
     $('login').hidden = false;

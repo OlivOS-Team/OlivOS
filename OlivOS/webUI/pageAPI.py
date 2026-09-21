@@ -488,7 +488,7 @@ def register_routes(host):
     def login():
         with host.lock:
             session = host.new_session()
-            response = jsonify(session=session, cursor=host.sequence)
+            response = jsonify(session=session, cursor=host.sequence, browser_token=host.browser_token)
         response.set_cookie('olivos_webui', session, httponly=True, samesite='Strict',
                             secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
         return response

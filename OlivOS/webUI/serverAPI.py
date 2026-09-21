@@ -91,6 +91,7 @@ class server(OlivOS.API.Proc_templet):
         self.account_path = self.root / account_path
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
+        self._browser_key = secrets.token_bytes(32)
         self.lock = threading.RLock()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
@@ -140,6 +141,11 @@ class server(OlivOS.API.Proc_templet):
         self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
         pageAPI.register_routes(self)
 
+    @property
+    def browser_token(self):
+        # 浏览器缓存仅在本次运行有效；原 Token 改变时，缓存也随之失效。
+        return 'webui.' + hmac.new(self._browser_key, self.token.encode(), 'sha256').hexdigest()
+
     def authenticate(self, token, address, origin=None, host=None):
         """REST 与 WS 共用认证与限流；不信任客户端提供的转发地址。"""
         if origin:
@@ -153,7 +159,10 @@ class server(OlivOS.API.Proc_templet):
                 attempts.popleft()
             if len(attempts) >= 10:
                 return 429
-            valid = isinstance(token, str) and hmac.compare_digest(token.encode(), self.token.encode())
+            valid = isinstance(token, str) and (
+                hmac.compare_digest(token.encode(), self.token.encode())
+                or hmac.compare_digest(token.encode(), self.browser_token.encode())
+            )
             if valid:
                 self.failures.pop(address, None)
                 return 200
