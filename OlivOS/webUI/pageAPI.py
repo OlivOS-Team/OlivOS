@@ -427,9 +427,12 @@ def register_routes(host):
         response.headers['Referrer-Policy'] = 'no-referrer'
         if request.path.startswith('/plugin/'):
             # 插件是独立沙箱，拿不到宿主 token、存储和 DOM。
+            # allow-downloads：插件页在自身页面内生成 blob 并通过 <a download> 导出
+            # （回复词 JSON、账号 zip、CCPK 等），没有它浏览器会静默拦截全部下载。
             response.headers['Content-Security-Policy'] = (
-                "sandbox allow-scripts; default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; "
-                "style-src 'self' 'unsafe-inline'; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
+                "sandbox allow-scripts allow-downloads; default-src 'self' data: blob:; "
+                "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                "connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
                 "form-action 'none'"
             )
         else:
