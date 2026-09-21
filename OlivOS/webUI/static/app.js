@@ -1086,7 +1086,9 @@ async function openPluginPage(page) {
     const frame = element('iframe', null, {
       title: page.title,
       src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
-      sandbox: 'allow-scripts',
+      // 下载由 iframe 自己的浏览上下文发起，必须在这里也放行 allow-downloads；
+      // 仅改 CSP 响应头不够（两套 sandbox 取更严格的那个）。
+      sandbox: 'allow-scripts allow-downloads',
     });
     entry = { key, frame, namespace: page.namespace, path: page.path };
     state.frames.set(key, entry);
