@@ -219,6 +219,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
 
 async function login(ev, token = null) {
   ev?.preventDefault();
+  const generation = ++state.authGeneration;
   $('login-error').textContent = '';
   const submit = $('login-form').querySelector('button');
   submit.disabled = true;
@@ -267,8 +268,10 @@ async function login(ev, token = null) {
     $('login').hidden = false;
     $('login-error').textContent = error.message;
   } finally {
-    $('loading').hidden = true;
-    submit.disabled = false;
+    if (generation === state.authGeneration) {
+      $('loading').hidden = true;
+      submit.disabled = false;
+    }
   }
 }
 async function logout() {
@@ -306,6 +309,7 @@ function resetLogin(message = '') {
   hideNotice();
   $('token').value = '';
   $('login-error').textContent = message;
+  $('login-form').querySelector('button').disabled = false;
 }
 function checkCachedLogin() {
   if (!state.token || !state.cachedLogin) return;

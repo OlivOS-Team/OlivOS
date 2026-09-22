@@ -67,6 +67,63 @@ def test_browser_login_cache_expires_when_token_changes(client, host):
 
 
 @pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='设置 OLIVOS_WEBUI_BROWSER=1 运行浏览器验证')
+@pytest.mark.parametrize('reset_between', [False, True])
+def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
+    pytest.importorskip('selenium')
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    host.config.update(host='127.0.0.1', port=0)
+    worker = threading.Thread(target=host.run, daemon=True)
+    worker.start()
+    driver = None
+    try:
+        assert host.ready.wait(5) and host.error is None
+        options = webdriver.ChromeOptions()
+        for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
+                         f'--user-data-dir={host.root / "login-race-profile"}'):
+            options.add_argument(argument)
+        driver_path = os.environ.get('OLIVOS_CHROMEDRIVER')
+        service = Service(executable_path=driver_path) if driver_path else None
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.get(f"http://127.0.0.1:{host.config['port']}")
+        driver.find_element(By.ID, 'token').send_keys(host.token)
+        driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
+        WebDriverWait(driver, 10).until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
+        result = driver.execute_async_script('''
+            const done = arguments[arguments.length - 1];
+            const resetBetween = arguments[0];
+            const originalFetch = window.fetch;
+            const credential = state.token;
+            const pending = [];
+            resetLogin();
+            window.fetch = (path, options) => path === '/api/login'
+              ? new Promise((resolve, reject) => pending.push({path, options, resolve, reject}))
+              : originalFetch(path, options);
+            const oldAttempt = login(null, credential);
+            if (resetBetween) resetLogin();
+            const newAttempt = login(null, credential);
+            pending[0].reject(new TypeError('delayed network error'));
+            oldAttempt.then(async () => {
+              const stayedDisabled = document.querySelector('#login-form button').disabled;
+              const reply = await originalFetch(pending[1].path, pending[1].options);
+              pending[1].resolve(reply);
+              await newAttempt;
+              window.fetch = originalFetch;
+              done({stayedDisabled, loggedIn: !document.getElementById('shell').hidden});
+            });
+        ''', reset_between)
+        assert result == {'stayedDisabled': True, 'loggedIn': True}
+    finally:
+        if driver is not None:
+            driver.quit()
+        host.on_terminate()
+        worker.join(timeout=5)
+
+
+@pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='设置 OLIVOS_WEBUI_BROWSER=1 运行浏览器验证')
 def test_browser_restart_requires_token(host):
     pytest.importorskip('selenium')
     from selenium import webdriver
