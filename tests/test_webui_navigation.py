@@ -114,6 +114,8 @@ def browser(navigation_host, tmp_path):
     from selenium.webdriver.support.ui import WebDriverWait
 
     options = webdriver.ChromeOptions()
+    if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
+        options.add_argument('--no-sandbox')
     for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
                      '--window-size=1440,1000', f'--user-data-dir={tmp_path / "browser-profile"}'):
         options.add_argument(argument)

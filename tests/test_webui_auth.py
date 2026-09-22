@@ -82,6 +82,8 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
     try:
         assert host.ready.wait(5) and host.error is None
         options = webdriver.ChromeOptions()
+        if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
+            options.add_argument('--no-sandbox')
         if os.environ.get('OLIVOS_CHROME_BINARY'):
             options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
         for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
@@ -135,6 +137,8 @@ def browser_auth(host):
     from selenium.webdriver.support.ui import WebDriverWait
 
     options = webdriver.ChromeOptions()
+    if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
+        options.add_argument('--no-sandbox')
     for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
                      f'--user-data-dir={host.root / "auth-profile"}'):
         options.add_argument(argument)
