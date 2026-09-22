@@ -35,7 +35,9 @@ on:
 
 jobs:
   build:
-    if: inputs.enable && inputs.runs-on == 'ubuntu-latest'
+    # 原来是写死的 inputs.runs-on == 'ubuntu-latest'，arm64 任务换成
+    # ubuntu-24.04-arm 之后这个条件会直接变 false，job 被静默跳过。
+    if: inputs.enable && startsWith(inputs.runs-on, 'ubuntu-')
     runs-on: ${{ inputs.runs-on }}
     # container:
     #   image: node:20-alpine
@@ -94,7 +96,8 @@ jobs:
     
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
-      if: inputs.name == 'OlivOS-Linux64-release'
+      if: inputs.name == 'OlivOS-Linux64-release' || inputs.name == 'OlivOS-Linux64-arm64-release'
       with:
-        name: OlivOS-Linux
+        # arm64 用单独的 artifact 名，release-draft 那边按名字分别下载
+        name: ${{ inputs.arch == 'arm64' && 'OlivOS-Linux-arm64' || 'OlivOS-Linux' }}
         path: ./OlivOS-PKG
