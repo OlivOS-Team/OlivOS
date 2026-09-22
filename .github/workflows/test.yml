@@ -57,10 +57,8 @@ jobs:
             test-results/chrome-startup.log; then
             exit 1
           fi
-          fallback_profile=$(mktemp -d)
-          timeout 20s "$OLIVOS_CHROME_BINARY" --headless=new --no-first-run --no-sandbox \
-            --user-data-dir="$fallback_profile" --dump-dom about:blank \
-            > test-results/chrome-fallback.html 2> test-results/chrome-fallback.log
+          # Selenium verifies the fallback by opening real sessions; dump-dom can wait on
+          # background services in headless runners even after the browser has started.
           echo 'OLIVOS_CHROME_NO_SANDBOX=1' >> "$GITHUB_ENV"
       - name: Run functional tests with line and branch coverage
         run: >-
