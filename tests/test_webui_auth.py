@@ -128,7 +128,7 @@ def test_browser_restart_requires_token(host):
         assert driver.execute_script("return localStorage.getItem('olivos.webui.token') === null")
         assert not driver.find_element(By.ID, 'token').get_attribute('value')
         assert not driver.find_element(By.ID, 'shell').is_displayed()
-        assert driver.find_element(By.ID, 'login-error').text == '登录已失效，请重新输入 Token。'
+        assert driver.find_element(By.ID, 'login-error').text == ''
         assert not driver.find_element(By.ID, 'notice').is_displayed()
 
     try:
@@ -225,7 +225,7 @@ def test_browser_restart_requires_token(host):
                   {status: arguments[0]}));
             ''', status)
             logged_out()
-            assert driver.execute_script('return window.authFailures[0].message') == '登录已失效，请重新输入 Token。'
+            assert driver.execute_script('return window.authFailures[0].message') == ''
             login()
             driver.execute_script('''
                 window.authPending[1].resolve(new Response(JSON.stringify({error: '认证失败'}), {status: 401}));
@@ -249,6 +249,21 @@ def test_browser_restart_requires_token(host):
         ''')
         assert message == '尝试过多，请一分钟后重试'
         visible('shell')
+
+        # 主动退出、重新进入和跨标签页清除缓存均安静显示登录页。
+        driver.find_element(By.ID, 'logout').click()
+        logged_out()
+        driver.refresh()
+        logged_out()
+        failed_manual_login()
+        driver.save_screenshot(str(screenshots / 'manual-token-failure.png'))
+        login()
+        driver.execute_script('''
+            localStorage.removeItem('olivos.webui.token');
+            window.dispatchEvent(new StorageEvent('storage', {key: 'olivos.webui.token'}));
+        ''')
+        logged_out()
+        driver.save_screenshot(str(screenshots / 'silent-login.png'))
     except Exception:
         if driver is not None:
             driver.execute_script("document.getElementById('token').value = ''")

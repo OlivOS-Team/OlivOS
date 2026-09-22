@@ -3,7 +3,6 @@
 const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
-const loginExpiredMessage = '登录已失效，请重新输入 Token。';
 
 // 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
 // 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
@@ -151,7 +150,7 @@ async function api(path, options = {}) {
     throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
   if (!response.ok) {
     const authHandled = response.status === 401 || response.status === 403;
-    const message = authHandled ? authMessage || loginExpiredMessage : data.error || `请求失败 (${response.status})`;
+    const message = authHandled ? authMessage ?? '' : data.error || `请求失败 (${response.status})`;
     if (authHandled) resetLogin(message);
     const error = new Error(message);
     error.status = response.status;
@@ -227,7 +226,7 @@ async function login(ev, token = null) {
     state.token = token ?? $('token').value.trim();
     const result = await api('/api/login', {
       method: 'POST',
-      authMessage: token === null ? '认证失败' : loginExpiredMessage,
+      authMessage: token === null ? '认证失败' : '',
     });
     state.token = result.browser_token;
     cachedToken(state.token);
@@ -312,7 +311,7 @@ function checkCachedLogin() {
   if (!state.token || !state.cachedLogin) return;
   try {
     if (localStorage.getItem(tokenStorageKey) !== state.token) {
-      resetLogin('登录缓存已清除或改变，请重新登录。');
+      resetLogin();
     }
   } catch {
     // 存储暂不可用不等同于凭据失效。
@@ -1589,7 +1588,7 @@ window.addEventListener('pageshow', (ev) => {
   const savedToken = cachedToken();
   if (savedToken?.startsWith('webui.')) login(null, savedToken);
   // 旧版缓存的是长期 Token，升级后需要手动登录一次才能换成本次运行的凭据。
-  else if (savedToken) resetLogin(loginExpiredMessage);
+  else if (savedToken) resetLogin();
   else {
     $('loading').hidden = true;
     $('login').hidden = false;
