@@ -226,6 +226,25 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: false
+
+          # 公开仓库的 arm64 托管 runner 是免费的（4 vCPU），
+          # x86 runner 上装 arm64 的 Python 跑不起来，必须换 arm64 runner。
+          #
+          # Python 用 3.11 而不是 amd64 那条的 3.10.8：gevent 26.9.0 只发布了
+          # x86_64 的 cp310 轮子，aarch64 从 cp311 才开始，用 3.10 的话 arm64
+          # 会退回 gevent 25.9.1，两个架构的依赖版本就对不上了。
+          # 3.11 也是这里能用的上限：Pillow 被钉在 9.3.0，而它只发到 cp311
+          # 的轮子，再往上（3.12/3.13）就得源码编译 Pillow。
+          # 不写死补丁号，让 setup-python 取最新的 3.11.x。
+          - name: OlivOS-Linux64-arm64-release
+            enable: true
+            runs-on: ubuntu-24.04-arm
+            python-version: '3.11'
+            arch: arm64
+            python-arch: arm64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
     with:
       name: ${{ matrix.name }}
       enable: ${{ matrix.enable }}
@@ -263,10 +282,13 @@ jobs:
             build-type: pack
             debug: false
 
+          # 下面两条 arm64 的常驻任务保持关闭，arm64 的正式产物由
+          # build-linux-publish 负责，开着会重复构建一遍。
+          # runner 与 Python 版本都已经改成 arm64 那套，要手动跑直接开 enable。
           - name: OlivOS-Linux64-ARM64-release
             enable: false
-            runs-on: ubuntu-latest
-            python-version: '3.10.8'
+            runs-on: ubuntu-24.04-arm
+            python-version: '3.11'
             arch: arm64
             python-arch: arm64
             freethreaded: false
@@ -275,8 +297,8 @@ jobs:
 
           - name: OlivOS-Linux64-ARM64-nuitka
             enable: false
-            runs-on: ubuntu-latest
-            python-version: '3.10.8'
+            runs-on: ubuntu-24.04-arm
+            python-version: '3.11'
             arch: arm64
             python-arch: arm64
             freethreaded: false
@@ -376,6 +398,12 @@ jobs:
           name: OlivOS-Linux
           path: OlivOS-Linux/
       
+      - name: Download Linux arm64 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-Linux-arm64
+          path: OlivOS-Linux-arm64/
+      
       - name: Packing Release
         run: |
           cd ./OlivOS-Win
@@ -387,6 +415,11 @@ jobs:
           zip -r ../OlivOS-Linux.zip ./
           cd ../
           cp ./OlivOS-Linux.zip ./OlivOS-Linux-${{ github.ref_name }}.zip
+          
+          cd ./OlivOS-Linux-arm64
+          zip -r ../OlivOS-Linux-arm64.zip ./
+          cd ../
+          cp ./OlivOS-Linux-arm64.zip ./OlivOS-Linux-arm64-${{ github.ref_name }}.zip
           
           ls -R
       
@@ -403,3 +436,5 @@ jobs:
             ./OlivOS-Win-${{ github.ref_name }}.zip
             ./OlivOS-Linux.zip
             ./OlivOS-Linux-${{ github.ref_name }}.zip
+            ./OlivOS-Linux-arm64.zip
+            ./OlivOS-Linux-arm64-${{ github.ref_name }}.zip
