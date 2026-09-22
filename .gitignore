@@ -3,6 +3,7 @@ plugin/app/*
 plugin/conf/*
 plugin/data/*
 plugin/tmp/*
+plugin/cache/webui/
 resource/tmp_*
 logfile/*
 flake8_output.log

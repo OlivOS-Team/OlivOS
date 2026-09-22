@@ -45,6 +45,7 @@ const state = {
   schema: null,
   plugins: {},
   pages: [],
+  collapsedPluginGroups: new Set(),
   terminals: [],
   selected: null,
   logs: [],
@@ -123,24 +124,37 @@ function notify(message) {
   noticeTimer = setTimeout(hideNotice, 5000);
 }
 function notifyError(error) {
+  if (error.authHandled || error.authObsolete) return;
   notify(error.message || String(error));
 }
 async function api(path, options = {}) {
   const generation = state.authGeneration;
-  const headers = { 'X-Auth-Token': state.token, ...options.headers };
-  if (options.body !== undefined) {
+  const authMessage = options.authMessage;
+  const requestOptions = { ...options };
+  delete requestOptions.authMessage;
+  const headers = { 'X-Auth-Token': state.token, ...requestOptions.headers };
+  if (requestOptions.body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(options.body);
+    requestOptions.body = JSON.stringify(requestOptions.body);
   }
-  const response = await fetch(path, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(path, { ...requestOptions, headers });
+  } catch (error) {
+    if (generation !== state.authGeneration) error.authObsolete = true;
+    throw error;
+  }
   const data = await response.json().catch(() => ({ error: `请求失败 (${response.status})` }));
-  if (generation !== state.authGeneration) throw new Error('登录状态已改变');
+  // 旧登录状态的响应不再改变当前页面，避免覆盖失效提示或打断重新登录。
+  if (generation !== state.authGeneration)
+    throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      resetLogin('登录已失效，请重新输入 Token。');
-    }
-    const error = new Error(data.error || `请求失败 (${response.status})`);
+    const authHandled = response.status === 401 || response.status === 403;
+    const message = authHandled ? authMessage ?? '' : data.error || `请求失败 (${response.status})`;
+    if (authHandled) resetLogin(message);
+    const error = new Error(message);
     error.status = response.status;
+    error.authHandled = authHandled;
     throw error;
   }
   return data;
@@ -205,12 +219,17 @@ function stream(name, path, onBatch, onStatus = () => {}) {
 
 async function login(ev, token = null) {
   ev?.preventDefault();
+  const generation = ++state.authGeneration;
   $('login-error').textContent = '';
   const submit = $('login-form').querySelector('button');
   submit.disabled = true;
   try {
     state.token = token ?? $('token').value.trim();
-    const result = await api('/api/login', { method: 'POST' });
+    const result = await api('/api/login', {
+      method: 'POST',
+      authMessage: token === null ? '认证失败' : '',
+    });
+    state.token = result.browser_token;
     cachedToken(state.token);
     state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
@@ -240,7 +259,7 @@ async function login(ev, token = null) {
       checkCachedLogin();
     }, 10000);
   } catch (error) {
-    if (error.status === 401 || error.status === 403) cachedToken('');
+    if (error.authHandled || error.authObsolete) return;
     for (const name of [...state.streams.keys()]) closeStream(name);
     clearInterval(state.timer);
     state.token = '';
@@ -249,8 +268,10 @@ async function login(ev, token = null) {
     $('login').hidden = false;
     $('login-error').textContent = error.message;
   } finally {
-    $('loading').hidden = true;
-    submit.disabled = false;
+    if (generation === state.authGeneration) {
+      $('loading').hidden = true;
+      submit.disabled = false;
+    }
   }
 }
 async function logout() {
@@ -288,12 +309,13 @@ function resetLogin(message = '') {
   hideNotice();
   $('token').value = '';
   $('login-error').textContent = message;
+  $('login-form').querySelector('button').disabled = false;
 }
 function checkCachedLogin() {
   if (!state.token || !state.cachedLogin) return;
   try {
     if (localStorage.getItem(tokenStorageKey) !== state.token) {
-      resetLogin('登录缓存已清除或改变，请重新登录。');
+      resetLogin();
     }
   } catch {
     // 存储暂不可用不等同于凭据失效。
@@ -948,29 +970,104 @@ function pluginMenu(namespace) {
   if (!plugin[3]?.length) $('menu-items').append(element('p', '此插件没有声明菜单。'));
   $('menu-dialog').showModal();
 }
+function pluginPagePath(page) {
+  const path = page.path;
+  if (typeof path !== 'string' || /[\\:*?"<>|\u0000-\u001f]/.test(path)) return null;
+  if (path.split('/').some(part => !part || part.startsWith('.') || /[ .]$/.test(part))) return null;
+  return path;
+}
 function embeddedPluginPage(page) {
-  return page.type === 'iframe' && typeof page.path === 'string' &&
-    page.path.startsWith('webui/') && !page.path.split('/').includes('..');
+  return page.type === 'iframe' && typeof page.path === 'string' && pluginPagePath(page) !== null;
+}
+function pluginPageLabel(page) {
+  const pages = state.pages.filter(item => embeddedPluginPage(item) || (item.type === 'link' && safeURL(item.url)));
+  const name = state.plugins[page.namespace]?.[0] || page.namespace;
+  const duplicateName = pages.some(item => item.namespace !== page.namespace &&
+    (state.plugins[item.namespace]?.[0] || item.namespace) === name);
+  const siblings = pages.filter(item => item.namespace === page.namespace);
+  let label = duplicateName ? `${name}（${page.namespace}）` : name;
+  if (siblings.length > 1 || page.title !== name) label += ` / ${page.title}`;
+  if (siblings.filter(item => item.title === page.title).length > 1)
+    label += `（${page.type === 'iframe' ? page.path : page.url}）`;
+  return label;
+}
+function appendPluginPage(container, page) {
+  if (page.type === 'link') {
+    const entry = element('a', page.title, {
+      href: page.url, target: '_blank', rel: 'noopener noreferrer', class: 'plugin-link-external',
+    });
+    container.append(entry);
+    return entry;
+  }
+  const row = element('div', null, { class: 'plugin-link-row' });
+  const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
+  entry.dataset.pluginNamespace = page.namespace;
+  entry.dataset.pluginPath = page.path;
+  // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×。
+  const close = button('×', () => closePluginPage(page), 'plugin-link-close');
+  const label = pluginPageLabel(page);
+  close.title = `关闭：${label}`;
+  close.setAttribute('aria-label', `关闭 ${label}`);
+  row.append(entry, close);
+  container.append(row);
+  return entry;
 }
 function renderPluginNavigation() {
   $('plugin-links').replaceChildren();
+  const groups = new Map();
   for (const page of state.pages) {
-    if (page.type === 'link' && safeURL(page.url))
-      $('plugin-links').append(
-        element('a', page.title, { href: page.url, target: '_blank', rel: 'noopener noreferrer' }),
-      );
-    else if (embeddedPluginPage(page)) {
-      const row = element('div', null, { class: 'plugin-link-row' });
-      const entry = button(page.title, () => openPluginPage(page), 'plugin-link-entry');
-      entry.dataset.pluginNamespace = page.namespace;
-      entry.dataset.pluginPath = page.path;
-      // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×
-      const close = button('×', () => closePluginPage(page), 'plugin-link-close');
-      close.title = `关闭：${page.title}`;
-      close.setAttribute('aria-label', `关闭 ${page.title}`);
-      row.append(entry, close);
-      $('plugin-links').append(row);
+    if (!embeddedPluginPage(page) && !(page.type === 'link' && safeURL(page.url))) continue;
+    if (!groups.has(page.namespace)) groups.set(page.namespace, []);
+    groups.get(page.namespace).push(page);
+  }
+  for (const namespace of state.collapsedPluginGroups)
+    if ((groups.get(namespace)?.length || 0) < 2) state.collapsedPluginGroups.delete(namespace);
+  const names = new Map();
+  for (const namespace of groups.keys()) {
+    const name = state.plugins[namespace]?.[0] || namespace;
+    names.set(name, (names.get(name) || 0) + 1);
+  }
+  for (const [namespace, pages] of groups) {
+    const group = element('div', null, { class: 'plugin-page-group' });
+    group.dataset.pluginNamespace = namespace;
+    const name = state.plugins[namespace]?.[0] || namespace;
+    const label = element('span', null, { class: 'plugin-group-label' });
+    label.append(element('span', name, { class: 'plugin-group-name' }));
+    if (names.get(name) > 1)
+      label.append(element('span', namespace, { class: 'plugin-group-namespace' }));
+    if (pages.length === 1) {
+      const page = pages[0];
+      const entry = appendPluginPage(group, page);
+      entry.classList.add('plugin-single-entry');
+      if (page.title !== name) label.append(element('span', page.title, { class: 'plugin-single-title' }));
+      entry.replaceChildren(label);
+      $('plugin-links').append(group);
+      continue;
     }
+    const id = `plugin-page-children-${$('plugin-links').children.length}`;
+    const toggle = button(null, () => {
+      setPluginGroupExpanded(group, toggle.getAttribute('aria-expanded') !== 'true');
+    }, 'plugin-group-toggle');
+    toggle.id = `${id}-toggle`;
+    toggle.setAttribute('aria-controls', id);
+    toggle.append(
+      element('span', '▾', { class: 'disclosure-arrow', 'aria-hidden': 'true' }),
+      label,
+      element('span', String(pages.length), { class: 'plugin-group-count', 'aria-label': `${pages.length} 个页面` }),
+    );
+    const children = element('div', null, {
+      id, class: 'plugin-group-children', role: 'group', 'aria-labelledby': toggle.id,
+    });
+    const titles = new Map();
+    for (const page of pages) titles.set(page.title, (titles.get(page.title) || 0) + 1);
+    for (const page of pages) {
+      const entry = appendPluginPage(children, page);
+      if (titles.get(page.title) > 1)
+        entry.append(element('span', page.type === 'iframe' ? page.path : page.url, { class: 'plugin-entry-path' }));
+    }
+    group.append(toggle, children);
+    setPluginGroupExpanded(group, !state.collapsedPluginGroups.has(namespace));
+    $('plugin-links').append(group);
   }
   if (!$('plugin-links').children.length) $('plugin-links').append(element('p', '暂无插件页面'));
   let unloaded = false;
@@ -981,6 +1078,12 @@ function renderPluginNavigation() {
   }
   if (unloaded) notify('插件页面已卸载。');
   syncPluginSelection();
+}
+function setPluginGroupExpanded(group, expanded) {
+  group.querySelector('.plugin-group-toggle').setAttribute('aria-expanded', String(expanded));
+  group.querySelector('.plugin-group-children').hidden = !expanded;
+  if (expanded) state.collapsedPluginGroups.delete(group.dataset.pluginNamespace);
+  else state.collapsedPluginGroups.add(group.dataset.pluginNamespace);
 }
 function syncPluginSelection() {
   $('plugin-links').querySelectorAll('.plugin-link-entry').forEach((entry) => {
@@ -997,24 +1100,33 @@ function syncPluginSelection() {
     const close = entry.parentElement.querySelector('.plugin-link-close');
     if (close) close.style.visibility = cached ? 'visible' : 'hidden';
   });
+  $('plugin-links').querySelectorAll('.plugin-page-group').forEach((group) => {
+    const toggle = group.querySelector('.plugin-group-toggle');
+    if (!toggle) return;
+    toggle.classList.toggle('contains-active', !!group.querySelector('.plugin-link-entry.active'));
+    toggle.classList.toggle('contains-cached', !!group.querySelector('.plugin-link-entry.cached'));
+  });
   const count = state.frames.size;
+  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
   const close = $('plugin-pages-close');
   close.hidden = count === 0;
-  close.title = count ? `关闭全部插件页面（当前 ${count} 个）` : '关闭全部插件页面';
+  close.title = count ? `关闭全部插件页面（${pluginCount} 个插件，${count} 个页面）` : '关闭全部插件页面';
+  close.setAttribute('aria-label', close.title);
 }
 function closePluginPage(page) {
   const key = frameKey(page.namespace, page.path);
   if (!state.frames.has(key)) return;
   const wasActive = state.frameNamespace === page.namespace && state.framePath === page.path;
   destroyFrame(key);
-  notify(`已关闭插件页面：${page.title}`);
+  notify(`已关闭插件页面：${pluginPageLabel(page)}`);
   if (wasActive) navigate('plugins').catch(notifyError);
 }
 function closePluginPages() {
   const count = state.frames.size;
   if (!count) return;
+  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
   destroyFrames();
-  notify(`已关闭 ${count} 个插件页面。`);
+  notify(`已关闭全部插件页面（${pluginCount} 个插件，共 ${count} 个页面）。`);
   if (state.page === 'plugin-page') navigate('plugins').catch(notifyError);
 }
 function frameKey(namespace, path) {
@@ -1109,12 +1221,14 @@ function destroyFrames() {
   syncPluginSelection();
 }
 async function openPluginPage(page) {
+  const routePath = pluginPagePath(page);
+  if (routePath === null) return;
   await navigate('plugin-page');
   dropExternalFrame();
   const key = frameKey(page.namespace, page.path);
   let entry = state.frames.get(key);
   if (!entry) {
-    const filename = page.path.slice('webui/'.length).split('/').map(encodeURIComponent).join('/');
+    const filename = routePath.split('/').map(encodeURIComponent).join('/');
     const frame = element('iframe', null, {
       title: page.title,
       src: `/plugin/${encodeURIComponent(page.namespace)}/${filename}`,
@@ -1129,6 +1243,9 @@ async function openPluginPage(page) {
   entry.frame.title = page.title;
   touchFrame(key);
   showFrame(entry);
+  for (const group of $('plugin-links').querySelectorAll('.plugin-page-group'))
+    if (group.dataset.pluginNamespace === page.namespace && group.querySelector('.plugin-group-toggle'))
+      setPluginGroupExpanded(group, true);
   trimFrames();
   $('page-title').textContent = page.title;
   rememberPage();
@@ -1473,7 +1590,9 @@ window.addEventListener('pageshow', (ev) => {
     }
   });
   const savedToken = cachedToken();
-  if (savedToken) login(null, savedToken);
+  if (savedToken?.startsWith('webui.')) login(null, savedToken);
+  // 旧版缓存的是长期 Token，升级后需要手动登录一次才能换成本次运行的凭据。
+  else if (savedToken) resetLogin();
   else {
     $('loading').hidden = true;
     $('login').hidden = false;

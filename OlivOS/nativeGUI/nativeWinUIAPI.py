@@ -25,6 +25,10 @@ import re
 import datetime
 import webbrowser
 import platform
+import logging.handlers
+import sys
+import time
+import traceback
 
 from PIL import Image
 from PIL import ImageTk
@@ -1922,35 +1926,82 @@ class OlivOSTerminalUI(BaseTerminalUI):
                     self.tree_add_line(line)
                 tmp_count_old = tmp_count_new
                 tmp_count_new = len(self.root.UIObject['root_OlivOS_terminal_data'])
+        except Exception as error:
+            self._report_log_display_error(error, 'history')
+
+    def _report_log_display_error(self, error, stage):
+        """限频记录显示异常，使用独立输出避免重新进入终端日志队列。"""
+        now = time.monotonic()
+        last_report = self.UIData.get('log_error_last_report')
+        suppressed = self.UIData.get('log_error_suppressed', 0)
+        if last_report is not None and now - last_report < 30:
+            self.UIData['log_error_suppressed'] = suppressed + 1
+            return
+        self.UIData['log_error_last_report'] = now
+        self.UIData['log_error_suppressed'] = 0
+        # 不记录日志正文、异常消息或局部变量，避免异常携带的用户数据被再次写出。
+        stack = ''.join(
+            f'  File "{frame.filename}", line {frame.lineno}, in {frame.name}\n'
+            for frame in traceback.extract_tb(error.__traceback__)
+        )
+        message = (
+            f'[nativeWinUI] 主终端日志显示异常: stage={stage}, '
+            f'error={type(error).__name__}, suppressed={suppressed}\n{stack}'
+        )
+        try:
+            print(message, file=sys.stderr)
         except Exception:
+            pass
+        try:
+            logger = logging.getLogger('OlivOS.nativeWinUI.terminal_display')
+            logger.propagate = False
+            if not logger.handlers:
+                os.makedirs('./logfile', exist_ok=True)
+                handler = logging.handlers.RotatingFileHandler(
+                    './logfile/OlivOS_native_terminal_error.log',
+                    maxBytes=1024 * 1024,
+                    backupCount=1,
+                    encoding='utf-8'
+                )
+                handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+                logger.addHandler(handler)
+                logger.setLevel(logging.ERROR)
+            logger.error(message)
+        except Exception:
+            # 诊断输出失败也不能中断后续日志的显示。
             pass
 
     def tree_add_line(self, data):
         """重写日志添加，支持等级过滤和带时间戳的格式"""
-        data_raw = data['data']
-        select_level = self.UIData['level_find'][self.UIData['root_level_StringVar'].get()]
-        this_level = data_raw['log_level']
-        if select_level <= this_level:
-            data_str = data['str']
+        stage = 'format'
+        try:
+            data_raw = data['data']
+            select_level = self.UIData['level_find'][self.UIData['root_level_StringVar'].get()]
+            this_level = data_raw['log_level']
+            if select_level > this_level:
+                return
+            data_str = OlivOS.diagnoseAPI.safe_text(data['str'])
             data_str = data_str.encode(encoding='gbk', errors='replace').decode(encoding='gbk', errors='replace')
             # 处理转义
-            data_str = data_str.replace('\r', '\\r').replace('\n', '\\n')
+            data_str = data_str.replace('\x00', '\\x00').replace('\r', '\\r').replace('\n', '\\n')
             log_level = OlivOS.diagnoseAPI.level_dict[data_raw['log_level']]
             time_str = datetime.datetime.fromtimestamp(int(data_raw['log_time'])).strftime("%Y-%m-%d %H:%M:%S")
             display_str = f"{time_str} - {log_level} - {data_str}"
             if len(display_str) > 0:
-                try:
-                    iid = self.UIObject['tree'].insert(
-                        '', tkinter.END,
-                        text=data_str,
-                        values=(display_str,),
-                        tag=log_level
-                    )
-                    keep_tree_thin(self.UIObject['tree'])
-                    if self.UIData.get('flag_tree_is_bottom', True):
-                        self.UIObject['tree'].see(iid)
-                except Exception:
-                    pass
+                stage = 'insert'
+                iid = self.UIObject['tree'].insert(
+                    '', tkinter.END,
+                    text=data_str,
+                    values=(display_str,),
+                    tag=log_level
+                )
+                stage = 'trim'
+                keep_tree_thin(self.UIObject['tree'])
+                if self.UIData.get('flag_tree_is_bottom', True):
+                    stage = 'scroll'
+                    self.UIObject['tree'].see(iid)
+        except Exception as error:
+            self._report_log_display_error(error, stage)
 
     def stop(self):
         """手动关闭时给通知"""

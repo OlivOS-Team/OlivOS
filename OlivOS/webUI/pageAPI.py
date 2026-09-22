@@ -32,6 +32,8 @@ from flask import abort, jsonify, request, send_file, send_from_directory
 
 import OlivOS
 
+from . import resourceAPI
+
 MASK = '********'
 # 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
 ACTIVITY_ONLINE_WINDOW = 180
@@ -50,9 +52,10 @@ ENTRY_FIELDS = {
 #   allow-top-navigation —— 会把宿主 WebUI 整页导航走。
 # 注意：iframe 的 sandbox 属性（webUI/static/app.js 的 pluginSandbox）必须使用同一份
 # 列表 —— CSP 头的 sandbox 指令与 iframe 属性是两套独立机制，浏览器取更严格的那个。
-# 这里只列 iframe sandbox 属性同样合法的 token —— CSP 指令虽然额外接受
-# allow-downloads-without-user-activation，但两处取交集，写进来只会让浏览器报
-# 「is an invalid sandbox flag」且毫无收益。
+# 只列两套机制都合法的 token。注意不要加 allow-downloads-without-user-activation：
+# `allow-downloads` 本身已允许「无用户手势也能下载」，而那个 token 既不在 CSP sandbox
+# 的合法值列表里、也不是 iframe 的合法 token，写进 iframe 属性浏览器会直接报
+# 「is an invalid sandbox flag」。
 PLUGIN_SANDBOX = (
     'sandbox allow-scripts allow-forms allow-modals allow-downloads '
     'allow-popups allow-popups-to-escape-sandbox allow-pointer-lock '
@@ -487,7 +490,7 @@ def register_routes(host):
     def login():
         with host.lock:
             session = host.new_session()
-            response = jsonify(session=session, cursor=host.sequence)
+            response = jsonify(session=session, cursor=host.sequence, browser_token=host.browser_token)
         response.set_cookie('olivos_webui', session, httponly=True, samesite='Strict',
                             secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
         return response
@@ -612,15 +615,28 @@ def register_routes(host):
     def plugin_file(namespace, filename):
         with host.lock:
             directory = host.plugin_roots.get(namespace)
-        if not directory or not re.fullmatch(r'[\w.-]+', namespace):
-            abort(404)
-        root = Path(directory).resolve() / 'webui'
-        if not within(root, host.root / 'plugin/app') and not within(root, host.root / 'plugin/tmp'):
-            abort(404)
-        path = (root / filename).resolve()
-        if not within(path, root) or not path.is_file() or any(part.startswith('.') for part in Path(filename).parts):
-            abort(404)
-        return send_from_directory(str(root), filename)
+            if not directory or not resourceAPI.valid_namespace(namespace):
+                abort(404)
+            root = Path(directory)
+            allowed_roots = (host.root / 'plugin/app', host.root / resourceAPI.CACHE_PATH / namespace)
+            if not any(within(root, allowed) for allowed in allowed_roots):
+                abort(404)
+            resources = host.plugin_webui_paths.get(namespace, [])
+            try:
+                name = resourceAPI.relative_path(filename)
+                if not resourceAPI.allows(name, resources):
+                    abort(404)
+                resourceAPI.safe_path(host.root, root.relative_to(host.root).as_posix())
+                path = resourceAPI.safe_path(root, name)
+                if not within(path, root) or not path.is_file():
+                    abort(404)
+                # 在切换挂载与回收旧缓存之前打开响应文件。
+                response = send_from_directory(str(root), name)
+                response.direct_passthrough = False
+                response.call_on_close(host.prune_plugin_cache)
+                return response
+            except (OSError, ValueError, RuntimeError):
+                abort(404)
 
     @app.post('/api/update/check')
     def update_check():

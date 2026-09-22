@@ -40,7 +40,7 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import pageAPI, staticData
+from . import pageAPI, resourceAPI, staticData
 
 BUFFER_LIMIT = 500
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
@@ -62,6 +62,23 @@ DEFAULT_SERVER = {
 ACTIVE_LISTENERS = {}
 
 
+def apply_environment_config(config):
+    """环境变量覆盖监听配置，仅影响当前进程，不写回配置文件。"""
+    host = os.environ.get('OLIVOS_WEBUI_HOST')
+    if isinstance(host, str) and host.strip():
+        config['host'] = host.strip()
+
+    port = os.environ.get('OLIVOS_WEBUI_PORT')
+    if port is not None:
+        try:
+            port_value = int(port)
+        except (TypeError, ValueError):
+            port_value = None
+        if port_value is not None and 0 <= port_value <= 65535:
+            config['port'] = port_value
+    return config
+
+
 class server(OlivOS.API.Proc_templet):
     def __init__(self, Proc_name='OlivOS_webUI', scan_interval=0.02, dead_interval=1,
                  rx_queue=None, tx_queue=None, control_queue=None, logger_proc=None,
@@ -70,10 +87,11 @@ class server(OlivOS.API.Proc_templet):
         super().__init__(Proc_name, 'webUI', scan_interval, dead_interval, rx_queue, tx_queue,
                          control_queue, logger_proc)
         self.root = Path(root_path or os.getcwd()).resolve()
-        self.config = dict(DEFAULT_SERVER, **(server_conf or {}))
+        self.config = apply_environment_config(dict(DEFAULT_SERVER, **(server_conf or {})))
         self.account_path = self.root / account_path
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
+        self._browser_key = secrets.token_bytes(32)
         self.lock = threading.RLock()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
@@ -90,6 +108,8 @@ class server(OlivOS.API.Proc_templet):
         self.plugins = {}
         self.plugin_pages = []
         self.plugin_roots = {}
+        self.plugin_webui_paths = {}
+        self.retired_plugin_roots = set()
         self.update_available = False
         self.pending = {}
         self.sessions = {}
@@ -123,6 +143,11 @@ class server(OlivOS.API.Proc_templet):
         self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
         pageAPI.register_routes(self)
 
+    @property
+    def browser_token(self):
+        # 浏览器缓存仅在本次运行有效；原 Token 改变时，缓存也随之失效。
+        return 'webui.' + hmac.new(self._browser_key, self.token.encode(), 'sha256').hexdigest()
+
     def authenticate(self, token, address, origin=None, host=None):
         """REST 与 WS 共用认证与限流；不信任客户端提供的转发地址。"""
         if origin:
@@ -136,7 +161,10 @@ class server(OlivOS.API.Proc_templet):
                 attempts.popleft()
             if len(attempts) >= 10:
                 return 429
-            valid = isinstance(token, str) and hmac.compare_digest(token.encode(), self.token.encode())
+            valid = isinstance(token, str) and (
+                hmac.compare_digest(token.encode(), self.token.encode())
+                or hmac.compare_digest(token.encode(), self.browser_token.encode())
+            )
             if valid:
                 self.failures.pop(address, None)
                 return 200
@@ -187,6 +215,17 @@ class server(OlivOS.API.Proc_templet):
             raise RuntimeError('Control 总线尚未就绪')
         self.Proc_info.control_queue.put(OlivOS.API.Control.packet(action, key), block=False)
 
+    def prune_plugin_cache(self):
+        with self.lock:
+            if not self.retired_plugin_roots:
+                return
+            try:
+                resourceAPI.prune_cache(self.root, self.retired_plugin_roots)
+                self.retired_plugin_roots.clear()
+            except (OSError, ValueError) as error:
+                # Windows 正在发送的文件可能暂时占用；响应关闭后再次回收。
+                self.log(3, f'WebUI cache cleanup failed: {error}')
+
     def consume(self, packet):
         if not isinstance(packet, OlivOS.API.Control.packet) or packet.action != 'send':
             return
@@ -210,7 +249,13 @@ class server(OlivOS.API.Proc_templet):
             with self.lock:
                 self.plugins = copy.deepcopy(update.get('shallow_plugin_data_dict', {}))
                 self.plugin_pages = copy.deepcopy(update.get('shallow_plugin_webui_list', []))
-                self.plugin_roots = copy.deepcopy(update.get('shallow_plugin_webui_roots', {}))
+                roots = update.get('shallow_plugin_webui_roots', {})
+                if roots or update.get('ready'):
+                    self.retired_plugin_roots.update(set(self.plugin_roots.values()) - set(roots.values()))
+                    self.retired_plugin_roots.difference_update(roots.values())
+                    self.plugin_roots = copy.deepcopy(roots)
+                    self.plugin_webui_paths = copy.deepcopy(update.get('shallow_plugin_webui_paths', {}))
+                    self.prune_plugin_cache()
             self.publish('events', {'type': 'plugins', 'ready': update.get('ready', False),
                                     'started_at': update.get('load_started', 0)})
         elif action in TERMINAL_TYPES and data.get('hash'):
@@ -550,6 +595,7 @@ def browser_url(root_path=None):
             enabled = model.get('enable', enabled)
         except (OSError, ValueError, KeyError):
             pass
+    apply_environment_config(config)
     try:
         active = json.loads((root / 'data/webui/listen.json').read_text(encoding='utf-8'))
         if listener_valid(active, root):

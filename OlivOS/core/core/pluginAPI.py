@@ -526,6 +526,7 @@ class shallow(API.Proc_templet):
         tmp_plugin_dict_send = {}
         tmp_plugin_webui_send = []
         tmp_plugin_webui_roots = {}
+        tmp_plugin_webui_paths = {}
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
                 plugin_models_this = self.plugin_models_dict[plugin_models_index_this]
@@ -538,6 +539,9 @@ class shallow(API.Proc_templet):
                             continue
                         tmp_plugin_webui_send.append(dict(entry, namespace=plugin_models_this['namespace']))
                     tmp_plugin_webui_roots[plugin_models_this['namespace']] = plugin_models_this.get('webui_root', '')
+                    tmp_plugin_webui_paths[plugin_models_this['namespace']] = plugin_models_this.get(
+                        'webui_resources', []
+                    )
                 tmp_plugin_list_this = None
                 if plugin_models_this['menu_config'] is not None:
                     plugin_models_this_menu = plugin_models_this['menu_config']
@@ -585,7 +589,8 @@ class shallow(API.Proc_templet):
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
                     'shallow_plugin_data_dict': tmp_plugin_dict_send,
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,
-                    'shallow_plugin_webui_roots': tmp_plugin_webui_roots
+                    'shallow_plugin_webui_roots': tmp_plugin_webui_roots,
+                    'shallow_plugin_webui_paths': tmp_plugin_webui_paths
                 }
             }
         }
@@ -659,6 +664,8 @@ class shallow(API.Proc_templet):
         return plugin_list
 
     def load_plugin_list(self):
+        from OlivOS.webUI import resourceAPI
+
         total_models_count = 0
         self.plugin_models_dict = {}
         skip_result = ''
@@ -756,7 +763,6 @@ class shallow(API.Proc_templet):
                             if 'menu_config' in plugin_models_app_conf:
                                 plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
                             plugin_models_dict_this['webui_config'] = plugin_models_app_conf.get('webui_config')
-                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.dirname(app_json_path))
                             if 'message_mode' in plugin_models_app_conf:
                                 plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
                             else:
@@ -821,6 +827,12 @@ class shallow(API.Proc_templet):
                                     )
                                     removeDir(os.path.join(plugin_path_tmp, plugin_dir_this))
                                     plugin_dir_this = plugin_namespace
+                                plugin_models_dict_this['module_name'] = plugin_namespace
+
+                            # OPK 可能已按 namespace 移动，记录最终导入目录。
+                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.join(
+                                plugin_path_tmp if flag_is_opk else plugin_path, plugin_dir_this
+                            ))
 
                             # 完成配置数据库中对应插件命名空间的表格页初始化
                             self.database._init_namespace(plugin_models_dict_this['namespace'])
@@ -872,7 +884,10 @@ class shallow(API.Proc_templet):
                     plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
                 )
                 # 获取插件所在的父目录
-                plugin_folder_path = plugin_models_dict_this.get('folder_path', '')
+                plugin_folder_path = (
+                    os.path.dirname(plugin_dir_this) if flag_is_opk
+                    else plugin_models_dict_this.get('folder_path', '')
+                )
                 if plugin_folder_path:
                     # 插件在子目录中,需要将父目录添加到 sys.path
                     if flag_is_opk:
@@ -941,11 +956,28 @@ class shallow(API.Proc_templet):
                     [plugin_namespace, self.Proc_name, skip_result]
                 ))
 
-        # 清理opk格式插件缓存
-        for plugin_models_dict_this in plugin_models_dict:
-            if plugin_models_dict[plugin_models_dict_this]['isOPK']:
-                plugin_dir = plugin_models_dict[plugin_models_dict_this].get('plugin_dir', plugin_models_dict_this)
-                removeDir(os.path.join(plugin_path_tmp, plugin_dir))
+        # 页面资源在全部 init 完成后生成独立快照，导入缓存随后正常清理。
+        for namespace, plugin in self.plugin_models_dict.items():
+            if not isinstance(plugin.get('webui_config'), list):
+                continue
+            try:
+                source = plugin['webui_root']
+                resources, pages = resourceAPI.declaration(source, plugin['appconf'])
+                if not resourceAPI.valid_namespace(namespace):
+                    raise ValueError('Invalid WebUI namespace')
+                if plugin_models_dict[namespace]['isOPK'] and resources:
+                    runtime_root = os.path.dirname(os.path.dirname(os.path.abspath(plugin_path_tmp)))
+                    plugin['webui_root'] = resourceAPI.build_cache(runtime_root, source, namespace, resources)
+                elif plugin_models_dict[namespace]['isOPK']:
+                    plugin['webui_root'] = ''
+                plugin.update(webui_resources=resources, webui_config=pages)
+            except (OSError, ValueError, RuntimeError) as error:
+                plugin.update(webui_resources=[], webui_config=[], webui_root='')
+                self.log(4, f'WebUI resources [{namespace}]: {error}')
+        # 只回收本次 OPK 的解包目录，保留 tmp 根目录及其他插件的临时文件。
+        for item in plugin_models_dict.values():
+            if item['isOPK']:
+                removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
         # 插件调用列表按照优先级排序
         plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
                                              key=lambda i: (i['priority'], i['namespace']))

@@ -72,6 +72,11 @@ class Entity(object):
         logger_proc = None
 
         preLoadPrint('OlivOS - Witness Union')
+        # 仅在整个实例启动时清理；插件重载由 WebUI 切换挂载后回收旧快照。
+        try:
+            OlivOS.webUI.resourceAPI.reset_cache(os.getcwd())
+        except (OSError, ValueError) as error:
+            preLoadPrint(f'WebUI cache cleanup failed: {error}')
         start_up_show_str = (r'''
 _______________________    ________________
 __  __ \__  /____  _/_ |  / /_  __ \_  ___/

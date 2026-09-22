@@ -306,6 +306,64 @@ nav h2 {
   color: var(--selected-text);
   font-weight: 600;
 }
+.plugin-page-group + .plugin-page-group {
+  margin-top: 6px;
+}
+#plugin-links .plugin-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-weight: 600;
+}
+.plugin-group-label {
+  flex: 1;
+  min-width: 0;
+}
+.plugin-group-name,
+.plugin-group-namespace,
+.plugin-entry-path,
+.plugin-single-title {
+  display: block;
+}
+.plugin-group-namespace,
+.plugin-entry-path,
+.plugin-single-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+#plugin-links .plugin-single-entry {
+  font-weight: 600;
+  color: var(--text);
+}
+#plugin-links .plugin-single-entry.active {
+  color: var(--selected-text);
+}
+.plugin-group-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+#plugin-links .plugin-group-toggle.contains-active {
+  color: var(--brand);
+}
+#plugin-links .plugin-group-toggle.contains-cached:not(.contains-active) {
+  color: var(--cached-text);
+}
+.plugin-group-toggle[aria-expanded='false'] .disclosure-arrow {
+  transform: rotate(-90deg);
+}
+.plugin-group-children {
+  margin-left: 14px;
+  padding-left: 5px;
+  border-left: 1px solid var(--line);
+}
+#plugin-links .plugin-group-children :is(.plugin-link-entry, .plugin-link-external) {
+  padding: 7px 9px;
+}
 #plugin-navigation-group {
   display: flex;
   flex-direction: column;
@@ -851,19 +909,18 @@ dialog::backdrop {
     display: block;
   }
   #plugin-links {
-    display: flex;
-    flex-wrap: nowrap;
-    max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    overscroll-behavior-y: auto;
-    padding-bottom: 4px;
+    display: block;
+    max-height: 36dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
   }
   #plugin-links :is(button, a) {
-    flex-shrink: 0;
-    max-width: none;
-    white-space: nowrap;
+    width: 100%;
+    white-space: normal;
+  }
+  #plugin-links .plugin-link-close {
+    width: 26px;
   }
   .sidebar-footer {
     grid-column: 2;
