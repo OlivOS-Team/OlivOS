@@ -65,7 +65,11 @@ on:
         default: false
 
 jobs:
+  tests:
+    uses: ./.github/workflows/test.yml
+
   build-windows:
+    needs: tests
     uses: ./.github/workflows/build-task-windows.yml
     with:
       name: OlivOS-Win
@@ -79,6 +83,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-linux:
+    needs: tests
     uses: ./.github/workflows/build-task-linux.yml
     with:
       name: OlivOS-Linux
@@ -92,6 +97,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-macos:
+    needs: tests
     uses: ./.github/workflows/build-task-macos.yml
     with:
       name: OlivOS-MacOS

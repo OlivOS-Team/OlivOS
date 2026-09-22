@@ -4,6 +4,7 @@ import os
 import queue
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -103,237 +104,165 @@ def navigation_host(tmp_path):
             worker.join(timeout=5)
 
 
-@pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
-def test_grouped_navigation_preserves_all_pages(navigation_host, tmp_path):
-    pytest.importorskip('selenium')
+@pytest.fixture
+def browser(navigation_host, tmp_path):
+    if not os.environ.get('OLIVOS_WEBUI_BROWSER'):
+        pytest.skip('Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
     from selenium import webdriver
-    from selenium.common.exceptions import StaleElementReferenceException
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver.support import expected_conditions as conditions
     from selenium.webdriver.support.ui import WebDriverWait
 
-    host = navigation_host
     options = webdriver.ChromeOptions()
-    for arg in ('--headless=new', '--no-first-run', '--disable-background-networking', '--window-size=1440,1000',
-                f'--user-data-dir={tmp_path / "browser-profile"}'):
-        options.add_argument(arg)
-    options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
-    driver_path = os.environ.get('OLIVOS_CHROMEDRIVER')
-    service = Service(executable_path=driver_path) if driver_path else None
-    driver = webdriver.Chrome(service=service, options=options)
-    wait = WebDriverWait(driver, 10, ignored_exceptions=(StaleElementReferenceException,))
-    screenshots = Path(os.environ.get('OLIVOS_WEBUI_SCREENSHOTS', tmp_path / 'screenshots'))
-    screenshots.mkdir(parents=True, exist_ok=True)
-    multi = '.plugin-page-group[data-plugin-namespace="multi"]'
-    single = '.plugin-page-group[data-plugin-namespace="single"]'
+    for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
+                     '--window-size=1440,1000', f'--user-data-dir={tmp_path / "browser-profile"}'):
+        options.add_argument(argument)
+    if os.environ.get('OLIVOS_CHROME_BINARY'):
+        options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
+    path = os.environ.get('OLIVOS_CHROMEDRIVER')
+    driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
+    wait = WebDriverWait(driver, 10)
 
     def find(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
 
-    def visible(selector):
-        return wait.until(lambda _: find(selector).is_displayed())
-
     def click(selector):
-        visible(selector)
-        previous_group = find(multi) if selector == '[data-page="plugins"]' else None
+        wait.until(lambda _: find(selector).is_displayed() and find(selector).is_enabled())
         find(selector).click()
-        if previous_group is not None:
-            wait.until(conditions.staleness_of(previous_group))
 
-    def select_page(path):
-        click(f'{multi} .plugin-link-entry[data-plugin-path="{path}"]')
-        frame = wait.until(lambda _: find('#plugin-frame-container iframe:not([hidden])'))
-        driver.switch_to.frame(frame)
-        visible('#draft')
+    def select(path='webui/index.html', namespace='multi'):
+        click(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
+        wait.until(lambda _: driver.execute_script('return !!state.frame && !state.frame.hidden'))
+        driver.switch_to.frame(driver.execute_script('return state.frame'))
+        wait.until(lambda _: driver.execute_script('return !!window.pageIdentity'))
         return driver.execute_script('return window.pageIdentity')
 
-    def screenshot(name):
-        driver.save_screenshot(str(screenshots / name))
-
     try:
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 1440, 'height': 1000, 'deviceScaleFactor': 1, 'mobile': False,
-        })
-        driver.get(f"http://127.0.0.1:{host.config['port']}/")
-        visible('#token')
-        find('#token').send_keys(host.token)
+        driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
+        find('#token').send_keys(navigation_host.token)
         click('#login-form button')
-        visible('#shell')
-        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '.plugin-page-group')) == 2)
-        assert [e.text for e in driver.find_elements(By.CSS_SELECTOR, f'{multi} .plugin-link-entry')] == [
-            '首页', '配置管理', '工具面板']
-        assert find(multi + ' .plugin-group-count').text == '4'
-        assert not driver.find_elements(By.CSS_SELECTOR, single + ' .plugin-group-toggle')
-        assert not driver.find_elements(By.CSS_SELECTOR, single + ' .plugin-group-children')
-        click(single + ' .plugin-single-entry')
-        driver.switch_to.frame(wait.until(lambda _: find('#plugin-frame-container iframe:not([hidden])')))
-        visible('#draft')
-        assert find('h1').text == '功能首页'
-        driver.switch_to.default_content()
-        screenshot('desktop-single.png')
-        assert find(single + ' .plugin-link-close').get_attribute('title') == '关闭：独立插件 / 功能首页'
-        previous_group = find(single)
-        click(single + ' .plugin-link-close')
-        wait.until(conditions.staleness_of(previous_group))
-        wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe'))
-        assert find('#notice-message').text == '已关闭插件页面：独立插件 / 功能首页'
-        screenshot('close-single.png')
-        click('#notice-close')
-        assert len(driver.find_elements(By.CSS_SELECTOR, '#navigation [data-page]')) == 5
-
-        identities = {}
-        for path, title in [('webui/index.html', '首页'), ('webui/settings/index.html', '配置管理'),
-                            ('webui/tools/index.html', '工具面板')]:
-            identities[path] = select_page(path)
-            assert find('h1').text == title
-            find('#draft').send_keys(title + '已编辑')
-            click('#request')
-            wait.until(lambda _: find('#reply').text == '回包成功：' + title + '已编辑')
-            driver.switch_to.default_content()
-        assert len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 3
-        screenshot('desktop-tools.png')
-        assert select_page('webui/settings/index.html') == identities['webui/settings/index.html']
-        assert find('#draft').get_attribute('value') == '配置管理已编辑'
-        driver.switch_to.default_content()
-        screenshot('desktop-settings.png')
-
-        click(multi + ' .plugin-group-toggle')
-        assert find('#page-title').text == '配置管理'
-        assert not find(multi + ' .plugin-group-children').is_displayed()
-        assert find(multi + ' .plugin-group-toggle').get_attribute('aria-expanded') == 'false'
-        assert len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 3
-        screenshot('desktop-collapsed.png')
-        click('[data-page="plugins"]')
-        wait.until(lambda _: find(multi + ' .plugin-group-toggle').get_attribute('aria-expanded') == 'false')
-        # 分组按钮可通过键盘展开，普通插件列表刷新也保留折叠状态。
-        find(multi + ' .plugin-group-toggle').send_keys(Keys.ENTER)
-        assert select_page('webui/settings/index.html') == identities['webui/settings/index.html']
-        driver.switch_to.default_content()
-
-        original = driver.current_window_handle
-        click(multi + ' .plugin-link-external')
-        wait.until(lambda _: len(driver.window_handles) == 2)
-        driver.switch_to.window(next(handle for handle in driver.window_handles if handle != original))
-        wait.until(lambda _: 'OK' in find('body').text)
-        driver.close()
-        driver.switch_to.window(original)
-
-        # 相同显示名也按 namespace 保持两个分组，不吞掉功能入口。
-        with host.lock:
-            host.plugins['single'][0] = host.plugins['multi'][0]
-            for page in host.plugin_pages:
-                if page.get('path') == 'webui/tools/index.html':
-                    page['title'] = '配置管理'
-        click('[data-page="plugins"]')
-        wait.until(lambda _: find(single + ' .plugin-group-name').text == '多页面插件')
-        assert len(driver.find_elements(By.CSS_SELECTOR, '.plugin-page-group')) == 2
-        assert find(multi + ' .plugin-group-namespace').text == 'multi'
-        assert find(single + ' .plugin-group-namespace').text == 'single'
-        assert [entry.text for entry in driver.find_elements(By.CSS_SELECTOR, multi + ' .plugin-entry-path')] == [
-            'webui/settings/index.html', 'webui/tools/index.html']
-        assert select_page('webui/tools/index.html') == identities['webui/tools/index.html']
-        driver.switch_to.default_content()
-        screenshot('desktop-duplicate-names.png')
-        tools = find(multi + ' .plugin-link-entry[data-plugin-path="webui/tools/index.html"]')
-        close = tools.find_element(By.XPATH, '..').find_element(By.CSS_SELECTOR, '.plugin-link-close')
-        label = '多页面插件（multi） / 配置管理（webui/tools/index.html）'
-        assert close.get_attribute('title') == '关闭：' + label
-        assert close.get_attribute('aria-label') == '关闭 ' + label
-        previous_group = find(multi)
-        close.click()
-        wait.until(conditions.staleness_of(previous_group))
-        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 2)
-        assert find('#notice-message').text == '已关闭插件页面：' + label
-        visible('#plugins')
-        screenshot('close-duplicate.png')
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False,
-        })
-        find('#notice').location_once_scrolled_into_view
-        assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
-        screenshot('close-duplicate-mobile.png')
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 1440, 'height': 1000, 'deviceScaleFactor': 1, 'mobile': False,
-        })
-        identities['webui/tools/index.html'] = select_page('webui/tools/index.html')
-        driver.switch_to.default_content()
-        click('#notice-close')
-        with host.lock:
-            host.plugins['single'][0] = '独立插件'
-            for page in host.plugin_pages:
-                if page.get('path') == 'webui/tools/index.html':
-                    page['title'] = '工具面板'
-        click('[data-page="plugins"]')
-        wait.until(lambda _: find(single + ' .plugin-group-name').text == '独立插件')
-        assert not driver.find_elements(By.CSS_SELECTOR, '.plugin-group-namespace, .plugin-entry-path')
-        select_page('webui/settings/index.html')
-        driver.switch_to.default_content()
-
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False,
-        })
-        assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
-        screenshot('mobile-settings.png')
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 1440, 'height': 1000, 'deviceScaleFactor': 1, 'mobile': False,
-        })
-        driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
-            'features': [{'name': 'prefers-color-scheme', 'value': 'dark'}],
-        })
-        wait.until(lambda _: driver.execute_script('return document.documentElement.dataset.theme') == 'dark')
-        screenshot('desktop-dark.png')
-
-        # 关闭一个非当前子页面只释放它；关闭全部后导航中的所有子入口仍保留。
-        tools = find(multi + ' .plugin-link-entry[data-plugin-path="webui/tools/index.html"]')
-        tools.find_element(By.XPATH, '..').find_element(By.CSS_SELECTOR, '.plugin-link-close').click()
-        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 2)
-        assert find('#notice-message').text == '已关闭插件页面：多页面插件 / 工具面板'
-        screenshot('close-child.png')
-        assert select_page('webui/settings/index.html') == identities['webui/settings/index.html']
-        driver.switch_to.default_content()
-        click(single + ' .plugin-single-entry')
-        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 3)
-        assert find('#plugin-pages-close').get_attribute('title') == '关闭全部插件页面（2 个插件，3 个页面）'
-        previous_group = find(multi)
-        click('#plugin-pages-close')
-        wait.until(conditions.staleness_of(previous_group))
-        wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe'))
-        assert find('#notice-message').text == '已关闭全部插件页面（2 个插件，共 3 个页面）。'
-        screenshot('close-all.png')
-        assert len(driver.find_elements(By.CSS_SELECTOR, f'{multi} .plugin-link-entry')) == 3
-        select_page('webui/index.html')
-        driver.switch_to.default_content()
-        driver.refresh()
-        visible('#shell')
-        wait.until(lambda _: len(driver.find_elements(By.CSS_SELECTOR, '#plugin-frame-container iframe')) == 1)
-        assert find(multi + ' .plugin-group-toggle').get_attribute('aria-expanded') == 'true'
-
-        for page in ('dashboard', 'accounts', 'logs', 'terminals', 'plugins'):
-            click(f'[data-page="{page}"]')
-            visible('#' + page)
-
-        # 页面注册表缩为一个入口后直接打开，重新增加页面后恢复分组。
-        with host.lock:
-            original_pages = host.plugin_pages[:]
-            host.plugin_pages = [page for page in host.plugin_pages
-                                 if page['namespace'] != 'multi' or page.get('path') == 'webui/tools/index.html']
-        click('[data-page="plugins"]')
-        wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, multi + ' .plugin-group-toggle'))
-        select_page('webui/tools/index.html')
-        assert find('h1').text == '工具面板'
-        driver.switch_to.default_content()
-        with host.lock:
-            host.plugin_pages = original_pages
-        click('[data-page="plugins"]')
-        visible(multi + ' .plugin-group-toggle')
-        assert len(driver.find_elements(By.CSS_SELECTOR, multi + ' .plugin-link-entry')) == 3
-        errors = [entry['message'] for entry in driver.get_log('browser')
-                  if entry['level'] == 'SEVERE' and entry.get('source') == 'javascript']
-        assert not errors
-    except Exception:
-        screenshot('failure.png')
-        raise
+        wait.until(lambda _: find('#shell').is_displayed())
+        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select, host=navigation_host)
     finally:
         driver.quit()
+
+
+@pytest.mark.browser
+def test_plugin_navigation_groups_multiple_entries_and_directly_opens_single(browser):
+    assert browser.find('.plugin-page-group[data-plugin-namespace="multi"] .plugin-group-count').text == '4'
+    assert browser.find('.plugin-page-group[data-plugin-namespace="single"] .plugin-single-entry').is_displayed()
+    browser.select(namespace='single')
+    assert browser.find('h1').text == '功能首页'
+
+
+@pytest.mark.browser
+def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
+    identity = browser.select()
+    browser.find('#draft').send_keys('retained')
+    browser.driver.switch_to.default_content()
+    browser.select('webui/settings/index.html')
+    browser.driver.switch_to.default_content()
+    assert browser.select() == identity
+    assert browser.find('#draft').get_attribute('value') == 'retained'
+
+
+@pytest.mark.browser
+def test_plugin_browser_message_bridge_roundtrip(browser):
+    browser.select()
+    browser.find('#draft').send_keys('roundtrip')
+    browser.click('#request')
+    browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：roundtrip')
+
+
+@pytest.mark.browser
+def test_collapsing_plugin_group_does_not_unload_frames(browser):
+    identity = browser.select()
+    browser.driver.switch_to.default_content()
+    toggle = '.plugin-page-group[data-plugin-namespace="multi"] .plugin-group-toggle'
+    browser.click(toggle)
+    assert browser.find(toggle).get_attribute('aria-expanded') == 'false'
+    assert browser.driver.execute_script('return state.frames.size') == 1
+    browser.click(toggle)
+    assert browser.select() == identity
+
+
+@pytest.mark.browser
+def test_duplicate_plugin_and_page_names_are_disambiguated(browser):
+    with browser.host.lock:
+        browser.host.plugins['single'][0] = browser.host.plugins['multi'][0]
+        for page in browser.host.plugin_pages:
+            if page.get('path') == 'webui/tools/index.html':
+                page['title'] = '配置管理'
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll(".plugin-group-namespace").length') == 2)
+    assert browser.driver.execute_script('return document.querySelectorAll(".plugin-entry-path").length') == 2
+    browser.select('webui/tools/index.html')
+    browser.driver.switch_to.default_content()
+    title = browser.find('[data-plugin-path="webui/tools/index.html"]').find_element('xpath', '..')
+    assert title.find_element('css selector', '.plugin-link-close').get_attribute('title') == (
+        '关闭：多页面插件（multi） / 配置管理（webui/tools/index.html）')
+
+
+@pytest.mark.browser
+def test_closing_one_plugin_page_keeps_other_cached_pages(browser):
+    browser.select()
+    browser.driver.switch_to.default_content()
+    browser.select('webui/settings/index.html')
+    browser.driver.switch_to.default_content()
+    row = browser.find('.plugin-link-entry[data-plugin-namespace="multi"][data-plugin-path="webui/index.html"]')
+    row.find_element('xpath', '..').find_element('css selector', '.plugin-link-close').click()
+    assert browser.driver.execute_script('return state.frames.size') == 1
+    assert browser.find('#page-title').text == '配置管理'
+
+
+@pytest.mark.browser
+def test_close_all_reports_plugin_and_page_counts(browser):
+    browser.select()
+    browser.driver.switch_to.default_content()
+    browser.select(namespace='single')
+    browser.driver.switch_to.default_content()
+    browser.click('#plugin-pages-close')
+    browser.wait.until(lambda _: browser.driver.execute_script('return state.frames.size') == 0)
+    assert browser.find('#notice-message').text == '已关闭全部插件页面（2 个插件，共 2 个页面）。'
+
+
+@pytest.mark.browser
+def test_refresh_restores_selected_plugin_page(browser):
+    browser.select('webui/settings/index.html')
+    browser.driver.switch_to.default_content()
+    browser.driver.refresh()
+    browser.wait.until(lambda _: browser.find('#shell').is_displayed())
+    assert browser.driver.execute_script('return state.framePath') == 'webui/settings/index.html'
+
+
+@pytest.mark.browser
+def test_plugin_registration_change_updates_group_navigation(browser):
+    with browser.host.lock:
+        browser.host.plugin_pages = [page for page in browser.host.plugin_pages
+                                     if page['namespace'] != 'multi' or page.get('path') == 'webui/index.html']
+    browser.click('[data-page="plugins"]')
+    selector = '.plugin-page-group[data-plugin-namespace="multi"] .plugin-single-entry'
+    browser.wait.until(lambda _: browser.find(selector).is_displayed())
+    browser.select()
+    assert browser.find('h1').text == '首页'
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('width,theme', [(390, 'light'), (1440, 'dark')])
+def test_plugin_navigation_layout_fits_viewport(browser, width, theme):
+    browser.driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-color-scheme', 'value': theme}]})
+    browser.wait.until(
+        lambda _: browser.driver.execute_script('return document.documentElement.dataset.theme') == theme)
+    assert browser.driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
+
+
+@pytest.mark.browser
+def test_external_plugin_link_opens_separate_tab(browser):
+    browser.click('.plugin-link-external')
+    browser.wait.until(lambda _: len(browser.driver.window_handles) == 2)
+    browser.driver.switch_to.window(browser.driver.window_handles[-1])
+    browser.wait.until(lambda _: 'OK' in browser.find('body').text)

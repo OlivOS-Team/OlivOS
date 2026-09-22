@@ -9,7 +9,11 @@ on:
     branches: [ main, dev ]
 
 jobs:
+  tests:
+    uses: ./.github/workflows/test.yml
+
   build-windows-publish:
+    needs: tests
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -36,6 +40,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-windows:
+    needs: tests
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -212,6 +217,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux-publish:
+    needs: tests
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -257,6 +263,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux:
+    needs: tests
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -316,6 +323,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos-publish:
+    needs: tests
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
@@ -342,6 +350,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos:
+    needs: tests
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 

@@ -788,8 +788,7 @@ class dock(OlivOS.API.Proc_templet):
             ['SEPARATOR']
         ])
         self.UIData['shallow_menu_list'].extend([
-            # ['账号管理', self.startAccountEditSendFunc()],
-            # ['账号管理', None],
+            ['账号管理', self.startAccountEditSendFunc()],
             ['NapCat管理', self.UIData['shallow_napcat_menu_list']],
             ['OPQBot管理', self.UIData['shallow_opqbot_menu_list']],
             ['gocqhttp管理', self.UIData['shallow_gocqhttp_menu_list']],
@@ -1955,7 +1954,7 @@ class OlivOSTerminalUI(BaseTerminalUI):
         try:
             logger = logging.getLogger('OlivOS.nativeWinUI.terminal_display')
             logger.propagate = False
-            if not logger.handlers:
+            if not any(isinstance(handler, logging.handlers.RotatingFileHandler) for handler in logger.handlers):
                 os.makedirs('./logfile', exist_ok=True)
                 handler = logging.handlers.RotatingFileHandler(
                     './logfile/OlivOS_native_terminal_error.log',

@@ -288,7 +288,7 @@ class Message_templet(object):
         elif self.mode_rx == 'milky_para_rx':
             self.init_from_milky_para_rx()
         elif self.mode_rx == 'milky_para_tx':
-            self.init_from_milky_para_rx()
+            self.init_from_milky_para_tx()
 
     def init_from_olivos_para(self):
         tmp_data = []
@@ -462,6 +462,7 @@ class Message_templet(object):
                     app_name = paraData['app_name']
                     json_payload = paraData['json_payload']
                     tmp_para = PARA.json(data=json_payload, resid=app_name)
+                    tmp_data.append(tmp_para)
                 elif paraType == 'xml':
                     service_id = paraData['service_id']
                     xml_payload = paraData['xml_payload']
@@ -521,6 +522,7 @@ class Message_templet(object):
                     app_name = paraData['app_name']
                     json_payload = paraData['json_payload']
                     tmp_para = PARA.json(data=json_payload, resid=app_name)
+                    tmp_data.append(tmp_para)
             self.data = tmp_data
         else:
             self.active = False

@@ -130,6 +130,13 @@ dev = [
     "ruff"
 ]
 
+# 功能测试与覆盖率；浏览器验证单独按标记选择。
+test = [
+    "pytest>=7.4,<9",
+    "pytest-cov>=5,<7",
+    "selenium>=4.20,<5",
+]
+
 [project.urls]
 Homepage = "https://doc.olivos.wiki/"
 Repository = "https://github.com/OlivOS-Team/OlivOS"
@@ -177,3 +184,39 @@ skip-magic-trailing-comma = false
 
 [tool.uv]
 python-preference = "managed"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "browser: real Chrome browser tests (OLIVOS_WEBUI_BROWSER=1)",
+    "native_gui: Windows native Tk terminal tests",
+]
+
+[tool.coverage.run]
+source = ["OlivOS"]
+branch = true
+relative_files = true
+omit = [
+    "OlivOS/thirdPartyModule/*",
+    "*/OlivOS/thirdPartyModule/*",
+    "OlivOS/core/inlineData/*",
+    "*/OlivOS/core/inlineData/*",
+    "OlivOS/webUI/staticData.py",
+    "*/OlivOS/webUI/staticData.py",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+omit = [
+    "OlivOS/thirdPartyModule/*",
+    "*/OlivOS/thirdPartyModule/*",
+    "OlivOS/core/inlineData/*",
+    "*/OlivOS/core/inlineData/*",
+    "OlivOS/webUI/staticData.py",
+    "*/OlivOS/webUI/staticData.py",
+]
+
+[tool.coverage.html]
+show_contexts = true
