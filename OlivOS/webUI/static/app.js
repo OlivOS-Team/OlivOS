@@ -130,14 +130,17 @@ function notifyError(error) {
 }
 async function api(path, options = {}) {
   const generation = state.authGeneration;
-  const headers = { 'X-Auth-Token': state.token, ...options.headers };
-  if (options.body !== undefined) {
+  const authMessage = options.authMessage;
+  const requestOptions = { ...options };
+  delete requestOptions.authMessage;
+  const headers = { 'X-Auth-Token': state.token, ...requestOptions.headers };
+  if (requestOptions.body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(options.body);
+    requestOptions.body = JSON.stringify(requestOptions.body);
   }
   let response;
   try {
-    response = await fetch(path, { ...options, headers });
+    response = await fetch(path, { ...requestOptions, headers });
   } catch (error) {
     if (generation !== state.authGeneration) error.authObsolete = true;
     throw error;
@@ -148,7 +151,7 @@ async function api(path, options = {}) {
     throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
   if (!response.ok) {
     const authHandled = response.status === 401 || response.status === 403;
-    const message = authHandled ? loginExpiredMessage : data.error || `请求失败 (${response.status})`;
+    const message = authHandled ? authMessage || loginExpiredMessage : data.error || `请求失败 (${response.status})`;
     if (authHandled) resetLogin(message);
     const error = new Error(message);
     error.status = response.status;
@@ -222,7 +225,10 @@ async function login(ev, token = null) {
   submit.disabled = true;
   try {
     state.token = token ?? $('token').value.trim();
-    const result = await api('/api/login', { method: 'POST' });
+    const result = await api('/api/login', {
+      method: 'POST',
+      authMessage: token === null ? '认证失败' : loginExpiredMessage,
+    });
     state.token = result.browser_token;
     cachedToken(state.token);
     state.cachedLogin = cachedToken() === state.token;

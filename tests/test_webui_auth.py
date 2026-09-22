@@ -114,6 +114,13 @@ def test_browser_restart_requires_token(host):
         driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
         visible('shell')
 
+    def failed_manual_login():
+        driver.find_element(By.ID, 'token').send_keys('incorrect-token-for-test')
+        driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
+        WebDriverWait(driver, 10).until(
+            lambda d: d.find_element(By.ID, 'login-error').text == '认证失败')
+        assert driver.find_element(By.ID, 'shell').get_attribute('hidden') is not None
+
     def logged_out():
         visible('login')
         WebDriverWait(driver, 10).until(
@@ -157,6 +164,8 @@ def test_browser_restart_requires_token(host):
         driver.get(url)
         logged_out()
         driver.save_screenshot(str(screenshots / 'restart-cached-login.png'))
+        failed_manual_login()
+        driver.save_screenshot(str(screenshots / 'manual-token-failure.png'))
         login()
 
         # 页面保持打开时重启，认证检查会退出并关闭弹窗。
