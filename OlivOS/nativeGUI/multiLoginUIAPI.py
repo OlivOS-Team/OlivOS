@@ -125,7 +125,8 @@ class HostUI(object):
         self.rootMode = rootMode
         self.control_queue = control_queue
         self.res = False
-        self.UIData['Account_data'] = Account_data
+        # 运行中的编辑使用独立草稿，取消窗口时不能修改宿主账号对象。
+        self.UIData['Account_data'] = copy.deepcopy(Account_data) if asaycMode else Account_data
         self.UIData['flag_commit'] = False
         self.UIConfig.update(dictColorContext)
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)

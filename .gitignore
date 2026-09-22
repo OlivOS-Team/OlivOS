@@ -18,5 +18,10 @@ data/webui_token.txt
 conf/webui_token.txt
 data/webui/
 conf/*.webui-backup
-tests/
 tmp/
+
+.pytest_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+test-results/

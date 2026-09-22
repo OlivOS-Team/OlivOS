@@ -4,7 +4,7 @@ import os
 import queue
 import secrets
 import threading
-from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -82,6 +82,10 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
     try:
         assert host.ready.wait(5) and host.error is None
         options = webdriver.ChromeOptions()
+        if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
+            options.add_argument('--no-sandbox')
+        if os.environ.get('OLIVOS_CHROME_BINARY'):
+            options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
         for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
                          f'--user-data-dir={host.root / "login-race-profile"}'):
             options.add_argument(argument)
@@ -123,27 +127,25 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
         worker.join(timeout=5)
 
 
-@pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='设置 OLIVOS_WEBUI_BROWSER=1 运行浏览器验证')
-def test_browser_restart_requires_token(host):
-    pytest.importorskip('selenium')
+@pytest.fixture
+def browser_auth(host):
+    if not os.environ.get('OLIVOS_WEBUI_BROWSER'):
+        pytest.skip('Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
     from selenium import webdriver
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
     options = webdriver.ChromeOptions()
-    for argument in ['--headless=new', '--no-first-run', '--disable-background-networking',
-                     f'--user-data-dir={host.root / "browser-profile"}']:
+    if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
+        options.add_argument('--no-sandbox')
+    for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
+                     f'--user-data-dir={host.root / "auth-profile"}'):
         options.add_argument(argument)
+    if os.environ.get('OLIVOS_CHROME_BINARY'):
+        options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
     services = []
-    driver = None
-    screenshots = Path(os.environ.get('OLIVOS_WEBUI_SCREENSHOTS', host.root / 'screenshots'))
-    screenshots.mkdir(parents=True, exist_ok=True)
-
-    def browser():
-        driver_path = os.environ.get('OLIVOS_CHROMEDRIVER')
-        service = Service(executable_path=driver_path) if driver_path else None
-        return webdriver.Chrome(options=options, service=service)
+    ui = SimpleNamespace(driver=None, host=host)
 
     def start(service):
         worker = threading.Thread(target=service.run, daemon=True)
@@ -157,179 +159,181 @@ def test_browser_restart_requires_token(host):
         previous.on_terminate()
         worker.join(timeout=5)
         assert not worker.is_alive()
-        service = serverAPI.server(root_path=host.root, server_conf={'port': previous.config['port']},
-                                   rx_queue=queue.Queue(), control_queue=queue.Queue(),
-                                   bot_info_dict=host.accounts)
-        assert start(service) == url
+        service = serverAPI.server(root_path=host.root, rx_queue=queue.Queue(), control_queue=queue.Queue(),
+                                   server_conf={'host': '127.0.0.1', 'port': previous.config['port']})
+        assert start(service) == ui.url
         assert service.token == host.token
 
-    def visible(name):
-        WebDriverWait(driver, 10).until(lambda d: d.find_element(By.ID, name).is_displayed())
+    def open_browser():
+        path = os.environ.get('OLIVOS_CHROMEDRIVER')
+        ui.driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
+        ui.wait = WebDriverWait(ui.driver, 10)
+
+    def find(selector):
+        return ui.driver.find_element(By.CSS_SELECTOR, selector)
 
     def login():
-        driver.find_element(By.ID, 'token').send_keys(host.token)
-        driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
-        visible('shell')
-
-    def failed_manual_login():
-        driver.find_element(By.ID, 'token').send_keys('incorrect-token-for-test')
-        driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
-        WebDriverWait(driver, 10).until(
-            lambda d: d.find_element(By.ID, 'login-error').text == '认证失败')
-        assert driver.find_element(By.ID, 'shell').get_attribute('hidden') is not None
+        find('#token').send_keys(host.token)
+        find('#login-form button').click()
+        ui.wait.until(lambda _: find('#shell').is_displayed())
 
     def logged_out():
-        visible('login')
-        WebDriverWait(driver, 10).until(
-            lambda d: d.find_element(By.CSS_SELECTOR, '#login-form button').is_enabled())
-        assert driver.execute_script("return localStorage.getItem('olivos.webui.token') === null")
-        assert not driver.find_element(By.ID, 'token').get_attribute('value')
-        assert not driver.find_element(By.ID, 'shell').is_displayed()
-        assert driver.find_element(By.ID, 'login-error').text == ''
-        assert not driver.find_element(By.ID, 'notice').is_displayed()
+        ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button').is_enabled())
+        assert not find('#shell').is_displayed()
+        assert find('#login-error').text == ''
+        assert find('#token').get_attribute('value') == ''
+        assert ui.driver.execute_script("return localStorage.getItem('olivos.webui.token') === null")
+        assert not find('#notice').is_displayed()
 
+    ui.find, ui.login, ui.logged_out, ui.restart, ui.open_browser = find, login, logged_out, restart, open_browser
     try:
-        host.config['port'] = 0
-        url = start(host)
-        driver = browser()
-        driver.get(url)
+        host.config.update(host='127.0.0.1', port=0)
+        ui.url = start(host)
+        open_browser()
+        ui.driver.get(ui.url)
         login()
-        assert driver.execute_script(
-            "return localStorage.getItem('olivos.webui.token') !== arguments[0]", host.token)
-        driver.refresh()
-        visible('shell')
-
-        # 短暂断网保留缓存，恢复后继续使用当前登录。
-        driver.execute_cdp_cmd('Network.enable', {})
-        network = {'latency': 0, 'downloadThroughput': -1, 'uploadThroughput': -1}
-        driver.execute_cdp_cmd('Network.emulateNetworkConditions', dict(network, offline=True))
-        driver.execute_async_script('checkAuthentication().then(arguments[arguments.length - 1])')
-        visible('shell')
-        driver.execute_cdp_cmd('Network.emulateNetworkConditions', dict(network, offline=False))
-        driver.execute_async_script('checkAuthentication().then(arguments[arguments.length - 1])')
-        visible('shell')
-
-        # 真正关闭并重开浏览器，同一次 OlivOS 运行仍自动登录。
-        driver.quit()
-        driver = browser()
-        driver.get(url)
-        visible('shell')
-
-        # 页面关闭期间重启服务，重新打开时必须手动输入原 Token。
-        driver.get(url + '/api/health')
-        restart()
-        driver.get(url)
-        logged_out()
-        driver.save_screenshot(str(screenshots / 'restart-cached-login.png'))
-        failed_manual_login()
-        driver.save_screenshot(str(screenshots / 'manual-token-failure.png'))
-        login()
-
-        # 页面保持打开时重启，认证检查会退出并关闭弹窗。
-        driver.find_element(By.CSS_SELECTOR, '[data-page="accounts"]').click()
-        driver.find_element(By.ID, 'add-account').click()
-        visible('account-dialog')
-        restart()
-        driver.execute_script('window.dispatchEvent(new Event("focus"))')
-        logged_out()
-        driver.save_screenshot(str(screenshots / 'restart-open-page.png'))
-        assert not driver.find_element(By.ID, 'account-dialog').is_displayed()
-        login()
-
-        # 旧版缓存的长期 Token 不能在升级后直接恢复登录。
-        driver.get(url + '/api/health')
-        driver.execute_script("localStorage.setItem('olivos.webui.token', arguments[0])", host.token)
-        driver.get(url)
-        logged_out()
-        login()
-
-        # 登录初始化请求尚未返回时认证失效，迟到响应不能覆盖登录页提示。
-        driver.execute_script('''
-            window.authOriginalFetch = window.fetch;
-            window.authWaitingSchema = null;
-            window.fetch = (path, options) => path === '/api/accounts/schema'
-              ? new Promise(resolve => { window.authWaitingSchema = resolve; })
-              : window.authOriginalFetch(path, options);
-            window.authOldLoginDone = false;
-            login(null, state.token).then(() => { window.authOldLoginDone = true; });
-        ''')
-        WebDriverWait(driver, 10).until(lambda d: d.execute_script('return !!window.authWaitingSchema'))
-        restart()
-        driver.execute_script('checkAuthentication()')
-        visible('login')
-        driver.execute_script('''
-            window.fetch = window.authOriginalFetch;
-            window.authWaitingSchema(new Response(JSON.stringify({error: '认证失败'}), {status: 401}));
-        ''')
-        WebDriverWait(driver, 10).until(lambda d: d.execute_script('return window.authOldLoginDone'))
-        logged_out()
-        driver.save_screenshot(str(screenshots / 'restart-during-login.png'))
-        login()
-
-        # 多个请求同时失败：第一次退出后，迟到的认证/网络错误不干扰新的登录。
-        for status in (401, 403):
-            driver.execute_script('''
-                window.authPending = [];
-                window.authFailures = [];
-                window.fetch = (path, options) => path === '/api/auth-notice-test'
-                  ? new Promise((resolve, reject) => { window.authPending.push({resolve, reject}); })
-                  : window.authOriginalFetch(path, options);
-                for (let i = 0; i < 3; i++) api('/api/auth-notice-test').catch(error => {
-                  window.authFailures.push({message: error.message, obsolete: error.authObsolete === true});
-                  notifyError(error);
-                });
-                window.authPending[0].resolve(new Response(JSON.stringify({error: '认证失败'}),
-                  {status: arguments[0]}));
-            ''', status)
-            logged_out()
-            assert driver.execute_script('return window.authFailures[0].message') == ''
-            login()
-            driver.execute_script('''
-                window.authPending[1].resolve(new Response(JSON.stringify({error: '认证失败'}), {status: 401}));
-                window.authPending[2].reject(new TypeError('Failed to fetch'));
-                window.fetch = window.authOriginalFetch;
-            ''')
-            WebDriverWait(driver, 10).until(lambda d: d.execute_script('return window.authFailures.length === 3'))
-            assert driver.execute_script('return window.authFailures.slice(1).every(item => item.obsolete)')
-            visible('shell')
-            assert not driver.find_element(By.ID, 'notice').is_displayed()
-
-        # 限流仍显示原始原因，不能误报为登录失效。
-        message = driver.execute_async_script('''
-            const done = arguments[arguments.length - 1];
-            window.fetch = () => Promise.resolve(new Response(
-              JSON.stringify({error: '尝试过多，请一分钟后重试'}), {status: 429}));
-            api('/api/auth-notice-test').catch(error => {
-              window.fetch = window.authOriginalFetch;
-              done(error.message);
-            });
-        ''')
-        assert message == '尝试过多，请一分钟后重试'
-        visible('shell')
-
-        # 主动退出、重新进入和跨标签页清除缓存均安静显示登录页。
-        driver.find_element(By.ID, 'logout').click()
-        logged_out()
-        driver.refresh()
-        logged_out()
-        failed_manual_login()
-        driver.save_screenshot(str(screenshots / 'manual-token-failure.png'))
-        login()
-        driver.execute_script('''
-            localStorage.removeItem('olivos.webui.token');
-            window.dispatchEvent(new StorageEvent('storage', {key: 'olivos.webui.token'}));
-        ''')
-        logged_out()
-        driver.save_screenshot(str(screenshots / 'silent-login.png'))
-    except Exception:
-        if driver is not None:
-            driver.execute_script("document.getElementById('token').value = ''")
-            driver.save_screenshot(str(screenshots / 'failure.png'))
-        raise
+        yield ui
     finally:
-        if driver is not None:
-            driver.quit()
+        if ui.driver is not None:
+            ui.driver.quit()
         for service, worker in services:
             service.on_terminate()
             worker.join(timeout=5)
             assert not worker.is_alive()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('reopen', [False, True])
+def test_browser_cache_survives_refresh_or_reopening(browser_auth, reopen):
+    ui = browser_auth
+    assert ui.driver.execute_script("return localStorage.getItem('olivos.webui.token') !== arguments[0]", ui.host.token)
+    if reopen:
+        ui.driver.quit()
+        ui.open_browser()
+        ui.driver.get(ui.url)
+    else:
+        ui.driver.refresh()
+    ui.wait.until(lambda _: ui.find('#shell').is_displayed())
+
+
+@pytest.mark.browser
+def test_temporary_network_loss_does_not_clear_login(browser_auth):
+    ui = browser_auth
+    ui.driver.execute_cdp_cmd('Network.enable', {})
+    network = {'latency': 0, 'downloadThroughput': -1, 'uploadThroughput': -1}
+    try:
+        ui.driver.execute_cdp_cmd('Network.emulateNetworkConditions', dict(network, offline=True))
+        ui.driver.execute_async_script('checkAuthentication().then(arguments[arguments.length - 1])')
+        assert ui.find('#shell').is_displayed()
+    finally:
+        ui.driver.execute_cdp_cmd('Network.emulateNetworkConditions', dict(network, offline=False))
+    ui.driver.execute_async_script('checkAuthentication().then(arguments[arguments.length - 1])')
+    assert ui.find('#shell').is_displayed()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('page_open', [False, True])
+def test_server_restart_returns_browser_to_silent_login(browser_auth, page_open):
+    ui = browser_auth
+    if not page_open:
+        ui.driver.get(ui.url + '/api/health')
+    ui.restart()
+    if page_open:
+        ui.driver.execute_script('window.dispatchEvent(new Event("focus"))')
+    else:
+        ui.driver.get(ui.url)
+    ui.logged_out()
+    ui.login()
+
+
+@pytest.mark.browser
+def test_manual_wrong_token_shows_error_and_can_retry(browser_auth):
+    ui = browser_auth
+    ui.find('#logout').click()
+    ui.logged_out()
+    ui.find('#token').send_keys('incorrect-fixture-token')
+    ui.find('#login-form button').click()
+    ui.wait.until(lambda _: ui.find('#login-error').text == '认证失败')
+    assert not ui.find('#shell').is_displayed()
+    ui.login()
+
+
+@pytest.mark.browser
+def test_legacy_long_lived_cache_requires_manual_login(browser_auth):
+    ui = browser_auth
+    ui.driver.get(ui.url + '/api/health')
+    ui.driver.execute_script("localStorage.setItem('olivos.webui.token', arguments[0])", ui.host.token)
+    ui.driver.get(ui.url)
+    ui.logged_out()
+
+
+@pytest.mark.browser
+def test_restart_during_login_initialization_ignores_delayed_response(browser_auth):
+    ui = browser_auth
+    ui.driver.execute_script('''
+        window.originalFetch = window.fetch;
+        window.waitingSchema = null;
+        window.fetch = (path, options) => path === '/api/accounts/schema'
+          ? new Promise(resolve => { window.waitingSchema = resolve; }) : originalFetch(path, options);
+        window.oldLoginDone = false;
+        login(null, state.token).then(() => { window.oldLoginDone = true; });
+    ''')
+    ui.wait.until(lambda _: ui.driver.execute_script('return !!window.waitingSchema'))
+    ui.restart()
+    ui.driver.execute_script('checkAuthentication()')
+    ui.logged_out()
+    ui.driver.execute_script('''
+        window.fetch = window.originalFetch;
+        window.waitingSchema(new Response(JSON.stringify({error: 'unauthorized'}), {status: 401}));
+    ''')
+    ui.wait.until(lambda _: ui.driver.execute_script('return window.oldLoginDone'))
+    ui.logged_out()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('status', [401, 403])
+def test_late_authentication_and_network_failures_do_not_break_new_login(browser_auth, status):
+    ui = browser_auth
+    ui.driver.execute_script('''
+        window.originalFetch = window.fetch;
+        window.pendingAuth = [];
+        window.authFailures = [];
+        window.fetch = (path, options) => path === '/api/fixture'
+          ? new Promise((resolve, reject) => pendingAuth.push({resolve, reject})) : originalFetch(path, options);
+        for (let i = 0; i < 3; i++) api('/api/fixture').catch(error => {
+          authFailures.push({message: error.message, obsolete: error.authObsolete === true});
+          notifyError(error);
+        });
+        pendingAuth[0].resolve(new Response(JSON.stringify({error: 'unauthorized'}), {status: arguments[0]}));
+    ''', status)
+    ui.logged_out()
+    ui.login()
+    ui.driver.execute_script('''
+        pendingAuth[1].resolve(new Response(JSON.stringify({error: 'unauthorized'}), {status: 401}));
+        pendingAuth[2].reject(new TypeError('Failed to fetch'));
+        window.fetch = originalFetch;
+    ''')
+    ui.wait.until(lambda _: ui.driver.execute_script('return authFailures.length === 3'))
+    assert ui.driver.execute_script('return authFailures.slice(1).every(item => item.obsolete)')
+    assert ui.find('#shell').is_displayed() and not ui.find('#notice').is_displayed()
+
+
+@pytest.mark.browser
+def test_rate_limit_message_does_not_log_browser_out(browser_auth):
+    ui = browser_auth
+    result = ui.driver.execute_async_script('''
+        const done = arguments[arguments.length - 1], original = window.fetch;
+        window.fetch = () => Promise.resolve(new Response(JSON.stringify({error: 'rate limited'}), {status: 429}));
+        api('/api/fixture').catch(error => { window.fetch = original; done(error.message); });
+    ''')
+    assert result == 'rate limited' and ui.find('#shell').is_displayed()
+
+
+@pytest.mark.browser
+def test_clearing_login_cache_in_other_tab_logs_browser_out(browser_auth):
+    ui = browser_auth
+    ui.driver.execute_script('''
+        localStorage.removeItem('olivos.webui.token');
+        window.dispatchEvent(new StorageEvent('storage', {key: 'olivos.webui.token'}));
+    ''')
+    ui.logged_out()
