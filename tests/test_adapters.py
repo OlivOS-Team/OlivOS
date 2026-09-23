@@ -60,7 +60,8 @@ def test_napcat_face_matches_old_string_plugin_keyword(kind, face_id):
 
 
 @pytest.mark.parametrize('qq', ['42', 'all'])
-def test_napcat_at_keeps_metadata_out_of_match_string(qq):
+@pytest.mark.parametrize('compatible', [189, 190, 210])
+def test_napcat_at_keeps_metadata_out_of_match_string(qq, compatible):
     segment = {'type': 'at', 'data': {
         'qq': qq, 'name': '[昵称],带逗号', 'raw': {'display': '[昵称]'}, 'extra': 'value',
     }}
@@ -68,9 +69,10 @@ def test_napcat_at_keeps_metadata_out_of_match_string(qq):
                          sub_type='normal', group_id=7, user_id=42, message_id=8,
                          message=[segment], raw_message='', font=0,
                          sender={'user_id': 42, 'nickname': 'tester'})
-    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.plugin_info.update(compatible_svn=compatible, message_mode_tx='old_string')
     event.get_Event_on_Plugin()
-    assert event.data.message == f'[CQ:at,qq={qq}]'
+    suffix = ',name=[昵称],带逗号' if compatible >= 190 else ''
+    assert event.data.message == f'[CQ:at,qq={qq}{suffix}]'
     assert event.data.extend['napcat_at_data'] == [segment['data']]
     assert event.sdk_event.json['message'] == [segment]
 
@@ -86,7 +88,7 @@ def test_non_napcat_keeps_original_face_and_image_fields():
                'sender': {'user_id': 42, 'nickname': 'tester'}}
     sdk_event = OlivOS.onebotSDK.event(json.dumps(payload))
     sdk_event.platform['model'] = 'gocqhttp'
-    assert OlivOS.onebotSDK.format_cq_code_msg(segments, 'gocqhttp') == (
+    assert OlivOS.onebotSDK.format_cq_code_msg(segments) == (
         '[CQ:face,id=311,raw={\'faceText\': \'[表情]\'}]'
         '[CQ:image,summary=[动画表情],file=x.png,sub_type=1]'
     )
@@ -130,7 +132,7 @@ def test_napcat_image_survives_plugin_delivery_and_reply(summary):
     assert event.data.message_sdk.data[0].data['url'] == url
     event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
     event.get_Event_on_Plugin()
-    assert re.match(r'^\[CQ:image,file=test\.png,.*\]$', event.data.message)
+    assert event.data.message == f'[CQ:image,file={url}]'
     reply = OlivOS.messageAPI.Message_templet('old_string', event.data.message)
     assert len(reply.data) == 1
     assert reply.get('old_string') == f'[CQ:image,file={url}]'

@@ -39,8 +39,8 @@ def event_for(bot):
 @pytest.mark.parametrize('model', OlivOS.onebotSDK.napcatModelMap + ['gocqhttp', 'lagrange_default'])
 @pytest.mark.parametrize('reported_model', ['default', 'para_default'])
 def test_account_model_resolves_only_configured_napcat(model, reported_model, monkeypatch):
-    bot = OlivOS.API.bot_info_T(id=10001, platform_sdk='onebot',
-                              platform_platform='qq', platform_model=model)
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model=model)
     loader = OlivOS.pluginAPI.shallow(
         control_queue=queue.Queue(), rx_queue=queue.Queue(), bot_info_dict={bot.hash: bot})
     loader.log = Mock()
