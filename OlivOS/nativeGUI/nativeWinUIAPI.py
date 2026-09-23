@@ -1839,7 +1839,7 @@ class OlivOSTerminalUI(BaseTerminalUI):
     WINDOW_TITLE = "OlivOS 终端"
     WINDOW_SIZE = "900x600"
     MIN_SIZE = (900, 600)
-    COLUMN_WEIGHTS = [(0, 0), (1, 2), (2, 2), (3, 0)]
+    COLUMN_WEIGHTS = [(0, 0), (1, 0), (2, 2), (3, 0)]
     HAS_SEND_BUTTON = False
 
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
@@ -1885,6 +1885,7 @@ class OlivOSTerminalUI(BaseTerminalUI):
             self.UIData['level_list'].append(level_name)
             self.UIData['level_find'][level_name] = level_this
         self.UIObject['root_level']['value'] = tuple(self.UIData['level_list'])
+        self.UIObject['root_level'].configure(width=6)
         self.UIObject['root_level'].current(self.UIData['level_list'].index(self.UIData['level_default']))
         self.UIObject['root_log_format_frame'] = tkinter.Frame(
             self.UIObject['root'], bg=self.UIConfig['color_001']

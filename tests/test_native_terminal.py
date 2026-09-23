@@ -180,5 +180,17 @@ def test_log_format_control_is_visible_in_main_terminal(tk_root):
         assert str(terminal.UIObject['root_log_format'].cget('state')) == 'readonly'
         assert terminal.UIData['root_log_format_StringVar'].get() in ('OP', 'CQ')
         assert terminal.UIObject['root_log_format']['values'] == ('OP', 'CQ')
+        assert terminal.UIObject['root_level'].cget('width') == 6
+        assert max(map(len, terminal.UIData['level_list'])) == 5
+        assert terminal.UIObject['root'].grid_columnconfigure(1, 'weight') == 0
+        terminal.UIObject['root'].attributes('-alpha', 0)
+        terminal.UIObject['root'].deiconify()
+        terminal.UIObject['root'].update()
+        entry = terminal.UIObject['root_input']
+        assert entry.winfo_width() > terminal.UIObject['root'].winfo_width() / 2
+        entry_width = entry.winfo_width()
+        terminal.UIObject['root'].geometry('1100x600')
+        terminal.UIObject['root'].update()
+        assert entry.winfo_width() >= entry_width + 180
     finally:
         terminal.UIObject['root'].destroy()
