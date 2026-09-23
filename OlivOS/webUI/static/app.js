@@ -39,6 +39,7 @@ const state = {
   token: '',
   session: '',
   page: 'dashboard',
+  navigationGeneration: 0,
   accounts: [],
   savedAccounts: [],
   revision: '',
@@ -71,6 +72,8 @@ const state = {
   authGeneration: 0,
   cachedLogin: false,
   checkingAuth: false,
+  sessionRefresh: null,
+  sessionCheckedAt: 0,
   actions: { reload: null, update: null },
 };
 const titles = {
@@ -181,8 +184,17 @@ function stream(name, path, onBatch, onStatus = () => {}) {
   closeStream(name);
   const entry = { closed: false, attempts: 0, socket: null, timer: null };
   state.streams.set(name, entry);
-  const connect = () => {
+  const connect = async () => {
     if (entry.closed || !state.token) return;
+    if (name === 'events') {
+      try {
+        await ensureSession();
+      } catch {
+        if (!entry.closed) entry.timer = setTimeout(connect, 5000);
+        return;
+      }
+      if (entry.closed || !state.token) return;
+    }
     const url = new URL(path, location.href);
     url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(url, ['olivos', `token.${state.token}`]);
@@ -220,6 +232,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
 async function login(ev, token = null) {
   ev?.preventDefault();
   const generation = ++state.authGeneration;
+  state.sessionRefresh = null;
   $('login-error').textContent = '';
   const submit = $('login-form').querySelector('button');
   submit.disabled = true;
@@ -233,6 +246,7 @@ async function login(ev, token = null) {
     cachedToken(state.token);
     state.cachedLogin = cachedToken() === state.token;
     state.session = result.session;
+    state.sessionCheckedAt = Date.now();
     state.schema = await api('/api/accounts/schema');
     await Promise.all([loadAccounts(), loadPlugins(), loadTerminals(), refreshStatus()]);
     await restorePage();
@@ -244,17 +258,10 @@ async function login(ev, token = null) {
     else if (state.page === 'terminals') {
       renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
     }
-    stream(
-      'events',
-      `/ws/events?session=${encodeURIComponent(state.session)}&since=${result.cursor}`,
-      eventBatch,
-      (text) => {
-        $('connection').textContent = text;
-      },
-    );
+    startEventStream(result.cursor);
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (state.page === 'dashboard') refreshStatus().catch(notifyError);
+      if (state.page === 'dashboard') refreshStatus().then(() => ensureSession()).catch(notifyError);
       else checkAuthentication();
       checkCachedLogin();
     }, 10000);
@@ -281,12 +288,15 @@ async function logout() {
 }
 function resetLogin(message = '') {
   state.authGeneration++;
+  state.navigationGeneration++;
   cachedToken('');
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
   state.token = '';
   state.session = '';
+  state.sessionRefresh = null;
+  state.sessionCheckedAt = 0;
   state.accounts = [];
   state.savedAccounts = [];
   state.logs = [];
@@ -326,10 +336,32 @@ async function checkAuthentication() {
   state.checkingAuth = true;
   try {
     await api('/api/status');
+    if (state.session) await ensureSession();
   } catch {
     // 认证失败由 api 统一退出；网络中断保留登录状态。
   } finally {
     state.checkingAuth = false;
+  }
+}
+function startEventStream(cursor) {
+  stream('events', `/ws/events?session=${encodeURIComponent(state.session)}&since=${cursor}`,
+    eventBatch, (text) => { $('connection').textContent = text; });
+}
+async function ensureSession(force = false) {
+  if (state.sessionRefresh) return state.sessionRefresh;
+  if (!force && state.session && Date.now() - state.sessionCheckedAt < 60000) return;
+  const pending = api('/api/session', { method: 'POST', body: { session: state.session } }).then(result => {
+    const changed = state.session !== result.session;
+    state.session = result.session;
+    state.sessionCheckedAt = Date.now();
+    // 会话被回收时重新订阅；保留已有 iframe、表单和滚动状态。
+    if (changed && state.streams.has('events')) startEventStream(result.cursor);
+  });
+  state.sessionRefresh = pending;
+  try {
+    await pending;
+  } finally {
+    if (state.sessionRefresh === pending) state.sessionRefresh = null;
   }
 }
 window.addEventListener('storage', (ev) => {
@@ -376,6 +408,7 @@ async function restorePage() {
   await navigate(Object.keys(titles).includes(saved?.page) ? saved.page : 'dashboard');
 }
 async function navigate(page) {
+  state.navigationGeneration++;
   state.page = page;
   document.querySelectorAll('.page').forEach((node) => {
     node.hidden = node.id !== page;
@@ -1223,11 +1256,17 @@ function destroyFrames() {
 async function openPluginPage(page) {
   const routePath = pluginPagePath(page);
   if (routePath === null) return;
+  const navigation = state.navigationGeneration + 1;
   await navigate('plugin-page');
+  if (navigation !== state.navigationGeneration) return;
   dropExternalFrame();
   const key = frameKey(page.namespace, page.path);
   let entry = state.frames.get(key);
   if (!entry) {
+    hideFrames();
+    // Cookie 可能已过期或被清除，必须先修复再发起 iframe 导航。
+    await ensureSession(true);
+    if (navigation !== state.navigationGeneration) return;
     const filename = routePath.split('/').map(encodeURIComponent).join('/');
     const frame = element('iframe', null, {
       title: page.title,
@@ -1267,6 +1306,20 @@ window.addEventListener('message', async (ev) => {
   const entry = entryOfWindow(ev.source);
   if (!entry) return;
   const data = ev.data;
+  if (data?.type === 'olivos:plugin_auth_required') {
+    if (entry.authRetried) {
+      notify('插件页面登录恢复失败，请关闭此插件页后重新打开。');
+      return;
+    }
+    entry.authRetried = true;
+    try {
+      await ensureSession(true);
+      if (state.frames.get(entry.key) === entry) entry.frame.src = entry.frame.src;
+    } catch (error) {
+      notifyError(error);
+    }
+    return;
+  }
   if (
     !data ||
     data.type !== 'olivos:plugin_event' ||
@@ -1275,6 +1328,7 @@ window.addEventListener('message', async (ev) => {
     data.request_id.length > 128
   )
     return;
+  entry.authRetried = false;
   // 同一 request_id 仍在处理中时丢弃重复投递，避免插件页面重发导致事件被执行多次
   if (state.requests.has(data.request_id)) return;
   if (state.requests.size >= 128) {
@@ -1283,6 +1337,7 @@ window.addEventListener('message', async (ev) => {
   }
   try {
     state.requests.set(data.request_id, entry.key);
+    await ensureSession();
     await api('/api/plugin_event', {
       method: 'POST',
       body: {
