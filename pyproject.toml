@@ -25,14 +25,16 @@ dependencies = [
     "Flask",
     "Werkzeug==2.2.2",
     "gevent",
-    "Pillow==9.3.0; platform_python_implementation != 'PyPy'",
+    "Pillow==9.3.0; platform_python_implementation != 'PyPy' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "Pillow==10.4.0; platform_python_implementation != 'PyPy' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "Pillow>=11.2.1; platform_python_implementation == 'PyPy'",
     "psutil",
     "pystray",
     "requests",
     "requests-toolbelt",
     "rsa",
-    "cryptography",
+    "cryptography; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "cryptography==46.0.0; sys_platform == 'win32' and platform_machine == 'ARM64'",
     "websocket-client",
     "websockets",
     "aiohttp",
@@ -41,8 +43,8 @@ dependencies = [
     "pyjson5",
     "pywebview>=4.0.2",
     "filetype",
-    "grpcio",
-    "grpcio-tools",
+    "grpcio; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "grpcio-tools; sys_platform != 'win32' or platform_machine != 'ARM64'",
     "protobuf",
 ]
 
@@ -83,7 +85,8 @@ pypywin = [
 # 打包工具
 build = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10'",
+    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "nuitka==2.8.10",
     "setuptools>=63.2.0",
 ]
@@ -91,7 +94,8 @@ build = [
 # pyinstaller打包工具
 pyinstaller = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10'",
+    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "setuptools>=63.2.0",
 ]
 

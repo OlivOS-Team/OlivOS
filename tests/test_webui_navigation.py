@@ -169,11 +169,116 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
 
 
 @pytest.mark.browser
+def test_plugin_restart_restores_the_open_page(browser):
+    identity = browser.select()
+    browser.find('#draft').send_keys('before restart')
+    browser.driver.switch_to.default_content()
+    with browser.host.lock:
+        plugins = browser.host.plugins
+        pages = browser.host.plugin_pages
+        browser.host.plugins = {}
+        browser.host.plugin_pages = []
+        browser.host.publish('events', {'type': 'plugins', 'ready': False})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.seenEvents.has(arguments[0])', browser.host.sequence))
+    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    assert browser.driver.execute_script('return window.pageIdentity') == identity
+    browser.driver.switch_to.default_content()
+    browser.driver.execute_script('state.frame.dataset.testIdentity = arguments[0]', 'before')
+    with browser.host.lock:
+        browser.host.plugins = plugins
+        browser.host.plugin_pages = pages
+        browser.host.publish('events', {'type': 'plugins', 'ready': True})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.frame?.isConnected && !state.frame.hidden && '
+        'state.frame.dataset.testIdentity !== arguments[1] && state.framePath === arguments[0]',
+        'webui/index.html', 'before'))
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.find('#draft').get_attribute('value') == ''
+
+
+@pytest.mark.browser
 def test_plugin_browser_message_bridge_roundtrip(browser):
     browser.select()
     browser.find('#draft').send_keys('roundtrip')
     browser.click('#request')
     browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：roundtrip')
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('failure', ['cookie', 'expired', 'evicted'])
+def test_plugin_page_recovers_lost_session_before_open(browser, failure):
+    if failure == 'cookie':
+        browser.driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
+    else:
+        session = browser.driver.execute_script('return state.session')
+        with browser.host.lock:
+            if failure == 'expired':
+                browser.host.sessions[session] = 0
+            else:
+                browser.host.sessions.pop(session)
+    browser.select()
+    browser.find('#draft').send_keys('recovered')
+    browser.click('#request')
+    browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：recovered')
+
+
+@pytest.mark.browser
+def test_plugin_frame_reload_recovers_missing_cookie(browser):
+    browser.select()
+    browser.driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
+    browser.driver.execute_script('location.reload()')
+    browser.driver.switch_to.default_content()
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!state.frame'))
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    browser.find('#draft').send_keys('reloaded')
+    browser.click('#request')
+    browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：reloaded')
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('evicted', [False, True])
+def test_open_plugin_survives_session_expiry_without_losing_form(browser, evicted):
+    identity = browser.select()
+    browser.find('#draft').send_keys('retained after expiry')
+    browser.driver.switch_to.default_content()
+    session = browser.driver.execute_script('state.sessionCheckedAt = 0; return state.session')
+    with browser.host.lock:
+        if evicted:
+            browser.host.sessions.pop(session)
+        else:
+            browser.host.sessions[session] = 0
+    browser.driver.execute_async_script('checkAuthentication().then(arguments[arguments.length - 1])')
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    assert browser.driver.execute_script('return window.pageIdentity') == identity
+    assert browser.find('#draft').get_attribute('value') == 'retained after expiry'
+    browser.click('#request')
+    browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：retained after expiry')
+
+
+@pytest.mark.browser
+def test_slow_session_renewal_does_not_override_later_navigation(browser):
+    browser.driver.execute_script('''
+        window.originalFetch = window.fetch;
+        window.pendingRenewal = null;
+        window.fetch = (path, options) => path === '/api/session'
+          ? new Promise(resolve => { pendingRenewal = () => resolve(originalFetch(path, options)); })
+          : originalFetch(path, options);
+    ''')
+    browser.click('.plugin-link-entry[data-plugin-namespace="single"]')
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!pendingRenewal'))
+    browser.click('[data-page="logs"]')
+    browser.driver.execute_async_script('''
+        const done = arguments[arguments.length - 1];
+        window.fetch = originalFetch;
+        pendingRenewal();
+        state.sessionRefresh.then(() => setTimeout(done, 0));
+    ''')
+    assert browser.find('#page-title').text == '日志'
+    assert browser.driver.execute_script('return state.frame === null && state.frames.size === 0')
 
 
 @pytest.mark.browser

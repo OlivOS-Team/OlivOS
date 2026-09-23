@@ -4,6 +4,8 @@ import os
 import queue
 import secrets
 import threading
+import time
+from http.cookies import SimpleCookie
 from types import SimpleNamespace
 
 import pytest
@@ -64,6 +66,56 @@ def test_browser_login_cache_expires_when_token_changes(client, host):
     host.token = secrets.token_urlsafe(32)
     assert client.get('/api/status', headers={'X-Auth-Token': cached}).status_code == 401
     assert client.post('/api/login', headers={'X-Auth-Token': host.token}).status_code == 200
+
+
+def test_session_renewal_requires_token_and_preserves_reply_session(client, host):
+    session = client.post('/api/login').json['session']
+    host.sessions[session] = 0
+    unauthenticated = host.app.test_client()
+    assert unauthenticated.post('/api/session', json={'session': session}).status_code == 401
+    assert not host.session_valid(session)
+    assert client.post('/api/session', json={'session': session},
+                       headers={'Origin': 'https://foreign.invalid'}).status_code == 403
+    response = client.post('/api/session', json={'session': session})
+    assert response.status_code == 200
+    assert response.json['session'] == session
+    assert host.sessions[session] > time.monotonic() + 11 * 3600
+    cookie = next(iter(SimpleCookie(response.headers['Set-Cookie']).values()))
+    assert cookie['httponly'] and cookie['samesite'] == 'Strict' and cookie['path'] == '/plugin/'
+    assert cookie['max-age'] == str(12 * 3600)
+    assert client.post('/api/session', json={'session': []}).status_code == 200
+
+
+def test_session_recreated_after_eviction(client, host):
+    session = client.post('/api/login').json['session']
+    host.sessions.pop(session)
+    response = client.post('/api/session', json={'session': session})
+    assert response.json['session'] != session
+    assert host.session_valid(response.json['session'])
+
+
+def test_plugin_cookie_names_are_isolated_by_port(client, host):
+    from test_webui import install_plugin
+
+    install_plugin(host)
+    first = client.post('/api/login', base_url='http://localhost:20480')
+    first_name = next(iter(SimpleCookie(first.headers['Set-Cookie'])))
+    second = client.post('/api/login', base_url='http://localhost:20481')
+    second_name = next(iter(SimpleCookie(second.headers['Set-Cookie'])))
+    assert first_name != second_name
+    client.post('/api/logout', base_url='http://localhost:20481', json={'session': second.json['session']})
+    assert client.get('/plugin/demo/webui/index.html', base_url='http://localhost:20480').status_code == 200
+    assert client.get('/plugin/demo/webui/index.html', base_url='http://localhost:20481').status_code == 401
+
+
+def test_plugin_navigation_auth_failure_can_notify_parent_without_credentials(host):
+    client = host.app.test_client()
+    response = client.get('/plugin/demo/index.html', headers={'Sec-Fetch-Dest': 'iframe'})
+    assert response.status_code == 401 and response.mimetype == 'text/html'
+    assert 'olivos:plugin_auth_required' in response.text
+    assert host.token not in response.text and host.browser_token not in response.text
+    assert 'allow-same-origin' not in response.headers['Content-Security-Policy']
+    assert client.get('/plugin/demo/index.html').json == {'error': '请先登录 WebUI'}
 
 
 @pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='设置 OLIVOS_WEBUI_BROWSER=1 运行浏览器验证')

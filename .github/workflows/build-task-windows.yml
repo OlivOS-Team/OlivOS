@@ -35,7 +35,7 @@ on:
 
 jobs:
   build:
-    if: inputs.enable && inputs.runs-on == 'windows-latest'
+    if: inputs.enable && (inputs.runs-on == 'windows-latest' || inputs.runs-on == 'windows-11-arm')
     runs-on: ${{ inputs.runs-on }}
     defaults:
       run:
@@ -107,7 +107,7 @@ jobs:
 
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
-      if: inputs.name == 'OlivOS-Win64-release'
+      if: inputs.name == 'OlivOS-Win64-release' || inputs.name == 'OlivOS-Win-arm64-release'
       with:
-        name: OlivOS-Win
+        name: ${{ inputs.arch == 'arm64' && 'OlivOS-Win-arm64' || 'OlivOS-Win' }}
         path: ./OlivOS-PKG

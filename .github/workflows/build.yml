@@ -28,6 +28,15 @@ jobs:
             freethreaded: false
             build-type: pyinstaller
             debug: false
+          - name: OlivOS-Win-arm64-release
+            enable: true
+            runs-on: windows-11-arm
+            python-version: '3.11'
+            arch: arm64
+            python-arch: arm64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
     with:
       name: ${{ matrix.name }}
       enable: ${{ matrix.enable }}
@@ -331,10 +340,19 @@ jobs:
         include:
           - name: OlivOS-MacOS64-release
             enable: true
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+          - name: OlivOS-MacOS-arm64-release
+            enable: true
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: arm64
+            python-arch: arm64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -358,7 +376,7 @@ jobs:
         include:
           - name: OlivOS-MacOS64-nuitka
             enable: false
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
@@ -368,10 +386,19 @@ jobs:
 
           - name: OlivOS-MacOS64-pack
             enable: true
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
+            freethreaded: false
+            build-type: pack
+            debug: false
+          - name: OlivOS-MacOS-arm64-pack
+            enable: true
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: arm64
+            python-arch: arm64
             freethreaded: false
             build-type: pack
             debug: false
@@ -400,6 +427,12 @@ jobs:
         with:
           name: OlivOS-Win
           path: OlivOS-Win/
+
+      - name: Download Windows arm64 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-Win-arm64
+          path: OlivOS-Win-arm64/
       
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
@@ -419,6 +452,11 @@ jobs:
           zip -r ../OlivOS-Win.zip ./
           cd ../
           cp ./OlivOS-Win.zip ./OlivOS-Win-${{ github.ref_name }}.zip
+
+          cd ./OlivOS-Win-arm64
+          zip -r ../OlivOS-Win-arm64.zip ./
+          cd ../
+          cp ./OlivOS-Win-arm64.zip ./OlivOS-Win-arm64-${{ github.ref_name }}.zip
           
           cd ./OlivOS-Linux
           zip -r ../OlivOS-Linux.zip ./
@@ -443,6 +481,8 @@ jobs:
           artifacts: |
             ./OlivOS-Win.zip
             ./OlivOS-Win-${{ github.ref_name }}.zip
+            ./OlivOS-Win-arm64.zip
+            ./OlivOS-Win-arm64-${{ github.ref_name }}.zip
             ./OlivOS-Linux.zip
             ./OlivOS-Linux-${{ github.ref_name }}.zip
             ./OlivOS-Linux-arm64.zip

@@ -424,12 +424,29 @@ def runtime_status(host):
 def register_routes(host):
     app = host.app
 
+    def cookie_name():
+        # Cookie 不按端口隔离；同一主机上的多个 WebUI 必须使用不同名称。
+        authority = request.host.lower().encode('utf-8')
+        return 'olivos_webui_' + hashlib.sha256(authority).hexdigest()[:16]
+
+    def session_response(session):
+        response = jsonify(session=session, cursor=host.sequence, browser_token=host.browser_token)
+        response.set_cookie(cookie_name(), session, httponly=True, samesite='Strict',
+                            secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
+        return response
+
     @app.before_request
     def authorize():
         if request.path == '/api/health':
             return None
         if request.path.startswith('/plugin/'):
-            if not host.session_valid(request.cookies.get('olivos_webui')):
+            if not host.session_valid(request.cookies.get(cookie_name())):
+                if request.headers.get('Sec-Fetch-Dest') in ('iframe', 'document'):
+                    # 沙箱页不能读 Cookie，由父页面验证身份并最多重试一次。
+                    return ('''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<p>插件页面登录已失效，正在尝试恢复；若未恢复，请关闭此插件页后重新打开。</p>
+<script>window.parent.postMessage({type: 'olivos:plugin_auth_required'}, '*');</script>
+</html>''', 401, {'Content-Type': 'text/html; charset=utf-8'})
                 return jsonify(error='请先登录 WebUI'), 401
             return None
         if request.path.startswith('/api/'):
@@ -490,10 +507,19 @@ def register_routes(host):
     def login():
         with host.lock:
             session = host.new_session()
-            response = jsonify(session=session, cursor=host.sequence, browser_token=host.browser_token)
-        response.set_cookie('olivos_webui', session, httponly=True, samesite='Strict',
-                            secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
-        return response
+            return session_response(session)
+
+    @app.post('/api/session')
+    def renew_session():
+        # 此接口已经通过 Token 认证；只读 Cookie/插件访问本身不能续期。
+        body = request.get_json(silent=True) or {}
+        session = body.get('session') if isinstance(body, dict) else None
+        with host.lock:
+            if isinstance(session, str) and session in host.sessions:
+                host.sessions[session] = time.monotonic() + 12 * 3600
+            else:
+                session = host.new_session()
+            return session_response(session)
 
     @app.post('/api/logout')
     def logout():
@@ -501,7 +527,7 @@ def register_routes(host):
         with host.lock:
             host.sessions.pop(body.get('session'), None)
         response = jsonify(ok=True)
-        response.delete_cookie('olivos_webui', path='/plugin/')
+        response.delete_cookie(cookie_name(), path='/plugin/')
         return response
 
     @app.get('/api/status')

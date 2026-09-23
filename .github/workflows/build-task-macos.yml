@@ -35,7 +35,7 @@ on:
 
 jobs:
   build:
-    if: inputs.enable && inputs.runs-on == 'macos-latest'
+    if: inputs.enable && (inputs.runs-on == 'macos-latest' || inputs.runs-on == 'macos-26-intel')
     runs-on: ${{ inputs.runs-on }}
     defaults:
       run:
@@ -55,6 +55,12 @@ jobs:
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       id: build
       run: |
+        expected=${{ inputs.arch == 'arm64' && 'arm64' || 'x86_64' }}
+        actual=$(uname -m)
+        if [[ $actual != $expected ]]; then
+          echo macOS构建架构不匹配：预期$expected，实际$actual >&2
+          exit 1
+        fi
         PYTHON_EXE="${{ steps.setup-python.outputs.python-path }}"
         PYTHON_ROOT="$(dirname "$(dirname "$PYTHON_EXE")")"
         echo "Python root directory: ${PYTHON_ROOT}"
@@ -91,7 +97,7 @@ jobs:
     
     - name: Upload Publish Artifact
       uses: actions/upload-artifact@v4
-      if: inputs.name == 'OlivOS-MacOS64-release'
+      if: inputs.name == 'OlivOS-MacOS64-release' || inputs.name == 'OlivOS-MacOS-arm64-release'
       with:
-        name: OlivOS-MacOS
+        name: ${{ inputs.arch == 'arm64' && 'OlivOS-MacOS-arm64' || 'OlivOS-MacOS' }}
         path: ./OlivOS-PKG
