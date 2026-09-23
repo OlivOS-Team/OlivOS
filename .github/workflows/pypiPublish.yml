@@ -4,7 +4,11 @@ on:
     branches: [ pypipublish ]
   workflow_dispatch:
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
   tests:
+    needs: lint
     uses: ./.github/workflows/test.yml
 
   build:

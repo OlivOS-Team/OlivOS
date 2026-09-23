@@ -9,7 +9,11 @@ on:
     branches: [ main, dev ]
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
   tests:
+    needs: lint
     uses: ./.github/workflows/test.yml
 
   build-windows-publish:
