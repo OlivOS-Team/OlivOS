@@ -340,10 +340,19 @@ jobs:
         include:
           - name: OlivOS-MacOS64-release
             enable: true
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
+            freethreaded: false
+            build-type: pyinstaller
+            debug: false
+          - name: OlivOS-MacOS-arm64-release
+            enable: true
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: arm64
+            python-arch: arm64
             freethreaded: false
             build-type: pyinstaller
             debug: false
@@ -367,7 +376,7 @@ jobs:
         include:
           - name: OlivOS-MacOS64-nuitka
             enable: false
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
@@ -377,10 +386,19 @@ jobs:
 
           - name: OlivOS-MacOS64-pack
             enable: true
-            runs-on: macos-latest
+            runs-on: macos-26-intel
             python-version: '3.11.0'
             arch: amd64
             python-arch: x64
+            freethreaded: false
+            build-type: pack
+            debug: false
+          - name: OlivOS-MacOS-arm64-pack
+            enable: true
+            runs-on: macos-latest
+            python-version: '3.11.0'
+            arch: arm64
+            python-arch: arm64
             freethreaded: false
             build-type: pack
             debug: false

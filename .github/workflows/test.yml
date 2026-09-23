@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-26-intel]
     env:
       PYSTRAY_BACKEND: dummy
       OLIVOS_WEBUI_BROWSER: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
@@ -24,6 +24,16 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+      - name: Verify macOS runner architecture
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          expected=${{ matrix.os == 'macos-26-intel' && 'x86_64' || 'arm64' }}
+          actual=$(uname -m)
+          if [[ $actual != $expected ]]; then
+            echo macOS运行器架构不匹配：预期$expected，实际$actual >&2
+            exit 1
+          fi
       - name: Install test dependencies
         run: python -m pip install ".[test${{ runner.os == 'Windows' && ',win' || '' }}]"
       - name: Setup Chrome for browser tests

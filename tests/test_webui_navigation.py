@@ -169,6 +169,37 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
 
 
 @pytest.mark.browser
+def test_plugin_restart_restores_the_open_page(browser):
+    identity = browser.select()
+    browser.find('#draft').send_keys('before restart')
+    browser.driver.switch_to.default_content()
+    with browser.host.lock:
+        plugins = browser.host.plugins
+        pages = browser.host.plugin_pages
+        browser.host.plugins = {}
+        browser.host.plugin_pages = []
+        browser.host.publish('events', {'type': 'plugins', 'ready': False})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.seenEvents.has(arguments[0])', browser.host.sequence))
+    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    assert browser.driver.execute_script('return window.pageIdentity') == identity
+    browser.driver.switch_to.default_content()
+    browser.driver.execute_script('state.frame.dataset.testIdentity = arguments[0]', 'before')
+    with browser.host.lock:
+        browser.host.plugins = plugins
+        browser.host.plugin_pages = pages
+        browser.host.publish('events', {'type': 'plugins', 'ready': True})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.frame?.isConnected && !state.frame.hidden && '
+        'state.frame.dataset.testIdentity !== arguments[1] && state.framePath === arguments[0]',
+        'webui/index.html', 'before'))
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.find('#draft').get_attribute('value') == ''
+
+
+@pytest.mark.browser
 def test_plugin_browser_message_bridge_roundtrip(browser):
     browser.select()
     browser.find('#draft').send_keys('roundtrip')

@@ -1396,11 +1396,32 @@ async function runAction(kind, path, progress) {
 }
 async function handleEvent(item) {
   if (item.type === 'plugins') {
-    if (item.ready && state.frames.size) {
-      destroyFrames();
-      notify('插件已重载，插件页面已刷新，请重新打开。');
-    }
+    // The loader broadcasts an empty list before it is ready. Keep the current
+    // iframe and navigation intact until the replacement plugins have loaded.
+    if (!item.ready) return;
+    const navigation = state.navigationGeneration;
+    const active = state.page === 'plugin-page' && state.frame
+      ? { namespace: state.frameNamespace, path: state.framePath } : null;
+    const hadFrames = state.frames.size > 0;
+    if (hadFrames) destroyFrames();
     await loadPlugins();
+    if (active && navigation === state.navigationGeneration && state.page === 'plugin-page') {
+      const page = state.pages.find(entry => embeddedPluginPage(entry) &&
+        entry.namespace === active.namespace && entry.path === active.path);
+      if (page) {
+        try {
+          await openPluginPage(page);
+          notify('插件已重载，当前插件页面已自动重新打开；未保存的内容可能需要重新填写。');
+        } catch (error) {
+          notifyError(error);
+        }
+      } else {
+        await navigate('plugins');
+        notify('插件已重载，原插件页面已不可用，请从列表重新选择。');
+      }
+    } else if (hadFrames) {
+      notify('插件已重载，缓存的插件页面已刷新。');
+    }
     if (item.ready) finishAction('reload', {
       started_at: item.started_at,
       message: `插件重载完成，当前已加载 ${Object.keys(state.plugins).length} 个插件。`,
