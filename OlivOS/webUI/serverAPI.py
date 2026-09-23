@@ -234,8 +234,11 @@ class server(OlivOS.API.Proc_templet):
         if action == 'logger' and data.get('event') == 'log':
             log = data.get('data', {})
             entry = log.get('data', {})
+            text = log.get('str', entry.get('log_message', ''))
             self.publish('logs', {'level': entry.get('log_level', 2), 'time': entry.get('log_time'),
-                                  'text': log.get('str', entry.get('log_message', ''))})
+                                  'text': text,
+                                  'op_text': OlivOS.diagnoseAPI.format_log_message(text, 'op'),
+                                  'cq_text': OlivOS.diagnoseAPI.format_log_message(text, 'cq')})
         elif action == 'account_update':
             with self.lock:
                 self.accounts = copy.deepcopy(data.get('data', {}))

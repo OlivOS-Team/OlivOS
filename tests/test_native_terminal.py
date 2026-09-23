@@ -7,6 +7,8 @@ from unittest.mock import Mock
 
 import pytest
 
+import OlivOS
+
 pytestmark = [pytest.mark.native_gui, pytest.mark.skipif(os.name != 'nt', reason='Windows native terminal')]
 
 
@@ -125,3 +127,58 @@ def test_terminal_history_is_bounded_and_keeps_latest_row(terminal):
     for index in range(5000):
         terminal.tree_add_line(packet(str(index)))
     assert len(rows(terminal)) <= 128 and rows(terminal)[-1] == '4999'
+
+
+def test_log_format_switch_rerenders_history_without_mutating_packets(terminal, tmp_path, tk_root):
+    import tkinter
+
+    terminal.root.webui_root = str(tmp_path)
+    terminal.root.UIObject['root_OlivOS_terminal_data'] = [packet('User: [OP:at,id=42]')]
+    terminal.UIData['root_log_format_StringVar'] = tkinter.StringVar(tk_root, value='CQ')
+    terminal._tree_init_line()
+    terminal._on_log_format_change()
+
+    assert rows(terminal) == ['User: [CQ:at,qq=42]']
+    assert terminal.root.UIObject['root_OlivOS_terminal_data'][0]['str'] == 'User: [OP:at,id=42]'
+    assert OlivOS.diagnoseAPI.load_log_display_mode(tmp_path) == 'cq'
+
+    terminal.UIData['root_log_format_StringVar'].set('OP')
+    terminal._on_log_format_change()
+    assert rows(terminal) == ['User: [OP:at,id=42]']
+
+
+def test_terminal_refreshes_display_setting_changed_by_webui(terminal, tmp_path, tk_root):
+    import tkinter
+
+    terminal.root.webui_root = str(tmp_path)
+    terminal.UIObject['root'] = tkinter.Toplevel(tk_root)
+    terminal.UIObject['root'].withdraw()
+    terminal.UIData['root_log_format_StringVar'] = tkinter.StringVar(tk_root, value='OP')
+    terminal.root.UIObject['root_OlivOS_terminal_data'] = [packet('User: [OP:at,id=42]')]
+    try:
+        OlivOS.diagnoseAPI.save_log_display_mode('cq', tmp_path)
+        terminal._sync_log_format()
+        assert terminal.UIData['root_log_format_StringVar'].get() == 'CQ'
+        assert rows(terminal) == ['User: [CQ:at,qq=42]']
+    finally:
+        terminal.UIObject['root'].destroy()
+
+
+def test_log_format_control_is_visible_in_main_terminal(tk_root):
+    from OlivOS.nativeGUI import nativeWinUIAPI
+
+    owner = SimpleNamespace(UIObject={'root_OlivOS_terminal_data': []})
+    terminal = nativeWinUIAPI.OlivOSTerminalUI('test', root=owner, logger_proc=Mock())
+    terminal._build_main_window()
+    terminal.UIObject['root'].withdraw()
+    try:
+        terminal._build_tree()
+        terminal._build_scrollbar()
+        terminal._build_input_area()
+        terminal._build_extra_controls()
+        assert terminal.UIObject['root_log_format_frame'].winfo_manager() == 'grid'
+        assert str(terminal.UIObject['root_log_format'].cget('state')) == 'readonly'
+        assert terminal.UIData['root_log_format_StringVar'].get() in ('OP', 'CQ')
+        assert terminal.UIObject['root_log_format']['values'] == ('OP', 'CQ')
+    finally:
+        terminal.UIObject['root'].destroy()

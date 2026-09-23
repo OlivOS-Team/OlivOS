@@ -130,6 +130,45 @@ def test_all_rest_routes(client, host):
         assert host.Proc_info.control_queue.get_nowait().action == action
 
 
+def test_log_display_setting_changes_webui_history_not_original_logs(client, host):
+    message = 'User: [OP:at,id=42,name=Alice][OP:face,id=311]'
+    send(host, {'action': 'logger', 'event': 'log', 'data': {
+        'data': {'log_level': 2, 'log_time': 1750000000}, 'str': message
+    }})
+    assert client.get('/api/logs/display').json == {'format': 'op'}
+    assert client.put('/api/logs/display', json={'format': 'wrong'}).status_code == 400
+    assert client.put('/api/logs/display', json={'format': 'cq'}).json == {
+        'format': 'cq'
+    }
+    assert OlivOS.diagnoseAPI.load_log_display_mode(host.root) == 'cq'
+    log = client.get('/api/logs').json['items'][-1]
+    assert log['text'] == message
+    assert log['op_text'] == message
+    assert log['cq_text'] == 'User: [CQ:at,qq=42,name=Alice][CQ:face,id=311]'
+    assert host.snapshot('logs')[-1]['text'] == message
+    assert client.put('/api/logs/display', json={'format': 'op'}).status_code == 200
+
+    send(host, {'action': 'logger', 'event': 'log', 'data': {
+        'data': {'log_level': 2, 'log_time': 1750000001},
+        'str': 'User: [CQ:at,qq=7,name=Bob][CQ:face,id=311]'
+    }})
+    last = client.get('/api/logs').json['items'][-1]
+    assert last['op_text'] == 'User: [OP:at,id=7,name=Bob][OP:face,id=311]'
+    assert last['cq_text'] == last['text']
+
+
+def test_log_display_formats_logfile_fallback_without_rewriting_file(client, host):
+    logfile = host.root / 'logfile/OlivOS_logfile_unity.log'
+    logfile.parent.mkdir(parents=True)
+    source = '[2026-09-23 17:00:00] - [INFO] - [unity] - [OP:at,id=42]'
+    logfile.write_text(source + '\n', encoding='utf-8')
+
+    item = client.get('/api/logs').json['items'][0]
+    assert item['op_text'] == '[unity] - [OP:at,id=42]'
+    assert item['cq_text'] == '[unity] - [CQ:at,qq=42]'
+    assert logfile.read_text(encoding='utf-8') == source + '\n'
+
+
 def test_unknown_account_details_exclude_disabled_and_known_states(client, host):
     from types import SimpleNamespace
 

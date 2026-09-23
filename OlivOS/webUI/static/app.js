@@ -50,6 +50,7 @@ const state = {
   terminals: [],
   selected: null,
   logs: [],
+  logMessageMode: 'op',
   terminalLogs: [],
   limit: 500,
   dirty: false,
@@ -262,7 +263,10 @@ async function login(ev, token = null) {
     clearInterval(state.timer);
     state.timer = setInterval(() => {
       if (state.page === 'dashboard') refreshStatus().then(() => ensureSession()).catch(notifyError);
-      else checkAuthentication();
+      else {
+        checkAuthentication();
+        if (state.page === 'logs') loadLogDisplay().catch(notifyError);
+      }
       checkCachedLogin();
     }, 10000);
   } catch (error) {
@@ -300,6 +304,7 @@ function resetLogin(message = '') {
   state.accounts = [];
   state.savedAccounts = [];
   state.logs = [];
+  state.logMessageMode = 'op';
   state.terminalLogs = [];
   state.seenEvents.clear();
   state.dirty = false;
@@ -820,7 +825,9 @@ function renderOutput(container, lines, follow, logMode = false) {
   const scrollTop = container.scrollTop;
   container.replaceChildren();
   for (const line of lines) {
-    let text = line.text ?? '';
+    let text = logMode
+      ? (state.logMessageMode === 'cq' ? line.cq_text : line.op_text) ?? line.text ?? ''
+      : line.text ?? '';
     if (logMode) {
       const timestamp =
         typeof line.time === 'number'
@@ -858,11 +865,20 @@ function renderLogs() {
   $('log-count').textContent = `${lines.length} / ${state.limit} 条`;
 }
 let logGeneration = 0;
+async function loadLogDisplay() {
+  const result = await api('/api/logs/display');
+  if (state.logMessageMode !== result.format) {
+    state.logMessageMode = result.format;
+    if (state.page === 'logs') renderLogs();
+  }
+  $('log-message-mode').value = state.logMessageMode;
+}
 async function openLogs() {
   const generation = ++logGeneration;
   closeStream('logs');
   state.logs = [];
   renderLogs();
+  await loadLogDisplay();
   const selected = selectedLogLevels();
   if (!selected.length) return;
   const query = `level=${encodeURIComponent(selected.length === Object.keys(levels).length ? '' : selected.join(','))}`;
@@ -1581,6 +1597,17 @@ $('log-filter').addEventListener('keydown', (ev) => {
   }
 });
 bind('log-scroll', renderLogs, 'change');
+bind('log-message-mode', async (ev) => {
+  const mode = ev.target.value;
+  try {
+    const result = await api('/api/logs/display', { method: 'PUT', body: { format: mode } });
+    state.logMessageMode = result.format;
+    renderLogs();
+  } catch (error) {
+    ev.target.value = state.logMessageMode;
+    throw error;
+  }
+}, 'change');
 bind(
   'terminal-scroll',
   () => renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked),
