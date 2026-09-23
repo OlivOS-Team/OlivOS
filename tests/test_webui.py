@@ -88,6 +88,7 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
             original_start = wsgi_server.start
             original_get_listener = wsgi_server.get_listener
             original_accepting = wsgi_server.start_accepting
+            original_make_socket_stdlib = wsgi_server._make_socket_stdlib
 
             def traced_get_listener(server, *args, **kwargs):
                 self.log(2, 'child listener binding', [])
@@ -100,6 +101,11 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
                 original_accepting(server)
                 self.log(2, 'child start_accepting finished', [])
 
+            def traced_make_socket_stdlib(server, fresh):
+                self.log(2, f'child unwrap socket entered: fresh={fresh}', [])
+                original_make_socket_stdlib(server, fresh)
+                self.log(2, 'child unwrap socket finished', [])
+
             def traced_start(server):
                 self.log(2, 'child server.start entered', [])
                 original_start(server)
@@ -108,7 +114,8 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
             try:
                 with patch.object(wsgi_server, 'start', traced_start), \
                      patch.object(wsgi_server, 'get_listener', traced_get_listener), \
-                     patch.object(wsgi_server, 'start_accepting', traced_accepting):
+                     patch.object(wsgi_server, 'start_accepting', traced_accepting), \
+                     patch.object(wsgi_server, '_make_socket_stdlib', traced_make_socket_stdlib):
                     super().run()
             finally:
                 faulthandler.cancel_dump_traceback_later()
