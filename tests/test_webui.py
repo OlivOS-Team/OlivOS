@@ -19,6 +19,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import asyncio
 import base64
 import copy
+import faulthandler
 import json
 import multiprocessing
 import os
@@ -76,6 +77,16 @@ class _ProcessLog:
 
     def log(self, level, message, segment):
         self.records.put((level, message))
+
+
+class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
+    def run(self):
+        with open(self.trace_path, 'w', encoding='utf-8') as trace:
+            faulthandler.dump_traceback_later(12, file=trace)
+            try:
+                super().run()
+            finally:
+                faulthandler.cancel_dump_traceback_later()
 
 
 def test_auth_and_rate_limit(host):
@@ -411,10 +422,11 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
         platform_model='public', server_type='post',
     )
     host.accounts = {bot.hash: bot}
-    webhook = OlivOS.qqGuildv2WebhookServerAPI.server(
+    webhook = _DiagnosticWebhook(
         'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', port,
         bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'), logger_proc=process_log,
     )
+    webhook.trace_path = str(tmp_path / 'webhook-child-trace.txt')
     host.runtime['webhook'] = webhook
     process = webhook.start_unity('processing')
     try:
@@ -431,7 +443,7 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
         assert webhook.webhook_online, (
             f'webhook child: alive={process.is_alive()}, exitcode={process.exitcode}, '
             f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}, '
-            f'logs={logs}'
+            f'logs={logs}, trace={Path(webhook.trace_path).read_text(encoding="utf-8")}'
         )
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
         webhook.on_terminate()
