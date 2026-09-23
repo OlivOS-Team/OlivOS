@@ -189,8 +189,11 @@ def test_log_format_control_is_visible_in_main_terminal(tk_root):
         entry = terminal.UIObject['root_input']
         assert entry.winfo_width() > terminal.UIObject['root'].winfo_width() / 2
         entry_width = entry.winfo_width()
-        terminal.UIObject['root'].geometry('1100x600')
+        window_width = terminal.UIObject['root'].winfo_width()
+        terminal.UIObject['root'].geometry(f'{window_width + 200}x600')
         terminal.UIObject['root'].update()
-        assert entry.winfo_width() >= entry_width + 180
+        window_growth = terminal.UIObject['root'].winfo_width() - window_width
+        assert window_growth > 0
+        assert abs((entry.winfo_width() - entry_width) - window_growth) <= 2
     finally:
         terminal.UIObject['root'].destroy()

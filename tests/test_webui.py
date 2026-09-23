@@ -684,6 +684,7 @@ def test_qrcode_private_and_path_guard(client, host):
     image = host.root / 'conf/qr.png'
     image.write_bytes(base64.b64decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='))
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash})
     send(host, {'action': 'napcat', 'event': 'qrcode', 'hash': bot_hash, 'path': str(image)})
     endpoint = f'/api/terminal/napcat/{bot_hash}/qrcode'
     assert client.get(endpoint).status_code == 200
@@ -997,18 +998,28 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
 
 
 def test_account_update_reconciles_terminal_models(host):
+    import copy
+
     bot_hash = next(iter(host.accounts))
-    bot = host.accounts[bot_hash]
+    bot = copy.deepcopy(host.accounts[bot_hash])
     bot.platform.update(sdk='onebot', model='napcat_show')
     send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    old_platform = bot.platform.copy()
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash, 'account_platform': old_platform})
     assert ('napcat', bot_hash) in host.terminals
     bot.platform['model'] = 'napcat_default'
     send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
     assert not host.terminals
-    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash})
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash, 'account_platform': old_platform})
+    assert not host.terminals
+    send(host, {'action': 'napcat', 'event': 'log', 'hash': bot_hash, 'data': 'late log'})
     assert not host.terminals
     bot.platform.update(sdk='terminal_link', model='default')
     send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    send(host, {'action': 'virtual_terminal', 'event': 'init', 'hash': bot_hash,
+                'account_platform': bot.platform.copy()})
     assert ('virtual_terminal', bot_hash) in host.terminals
     bot.enable = False
     send(host, {'action': 'account_update', 'data': {bot_hash: bot}})

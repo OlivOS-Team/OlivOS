@@ -30,28 +30,6 @@ default_account_conf = {
 modelName = 'accountAPI'
 
 
-def get_terminal_type(bot):
-    """按内置启动器的窗口模式判断账号需要的终端。"""
-    if bot is None or not bot.enable:
-        return None
-    model = bot.platform['model']
-    if bot.platform['sdk'] == 'terminal_link':
-        return 'virtual_terminal' if model == 'default' else None
-    if model in ('napcat', 'napcat_show', 'napcat_show_new', 'napcat_show_new_9_9_19'):
-        return 'napcat'
-    if model in ('opqbot_auto', 'opqbot_port', 'opqbot_port_old'):
-        return 'opqbot'
-    if model == 'ComWeChatBotClient':
-        return 'cwcb'
-    for kind in ('gocqhttp', 'walleq'):
-        if model == kind + '_show' or model in (
-            kind + '_show_' + suffix for suffix in
-            ('Android_Phone', 'Android_Watch', 'iMac', 'iPad', 'Android_Pad')
-        ):
-            return kind
-    return None
-
-
 class Account(object):
     def load(path, logger_proc, safe_mode=False):
         account_conf = None

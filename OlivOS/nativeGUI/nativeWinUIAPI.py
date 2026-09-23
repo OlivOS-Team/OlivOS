@@ -141,23 +141,7 @@ class dock(OlivOS.API.Proc_templet):
                     and 'action' in packet.key['data']
                 ):
                     if 'account_update' == packet.key['data']['action']:
-                        if (
-                            'data' in packet.key['data']
-                            and type(packet.key['data']['data']) is dict
-                        ):
-                            self.bot_info = packet.key['data']['data']
-                        self.UIData['shallow_napcat_menu_list'] = None
-                        self.UIData['shallow_opqbot_menu_list'] = None
-                        self.UIData['shallow_gocqhttp_menu_list'] = None
-                        self.UIData['shallow_walleq_menu_list'] = None
-                        self.UIData['shallow_cwcb_menu_list'] = None
-                        self.UIData['shallow_virtual_terminal_menu_list'] = None
-                        self.UIData['shallow_account_menu_list'] = None
-                        self.updateAccountList(flagInit=True)
-                        self.mergeAccountList()
-                        self.updateShallowMenuList()
-
-                        self.sendRxEvent('send', {'data': {'action': 'reconcile_terminals'}})
+                        self.sendRxEvent('send', packet.key)
 
     def process_msg(self):
         delay = 1 if self.busy else 20
@@ -193,14 +177,31 @@ class dock(OlivOS.API.Proc_templet):
                     and 'action' in rx_packet_data.key['data']
                 ):
                     terminal_kind = rx_packet_data.key['data']['action']
-                    if terminal_kind == 'ComWeChatBotClient':
-                        terminal_kind = 'cwcb'
-                    if terminal_kind in ('napcat', 'gocqhttp', 'walleq', 'cwcb', 'opqbot', 'virtual_terminal'):
-                        bot_hash = rx_packet_data.key['data'].get('hash')
-                        if OlivOS.accountAPI.get_terminal_type(self.bot_info.get(bot_hash)) != terminal_kind:
+                    if terminal_kind in ('napcat', 'gocqhttp', 'walleq', 'ComWeChatBotClient',
+                                         'opqbot', 'virtual_terminal'):
+                        event = rx_packet_data.key['data']
+                        bot = self.bot_info.get(event.get('hash'))
+                        if (bot is None or not bot.enable or
+                                event.get('account_platform', bot.platform) != bot.platform):
                             return
-                    if 'reconcile_terminals' == rx_packet_data.key['data']['action']:
-                        self.reconcileTerminals()
+                    if 'account_update' == rx_packet_data.key['data']['action']:
+                        self.bot_info = rx_packet_data.key['data']['data']
+                        for key in ('root_gocqhttp_terminal', 'root_walleq_terminal', 'root_cwcb_terminal',
+                                    'root_opqbot_terminal', 'root_napcat_terminal', 'root_virtual_terminal_terminal'):
+                            for bot_hash, window in list(self.UIObject[key].items()):
+                                bot = self.bot_info.get(bot_hash)
+                                if bot is None or not bot.enable or window.bot.platform != bot.platform:
+                                    window.stop()
+                        self.UIData['shallow_napcat_menu_list'] = None
+                        self.UIData['shallow_opqbot_menu_list'] = None
+                        self.UIData['shallow_gocqhttp_menu_list'] = None
+                        self.UIData['shallow_walleq_menu_list'] = None
+                        self.UIData['shallow_cwcb_menu_list'] = None
+                        self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.UIData['shallow_account_menu_list'] = None
+                        self.updateAccountList(flagInit=True)
+                        self.mergeAccountList()
+                        self.updateShallowMenuList()
                     elif 'update_data' == rx_packet_data.key['data']['action']:
                         self.UIData.update(rx_packet_data.key['data']['data'])
                         self.updateShallowMenuList()
@@ -935,22 +936,6 @@ class dock(OlivOS.API.Proc_templet):
                 }
             }
         )
-
-    def reconcileTerminals(self):
-        # 在 Tk 消息循环内开关窗口，避免控制线程直接操作 Tk。
-        for kind, start in (
-            ('gocqhttp', self.startGoCqhttpTerminalUI), ('walleq', self.startWalleQTerminalUI),
-            ('cwcb', self.startCWCBTerminalUI), ('opqbot', self.startOPQBotTerminalUI),
-            ('napcat', self.startNapCatTerminalUI), ('virtual_terminal', self.startVirtualTerminalUI),
-        ):
-            key = 'root_' + kind + '_terminal'
-            windows = self.UIObject[key]
-            for bot_hash, window in list(windows.items()):
-                if OlivOS.accountAPI.get_terminal_type(self.bot_info.get(bot_hash)) != kind:
-                    window.stop()
-            for bot_hash, bot in self.bot_info.items():
-                if OlivOS.accountAPI.get_terminal_type(bot) == kind and bot_hash not in windows:
-                    start(bot_hash)
 
     def startGoCqhttpTerminalUI(self, hash):
         if self.isAccountEnabled(hash):
