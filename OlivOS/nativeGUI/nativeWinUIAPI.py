@@ -157,6 +157,8 @@ class dock(OlivOS.API.Proc_templet):
                         self.mergeAccountList()
                         self.updateShallowMenuList()
 
+                        self.sendRxEvent('send', {'data': {'action': 'reconcile_terminals'}})
+
     def process_msg(self):
         delay = 1 if self.busy else 20
         self.UIObject['main_tk'].after(delay, self.process_msg)
@@ -190,7 +192,16 @@ class dock(OlivOS.API.Proc_templet):
                     and 'data' in rx_packet_data.key
                     and 'action' in rx_packet_data.key['data']
                 ):
-                    if 'update_data' == rx_packet_data.key['data']['action']:
+                    terminal_kind = rx_packet_data.key['data']['action']
+                    if terminal_kind == 'ComWeChatBotClient':
+                        terminal_kind = 'cwcb'
+                    if terminal_kind in ('napcat', 'gocqhttp', 'walleq', 'cwcb', 'opqbot', 'virtual_terminal'):
+                        bot_hash = rx_packet_data.key['data'].get('hash')
+                        if OlivOS.accountAPI.get_terminal_type(self.bot_info.get(bot_hash)) != terminal_kind:
+                            return
+                    if 'reconcile_terminals' == rx_packet_data.key['data']['action']:
+                        self.reconcileTerminals()
+                    elif 'update_data' == rx_packet_data.key['data']['action']:
                         self.UIData.update(rx_packet_data.key['data']['data'])
                         self.updateShallowMenuList()
                     elif 'update_account_list' == rx_packet_data.key['data']['action']:
@@ -924,6 +935,22 @@ class dock(OlivOS.API.Proc_templet):
                 }
             }
         )
+
+    def reconcileTerminals(self):
+        # 在 Tk 消息循环内开关窗口，避免控制线程直接操作 Tk。
+        for kind, start in (
+            ('gocqhttp', self.startGoCqhttpTerminalUI), ('walleq', self.startWalleQTerminalUI),
+            ('cwcb', self.startCWCBTerminalUI), ('opqbot', self.startOPQBotTerminalUI),
+            ('napcat', self.startNapCatTerminalUI), ('virtual_terminal', self.startVirtualTerminalUI),
+        ):
+            key = 'root_' + kind + '_terminal'
+            windows = self.UIObject[key]
+            for bot_hash, window in list(windows.items()):
+                if OlivOS.accountAPI.get_terminal_type(self.bot_info.get(bot_hash)) != kind:
+                    window.stop()
+            for bot_hash, bot in self.bot_info.items():
+                if OlivOS.accountAPI.get_terminal_type(bot) == kind and bot_hash not in windows:
+                    start(bot_hash)
 
     def startGoCqhttpTerminalUI(self, hash):
         if self.isAccountEnabled(hash):

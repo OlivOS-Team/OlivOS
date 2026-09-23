@@ -243,9 +243,13 @@ class server(OlivOS.API.Proc_templet):
             with self.lock:
                 self.accounts = copy.deepcopy(data.get('data', {}))
                 for key in list(self.terminals):
-                    if not self.accounts.get(key[1]) or not self.accounts[key[1]].enable:
+                    if OlivOS.accountAPI.get_terminal_type(self.accounts.get(key[1])) != key[0]:
                         self.terminals.pop(key)
                         self.streams.pop('/'.join(key), None)
+                for bot_hash, bot in self.accounts.items():
+                    kind = OlivOS.accountAPI.get_terminal_type(bot)
+                    if kind:
+                        self.terminals.setdefault((kind, bot_hash), {'model': kind, 'hash': bot_hash})
             self.publish('events', {'type': 'accounts'})
         elif action == 'update_data':
             update = data.get('data', {})
@@ -265,7 +269,7 @@ class server(OlivOS.API.Proc_templet):
             bot_hash = data['hash']
             with self.lock:
                 bot = self.accounts.get(bot_hash)
-                if bot is None or not bot.enable:
+                if OlivOS.accountAPI.get_terminal_type(bot) != action:
                     return
                 terminal = self.terminals.setdefault((action, bot_hash), {'model': action, 'hash': bot_hash})
                 event = data.get('event')

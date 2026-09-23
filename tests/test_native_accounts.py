@@ -71,3 +71,19 @@ def test_account_save_requests_persistence_then_hot_reload(account_editor):
     assert 'OlivOS_account_config_save' in steps and 'OlivOS_account_config_update' in steps
     assert editor.UIData['flag_commit'] is True
     editor.UIObject['root'].destroy.assert_called_once()
+
+
+def test_terminal_model_switch_closes_old_and_opens_new():
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model='napcat_show')
+    dock = OlivOS.nativeWinUIAPI.dock(control_queue=queue.Queue(), bot_info_dict={bot.hash: bot})
+    dock.startNapCatTerminalUI = Mock()
+    dock.reconcileTerminals()
+    dock.startNapCatTerminalUI.assert_called_once_with(bot.hash)
+    window = Mock()
+    dock.UIObject['root_napcat_terminal'][bot.hash] = window
+    window.stop.side_effect = lambda: dock.UIObject['root_napcat_terminal'].pop(bot.hash)
+    bot.platform['model'] = 'napcat_default'
+    dock.reconcileTerminals()
+    window.stop.assert_called_once()
+    dock.startNapCatTerminalUI.assert_called_once()

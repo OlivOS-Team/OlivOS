@@ -235,7 +235,7 @@ async function login(ev, token = null) {
   const generation = ++state.authGeneration;
   state.sessionRefresh = null;
   $('login-error').textContent = '';
-  const submit = $('login-form').querySelector('button');
+  const submit = $('login-form').querySelector('button[type=submit]');
   submit.disabled = true;
   try {
     state.token = token ?? $('token').value.trim();
@@ -324,7 +324,7 @@ function resetLogin(message = '') {
   hideNotice();
   $('token').value = '';
   $('login-error').textContent = message;
-  $('login-form').querySelector('button').disabled = false;
+  $('login-form').querySelector('button[type=submit]').disabled = false;
 }
 function checkCachedLogin() {
   if (!state.token || !state.cachedLogin) return;
@@ -702,8 +702,28 @@ function fieldInput(field, parent, attribute = 'data-field') {
       if (!$('webhook-fields').hidden) refreshWebhook().catch(notifyError);
     });
   label.append(input);
+  if (secret) addSecretToggle(input);
   parent.append(label);
 }
+
+function addSecretToggle(input) {
+  const wrapper = element('span', null, { class: 'secret-input' });
+  input.replaceWith(wrapper);
+  const toggle = button('👁', () => {
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    toggle.setAttribute('aria-pressed', String(visible));
+    toggle.setAttribute('aria-label', visible ? '隐藏内容' : '显示内容');
+    toggle.title = visible ? '隐藏内容' : '显示内容';
+  });
+  toggle.className = 'secret-toggle';
+  toggle.setAttribute('aria-label', '显示内容');
+  toggle.setAttribute('aria-pressed', 'false');
+  toggle.title = '显示内容';
+  wrapper.append(input, toggle);
+}
+
+addSecretToggle($('token'));
 function renderAccountFields() {
   const preset = state.schema.presets.find((p) => p.title === $('account-preset').value);
   const fields = preset?.fields || state.schema.fields;
@@ -759,6 +779,7 @@ function renderQsign() {
       });
       input.value = entry[key] || '';
       label.append(input);
+      if (key === 'key') addSecretToggle(input);
       row.append(label);
     }
     row.append(
@@ -897,6 +918,7 @@ async function openLogs() {
   });
 }
 async function loadTerminals() {
+  const previous = state.selected;
   const result = await api('/api/terminals');
   state.terminals = result.items;
   state.selected =
@@ -906,6 +928,10 @@ async function loadTerminals() {
     state.terminals[0] ||
     null;
   renderTerminals();
+  if (state.page === 'terminals' && state.selected &&
+      (previous?.hash !== state.selected.hash || previous?.model !== state.selected.model)) {
+    openTerminal(state.selected);
+  }
 }
 function renderTerminals() {
   $('terminal-tabs').replaceChildren();

@@ -659,6 +659,12 @@ def test_logs_filter_tail_and_bounded_replay(client, host):
 @pytest.mark.parametrize('model', list(serverAPI.TERMINAL_TYPES))
 def test_all_six_terminal_inputs(client, host, model):
     bot_hash = next(iter(host.accounts))
+    host.accounts[bot_hash].platform.update(sdk='onebot', model={
+        'napcat': 'napcat_show', 'gocqhttp': 'gocqhttp_show', 'walleq': 'walleq_show',
+        'cwcb': 'ComWeChatBotClient', 'opqbot': 'opqbot_auto', 'virtual_terminal': 'default',
+    }[model])
+    if model == 'virtual_terminal':
+        host.accounts[bot_hash].platform['sdk'] = 'terminal_link'
     send(host, {'action': model, 'event': 'init', 'hash': bot_hash})
     host.terminal_input(model, bot_hash, {'data': 'test'})
     packet = host.Proc_info.control_queue.get_nowait()
@@ -674,6 +680,7 @@ def test_all_six_terminal_inputs(client, host, model):
 
 def test_qrcode_private_and_path_guard(client, host):
     bot_hash = next(iter(host.accounts))
+    host.accounts[bot_hash].platform.update(sdk='onebot', model='napcat_show')
     image = host.root / 'conf/qr.png'
     image.write_bytes(base64.b64decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='))
@@ -987,3 +994,22 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
                 await ws.send_str('not json')
                 assert (await ws.receive_json(timeout=2))['type'] == 'error'
     asyncio.run(scenario())
+
+
+def test_account_update_reconciles_terminal_models(host):
+    bot_hash = next(iter(host.accounts))
+    bot = host.accounts[bot_hash]
+    bot.platform.update(sdk='onebot', model='napcat_show')
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert ('napcat', bot_hash) in host.terminals
+    bot.platform['model'] = 'napcat_default'
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash})
+    assert not host.terminals
+    bot.platform.update(sdk='terminal_link', model='default')
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert ('virtual_terminal', bot_hash) in host.terminals
+    bot.enable = False
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals

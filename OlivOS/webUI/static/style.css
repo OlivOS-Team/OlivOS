@@ -981,3 +981,7 @@ dialog::backdrop {
     padding: 10px;
   }
 }
+/* 密钥显隐按钮与输入框保持同一行。 */
+.secret-input { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.secret-input input { flex: 1; min-width: 0; width: 100%; }
+.secret-toggle { flex: 0 0 auto; padding: 8px 10px; }
