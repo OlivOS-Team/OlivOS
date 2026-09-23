@@ -88,6 +88,10 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
             finally:
                 faulthandler.cancel_dump_traceback_later()
 
+    def on_terminate(self):
+        self.log(2, f'child stopping: last_ready={self._webhook_last_ready.value}', [])
+        super().on_terminate()
+
 
 def test_auth_and_rate_limit(host):
     client = host.app.test_client()
@@ -440,10 +444,16 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
                     logs.append(process_log.records.get_nowait())
             except queue.Empty:
                 pass
+        try:
+            with socket.create_connection(('127.0.0.1', port), timeout=1):
+                reachable = True
+        except OSError:
+            reachable = False
         assert webhook.webhook_online, (
             f'webhook child: alive={process.is_alive()}, exitcode={process.exitcode}, '
             f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}, '
-            f'logs={logs}, trace={Path(webhook.trace_path).read_text(encoding="utf-8")}'
+            f'listener_reachable={reachable}, logs={logs}, '
+            f'trace={Path(webhook.trace_path).read_text(encoding="utf-8")}'
         )
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
         webhook.on_terminate()
