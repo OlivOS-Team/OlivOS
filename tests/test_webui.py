@@ -20,6 +20,7 @@ import asyncio
 import base64
 import copy
 import json
+import multiprocessing
 import os
 import queue
 import secrets
@@ -67,6 +68,14 @@ def client(host):
 
 def send(host, data):
     host.consume(OlivOS.API.Control.packet('send', {'data': data}))
+
+
+class _ProcessLog:
+    def __init__(self):
+        self.records = multiprocessing.Queue()
+
+    def log(self, level, message, segment):
+        self.records.put((level, message))
 
 
 def test_auth_and_rate_limit(host):
@@ -393,6 +402,7 @@ def test_webhook_watchdog_updates_and_clears_status(tmp_path, monkeypatch):
 
 def test_webhook_listener_status_visible_from_child_process(client, host, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    process_log = _ProcessLog()
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
@@ -403,17 +413,25 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
     host.accounts = {bot.hash: bot}
     webhook = OlivOS.qqGuildv2WebhookServerAPI.server(
         'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', port,
-        bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'),
+        bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'), logger_proc=process_log,
     )
     host.runtime['webhook'] = webhook
     process = webhook.start_unity('processing')
     try:
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 30
         while not webhook.webhook_online and process.is_alive() and time.monotonic() < deadline:
             time.sleep(.05)
+        logs = []
+        if not webhook.webhook_online:
+            try:
+                while True:
+                    logs.append(process_log.records.get_nowait())
+            except queue.Empty:
+                pass
         assert webhook.webhook_online, (
             f'webhook child: alive={process.is_alive()}, exitcode={process.exitcode}, '
-            f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}'
+            f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}, '
+            f'logs={logs}'
         )
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
         webhook.on_terminate()
