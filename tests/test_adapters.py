@@ -44,6 +44,36 @@ def test_onebot_message_maps_sender_and_text(kind):
     assert event.data.message_sdk.get('olivos_string') == 'hello[OP:at,id=10001]'
 
 
+def test_receive_log_preserves_at_name_while_plugin_compatibility_controls_delivery():
+    log = Mock()
+    payload = {
+        'time': 1750000000, 'self_id': 10001, 'post_type': 'message',
+        'message_type': 'private', 'sub_type': 'normal', 'user_id': 42,
+        'message_id': 8, 'message': [
+            {'type': 'at', 'data': {'qq': '10001', 'name': 'tester-name'}}
+        ],
+        'raw_message': '', 'font': 0,
+        'sender': {'user_id': 42, 'nickname': 'tester', 'role': 'member'}
+    }
+    event = OlivOS.API.Event(OlivOS.onebotSDK.event(json.dumps(payload)), log_func=log)
+
+    assert any('[OP:at,id=10001,name=tester-name]' in call.args[1] for call in log.call_args_list)
+    assert event.data.message == '[OP:at,id=10001]'
+
+    event.plugin_info.update(compatible_svn=189, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    assert event.data.message == '[CQ:at,qq=10001]'
+    event.plugin_info['compatible_svn'] = 190
+    event.get_Event_on_Plugin()
+    assert event.data.message == '[CQ:at,qq=10001,name=tester-name]'
+    event.plugin_info.update(compatible_svn=189, message_mode_tx='olivos_string')
+    event.get_Event_on_Plugin()
+    assert event.data.message == '[OP:at,id=10001]'
+    event.plugin_info['compatible_svn'] = 190
+    event.get_Event_on_Plugin()
+    assert event.data.message == '[OP:at,id=10001,name=tester-name]'
+
+
 @pytest.mark.parametrize('notice,expected,extra', [
     ('group_increase', 'group_member_increase', {'sub_type': 'approve'}),
     ('group_decrease', 'group_member_decrease', {'sub_type': 'kick'}),

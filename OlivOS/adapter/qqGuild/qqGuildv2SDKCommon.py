@@ -816,8 +816,7 @@ class event(object):
 
 # QQ 消息会把表情编码成正文前缀,正文不应把该平台标记原样暴露给插件。
 qqFaceTagPattern = re.compile(
-    r'<faceType\s*=\s*(?P<face_type>[^,>]+)\s*,\s*faceId\s*=\s*'
-    r'(?P<face_id>"[^"]*"|\'[^\']*\'|[^,\s>]+)'
+    r'<faceType\s*=\s*(?P<face_type>[^,>]+)'
     r'(?P<extra>(?:,[^>]*)?)\s*/?>'
 )
 qqFaceAttributePattern = re.compile(
@@ -844,11 +843,13 @@ def _strip_qq_face_tags(content):
     def replace_face_tag(match):
         face_item = {
             'face_type': _unquote_qq_face_value(match.group('face_type')),
-            'face_id': _unquote_qq_face_value(match.group('face_id')),
             'raw': match.group(0)
         }
         for attribute_match in qqFaceAttributePattern.finditer(match.group('extra')):
-            face_item[attribute_match.group('key')] = _unquote_qq_face_value(
+            key = attribute_match.group('key')
+            if key == 'faceId':
+                key = 'face_id'
+            face_item[key] = _unquote_qq_face_value(
                 attribute_match.group('value')
             )
         face_data.append(face_item)
@@ -874,14 +875,24 @@ def _get_qq_mface_data(face_item):
     return mface_data if len(mface_data) > 0 else None
 
 
-def _get_qq_mface_fallback_data(face_data, image_count):
+def _get_qq_face_fallback_data(face_data, image_count):
     if not isinstance(face_data, list):
         return []
     fallback_data = []
-    for face_item in face_data[max(0, image_count):]:
+    skipped_images = 0
+    for face_item in face_data:
+        if not isinstance(face_item, dict):
+            continue
+        if skipped_images < image_count:
+            skipped_images += 1
+            continue
+        face_id = face_item.get('face_id')
+        if face_id is not None and str(face_id).strip():
+            fallback_data.append({'type': 'face', 'data': {'id': str(face_id).strip()}})
+            continue
         mface_data = _get_qq_mface_data(face_item)
         if mface_data is not None:
-            fallback_data.append(mface_data)
+            fallback_data.append({'type': 'mface', 'data': mface_data})
     return fallback_data
 
 
@@ -944,16 +955,22 @@ def _append_qq_message_attachments(
     if skip:
         return
     attachment_data = _get_message_attachments(attachments)
-    image_count = sum(
+    attachment_image_count = sum(
         isinstance(attachment, OlivOS.messageAPI.PARA.image)
         for attachment in attachment_data
     )
-    fallback_data = _get_qq_mface_fallback_data(face_data, image_count)
-    mface_data = [
-        OlivOS.messageAPI.PARA.mface(**face_item)
-        for face_item in fallback_data
+    existing_image_count = sum(
+        isinstance(segment, OlivOS.messageAPI.PARA.image)
+        for segment in message_obj.data
+    )
+    image_count = max(attachment_image_count, existing_image_count)
+    fallback_data = _get_qq_face_fallback_data(face_data, image_count)
+    face_segments = [
+        OlivOS.messageAPI.PARA.face(**segment['data'])
+        if segment['type'] == 'face' else OlivOS.messageAPI.PARA.mface(**segment['data'])
+        for segment in fallback_data
     ]
-    message_data = attachment_data + mface_data
+    message_data = attachment_data + face_segments
     if len(message_data) == 0:
         return
     message_obj.data.extend(message_data)
@@ -1029,11 +1046,7 @@ def _get_qq_forward_element_content(element):
         for segment in content
         if isinstance(segment, dict)
     )
-    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
-        content.append({
-            'type': 'mface',
-            'data': mface_data
-        })
+    content.extend(_get_qq_face_fallback_data(face_data, image_count))
     nested_elements = element.get('msg_elements', None)
     if isinstance(nested_elements, list):
         for nested_element in nested_elements:
@@ -1210,11 +1223,7 @@ def _get_qq_forward_text_node(block, attachment_state):
         for segment in content_segments
         if isinstance(segment, dict)
     )
-    for mface_data in _get_qq_mface_fallback_data(face_data, image_count):
-        content_segments.append({
-            'type': 'mface',
-            'data': mface_data
-        })
+    content_segments.extend(_get_qq_face_fallback_data(face_data, image_count))
     if not content_segments and block != '':
         content_segments.append({
             'type': 'text',

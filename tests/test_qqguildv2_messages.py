@@ -26,6 +26,8 @@ from OlivOS.adapter.qqGuild import qqGuildv2SDKCommon as common
 SDK = OlivOS.qqGuildv2SDK
 PICTURE_URL = 'https://example.invalid/photo.png'
 EVENT_TYPES = ['GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE', 'C2C_MESSAGE_CREATE']
+FACE_TAG = '<faceType=1,faceId=311>'
+MFACE_TAG = '<faceType=4,faceId=,ext=eyJ0ZXh0IjoiW10ifQ==>'
 
 
 @pytest.fixture
@@ -69,6 +71,97 @@ def picture_data(**overrides):
         },
         **overrides
     }
+
+
+@pytest.mark.parametrize('event_type', EVENT_TYPES)
+@pytest.mark.parametrize('tag', [FACE_TAG, '<faceType=1,faceId=311,type=sticker>'])
+def test_qq_face_id_becomes_cq_face(bot, event_type, tag):
+    event = message_event(bot, event_type, {'content': 'hello ' + tag})
+
+    assert event.active
+    assert event.data.message_sdk.get('old_string') == 'hello [CQ:face,id=311]'
+    assert event.data.message_sdk.get('olivos_string') == 'hello [OP:face,id=311]'
+    assert event.data.extend['qq_face_data'][0]['face_id'] == '311'
+
+
+@pytest.mark.parametrize('tag', [MFACE_TAG, '<faceType=4,faceId="">', '<faceType=4,ext=abc>'])
+def test_qq_face_without_id_remains_mface(bot, tag):
+    event = message_event(bot, 'C2C_MESSAGE_CREATE', {'content': tag})
+
+    assert event.active
+    assert [segment.type for segment in event.data.message_sdk.data] == ['mface']
+    assert event.data.message_sdk.get('old_string').startswith('[CQ:mface,')
+
+
+@pytest.mark.parametrize('event_type', EVENT_TYPES)
+@pytest.mark.parametrize('face_id', ['0', '311'])
+def test_qq_face_tag_for_image_does_not_add_face(bot, event_type, face_id):
+    event = message_event(bot, event_type, {
+        'content': '<faceType=1,faceId=%s>' % face_id,
+        'attachments': [{'content_type': 'image/png', 'url': PICTURE_URL}]
+    })
+
+    assert [segment.type for segment in event.data.message_sdk.data] == ['image']
+    assert '[OP:face,' not in event.data.message_sdk.get('olivos_string')
+    assert '[CQ:face,' not in event.data.message_sdk.get('old_string')
+    assert event.data.extend['qq_face_data'][0]['face_id'] == face_id
+
+
+def test_qq_face_after_image_tag_is_not_discarded(bot):
+    event = message_event(bot, 'C2C_MESSAGE_CREATE', {
+        'content': '<faceType=1,faceId=0>' + FACE_TAG,
+        'attachments': [{'content_type': 'image/png', 'url': PICTURE_URL}]
+    })
+
+    assert [segment.type for segment in event.data.message_sdk.data] == ['image', 'face']
+    assert event.data.message_sdk.get('old_string').endswith('[CQ:face,id=311]')
+
+
+def test_qq_multiple_image_tags_only_consume_matching_face_tags(bot):
+    event = message_event(bot, 'C2C_MESSAGE_CREATE', {
+        'content': '<faceType=1,faceId=0>' * 2 + FACE_TAG,
+        'attachments': [
+            {'content_type': 'image/png', 'url': PICTURE_URL},
+            {'content_type': 'image/png', 'url': 'https://example.invalid/second.png'}
+        ]
+    })
+
+    assert [segment.type for segment in event.data.message_sdk.data] == ['image', 'image', 'face']
+    assert event.data.message_sdk.get('old_string').endswith('[CQ:face,id=311]')
+
+
+def test_qq_picture_card_face_tag_does_not_add_face(bot):
+    event = message_event(bot, 'C2C_MESSAGE_CREATE', picture_data(content='<faceType=1,faceId=0>'))
+
+    assert [segment.type for segment in event.data.message_sdk.data] == ['image']
+
+
+def test_qq_face_in_forward_content_uses_same_mapping():
+    content = common._get_qq_forward_element_content({
+        'content': FACE_TAG + MFACE_TAG
+    })
+
+    assert [(segment['type'], segment['data'].get('id')) for segment in content] == [
+        ('face', '311'), ('mface', None)
+    ]
+    node = common._get_qq_forward_text_node('[消息内容] ' + FACE_TAG + MFACE_TAG, {'index': 0, 'items': []})
+    assert [segment['type'] for segment in node['data']['content']] == ['face', 'mface']
+
+
+def test_qq_forward_image_face_tag_does_not_add_face():
+    element = {
+        'content': '<faceType=1,faceId=0>' + FACE_TAG,
+        'attachments': [{'content_type': 'image/png', 'url': PICTURE_URL}]
+    }
+    content = common._get_qq_forward_element_content(element)
+    assert [segment['type'] for segment in content] == ['image', 'face']
+    assert content[-1]['data']['id'] == '311'
+
+    node = common._get_qq_forward_text_node(
+        '[消息内容] <faceType=1,faceId=0>' + FACE_TAG + '\n[附件1] URL: ' + PICTURE_URL + ' 类型: image',
+        {'index': 0, 'items': []}
+    )
+    assert [segment['type'] for segment in node['data']['content']] == ['image', 'face']
 
 
 @pytest.mark.parametrize('event_type', EVENT_TYPES)
