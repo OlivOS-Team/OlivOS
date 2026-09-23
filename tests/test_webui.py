@@ -28,6 +28,7 @@ import secrets
 import socket
 import threading
 import time
+from unittest.mock import patch
 from pathlib import Path
 
 import aiohttp
@@ -83,8 +84,17 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
     def run(self):
         with open(self.trace_path, 'w', encoding='utf-8') as trace:
             faulthandler.dump_traceback_later(12, file=trace)
+            original_start = OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer.start
+
+            def traced_start(server):
+                self.log(2, 'child server.start entered', [])
+                original_start(server)
+                self.log(2, f'child server.start finished: last_ready={self._webhook_last_ready.value}', [])
+
             try:
-                super().run()
+                with patch.object(OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer,
+                                  'start', traced_start):
+                    super().run()
             finally:
                 faulthandler.cancel_dump_traceback_later()
 
