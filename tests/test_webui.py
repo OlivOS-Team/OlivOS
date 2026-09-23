@@ -393,13 +393,16 @@ def test_webhook_watchdog_updates_and_clears_status(tmp_path, monkeypatch):
 
 def test_webhook_listener_status_visible_from_child_process(client, host, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1', 0))
+        port = listener.getsockname()[1]
     bot = OlivOS.API.bot_info_T(
         id=10010, platform_sdk='qqGuildv2_link', platform_platform='qqGuild',
         platform_model='public', server_type='post',
     )
     host.accounts = {bot.hash: bot}
     webhook = OlivOS.qqGuildv2WebhookServerAPI.server(
-        'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', 0,
+        'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', port,
         bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'),
     )
     host.runtime['webhook'] = webhook
@@ -408,7 +411,10 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
         deadline = time.monotonic() + 15
         while not webhook.webhook_online and process.is_alive() and time.monotonic() < deadline:
             time.sleep(.05)
-        assert webhook.webhook_online
+        assert webhook.webhook_online, (
+            f'webhook child: alive={process.is_alive()}, exitcode={process.exitcode}, '
+            f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}'
+        )
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
         webhook.on_terminate()
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'offline'
