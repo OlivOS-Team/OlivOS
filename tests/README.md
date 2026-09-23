@@ -107,12 +107,11 @@ DoDo Poll/Link/EA、KOOK、黑盒语音、B站直播、OPQ、米游社大别野�
 
 ## CI 与构建关系
 
-`lint.yml` 与 `test.yml` 是独立文件，均支持手动触发和作为可复用 workflow 调用。
-`build.yml`、`build-dispatch.yml`、`pypiPublish.yml` 都依次执行 Lint → Test → Build；
+`lint.yml` 与 `test.yml` 是可复用 workflow，也支持手动触发。常规构建
+`build.yml` 与手动构建 `build-dispatch.yml` 依次执行 Lint → Test → Build；
 任一前置阶段失败，后续阶段不运行。自动 CI 由 `build.yml` 触发，Lint 与 Test
-不会再单独响应同一次 push 或 PR，以免重复执行。测试失败时仍上传失败报告。
-虽然 Lint、Test 单独定义，自动构建仍需在同一调用链内声明 `needs`，否则
-测试失败无法阻止构建和草稿发布。
+不再单独响应同一次 push 或 PR，以免重复执行。测试失败时仍上传失败报告。
+`pypiPublish.yml` 保留 Test → 发布的门禁，不额外运行 Lint。
 保留上游新合并的 Linux ARM64 构建与产物发布逻辑。
 
 测试矩阵：Python 3.11，Linux x64（含 Chrome）、Linux ARM64、Windows x64/ARM64、

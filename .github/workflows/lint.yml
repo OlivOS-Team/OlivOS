@@ -2,8 +2,7 @@ name: Lint
 on:
   workflow_call:
   workflow_dispatch:
-permissions:
-  contents: read
+
 jobs:
   run-flake8-check:
     runs-on: ubuntu-latest
