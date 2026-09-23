@@ -1,6 +1,7 @@
 """Offline adapter boundaries: account mapping, events, notices and signatures."""
 
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -29,9 +30,68 @@ def test_adapter_receives_correct_bot_identity(sdk, monkeypatch):
     assert getattr(mapped, 'id', getattr(mapped, 'bot_id', None)) == bot.id
 
 
-def onebot_event(**fields):
+def onebot_event(model='default', **fields):
     payload = {'time': 1750000000, 'self_id': 10001, **fields}
-    return OlivOS.API.Event(OlivOS.onebotSDK.event(json.dumps(payload)))
+    sdk_event = OlivOS.onebotSDK.event(json.dumps(payload))
+    sdk_event.platform['model'] = model
+    return OlivOS.API.Event(sdk_event)
+
+
+@pytest.mark.parametrize('kind', ['private', 'group'])
+@pytest.mark.parametrize('face_id', ['14', '311', '333'])
+def test_napcat_face_matches_old_string_plugin_keyword(kind, face_id):
+    segment = {'type': 'face', 'data': {
+        'id': face_id, 'raw': {'faceIndex': int(face_id), 'faceText': '[表情]'},
+        'resultId': None, 'chainCount': None,
+    }}
+    event = onebot_event(model='napcat', post_type='message', message_type=kind, sub_type='normal',
+                         group_id=7, user_id=42, message_id=8, message=[segment],
+                         raw_message='', font=0, sender={'user_id': 42, 'nickname': 'tester'})
+    assert event.data.message_sdk.get('olivos_string') == f'[OP:face,id={face_id}]'
+    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    keyword = f'[CQ:face,id={face_id}]'
+    assert event.data.message == keyword
+    assert re.match('^' + re.escape(keyword) + '$', event.data.message)
+    assert event.sdk_event.json['message'] == [segment]
+
+
+def test_non_napcat_keeps_original_face_and_image_fields():
+    segments = [
+        {'type': 'face', 'data': {'id': '311', 'raw': {'faceText': '[表情]'}}},
+        {'type': 'image', 'data': {'summary': '[动画表情]', 'file': 'x.png', 'sub_type': 1}},
+    ]
+    payload = {'time': 1750000000, 'self_id': 10001, 'post_type': 'message',
+               'message_type': 'private', 'sub_type': 'friend', 'user_id': 42,
+               'message_id': 8, 'message': segments, 'raw_message': '', 'font': 0,
+               'sender': {'user_id': 42, 'nickname': 'tester'}}
+    sdk_event = OlivOS.onebotSDK.event(json.dumps(payload))
+    sdk_event.platform['model'] = 'gocqhttp'
+    assert OlivOS.onebotSDK.format_cq_code_msg(segments, 'gocqhttp') == (
+        '[CQ:face,id=311,raw={\'faceText\': \'[表情]\'}]'
+        '[CQ:image,summary=[动画表情],file=x.png,sub_type=1]'
+    )
+
+
+@pytest.mark.parametrize('summary', ['[动画表情]', '[躺赢]', '', '[CQ:face,id=311]'])
+def test_napcat_image_survives_plugin_delivery_and_reply(summary):
+    url = 'https://example.invalid/test.png?appid=1406&fileid=fixture&rkey=fixture'
+    segment = {'type': 'image', 'data': {
+        'summary': summary, 'file': 'test.png', 'sub_type': 1, 'url': url, 'file_size': '6030',
+    }}
+    event = onebot_event(model='napcat', post_type='message', message_type='private', sub_type='friend',
+                         user_id=42, message_id=8, message=[segment], raw_message='', font=0,
+                         sender={'user_id': 42, 'nickname': 'tester'})
+    assert len(event.data.message_sdk.data) == 1
+    assert event.data.message_sdk.data[0].data['file'] == 'test.png'
+    assert event.data.message_sdk.data[0].data['url'] == url
+    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    assert re.match(r'^\[CQ:image,file=test\.png,.*\]$', event.data.message)
+    reply = OlivOS.messageAPI.Message_templet('old_string', event.data.message)
+    assert len(reply.data) == 1
+    assert reply.get('old_string') == f'[CQ:image,file={url}]'
+    assert event.sdk_event.json['message'] == [segment]
 
 
 @pytest.mark.parametrize('kind', ['private', 'group'])

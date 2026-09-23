@@ -332,7 +332,8 @@ class event(object):
         return res
 
 
-def format_cq_code_msg(msg):
+def format_cq_code_msg(msg, model=None):
+    is_napcat = model in napcatModelMap
     res = msg
     if type(msg) is str:
         res = msg
@@ -352,12 +353,20 @@ def format_cq_code_msg(msg):
                         if 'name' in msg_this['data'] and msg_this['data']['name']:
                             cq_params.append(f"name={msg_this['data']['name']}")
                         res += f"[CQ:at,{','.join(cq_params)}]"
+                elif is_napcat and msg_this['type'] == 'face' and 'id' in msg_this['data']:
+                    # NapCat 的 raw 等扩展数据保留在 SDK 事件，不混入插件匹配串。
+                    res += f"[CQ:face,id={msg_this['data']['id']}]"
                 else:
                     res += (
                         '['
                         + ','.join(
                             [f"CQ:{msg_this['type']}"]
-                            + [f"{key_this}={msg_this['data'][key_this]}" for key_this in msg_this['data']]
+                            + [
+                                f"{key_this}={value}"
+                                for key_this, value in msg_this['data'].items()
+                                # 图片描述不是图片参数；其方括号也会被旧插件的实体解码还原。
+                                if not (is_napcat and msg_this['type'] == 'image' and key_this == 'summary')
+                            ]
                         )
                         + ']'
                     )
@@ -390,7 +399,9 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_sent'
-            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+            new_msg = format_cq_code_msg(
+                target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+            )
             target_event.data = target_event.private_message_sent(
                 str(target_event.sdk_event.json['user_id']),
                 new_msg,
@@ -410,7 +421,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message_sent'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                )
                 target_event.data = target_event.group_message_sent(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
@@ -431,7 +444,9 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
-            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+            new_msg = format_cq_code_msg(
+                target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+            )
             target_event.data = target_event.private_message(
                 str(target_event.sdk_event.json['user_id']),
                 new_msg,
@@ -451,7 +466,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
@@ -472,7 +489,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'channel':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['channel_id']),
                     str(target_event.sdk_event.json['user_id']),
