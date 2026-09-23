@@ -67,11 +67,15 @@ on:
         default: false
 
 jobs:
-  tests:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    needs: lint
     uses: ./.github/workflows/test.yml
 
   build-windows:
-    needs: tests
+    needs: test
     uses: ./.github/workflows/build-task-windows.yml
     with:
       name: OlivOS-Win
@@ -85,7 +89,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-linux:
-    needs: tests
+    needs: test
     uses: ./.github/workflows/build-task-linux.yml
     with:
       name: OlivOS-Linux
@@ -99,7 +103,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-macos:
-    needs: tests
+    needs: test
     uses: ./.github/workflows/build-task-macos.yml
     with:
       name: OlivOS-MacOS
