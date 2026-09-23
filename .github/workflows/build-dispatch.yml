@@ -7,6 +7,7 @@ on:
         type: choice
         options:
           - windows-latest
+          - windows-11-arm
           - ubuntu-latest
           - macos-latest
         default: windows-latest
