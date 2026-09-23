@@ -19,16 +19,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import asyncio
 import base64
 import copy
-import faulthandler
 import json
-import multiprocessing
 import os
 import queue
 import secrets
 import socket
 import threading
 import time
-from unittest.mock import patch
 from pathlib import Path
 
 import aiohttp
@@ -70,59 +67,6 @@ def client(host):
 
 def send(host, data):
     host.consume(OlivOS.API.Control.packet('send', {'data': data}))
-
-
-class _ProcessLog:
-    def __init__(self):
-        self.records = multiprocessing.Queue()
-
-    def log(self, level, message, segment):
-        self.records.put((level, message))
-
-
-class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
-    def run(self):
-        with open(self.trace_path, 'w', encoding='utf-8') as trace:
-            faulthandler.dump_traceback_later(12, file=trace)
-            wsgi_server = OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer
-            original_start = wsgi_server.start
-            original_get_listener = wsgi_server.get_listener
-            original_accepting = wsgi_server.start_accepting
-            original_make_socket_stdlib = wsgi_server._make_socket_stdlib
-
-            def traced_get_listener(server, *args, **kwargs):
-                self.log(2, 'child listener binding', [])
-                listener = original_get_listener(*args, **kwargs)
-                self.log(2, f'child listener bound: {listener.getsockname()}', [])
-                return listener
-
-            def traced_accepting(server):
-                self.log(2, 'child start_accepting entered', [])
-                original_accepting(server)
-                self.log(2, 'child start_accepting finished', [])
-
-            def traced_make_socket_stdlib(server, fresh):
-                self.log(2, f'child unwrap socket entered: fresh={fresh}', [])
-                original_make_socket_stdlib(server, fresh)
-                self.log(2, 'child unwrap socket finished', [])
-
-            def traced_start(server):
-                self.log(2, 'child server.start entered', [])
-                original_start(server)
-                self.log(2, f'child server.start finished: last_ready={self._webhook_last_ready.value}', [])
-
-            try:
-                with patch.object(wsgi_server, 'start', traced_start), \
-                     patch.object(wsgi_server, 'get_listener', traced_get_listener), \
-                     patch.object(wsgi_server, 'start_accepting', traced_accepting), \
-                     patch.object(wsgi_server, '_make_socket_stdlib', traced_make_socket_stdlib):
-                    super().run()
-            finally:
-                faulthandler.cancel_dump_traceback_later()
-
-    def on_terminate(self):
-        self.log(2, f'child stopping: last_ready={self._webhook_last_ready.value}', [])
-        super().on_terminate()
 
 
 def test_auth_and_rate_limit(host):
@@ -447,9 +391,27 @@ def test_webhook_watchdog_updates_and_clears_status(tmp_path, monkeypatch):
         assert not watcher.is_alive()
 
 
+def test_webhook_listener_does_not_resolve_hostname_on_start(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    webhook = OlivOS.qqGuildv2WebhookServerAPI.server(
+        'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', 0,
+        Flask_ssl_dir=str(tmp_path / 'ssl'),
+    )
+    listener = Mock()
+    listener.serve_forever.side_effect = KeyboardInterrupt
+    factory = Mock(return_value=listener)
+    monkeypatch.setattr(OlivOS.qqGuildv2WebhookServerAPI.pywsgi, 'WSGIServer', factory)
+    monkeypatch.setattr(webhook, '_run_watchdog', lambda: None)
+    monkeypatch.setattr(OlivOS.qqGuildv2WebhookServerAPI.socket, 'getfqdn',
+                        lambda name: pytest.fail(f'unexpected reverse DNS for {name}'))
+    with pytest.raises(KeyboardInterrupt):
+        webhook.run()
+    assert factory.call_args.kwargs['environ']['SERVER_NAME'] == '127.0.0.1'
+
+
 def test_webhook_listener_status_visible_from_child_process(client, host, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    process_log = _ProcessLog()
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
@@ -458,34 +420,19 @@ def test_webhook_listener_status_visible_from_child_process(client, host, tmp_pa
         platform_model='public', server_type='post',
     )
     host.accounts = {bot.hash: bot}
-    webhook = _DiagnosticWebhook(
+    webhook = OlivOS.qqGuildv2WebhookServerAPI.server(
         'test-webhook', 'test-webhook', ['POST'], '127.0.0.1', port,
-        bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'), logger_proc=process_log,
+        bot_info_dict=host.accounts, Flask_ssl_dir=str(tmp_path / 'ssl'),
     )
-    webhook.trace_path = str(tmp_path / 'webhook-child-trace.txt')
     host.runtime['webhook'] = webhook
     process = webhook.start_unity('processing')
     try:
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + 15
         while not webhook.webhook_online and process.is_alive() and time.monotonic() < deadline:
             time.sleep(.05)
-        logs = []
-        if not webhook.webhook_online:
-            try:
-                while True:
-                    logs.append(process_log.records.get_nowait())
-            except queue.Empty:
-                pass
-        try:
-            with socket.create_connection(('127.0.0.1', port), timeout=1):
-                reachable = True
-        except OSError:
-            reachable = False
         assert webhook.webhook_online, (
             f'webhook child: alive={process.is_alive()}, exitcode={process.exitcode}, '
-            f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}, '
-            f'listener_reachable={reachable}, logs={logs}, '
-            f'trace={Path(webhook.trace_path).read_text(encoding="utf-8")}'
+            f'last_ready={webhook._webhook_last_ready.value}, stopped={webhook._webhook_stopped.is_set()}'
         )
         assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
         webhook.on_terminate()

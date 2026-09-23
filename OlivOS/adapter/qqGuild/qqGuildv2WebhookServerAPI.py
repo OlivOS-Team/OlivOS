@@ -24,6 +24,7 @@ import http.client
 import json
 import multiprocessing
 import os
+import socket
 import ssl
 import threading
 import time
@@ -814,7 +815,11 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_config['Flask_server_port']
             )
             tmp_wsgi_kwargs = {
-                'log': None
+                'log': None,
+                'environ': {
+                    'SERVER_NAME': socket.gethostname() if tmp_listen[0] in ('0.0.0.0', '::', '')
+                    else str(tmp_listen[0])
+                }
             }
             if tmp_ssl_context is not None:
                 tmp_wsgi_kwargs['ssl_context'] = tmp_ssl_context
