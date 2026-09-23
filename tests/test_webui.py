@@ -84,7 +84,21 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
     def run(self):
         with open(self.trace_path, 'w', encoding='utf-8') as trace:
             faulthandler.dump_traceback_later(12, file=trace)
-            original_start = OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer.start
+            wsgi_server = OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer
+            original_start = wsgi_server.start
+            original_get_listener = wsgi_server.get_listener
+            original_accepting = wsgi_server.start_accepting
+
+            def traced_get_listener(server, *args, **kwargs):
+                self.log(2, 'child listener binding', [])
+                listener = original_get_listener(*args, **kwargs)
+                self.log(2, f'child listener bound: {listener.getsockname()}', [])
+                return listener
+
+            def traced_accepting(server):
+                self.log(2, 'child start_accepting entered', [])
+                original_accepting(server)
+                self.log(2, 'child start_accepting finished', [])
 
             def traced_start(server):
                 self.log(2, 'child server.start entered', [])
@@ -92,8 +106,9 @@ class _DiagnosticWebhook(OlivOS.qqGuildv2WebhookServerAPI.server):
                 self.log(2, f'child server.start finished: last_ready={self._webhook_last_ready.value}', [])
 
             try:
-                with patch.object(OlivOS.qqGuildv2WebhookServerAPI.pywsgi.WSGIServer,
-                                  'start', traced_start):
+                with patch.object(wsgi_server, 'start', traced_start), \
+                     patch.object(wsgi_server, 'get_listener', traced_get_listener), \
+                     patch.object(wsgi_server, 'start_accepting', traced_accepting):
                     super().run()
             finally:
                 faulthandler.cancel_dump_traceback_later()
