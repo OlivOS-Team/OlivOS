@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import copy
 import requests as req
 from urllib import parse
 import os
@@ -46,6 +47,23 @@ llonebotModelMap = [
 lagrangeModelMap = [
     'lagrange_default'
 ]
+
+# NapCat 扩展字段保存在事件 extend；代码串只使用消息解析器支持的参数。
+napcatMessageFields = {
+    'face': ('id',),
+    'at': ('qq',),
+    'reply': ('id',),
+    'image': ('file', 'type', 'url'),
+    'record': ('file', 'url'),
+    'video': ('file', 'url'),
+    'file': ('file', 'path', 'url', 'name', 'size'),
+    'forward': ('id',),
+    'rps': (),
+    'dice': (),
+    'shake': (),
+    'anonymous': (),
+    'poke': ('id',),
+}
 
 gFlagCheckList = []
 
@@ -347,15 +365,17 @@ def format_cq_code_msg(msg, model=None):
                 if msg_this['type'] == 'text':
                     if 'text' in msg_this['data']:
                         res += msg_this['data']['text']
+                elif is_napcat and msg_this['type'] in napcatMessageFields:
+                    params = [f"{key}={msg_this['data'][key]}"
+                              for key in napcatMessageFields[msg_this['type']]
+                              if msg_this['data'].get(key) is not None]
+                    res += '[' + ','.join([f"CQ:{msg_this['type']}"] + params) + ']'
                 elif msg_this['type'] == 'at':
                     if 'qq' in msg_this['data']:
                         cq_params = [f"qq={msg_this['data']['qq']}"]
                         if 'name' in msg_this['data'] and msg_this['data']['name']:
                             cq_params.append(f"name={msg_this['data']['name']}")
                         res += f"[CQ:at,{','.join(cq_params)}]"
-                elif is_napcat and msg_this['type'] == 'face' and 'id' in msg_this['data']:
-                    # NapCat 的 raw 等扩展数据保留在 SDK 事件，不混入插件匹配串。
-                    res += f"[CQ:face,id={msg_this['data']['id']}]"
                 else:
                     res += (
                         '['
@@ -364,8 +384,6 @@ def format_cq_code_msg(msg, model=None):
                             + [
                                 f"{key_this}={value}"
                                 for key_this, value in msg_this['data'].items()
-                                # 图片描述不是图片参数；其方括号也会被旧插件的实体解码还原。
-                                if not (is_napcat and msg_this['type'] == 'image' and key_this == 'summary')
                             ]
                         )
                         + ']'
@@ -375,6 +393,19 @@ def format_cq_code_msg(msg, model=None):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
+    # SDK 内根据宿主账号表识别模型，不依赖 HTTP/WS 上报中的模型名称。
+    model = target_event.sdk_event.platform['model']
+    proc = OlivOS.pluginAPI.gProc
+    if proc is not None:
+        bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.sdk_event.base_info.get('self_id'),
+            platform_sdk=target_event.sdk_event.platform['sdk'],
+            platform_platform=target_event.sdk_event.platform['platform'],
+            platform_model=model
+        )
+        bot = proc.Proc_data.get('bot_info_dict', {}).get(bot_hash)
+        if bot is not None:
+            model = bot.platform['model']
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info.get('self_id', '-1'))
     target_event.base_info['type'] = target_event.sdk_event.base_info.get('post_type', 'None')
@@ -400,7 +431,7 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_sent'
             new_msg = format_cq_code_msg(
-                target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                target_event.sdk_event.json['message'], model
             )
             target_event.data = target_event.private_message_sent(
                 str(target_event.sdk_event.json['user_id']),
@@ -422,7 +453,7 @@ def get_Event_from_SDK(target_event):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message_sent'
                 new_msg = format_cq_code_msg(
-                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                    target_event.sdk_event.json['message'], model
                 )
                 target_event.data = target_event.group_message_sent(
                     str(target_event.sdk_event.json['group_id']),
@@ -445,7 +476,7 @@ def get_Event_from_SDK(target_event):
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
             new_msg = format_cq_code_msg(
-                target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                target_event.sdk_event.json['message'], model
             )
             target_event.data = target_event.private_message(
                 str(target_event.sdk_event.json['user_id']),
@@ -467,7 +498,7 @@ def get_Event_from_SDK(target_event):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
                 new_msg = format_cq_code_msg(
-                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                    target_event.sdk_event.json['message'], model
                 )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['group_id']),
@@ -490,7 +521,7 @@ def get_Event_from_SDK(target_event):
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
                 new_msg = format_cq_code_msg(
-                    target_event.sdk_event.json['message'], target_event.sdk_event.platform['model']
+                    target_event.sdk_event.json['message'], model
                 )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['channel_id']),
@@ -679,6 +710,21 @@ def get_Event_from_SDK(target_event):
             target_event.data = target_event.heartbeat(
                 target_event.sdk_event.json['interval']
             )
+
+
+    # 平台扩展独立保存，不混入供插件匹配和回复的消息代码串。
+    if (model in napcatModelMap
+            and target_event.base_info['type'] in ('message', 'message_sent')
+            and target_event.data is not None):
+        segments = target_event.sdk_event.json.get('message')
+        if isinstance(segments, list):
+            target_event.data.extend['napcat_raw_message'] = copy.deepcopy(segments)
+            for segment_type in napcatMessageFields:
+                metadata = [copy.deepcopy(segment['data']) for segment in segments
+                            if isinstance(segment, dict) and segment.get('type') == segment_type
+                            and isinstance(segment.get('data'), dict)]
+                if metadata:
+                    target_event.data.extend[f'napcat_{segment_type}_data'] = metadata
 
 
 def formatMessage(data: str, msgType: str = 'para'):

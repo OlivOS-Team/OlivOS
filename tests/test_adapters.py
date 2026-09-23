@@ -54,6 +54,25 @@ def test_napcat_face_matches_old_string_plugin_keyword(kind, face_id):
     assert event.data.message == keyword
     assert re.match('^' + re.escape(keyword) + '$', event.data.message)
     assert event.sdk_event.json['message'] == [segment]
+    assert event.data.extend['napcat_face_data'] == [segment['data']]
+    event.data.extend['napcat_face_data'][0]['raw']['faceText'] = 'changed'
+    assert event.sdk_event.json['message'][0]['data']['raw']['faceText'] == '[表情]'
+
+
+@pytest.mark.parametrize('qq', ['42', 'all'])
+def test_napcat_at_keeps_metadata_out_of_match_string(qq):
+    segment = {'type': 'at', 'data': {
+        'qq': qq, 'name': '[昵称],带逗号', 'raw': {'display': '[昵称]'}, 'extra': 'value',
+    }}
+    event = onebot_event(model='napcat_default', post_type='message', message_type='group',
+                         sub_type='normal', group_id=7, user_id=42, message_id=8,
+                         message=[segment], raw_message='', font=0,
+                         sender={'user_id': 42, 'nickname': 'tester'})
+    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    assert event.data.message == f'[CQ:at,qq={qq}]'
+    assert event.data.extend['napcat_at_data'] == [segment['data']]
+    assert event.sdk_event.json['message'] == [segment]
 
 
 def test_non_napcat_keeps_original_face_and_image_fields():
@@ -71,6 +90,30 @@ def test_non_napcat_keeps_original_face_and_image_fields():
         '[CQ:face,id=311,raw={\'faceText\': \'[表情]\'}]'
         '[CQ:image,summary=[动画表情],file=x.png,sub_type=1]'
     )
+
+
+@pytest.mark.parametrize('kind,data,expected', [
+    ('reply', {'id': '7'}, '[CQ:reply,id=7]'),
+    ('record', {'file': 'a.amr', 'url': 'https://example.invalid/a.amr'},
+     '[CQ:record,file=a.amr,url=https://example.invalid/a.amr]'),
+    ('video', {'file': 'a.mp4'}, '[CQ:video,file=a.mp4]'),
+    ('file', {'file': 'a.txt', 'name': 'a.txt', 'size': 123}, '[CQ:file,file=a.txt,name=a.txt,size=123]'),
+    ('forward', {'id': '7'}, '[CQ:forward,id=7]'),
+    ('dice', {'result': 6}, '[CQ:dice]'),
+    ('rps', {'result': 2}, '[CQ:rps]'),
+])
+@pytest.mark.parametrize('post_type', ['message', 'message_sent'])
+def test_napcat_message_metadata_is_separate(kind, data, expected, post_type):
+    segment = {'type': kind, 'data': {**data, 'raw': {'label': '[扩展],内容'}}}
+    event = onebot_event(model='napcat_default', post_type=post_type,
+                         message_type='private', sub_type='friend', user_id=42,
+                         message_id=8, message=[segment], raw_message='', font=0,
+                         sender={'user_id': 42, 'nickname': 'tester'})
+    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    assert event.data.message == expected
+    assert event.data.extend[f'napcat_{kind}_data'] == [segment['data']]
+    assert event.data.extend['napcat_raw_message'] == [segment]
 
 
 @pytest.mark.parametrize('summary', ['[动画表情]', '[躺赢]', '', '[CQ:face,id=311]'])
@@ -92,6 +135,7 @@ def test_napcat_image_survives_plugin_delivery_and_reply(summary):
     assert len(reply.data) == 1
     assert reply.get('old_string') == f'[CQ:image,file={url}]'
     assert event.sdk_event.json['message'] == [segment]
+    assert event.data.extend['napcat_image_data'] == [segment['data']]
 
 
 @pytest.mark.parametrize('kind', ['private', 'group'])
