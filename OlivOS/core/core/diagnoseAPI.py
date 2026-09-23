@@ -71,7 +71,7 @@ def format_log_message(message, mode):
 
     def convert(match):
         body = match.group(1)
-        if body.startswith('at,'):
+        if body.startswith(('at,', 'poke,')):
             if mode == 'cq':
                 body = re.sub(r'(?<!\\),id=', ',qq=', body)
             else:

@@ -131,7 +131,7 @@ def test_all_rest_routes(client, host):
 
 
 def test_log_display_setting_changes_webui_history_not_original_logs(client, host):
-    message = 'User: [OP:at,id=42,name=Alice][OP:face,id=311]'
+    message = 'User: [OP:at,id=42,name=Alice][OP:face,id=311][OP:poke,id=123456]'
     send(host, {'action': 'logger', 'event': 'log', 'data': {
         'data': {'log_level': 2, 'log_time': 1750000000}, 'str': message
     }})
@@ -144,16 +144,16 @@ def test_log_display_setting_changes_webui_history_not_original_logs(client, hos
     log = client.get('/api/logs').json['items'][-1]
     assert log['text'] == message
     assert log['op_text'] == message
-    assert log['cq_text'] == 'User: [CQ:at,qq=42,name=Alice][CQ:face,id=311]'
+    assert log['cq_text'] == 'User: [CQ:at,qq=42,name=Alice][CQ:face,id=311][CQ:poke,qq=123456]'
     assert host.snapshot('logs')[-1]['text'] == message
     assert client.put('/api/logs/display', json={'format': 'op'}).status_code == 200
 
     send(host, {'action': 'logger', 'event': 'log', 'data': {
         'data': {'log_level': 2, 'log_time': 1750000001},
-        'str': 'User: [CQ:at,qq=7,name=Bob][CQ:face,id=311]'
+        'str': 'User: [CQ:at,qq=7,name=Bob][CQ:face,id=311][CQ:poke,qq=987]'
     }})
     last = client.get('/api/logs').json['items'][-1]
-    assert last['op_text'] == 'User: [OP:at,id=7,name=Bob][OP:face,id=311]'
+    assert last['op_text'] == 'User: [OP:at,id=7,name=Bob][OP:face,id=311][OP:poke,id=987]'
     assert last['cq_text'] == last['text']
 
 

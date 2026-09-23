@@ -133,18 +133,18 @@ def test_log_format_switch_rerenders_history_without_mutating_packets(terminal, 
     import tkinter
 
     terminal.root.webui_root = str(tmp_path)
-    terminal.root.UIObject['root_OlivOS_terminal_data'] = [packet('User: [OP:at,id=42]')]
+    terminal.root.UIObject['root_OlivOS_terminal_data'] = [packet('User: [OP:at,id=42][OP:poke,id=123456]')]
     terminal.UIData['root_log_format_StringVar'] = tkinter.StringVar(tk_root, value='CQ')
     terminal._tree_init_line()
     terminal._on_log_format_change()
 
-    assert rows(terminal) == ['User: [CQ:at,qq=42]']
-    assert terminal.root.UIObject['root_OlivOS_terminal_data'][0]['str'] == 'User: [OP:at,id=42]'
+    assert rows(terminal) == ['User: [CQ:at,qq=42][CQ:poke,qq=123456]']
+    assert terminal.root.UIObject['root_OlivOS_terminal_data'][0]['str'] == 'User: [OP:at,id=42][OP:poke,id=123456]'
     assert OlivOS.diagnoseAPI.load_log_display_mode(tmp_path) == 'cq'
 
     terminal.UIData['root_log_format_StringVar'].set('OP')
     terminal._on_log_format_change()
-    assert rows(terminal) == ['User: [OP:at,id=42]']
+    assert rows(terminal) == ['User: [OP:at,id=42][OP:poke,id=123456]']
 
 
 def test_terminal_refreshes_display_setting_changed_by_webui(terminal, tmp_path, tk_root):
