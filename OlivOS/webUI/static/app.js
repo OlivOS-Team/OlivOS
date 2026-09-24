@@ -712,20 +712,30 @@ function fieldInput(field, parent, attribute = 'data-field') {
 function addSecretToggle(input) {
   const wrapper = element('span', null, { class: 'secret-input' });
   input.replaceWith(wrapper);
-  const eye = (visible) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-    stroke="currentColor" stroke-width="2" aria-hidden="true">
-    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/>
-    ${visible ? '<circle cx="12" cy="12" r="3"/>' : '<path d="m3 3 18 18"/>'}</svg>`;
+  const eye = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [name, value] of Object.entries({
+    viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none',
+    stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true',
+  })) eye.setAttribute(name, value);
+  const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  outline.setAttribute('d', 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z');
+  const pupil = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  pupil.setAttribute('cx', '12');
+  pupil.setAttribute('cy', '12');
+  pupil.setAttribute('r', '3');
+  const slash = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  slash.setAttribute('d', 'm3 3 18 18');
+  eye.append(outline, slash);
   const toggle = button('', () => {
     const visible = input.type === 'password';
     input.type = visible ? 'text' : 'password';
-    toggle.innerHTML = eye(visible);
+    eye.replaceChildren(outline, visible ? pupil : slash);
     toggle.setAttribute('aria-pressed', String(visible));
     toggle.setAttribute('aria-label', visible ? '隐藏内容' : '显示内容');
     toggle.title = visible ? '隐藏内容' : '显示内容';
   });
   toggle.className = 'secret-toggle';
-  toggle.innerHTML = eye(false);
+  toggle.append(eye);
   toggle.setAttribute('aria-label', '显示内容');
   toggle.setAttribute('aria-pressed', 'false');
   toggle.title = '显示内容';
