@@ -165,7 +165,7 @@ def account_revision(accounts):
 
 
 def account_response(accounts):
-    return {'account': [dict(redact(account_dict(bot)), hash=key, id=str(bot.id)) for key, bot in accounts.items()],
+    return {'account': [dict(account_dict(bot), hash=key, id=str(bot.id)) for key, bot in accounts.items()],
             'revision': account_revision(accounts)}
 
 

@@ -691,7 +691,7 @@ function collectFields() {
 function fieldInput(field, parent, attribute = 'data-field') {
   const label = element('label', field.title);
   const input = element('input', null, { [attribute]: field.name, autocomplete: 'off' });
-  const secret = /password|access_token|secret|key$/i.test(field.name);
+  const secret = /password|token|secret|key$|cookie|authorization/i.test(field.name);
   input.type = secret ? 'password' : 'text';
   input.value =
     (attribute === 'data-field'
@@ -702,21 +702,30 @@ function fieldInput(field, parent, attribute = 'data-field') {
       if (!$('webhook-fields').hidden) refreshWebhook().catch(notifyError);
     });
   label.append(input);
-  if (secret) addSecretToggle(input);
+  if (secret || input.value === '********') {
+    input.type = 'password';
+    addSecretToggle(input);
+  }
   parent.append(label);
 }
 
 function addSecretToggle(input) {
   const wrapper = element('span', null, { class: 'secret-input' });
   input.replaceWith(wrapper);
-  const toggle = button('👁', () => {
+  const eye = (visible) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+    stroke="currentColor" stroke-width="2" aria-hidden="true">
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/>
+    ${visible ? '<circle cx="12" cy="12" r="3"/>' : '<path d="m3 3 18 18"/>'}</svg>`;
+  const toggle = button('', () => {
     const visible = input.type === 'password';
     input.type = visible ? 'text' : 'password';
+    toggle.innerHTML = eye(visible);
     toggle.setAttribute('aria-pressed', String(visible));
     toggle.setAttribute('aria-label', visible ? '隐藏内容' : '显示内容');
     toggle.title = visible ? '隐藏内容' : '显示内容';
   });
   toggle.className = 'secret-toggle';
+  toggle.innerHTML = eye(false);
   toggle.setAttribute('aria-label', '显示内容');
   toggle.setAttribute('aria-pressed', 'false');
   toggle.title = '显示内容';
