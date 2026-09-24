@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import copy
 import requests as req
 from urllib import parse
 import os
@@ -366,6 +367,19 @@ def format_cq_code_msg(msg):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
+    # SDK 内根据宿主账号表识别模型，不依赖 HTTP/WS 上报中的模型名称。
+    model = target_event.sdk_event.platform['model']
+    proc = OlivOS.pluginAPI.gProc
+    if proc is not None:
+        bot_hash = OlivOS.API.getBotHash(
+            bot_id=target_event.sdk_event.base_info.get('self_id'),
+            platform_sdk=target_event.sdk_event.platform['sdk'],
+            platform_platform=target_event.sdk_event.platform['platform'],
+            platform_model=model
+        )
+        bot = proc.Proc_data.get('bot_info_dict', {}).get(bot_hash)
+        if bot is not None:
+            model = bot.platform['model']
     target_event.base_info['time'] = target_event.sdk_event.base_info.get('time', int(time.time()))
     target_event.base_info['self_id'] = str(target_event.sdk_event.base_info.get('self_id', '-1'))
     target_event.base_info['type'] = target_event.sdk_event.base_info.get('post_type', 'None')
@@ -390,7 +404,9 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message_sent'
-            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+            new_msg = format_cq_code_msg(
+                target_event.sdk_event.json['message']
+            )
             target_event.data = target_event.private_message_sent(
                 str(target_event.sdk_event.json['user_id']),
                 new_msg,
@@ -410,7 +426,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message_sent'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message']
+                )
                 target_event.data = target_event.group_message_sent(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
@@ -431,7 +449,9 @@ def get_Event_from_SDK(target_event):
         if target_event.sdk_event.json['message_type'] == 'private':
             target_event.active = True
             target_event.plugin_info['func_type'] = 'private_message'
-            new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+            new_msg = format_cq_code_msg(
+                target_event.sdk_event.json['message']
+            )
             target_event.data = target_event.private_message(
                 str(target_event.sdk_event.json['user_id']),
                 new_msg,
@@ -451,7 +471,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'normal':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message']
+                )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['group_id']),
                     str(target_event.sdk_event.json['user_id']),
@@ -472,7 +494,9 @@ def get_Event_from_SDK(target_event):
             if target_event.sdk_event.json['sub_type'] == 'channel':
                 target_event.active = True
                 target_event.plugin_info['func_type'] = 'group_message'
-                new_msg = format_cq_code_msg(target_event.sdk_event.json['message'])
+                new_msg = format_cq_code_msg(
+                    target_event.sdk_event.json['message']
+                )
                 target_event.data = target_event.group_message(
                     str(target_event.sdk_event.json['channel_id']),
                     str(target_event.sdk_event.json['user_id']),
@@ -660,6 +684,84 @@ def get_Event_from_SDK(target_event):
             target_event.data = target_event.heartbeat(
                 target_event.sdk_event.json['interval']
             )
+
+    if (model in napcatModelMap
+            and target_event.base_info['type'] in ('message', 'message_sent')
+            and target_event.data is not None):
+        segments = target_event.sdk_event.json.get('message')
+        if isinstance(segments, list):
+            message = get_napcat_message(segments)
+            target_event.data.message_sdk = message
+            target_event.data.raw_message_sdk = copy.deepcopy(message)
+            target_event.data.extend['napcat_raw_message'] = copy.deepcopy(segments)
+            for segment in segments:
+                if isinstance(segment, dict) and isinstance(segment.get('data'), dict):
+                    key = f"napcat_{segment.get('type')}_data"
+                    target_event.data.extend.setdefault(key, []).append(copy.deepcopy(segment['data']))
+
+
+def get_napcat_message(segments):
+    data = []
+    para = OlivOS.messageAPI.PARA
+    for segment in segments:
+        if not isinstance(segment, dict) or not isinstance(segment.get('data'), dict):
+            continue
+        kind, fields = segment.get('type'), segment['data']
+        if kind == 'text':
+            item = para.text(fields.get('text', ''))
+        elif kind == 'at':
+            item = para.at(str(fields.get('qq', -1)), name=fields.get('name'))
+        elif kind == 'face':
+            item = para.face(str(fields.get('id')))
+        elif kind == 'image':
+            item = para.image(str(fields.get('file')), type=fields.get('type'), url=fields.get('url'))
+        elif kind == 'reply':
+            item = para.reply(str(fields.get('id', 0)))
+        elif kind == 'record':
+            item = para.record(str(fields.get('file')), url=fields.get('url'))
+        elif kind == 'video':
+            item = para.video(str(fields.get('file')), url=fields.get('url'))
+        elif kind == 'file':
+            item = para.file(str(fields.get('file')), path=fields.get('path'), url=fields.get('url'),
+                             name=fields.get('name'), size=fields.get('size'))
+        elif kind == 'forward':
+            item = para.forward(str(fields.get('id')))
+        elif kind == 'dice':
+            item = para.dice()
+        elif kind == 'rps':
+            item = para.rps()
+        elif kind == 'shake':
+            item = para.shake()
+        elif kind == 'anonymous':
+            item = para.anonymous()
+        elif kind == 'poke':
+            item = para.poke(str(fields.get('id', -1)))
+        elif kind == 'json':
+            item = para.json(str(fields.get('data', '')))
+        elif kind == 'xml':
+            item = para.xml(str(fields.get('data', '')))
+        elif kind == 'mface':
+            item = para.mface(
+                emoji_package_id=fields.get('emoji_package_id'), emoji_id=fields.get('emoji_id'),
+                key=fields.get('key'), summary=fields.get('summary'), url=fields.get('url'),
+                face_type=fields.get('face_type'), face_id=fields.get('face_id'), ext=fields.get('ext'))
+        elif kind == 'share':
+            item = para.share(fields.get('url', ''), fields.get('title', ''),
+                              content=fields.get('content'), image=fields.get('image'))
+        elif kind == 'location':
+            item = para.location(fields.get('lat', ''), fields.get('lon', ''),
+                                 title=fields.get('title'), content=fields.get('content'))
+        elif kind == 'music':
+            item = para.music(fields.get('type', ''), id=fields.get('id'), url=fields.get('url'),
+                              audio=fields.get('audio'), title=fields.get('title'),
+                              content=fields.get('content'), image=fields.get('image'))
+        else:
+            data.extend(OlivOS.messageAPI.Message_templet('old_string', format_cq_code_msg([segment])).data)
+            continue
+        data.append(item)
+    message = OlivOS.messageAPI.Message_templet('olivos_para', data)
+    message.data_raw = copy.deepcopy(data)
+    return message
 
 
 def formatMessage(data: str, msgType: str = 'para'):

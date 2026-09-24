@@ -234,13 +234,20 @@ class server(OlivOS.API.Proc_templet):
         if action == 'logger' and data.get('event') == 'log':
             log = data.get('data', {})
             entry = log.get('data', {})
+            text = log.get('str', entry.get('log_message', ''))
             self.publish('logs', {'level': entry.get('log_level', 2), 'time': entry.get('log_time'),
-                                  'text': log.get('str', entry.get('log_message', ''))})
+                                  'text': text,
+                                  'op_text': OlivOS.diagnoseAPI.format_log_message(text, 'op'),
+                                  'cq_text': OlivOS.diagnoseAPI.format_log_message(text, 'cq')})
         elif action == 'account_update':
             with self.lock:
+                old_accounts = self.accounts
                 self.accounts = copy.deepcopy(data.get('data', {}))
                 for key in list(self.terminals):
-                    if not self.accounts.get(key[1]) or not self.accounts[key[1]].enable:
+                    bot = self.accounts.get(key[1])
+                    previous = old_accounts.get(key[1])
+                    if (bot is None or not bot.enable or previous is None
+                            or previous.platform != bot.platform):
                         self.terminals.pop(key)
                         self.streams.pop('/'.join(key), None)
             self.publish('events', {'type': 'accounts'})
@@ -262,7 +269,10 @@ class server(OlivOS.API.Proc_templet):
             bot_hash = data['hash']
             with self.lock:
                 bot = self.accounts.get(bot_hash)
-                if bot is None or not bot.enable:
+                if (bot is None or not bot.enable
+                        or data.get('account_platform', bot.platform) != bot.platform):
+                    return
+                if data.get('event') != 'init' and (action, bot_hash) not in self.terminals:
                     return
                 terminal = self.terminals.setdefault((action, bot_hash), {'model': action, 'hash': bot_hash})
                 event = data.get('event')

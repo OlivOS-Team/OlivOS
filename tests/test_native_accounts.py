@@ -71,3 +71,57 @@ def test_account_save_requests_persistence_then_hot_reload(account_editor):
     assert 'OlivOS_account_config_save' in steps and 'OlivOS_account_config_update' in steps
     assert editor.UIData['flag_commit'] is True
     editor.UIObject['root'].destroy.assert_called_once()
+
+
+def test_terminal_model_switch_uses_launcher_init_and_closes_old():
+    import copy
+
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model='napcat_show')
+    inbox = queue.Queue()
+    dock = OlivOS.nativeWinUIAPI.dock(
+        rx_queue=inbox, control_queue=queue.Queue(), bot_info_dict={bot.hash: bot})
+    dock.updateShallowMenuList = Mock()
+    dock.startNapCatTerminalUI = Mock()
+    window = Mock(bot=copy.deepcopy(bot))
+    dock.UIObject['root_napcat_terminal'][bot.hash] = window
+    window.stop.side_effect = lambda: dock.UIObject['root_napcat_terminal'].pop(bot.hash)
+    changed = copy.deepcopy(bot)
+    changed.platform['model'] = 'napcat_default'
+    packet = OlivOS.API.Control.packet('send', {'data': {
+        'action': 'account_update', 'data': {bot.hash: changed}}})
+    dock.on_control_rx(packet)
+    window.stop.assert_not_called()
+    dock.mainrun()
+    window.stop.assert_called_once()
+    dock.startNapCatTerminalUI.assert_not_called()
+    inbox.put(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'napcat', 'event': 'init', 'hash': bot.hash, 'account_platform': bot.platform}}))
+    dock.mainrun()
+    assert inbox.empty()
+    dock.on_control_rx(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'account_update', 'data': {bot.hash: bot}}}))
+    dock.mainrun()
+    inbox.put(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'napcat', 'event': 'init', 'hash': bot.hash, 'account_platform': bot.platform}}))
+    dock.mainrun()
+    dock.mainrun()
+    dock.startNapCatTerminalUI.assert_called_once_with(bot.hash)
+
+
+@pytest.mark.parametrize('module,model', [
+    ('libNapCatEXEModelAPI', 'napcat_show'), ('libEXEModelAPI', 'gocqhttp_show'),
+    ('libWQEXEModelAPI', 'walleq_show'), ('libCWCBEXEModelAPI', 'ComWeChatBotClient'),
+    ('libOPQBotEXEModelAPI', 'opqbot_auto'), ('virtualTerminalLinkServerAPI', 'default'),
+])
+def test_launcher_init_carries_account_snapshot(module, model):
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model=model)
+    control = queue.Queue()
+    launcher = getattr(OlivOS, module).server('test', control_queue=control, bot_info_dict=bot)
+    launcher.send_init_event()
+    packet = control.get_nowait()
+    assert packet.key['data']['event'] == 'init'
+    assert packet.key['data']['account_platform'] == bot.platform
+    bot.platform['model'] = 'changed'
+    assert packet.key['data']['account_platform']['model'] == model

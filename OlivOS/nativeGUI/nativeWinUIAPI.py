@@ -141,21 +141,7 @@ class dock(OlivOS.API.Proc_templet):
                     and 'action' in packet.key['data']
                 ):
                     if 'account_update' == packet.key['data']['action']:
-                        if (
-                            'data' in packet.key['data']
-                            and type(packet.key['data']['data']) is dict
-                        ):
-                            self.bot_info = packet.key['data']['data']
-                        self.UIData['shallow_napcat_menu_list'] = None
-                        self.UIData['shallow_opqbot_menu_list'] = None
-                        self.UIData['shallow_gocqhttp_menu_list'] = None
-                        self.UIData['shallow_walleq_menu_list'] = None
-                        self.UIData['shallow_cwcb_menu_list'] = None
-                        self.UIData['shallow_virtual_terminal_menu_list'] = None
-                        self.UIData['shallow_account_menu_list'] = None
-                        self.updateAccountList(flagInit=True)
-                        self.mergeAccountList()
-                        self.updateShallowMenuList()
+                        self.sendRxEvent('send', packet.key)
 
     def process_msg(self):
         delay = 1 if self.busy else 20
@@ -190,7 +176,33 @@ class dock(OlivOS.API.Proc_templet):
                     and 'data' in rx_packet_data.key
                     and 'action' in rx_packet_data.key['data']
                 ):
-                    if 'update_data' == rx_packet_data.key['data']['action']:
+                    terminal_kind = rx_packet_data.key['data']['action']
+                    if terminal_kind in ('napcat', 'gocqhttp', 'walleq', 'ComWeChatBotClient',
+                                         'opqbot', 'virtual_terminal'):
+                        event = rx_packet_data.key['data']
+                        bot = self.bot_info.get(event.get('hash'))
+                        if (bot is None or not bot.enable or
+                                event.get('account_platform', bot.platform) != bot.platform):
+                            return
+                    if 'account_update' == rx_packet_data.key['data']['action']:
+                        self.bot_info = rx_packet_data.key['data']['data']
+                        for key in ('root_gocqhttp_terminal', 'root_walleq_terminal', 'root_cwcb_terminal',
+                                    'root_opqbot_terminal', 'root_napcat_terminal', 'root_virtual_terminal_terminal'):
+                            for bot_hash, window in list(self.UIObject[key].items()):
+                                bot = self.bot_info.get(bot_hash)
+                                if bot is None or not bot.enable or window.bot.platform != bot.platform:
+                                    window.stop()
+                        self.UIData['shallow_napcat_menu_list'] = None
+                        self.UIData['shallow_opqbot_menu_list'] = None
+                        self.UIData['shallow_gocqhttp_menu_list'] = None
+                        self.UIData['shallow_walleq_menu_list'] = None
+                        self.UIData['shallow_cwcb_menu_list'] = None
+                        self.UIData['shallow_virtual_terminal_menu_list'] = None
+                        self.UIData['shallow_account_menu_list'] = None
+                        self.updateAccountList(flagInit=True)
+                        self.mergeAccountList()
+                        self.updateShallowMenuList()
+                    elif 'update_data' == rx_packet_data.key['data']['action']:
                         self.UIData.update(rx_packet_data.key['data']['data'])
                         self.updateShallowMenuList()
                     elif 'update_account_list' == rx_packet_data.key['data']['action']:
@@ -1839,12 +1851,15 @@ class OlivOSTerminalUI(BaseTerminalUI):
     WINDOW_TITLE = "OlivOS 终端"
     WINDOW_SIZE = "900x600"
     MIN_SIZE = (900, 600)
-    COLUMN_WEIGHTS = [(0, 0), (1, 2), (2, 2), (3, 0)]
+    COLUMN_WEIGHTS = [(0, 0), (1, 0), (2, 2), (3, 0)]
     HAS_SEND_BUTTON = False
 
     def __init__(self, Model_name, logger_proc=None, root=None, root_tk=None, bot=None):
         # OlivOS终端没有bot参数，但基类要求，我们忽略它
         super().__init__(Model_name, logger_proc, root, root_tk, bot)
+        self.UIData['log_message_mode'] = OlivOS.diagnoseAPI.load_log_display_mode(
+            getattr(root, 'webui_root', '.')
+        )
 
     def get_window_title(self):
         # 假设 OlivOS.infoAPI.OlivOS_Version_Title 存在
@@ -1882,7 +1897,26 @@ class OlivOSTerminalUI(BaseTerminalUI):
             self.UIData['level_list'].append(level_name)
             self.UIData['level_find'][level_name] = level_this
         self.UIObject['root_level']['value'] = tuple(self.UIData['level_list'])
+        self.UIObject['root_level'].configure(width=6)
         self.UIObject['root_level'].current(self.UIData['level_list'].index(self.UIData['level_default']))
+        self.UIObject['root_log_format_frame'] = tkinter.Frame(
+            self.UIObject['root'], bg=self.UIConfig['color_001']
+        )
+        self._tree_edit_UI_Combobox_init(
+            obj_root='root_log_format_frame', obj_name='root_log_format', str_name='root_log_format_StringVar',
+            x=0, y=0, width_t=0, width=0, height=24, action=None, title='消息格式'
+        )
+        self.UIObject['root_log_format=Label'].pack(side=tkinter.LEFT, padx=(0, 6))
+        self.UIObject['root_log_format']['values'] = ('OP', 'CQ')
+        self.UIObject['root_log_format'].configure(width=5)
+        self.UIData['root_log_format_StringVar'].set(
+            self.UIData['log_message_mode'].upper()
+        )
+        self.UIObject['root_log_format'].pack(side=tkinter.LEFT)
+        self.UIObject['root_log_format_frame'].grid(
+            row=1, column=1, sticky='w', padx=(0, 8), pady=(9, 15)
+        )
+        self.UIObject['root_log_format'].bind('<<ComboboxSelected>>', self._on_log_format_change)
 
     def _build_input_area(self):
         # 输入框占据第1列（共3列，tree占2列，这里需要调整）
@@ -1893,9 +1927,41 @@ class OlivOSTerminalUI(BaseTerminalUI):
         )
         self.UIObject['root_input'].bind("<Return>", self._root_Entry_enter_Func('root_input'))
         self.UIObject['root_input'].grid(
-            row=1, column=1, sticky="we", rowspan=1, columnspan=3,
+            row=1, column=2, sticky="we", rowspan=1, columnspan=2,
             padx=(0, 15), pady=(8, 15), ipadx=0, ipady=2
         )
+
+    def _post_build(self):
+        super()._post_build()
+        self.UIObject['root'].after(3000, self._sync_log_format)
+
+    def _refresh_log_history(self):
+        tree = self.UIObject['tree']
+        tree.delete(*tree.get_children())
+        self._tree_init_line()
+
+    def _on_log_format_change(self, event=None):
+        mode = self.UIData['root_log_format_StringVar'].get().lower()
+        try:
+            OlivOS.diagnoseAPI.save_log_display_mode(mode, getattr(self.root, 'webui_root', '.'))
+        except OSError:
+            self.UIData['root_log_format_StringVar'].set(
+                self.UIData['log_message_mode'].upper()
+            )
+            tkinter.messagebox.showerror('消息格式', '保存日志显示设置失败')
+            return
+        self.UIData['log_message_mode'] = mode
+        self._refresh_log_history()
+
+    def _sync_log_format(self):
+        if not self.UIObject['root'].winfo_exists():
+            return
+        mode = OlivOS.diagnoseAPI.load_log_display_mode(getattr(self.root, 'webui_root', '.'))
+        if mode != self.UIData['log_message_mode']:
+            self.UIData['log_message_mode'] = mode
+            self.UIData['root_log_format_StringVar'].set(mode.upper())
+            self._refresh_log_history()
+        self.UIObject['root'].after(3000, self._sync_log_format)
 
     def _root_Entry_enter(self, name, event):
         if name == 'root_input':
@@ -1979,7 +2045,9 @@ class OlivOSTerminalUI(BaseTerminalUI):
             this_level = data_raw['log_level']
             if select_level > this_level:
                 return
-            data_str = OlivOS.diagnoseAPI.safe_text(data['str'])
+            data_str = OlivOS.diagnoseAPI.format_log_message(
+                OlivOS.diagnoseAPI.safe_text(data['str']), self.UIData['log_message_mode']
+            )
             data_str = data_str.encode(encoding='gbk', errors='replace').decode(encoding='gbk', errors='replace')
             # 处理转义
             data_str = data_str.replace('\x00', '\\x00').replace('\r', '\\r').replace('\n', '\\n')

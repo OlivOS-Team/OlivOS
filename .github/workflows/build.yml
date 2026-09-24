@@ -423,6 +423,7 @@ jobs:
     needs:
       - build-windows-publish
       - build-linux-publish
+      - build-macos-publish
     permissions:
       contents: write
     steps:
@@ -449,6 +450,18 @@ jobs:
         with:
           name: OlivOS-Linux-arm64
           path: OlivOS-Linux-arm64/
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-MacOS
+          path: OlivOS-MacOS/
+
+      - name: Download macOS arm64 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OlivOS-MacOS-arm64
+          path: OlivOS-MacOS-arm64/
       
       - name: Packing Release
         run: |
@@ -471,6 +484,16 @@ jobs:
           zip -r ../OlivOS-Linux-arm64.zip ./
           cd ../
           cp ./OlivOS-Linux-arm64.zip ./OlivOS-Linux-arm64-${{ github.ref_name }}.zip
+
+          cd ./OlivOS-MacOS
+          zip -r ../OlivOS-MacOS.zip ./
+          cd ../
+          cp ./OlivOS-MacOS.zip ./OlivOS-MacOS-${{ github.ref_name }}.zip
+
+          cd ./OlivOS-MacOS-arm64
+          zip -r ../OlivOS-MacOS-arm64.zip ./
+          cd ../
+          cp ./OlivOS-MacOS-arm64.zip ./OlivOS-MacOS-arm64-${{ github.ref_name }}.zip
           
           ls -R
       
@@ -491,3 +514,7 @@ jobs:
             ./OlivOS-Linux-${{ github.ref_name }}.zip
             ./OlivOS-Linux-arm64.zip
             ./OlivOS-Linux-arm64-${{ github.ref_name }}.zip
+            ./OlivOS-MacOS.zip
+            ./OlivOS-MacOS-${{ github.ref_name }}.zip
+            ./OlivOS-MacOS-arm64.zip
+            ./OlivOS-MacOS-arm64-${{ github.ref_name }}.zip

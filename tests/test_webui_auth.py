@@ -146,7 +146,7 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(f"http://127.0.0.1:{host.config['port']}")
         driver.find_element(By.ID, 'token').send_keys(host.token)
-        driver.find_element(By.CSS_SELECTOR, '#login-form button').click()
+        driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
         WebDriverWait(driver, 10).until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
         result = driver.execute_async_script('''
             const done = arguments[arguments.length - 1];
@@ -163,7 +163,7 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
             const newAttempt = login(null, credential);
             pending[0].reject(new TypeError('delayed network error'));
             oldAttempt.then(async () => {
-              const stayedDisabled = document.querySelector('#login-form button').disabled;
+              const stayedDisabled = document.querySelector('#login-form button[type=submit]').disabled;
               const reply = await originalFetch(pending[1].path, pending[1].options);
               pending[1].resolve(reply);
               await newAttempt;
@@ -226,11 +226,11 @@ def browser_auth(host):
 
     def login():
         find('#token').send_keys(host.token)
-        find('#login-form button').click()
+        find('#login-form button[type=submit]').click()
         ui.wait.until(lambda _: find('#shell').is_displayed())
 
     def logged_out():
-        ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button').is_enabled())
+        ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button[type=submit]').is_enabled())
         assert not find('#shell').is_displayed()
         assert find('#login-error').text == ''
         assert find('#token').get_attribute('value') == ''
@@ -304,7 +304,7 @@ def test_manual_wrong_token_shows_error_and_can_retry(browser_auth):
     ui.find('#logout').click()
     ui.logged_out()
     ui.find('#token').send_keys('incorrect-fixture-token')
-    ui.find('#login-form button').click()
+    ui.find('#login-form button[type=submit]').click()
     ui.wait.until(lambda _: ui.find('#login-error').text == '认证失败')
     assert not ui.find('#shell').is_displayed()
     ui.login()

@@ -130,6 +130,45 @@ def test_all_rest_routes(client, host):
         assert host.Proc_info.control_queue.get_nowait().action == action
 
 
+def test_log_display_setting_changes_webui_history_not_original_logs(client, host):
+    message = 'User: [OP:at,id=42,name=Alice][OP:face,id=311][OP:poke,id=123456]'
+    send(host, {'action': 'logger', 'event': 'log', 'data': {
+        'data': {'log_level': 2, 'log_time': 1750000000}, 'str': message
+    }})
+    assert client.get('/api/logs/display').json == {'format': 'op'}
+    assert client.put('/api/logs/display', json={'format': 'wrong'}).status_code == 400
+    assert client.put('/api/logs/display', json={'format': 'cq'}).json == {
+        'format': 'cq'
+    }
+    assert OlivOS.diagnoseAPI.load_log_display_mode(host.root) == 'cq'
+    log = client.get('/api/logs').json['items'][-1]
+    assert log['text'] == message
+    assert log['op_text'] == message
+    assert log['cq_text'] == 'User: [CQ:at,qq=42,name=Alice][CQ:face,id=311][CQ:poke,qq=123456]'
+    assert host.snapshot('logs')[-1]['text'] == message
+    assert client.put('/api/logs/display', json={'format': 'op'}).status_code == 200
+
+    send(host, {'action': 'logger', 'event': 'log', 'data': {
+        'data': {'log_level': 2, 'log_time': 1750000001},
+        'str': 'User: [CQ:at,qq=7,name=Bob][CQ:face,id=311][CQ:poke,qq=987]'
+    }})
+    last = client.get('/api/logs').json['items'][-1]
+    assert last['op_text'] == 'User: [OP:at,id=7,name=Bob][OP:face,id=311][OP:poke,id=987]'
+    assert last['cq_text'] == last['text']
+
+
+def test_log_display_formats_logfile_fallback_without_rewriting_file(client, host):
+    logfile = host.root / 'logfile/OlivOS_logfile_unity.log'
+    logfile.parent.mkdir(parents=True)
+    source = '[2026-09-23 17:00:00] - [INFO] - [unity] - [OP:at,id=42]'
+    logfile.write_text(source + '\n', encoding='utf-8')
+
+    item = client.get('/api/logs').json['items'][0]
+    assert item['op_text'] == '[unity] - [OP:at,id=42]'
+    assert item['cq_text'] == '[unity] - [CQ:at,qq=42]'
+    assert logfile.read_text(encoding='utf-8') == source + '\n'
+
+
 def test_unknown_account_details_exclude_disabled_and_known_states(client, host):
     from types import SimpleNamespace
 
@@ -620,6 +659,12 @@ def test_logs_filter_tail_and_bounded_replay(client, host):
 @pytest.mark.parametrize('model', list(serverAPI.TERMINAL_TYPES))
 def test_all_six_terminal_inputs(client, host, model):
     bot_hash = next(iter(host.accounts))
+    host.accounts[bot_hash].platform.update(sdk='onebot', model={
+        'napcat': 'napcat_show', 'gocqhttp': 'gocqhttp_show', 'walleq': 'walleq_show',
+        'cwcb': 'ComWeChatBotClient', 'opqbot': 'opqbot_auto', 'virtual_terminal': 'default',
+    }[model])
+    if model == 'virtual_terminal':
+        host.accounts[bot_hash].platform['sdk'] = 'terminal_link'
     send(host, {'action': model, 'event': 'init', 'hash': bot_hash})
     host.terminal_input(model, bot_hash, {'data': 'test'})
     packet = host.Proc_info.control_queue.get_nowait()
@@ -635,9 +680,11 @@ def test_all_six_terminal_inputs(client, host, model):
 
 def test_qrcode_private_and_path_guard(client, host):
     bot_hash = next(iter(host.accounts))
+    host.accounts[bot_hash].platform.update(sdk='onebot', model='napcat_show')
     image = host.root / 'conf/qr.png'
     image.write_bytes(base64.b64decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='))
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash})
     send(host, {'action': 'napcat', 'event': 'qrcode', 'hash': bot_hash, 'path': str(image)})
     endpoint = f'/api/terminal/napcat/{bot_hash}/qrcode'
     assert client.get(endpoint).status_code == 200
@@ -948,3 +995,32 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
                 await ws.send_str('not json')
                 assert (await ws.receive_json(timeout=2))['type'] == 'error'
     asyncio.run(scenario())
+
+
+def test_account_update_reconciles_terminal_models(host):
+    import copy
+
+    bot_hash = next(iter(host.accounts))
+    bot = copy.deepcopy(host.accounts[bot_hash])
+    bot.platform.update(sdk='onebot', model='napcat_show')
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    old_platform = bot.platform.copy()
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash, 'account_platform': old_platform})
+    assert ('napcat', bot_hash) in host.terminals
+    bot.platform['model'] = 'napcat_default'
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    send(host, {'action': 'napcat', 'event': 'init', 'hash': bot_hash, 'account_platform': old_platform})
+    assert not host.terminals
+    send(host, {'action': 'napcat', 'event': 'log', 'hash': bot_hash, 'data': 'late log'})
+    assert not host.terminals
+    bot.platform.update(sdk='terminal_link', model='default')
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals
+    send(host, {'action': 'virtual_terminal', 'event': 'init', 'hash': bot_hash,
+                'account_platform': bot.platform.copy()})
+    assert ('virtual_terminal', bot_hash) in host.terminals
+    bot.enable = False
+    send(host, {'action': 'account_update', 'data': {bot_hash: bot}})
+    assert not host.terminals

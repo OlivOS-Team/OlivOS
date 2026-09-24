@@ -1,6 +1,7 @@
 """Plugin event dispatch, blocking and exception isolation."""
 
 import queue
+import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -33,6 +34,39 @@ def event_for(bot):
     packet = OlivOS.API.Control.packet('send', {'data': {'data': 'hello', 'user_conf': {
         'user_id': '42', 'target_id': '7', 'user_name': 'test', 'flag_group': True}}})
     return OlivOS.virtualTerminalSDK.event(packet, bot)
+
+
+@pytest.mark.parametrize('model', OlivOS.onebotSDK.napcatModelMap + ['gocqhttp', 'lagrange_default'])
+@pytest.mark.parametrize('reported_model', ['default', 'para_default'])
+def test_account_model_resolves_only_configured_napcat(model, reported_model, monkeypatch):
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model=model)
+    loader = OlivOS.pluginAPI.shallow(
+        control_queue=queue.Queue(), rx_queue=queue.Queue(), bot_info_dict={bot.hash: bot})
+    loader.log = Mock()
+    monkeypatch.setattr(OlivOS.pluginAPI, 'gProc', loader)
+    callback = Mock()
+    register(loader, 'probe', callback)
+    loader.plugin_models_dict['probe']['message_mode'] = 'old_string'
+    payload = {'time': 1, 'self_id': 10001, 'post_type': 'message',
+               'message_type': 'group', 'sub_type': 'normal', 'group_id': 7,
+               'user_id': 42, 'message_id': 8, 'font': 0,
+               'sender': {'user_id': 42, 'nickname': 'tester'},
+               'message': [{'type': 'face', 'data': {'id': '311', 'raw': {
+                   'faceText': '[表情]', 'faceType': 3, 'chainCount': 0}}}]}
+    sdk_event = OlivOS.onebotSDK.event(json.dumps(payload))
+    sdk_event.platform['model'] = reported_model
+    loader.run_plugin(sdk_event)
+    callback.assert_called_once()
+    event = callback.call_args.kwargs['plugin_event']
+    if model in OlivOS.onebotSDK.napcatModelMap:
+        assert event.platform['model'] == reported_model
+        assert event.data.message == '[CQ:face,id=311]'
+        assert event.data.extend['napcat_face_data'] == [payload['message'][0]['data']]
+    else:
+        assert event.platform['model'] == reported_model
+        assert 'raw=' in event.data.message
+        assert 'napcat_face_data' not in event.data.extend
 
 
 def test_plugin_dispatch_preserves_order(dispatcher):

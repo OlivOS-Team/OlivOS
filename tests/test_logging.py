@@ -23,6 +23,43 @@ def test_unprintable_object_does_not_break_logger():
     assert OlivOS.diagnoseAPI.safe_text(Broken()) == '<unprintable>'
 
 
+def test_log_display_mode_persists_and_invalid_settings_fall_back(tmp_path):
+    logging = OlivOS.diagnoseAPI
+    assert logging.load_log_display_mode(tmp_path) == 'op'
+    with pytest.raises(ValueError):
+        logging.save_log_display_mode('unsupported', tmp_path)
+    logging.save_log_display_mode('cq', tmp_path)
+    assert logging.load_log_display_mode(tmp_path) == 'cq'
+    path = tmp_path / logging.log_display_file
+    path.write_text('{invalid', encoding='utf-8')
+    assert logging.load_log_display_mode(tmp_path) == 'op'
+
+
+def test_log_message_format_converts_segments_without_changing_op_source():
+    source = ('User: [OP:at,id=42,name=Alice][OP:face,id=311][OP:poke,id=123456]'
+              ' text [CQ:at,qq=7][CQ:poke,qq=987]')
+    assert OlivOS.diagnoseAPI.format_log_message(source, 'op') == (
+        'User: [OP:at,id=42,name=Alice][OP:face,id=311][OP:poke,id=123456]'
+        ' text [OP:at,id=7][OP:poke,id=987]'
+    )
+    assert OlivOS.diagnoseAPI.format_log_message(source, 'cq') == (
+        'User: [CQ:at,qq=42,name=Alice][CQ:face,id=311][CQ:poke,qq=123456]'
+        ' text [CQ:at,qq=7][CQ:poke,qq=987]'
+    )
+    assert OlivOS.diagnoseAPI.format_log_message(source, 'invalid') == source
+
+
+def test_log_message_format_only_renames_at_and_poke_id_and_preserves_other_fields():
+    source = (r'[OP:mface,face_id=556,emoji_id=22,id=99,ext=x\,id=y]'
+              r'[OP:face,id=311][OP:reply,id=12][OP:custom,id=6]'
+              r'[OP:at,name=A\,id=mask,id=42][OP:poke,name=B\,id=mask,id=123456]')
+    expected = (r'[CQ:mface,face_id=556,emoji_id=22,id=99,ext=x\,id=y]'
+                r'[CQ:face,id=311][CQ:reply,id=12][CQ:custom,id=6]'
+                r'[CQ:at,name=A\,id=mask,qq=42][CQ:poke,name=B\,id=mask,qq=123456]')
+    assert OlivOS.diagnoseAPI.format_log_message(source, 'cq') == expected
+    assert OlivOS.diagnoseAPI.format_log_message(expected, 'op') == source
+
+
 def test_log_packet_is_sanitized_before_queueing():
     packets = queue.Queue()
     logger = OlivOS.diagnoseAPI.logger(logger_queue=packets)

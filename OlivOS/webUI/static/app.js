@@ -50,6 +50,7 @@ const state = {
   terminals: [],
   selected: null,
   logs: [],
+  logMessageMode: 'op',
   terminalLogs: [],
   limit: 500,
   dirty: false,
@@ -234,7 +235,7 @@ async function login(ev, token = null) {
   const generation = ++state.authGeneration;
   state.sessionRefresh = null;
   $('login-error').textContent = '';
-  const submit = $('login-form').querySelector('button');
+  const submit = $('login-form').querySelector('button[type=submit]');
   submit.disabled = true;
   try {
     state.token = token ?? $('token').value.trim();
@@ -262,7 +263,10 @@ async function login(ev, token = null) {
     clearInterval(state.timer);
     state.timer = setInterval(() => {
       if (state.page === 'dashboard') refreshStatus().then(() => ensureSession()).catch(notifyError);
-      else checkAuthentication();
+      else {
+        checkAuthentication();
+        if (state.page === 'logs') loadLogDisplay().catch(notifyError);
+      }
       checkCachedLogin();
     }, 10000);
   } catch (error) {
@@ -300,6 +304,7 @@ function resetLogin(message = '') {
   state.accounts = [];
   state.savedAccounts = [];
   state.logs = [];
+  state.logMessageMode = 'op';
   state.terminalLogs = [];
   state.seenEvents.clear();
   state.dirty = false;
@@ -319,7 +324,7 @@ function resetLogin(message = '') {
   hideNotice();
   $('token').value = '';
   $('login-error').textContent = message;
-  $('login-form').querySelector('button').disabled = false;
+  $('login-form').querySelector('button[type=submit]').disabled = false;
 }
 function checkCachedLogin() {
   if (!state.token || !state.cachedLogin) return;
@@ -697,8 +702,28 @@ function fieldInput(field, parent, attribute = 'data-field') {
       if (!$('webhook-fields').hidden) refreshWebhook().catch(notifyError);
     });
   label.append(input);
+  if (secret) addSecretToggle(input);
   parent.append(label);
 }
+
+function addSecretToggle(input) {
+  const wrapper = element('span', null, { class: 'secret-input' });
+  input.replaceWith(wrapper);
+  const toggle = button('👁', () => {
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    toggle.setAttribute('aria-pressed', String(visible));
+    toggle.setAttribute('aria-label', visible ? '隐藏内容' : '显示内容');
+    toggle.title = visible ? '隐藏内容' : '显示内容';
+  });
+  toggle.className = 'secret-toggle';
+  toggle.setAttribute('aria-label', '显示内容');
+  toggle.setAttribute('aria-pressed', 'false');
+  toggle.title = '显示内容';
+  wrapper.append(input, toggle);
+}
+
+addSecretToggle($('token'));
 function renderAccountFields() {
   const preset = state.schema.presets.find((p) => p.title === $('account-preset').value);
   const fields = preset?.fields || state.schema.fields;
@@ -754,6 +779,7 @@ function renderQsign() {
       });
       input.value = entry[key] || '';
       label.append(input);
+      if (key === 'key') addSecretToggle(input);
       row.append(label);
     }
     row.append(
@@ -820,7 +846,9 @@ function renderOutput(container, lines, follow, logMode = false) {
   const scrollTop = container.scrollTop;
   container.replaceChildren();
   for (const line of lines) {
-    let text = line.text ?? '';
+    let text = logMode
+      ? (state.logMessageMode === 'cq' ? line.cq_text : line.op_text) ?? line.text ?? ''
+      : line.text ?? '';
     if (logMode) {
       const timestamp =
         typeof line.time === 'number'
@@ -858,11 +886,20 @@ function renderLogs() {
   $('log-count').textContent = `${lines.length} / ${state.limit} 条`;
 }
 let logGeneration = 0;
+async function loadLogDisplay() {
+  const result = await api('/api/logs/display');
+  if (state.logMessageMode !== result.format) {
+    state.logMessageMode = result.format;
+    if (state.page === 'logs') renderLogs();
+  }
+  $('log-message-mode').value = state.logMessageMode;
+}
 async function openLogs() {
   const generation = ++logGeneration;
   closeStream('logs');
   state.logs = [];
   renderLogs();
+  await loadLogDisplay();
   const selected = selectedLogLevels();
   if (!selected.length) return;
   const query = `level=${encodeURIComponent(selected.length === Object.keys(levels).length ? '' : selected.join(','))}`;
@@ -881,6 +918,7 @@ async function openLogs() {
   });
 }
 async function loadTerminals() {
+  const previous = state.selected;
   const result = await api('/api/terminals');
   state.terminals = result.items;
   state.selected =
@@ -890,6 +928,10 @@ async function loadTerminals() {
     state.terminals[0] ||
     null;
   renderTerminals();
+  if (state.page === 'terminals' && state.selected &&
+      (previous?.hash !== state.selected.hash || previous?.model !== state.selected.model)) {
+    openTerminal(state.selected);
+  }
 }
 function renderTerminals() {
   $('terminal-tabs').replaceChildren();
@@ -1581,6 +1623,17 @@ $('log-filter').addEventListener('keydown', (ev) => {
   }
 });
 bind('log-scroll', renderLogs, 'change');
+bind('log-message-mode', async (ev) => {
+  const mode = ev.target.value;
+  try {
+    const result = await api('/api/logs/display', { method: 'PUT', body: { format: mode } });
+    state.logMessageMode = result.format;
+    renderLogs();
+  } catch (error) {
+    ev.target.value = state.logMessageMode;
+    throw error;
+  }
+}, 'change');
 bind(
   'terminal-scroll',
   () => renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked),

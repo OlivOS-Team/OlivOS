@@ -142,11 +142,30 @@ def browser(navigation_host, tmp_path):
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
         find('#token').send_keys(navigation_host.token)
-        click('#login-form button')
+        click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
         yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select, host=navigation_host)
     finally:
         driver.quit()
+
+
+@pytest.mark.browser
+def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser):
+    browser.driver.execute_script("state.draft = {server: {access_token: 'fixture-secret'}, extends: {}};"
+                                  "fieldInput({name: 'server.access_token', title: 'Token'}, $('account-fields'));")
+    result = browser.driver.execute_async_script("""
+        const done = arguments[0];
+        const input = document.querySelector('[data-field="server.access_token"]');
+        const toggle = input.parentElement.querySelector('button');
+        const initial = input.type;
+        toggle.click();
+        setTimeout(() => {
+          const shown = input.type;
+          toggle.click();
+          setTimeout(() => done([initial, shown, input.type, input.value, toggle.type]), 0);
+        }, 0);
+    """)
+    assert result == ['password', 'text', 'password', 'fixture-secret', 'button']
 
 
 @pytest.mark.browser

@@ -271,15 +271,17 @@ class Event(object):
                         self.data.message_sdk.data_raw
                     )
                     # 从at部分移除name
+                    at_name_removed = False
                     for para_this in temp_message_sdk.data:
                         if type(para_this) is OlivOS.messageAPI.PARA.at:
-                            if 'name' in para_this.data:
+                            if para_this.data.get('name') is not None:
                                 new_data = para_this.data.copy()
                                 del new_data['name']
                                 para_this.data = new_data
+                                at_name_removed = True
                     # 使用临时副本生成消息
                     if (
-                        self.plugin_info['message_mode_tx'] == 'olivos_para'
+                        at_name_removed or self.plugin_info['message_mode_tx'] == 'olivos_para'
                         or temp_message_sdk.mode_rx != self.plugin_info['message_mode_tx']
                     ):
                         self.data.message = temp_message_sdk.get(self.plugin_info['message_mode_tx'])
@@ -331,6 +333,13 @@ class Event(object):
             tmp_log_level = 0
             tmp_log_message = ''
             tmp_log_message_default = 'N/A'
+            tmp_message_for_log = None
+            if self.plugin_info['func_type'] in [
+                'private_message', 'private_message_sent', 'group_message', 'group_message_sent'
+            ] and isinstance(self.data.message_sdk, OlivOS.messageAPI.Message_templet):
+                tmp_message_for_log = self._html_unescape_if_str(
+                    self.data.message_sdk.get(OlivOS.infoAPI.OlivOS_message_mode_tx_unity)
+                )
             if self.plugin_info['func_type'] == 'fake_event':
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['self', self.base_info['self_id']]
@@ -339,13 +348,13 @@ class Event(object):
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
-                    ['message', self.data.message]
+                    ['message', tmp_message_for_log if tmp_message_for_log is not None else self.data.message]
                 ])
             elif self.plugin_info['func_type'] == 'private_message_sent':
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
-                    ['message', self.data.message]
+                    ['message', tmp_message_for_log if tmp_message_for_log is not None else self.data.message]
                 ])
             elif self.plugin_info['func_type'] == 'group_message':
                 tmp_host_id = '-'
@@ -356,7 +365,7 @@ class Event(object):
                     ['group_id', self.data.group_id],
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
-                    ['message', self.data.message]
+                    ['message', tmp_message_for_log if tmp_message_for_log is not None else self.data.message]
                 ])
             elif self.plugin_info['func_type'] == 'group_message_sent':
                 tmp_host_id = '-'
@@ -367,7 +376,7 @@ class Event(object):
                     ['group_id', self.data.group_id],
                     ['nickname', self.data.sender['nickname']],
                     ['user_id', self.data.user_id],
-                    ['message', self.data.message]
+                    ['message', tmp_message_for_log if tmp_message_for_log is not None else self.data.message]
                 ])
             elif self.plugin_info['func_type'] == 'group_file_upload':
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([

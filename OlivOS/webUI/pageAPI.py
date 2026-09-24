@@ -569,7 +569,18 @@ def register_routes(host):
             cursor = host.sequence
         if not items:
             items = log_tail(host.root / 'logfile/OlivOS_logfile_unity.log', limit, level)
+            for item in items:
+                item['op_text'] = OlivOS.diagnoseAPI.format_log_message(item['text'], 'op')
+                item['cq_text'] = OlivOS.diagnoseAPI.format_log_message(item['text'], 'cq')
         return jsonify(items=items, cursor=cursor, limit=host.limit)
+
+    @app.route('/api/logs/display', methods=['GET', 'PUT'])
+    def log_display():
+        if request.method == 'PUT':
+            body = request.get_json(silent=True)
+            mode = body.get('format') if isinstance(body, dict) else None
+            OlivOS.diagnoseAPI.save_log_display_mode(mode, host.root)
+        return jsonify(format=OlivOS.diagnoseAPI.load_log_display_mode(host.root))
 
     @app.get('/api/terminals')
     def terminals():

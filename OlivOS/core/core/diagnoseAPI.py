@@ -15,11 +15,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import ctypes
-import platform
-import time
 import datetime
+import json
 import os
+import platform
+import re
 import sys
+import tempfile
+import time
+from pathlib import Path
 
 import OlivOS
 from OlivOS.core.core import API
@@ -29,6 +33,53 @@ modelName = 'diagnoseAPI'
 logfile_dir = './logfile'
 logfile_file = 'OlivOS_logfile_%s.log'
 logfile_file_unity = 'OlivOS_logfile_unity.log'
+log_display_file = 'conf/log_display.json'
+log_display_modes = ('op', 'cq')
+log_code_pattern = re.compile(r'\[(?:OP|CQ):([^\]\r\n]*)\]')
+
+
+def load_log_display_mode(root='.'):
+    try:
+        data = json.loads((Path(root) / log_display_file).read_text(encoding='utf-8'))
+        if isinstance(data, dict) and data.get('format') in log_display_modes:
+            return data['format']
+    except (OSError, ValueError, TypeError):
+        pass
+    return 'op'
+
+
+def save_log_display_mode(mode, root='.'):
+    if mode not in log_display_modes:
+        raise ValueError('Unsupported log display mode')
+    path = Path(root) / log_display_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent,
+                                         prefix='.log-display-', delete=False) as output:
+            temporary = Path(output.name)
+            json.dump({'format': mode}, output)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
+def format_log_message(message, mode):
+    if mode not in log_display_modes or not isinstance(message, str):
+        return message
+
+    def convert(match):
+        body = match.group(1)
+        if body.startswith(('at,', 'poke,')):
+            if mode == 'cq':
+                body = re.sub(r'(?<!\\),id=', ',qq=', body)
+            else:
+                body = re.sub(r'(?<!\\),qq=', ',id=', body)
+        return '[' + mode.upper() + ':' + body + ']'
+
+    return log_code_pattern.sub(convert, message)
+
 
 level_dict = {
     -1: 'TRACE',
