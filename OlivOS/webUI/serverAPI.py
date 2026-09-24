@@ -130,8 +130,6 @@ class server(OlivOS.API.Proc_templet):
             self.token = secrets.token_urlsafe(32)
             with os.fdopen(descriptor, 'w', encoding='utf-8') as token_file:
                 token_file.write(self.token)
-        if len(self.token) < 32:
-            raise ValueError('WebUI token 文件无效，请恢复或移走该文件后重新启动')
         static_override = os.environ.get('OLIVOS_WEBUI_STATIC')
         if static_override:
             self.static_path = Path(static_override).resolve()

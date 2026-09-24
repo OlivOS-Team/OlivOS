@@ -92,6 +92,21 @@ def test_token_persisted_not_regenerated(host):
     assert (host.root / 'conf/webui_token.txt').is_file()
 
 
+@pytest.mark.parametrize('token', ['1', '123456789'])
+def test_user_token_can_be_short(tmp_path, token):
+    token_path = tmp_path / 'conf/webui_token.txt'
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(token, encoding='utf-8')
+    service = serverAPI.server(root_path=tmp_path)
+    try:
+        client = service.app.test_client()
+        assert client.get('/api/status', headers={'X-Auth-Token': token}).status_code == 200
+        assert client.get('/api/status', headers={'X-Auth-Token': 'wrong'}).status_code == 401
+        assert token_path.read_text(encoding='utf-8') == token
+    finally:
+        service.on_terminate()
+
+
 @pytest.mark.parametrize('legacy_path', ['data/webui_token', 'data/webui_token.txt'])
 def test_legacy_token_is_not_used(tmp_path, legacy_path):
     legacy = tmp_path / legacy_path
