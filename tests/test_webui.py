@@ -107,6 +107,23 @@ def test_user_token_can_be_short(tmp_path, token):
         service.on_terminate()
 
 
+@pytest.mark.parametrize('token', ['', ' \n\t'])
+def test_empty_token_does_not_authorize_missing_credentials(tmp_path, token):
+    token_path = tmp_path / 'conf/webui_token.txt'
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(token, encoding='utf-8')
+    service = serverAPI.server(root_path=tmp_path)
+    try:
+        client = service.app.test_client()
+        assert client.get('/api/status').status_code == 401
+        assert client.get('/api/status', headers={'X-Auth-Token': ''}).status_code == 401
+        # WebSocket 缺失凭据同样经过此认证入口。
+        assert service.authenticate('', '127.0.0.1') == 401
+        assert token_path.read_text(encoding='utf-8') == token
+    finally:
+        service.on_terminate()
+
+
 @pytest.mark.parametrize('legacy_path', ['data/webui_token', 'data/webui_token.txt'])
 def test_legacy_token_is_not_used(tmp_path, legacy_path):
     legacy = tmp_path / legacy_path

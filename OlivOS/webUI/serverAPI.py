@@ -159,7 +159,7 @@ class server(OlivOS.API.Proc_templet):
                 attempts.popleft()
             if len(attempts) >= 10:
                 return 429
-            valid = isinstance(token, str) and (
+            valid = isinstance(token, str) and bool(token) and (
                 hmac.compare_digest(token.encode(), self.token.encode())
                 or hmac.compare_digest(token.encode(), self.browser_token.encode())
             )

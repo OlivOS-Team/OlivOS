@@ -57,6 +57,10 @@ if __name__ == '__main__':
             basic_conf='./conf/basic.json',
             patch_conf='./conf/config.json'
         ).start()
+    except SystemExit as error:
+        if error.code is not None and error.code != 0:
+            report_startup_error()
+        raise
     except Exception:
         report_startup_error()
         sys.exit(1)

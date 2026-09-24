@@ -117,7 +117,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
             preLoadPrint('init models from config ... done')
         else:
             preLoadPrint('init models from config ... failed')
-            sys.exit()
+            raise ValueError('基础配置为空，无法初始化组件，请检查 conf/basic.json')
 
         preLoadPrint('generate queue from config ... ')
         multiprocessing_dict = {}

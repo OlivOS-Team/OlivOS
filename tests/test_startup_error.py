@@ -9,12 +9,16 @@ import pytest
 
 
 @pytest.mark.parametrize('log_writable', [True, False])
-def test_windowed_startup_failure_is_visible(tmp_path, monkeypatch, log_writable):
+@pytest.mark.parametrize('error', [
+    ValueError('test startup configuration error'), SystemExit(2),
+    SystemExit('test startup failure'), SystemExit(0), SystemExit(None), KeyboardInterrupt(),
+])
+def test_windowed_startup_failure_is_visible(tmp_path, monkeypatch, log_writable, error):
     entry = Path(__file__).resolve().parents[1] / 'main.py'
     dialogs = []
 
     def fail_start():
-        raise ValueError('test startup configuration error')
+        raise error
 
     monkeypatch.setitem(sys.modules, 'OlivOS', SimpleNamespace(
         bootAPI=SimpleNamespace(Entity=lambda **kwargs: SimpleNamespace(start=fail_start))))
@@ -25,11 +29,16 @@ def test_windowed_startup_failure_is_visible(tmp_path, monkeypatch, log_writable
     monkeypatch.setattr(sys, 'stderr', None)
     if not log_writable:
         (tmp_path / 'logfile').write_text('occupied', encoding='utf-8')
-    with pytest.raises(SystemExit) as result:
+    expected = KeyboardInterrupt if isinstance(error, KeyboardInterrupt) else SystemExit
+    with pytest.raises(expected) as result:
         runpy.run_path(str(entry), run_name='__main__')
-    assert result.value.code == 1
+    if isinstance(error, KeyboardInterrupt) or isinstance(error, SystemExit) and error.code in (None, 0):
+        assert not dialogs
+        assert not list((tmp_path / 'logfile').glob('startup-error-*.log'))
+        return
+    assert result.value.code == (error.code if isinstance(error, SystemExit) else 1)
     assert len(dialogs) == 1
-    assert 'ValueError: test startup configuration error' in dialogs[0][1]
+    assert f'{type(error).__name__}: {error}' in dialogs[0][1]
     if log_writable:
         logs = list((tmp_path / 'logfile').glob('startup-error-*.log'))
         assert len(logs) == 1
