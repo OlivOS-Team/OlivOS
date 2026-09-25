@@ -452,7 +452,7 @@ def plugin_priority_revision(document):
 
 
 def save_plugin_priority_document(host, document):
-    """原子写回优先级文件；与账号保存一致，保留一份 .webui-backup。"""
+    """原子写回优先级文件，并保留一份 .webui-backup。"""
     path = host.root / PLUGIN_PRIORITY_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -677,9 +677,9 @@ def register_routes(host):
             if not isinstance(namespace, str) or not namespace:
                 raise ValueError('插件 namespace 无效')
             if priority is not None and (
-                type(priority) is not int or not -PLUGIN_PRIORITY_LIMIT <= priority <= PLUGIN_PRIORITY_LIMIT
+                type(priority) is not int or not 0 <= priority <= PLUGIN_PRIORITY_LIMIT
             ):
-                raise ValueError('优先级必须是范围内的整数')
+                raise ValueError('优先级必须是非负整数')
         document, error = load_plugin_priority_document(host)
         if document is None:
             return jsonify(error=error), 409
@@ -692,7 +692,6 @@ def register_routes(host):
                 continue
             entry = entries.get(namespace)
             if isinstance(entry, dict):
-                # 保留条目里的其他字段，为后续相对顺序扩展留出空间。
                 entry['priority'] = priority
             else:
                 entries[namespace] = {'priority': priority}

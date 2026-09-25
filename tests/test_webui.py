@@ -862,6 +862,7 @@ def test_plugin_priority_update_creates_missing_file(client, host):
     {'revision': 'stale', 'plugins': {'demo': True}},
     {'revision': 'stale', 'plugins': {'demo': 1.5}},
     {'revision': 'stale', 'plugins': {'demo': 'high'}},
+    {'revision': 'stale', 'plugins': {'demo': -1}},
 ])
 def test_plugin_priority_update_rejects_invalid_body(client, body):
     assert client.put('/api/plugins/priority', json=body).status_code == 400

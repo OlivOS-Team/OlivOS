@@ -1014,7 +1014,7 @@ function pluginEffectivePriority(namespace, plugin) {
   const info = state.pluginPriority[namespace] || {};
   return Number.isInteger(info.effective) ? info.effective : plugin[6] || 0;
 }
-// 与加载器的 (生效优先级, namespace) 排序保持一致：Python 比较字符串按码点，不能用 localeCompare。
+// 与加载器的 (生效优先级, namespace) 排序保持一致。
 function namespaceCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -1042,12 +1042,14 @@ function priorityCell(namespace, plugin, position) {
   const input = document.createElement('input');
   input.type = 'number';
   input.step = '1';
+  input.min = '0';
   input.value = String(effective);
   input.className = 'priority-input';
   input.setAttribute('aria-label', `${plugin[0]} 的优先级`);
   input.disabled = !!state.priorityError;
   const current = () => (
-    input.value !== '' && Number.isSafeInteger(Number(input.value)) ? Number(input.value) : null
+    input.value !== '' && Number.isSafeInteger(Number(input.value)) && Number(input.value) >= 0
+      ? Number(input.value) : null
   );
   const apply = button('应用', () => savePluginPriority(namespace, current()));
   const reset = button('默认', () => savePluginPriority(namespace, null));
@@ -1069,7 +1071,8 @@ function priorityCell(namespace, plugin, position) {
   return cell;
 }
 async function savePluginPriority(namespace, priority) {
-  if (priority !== null && !Number.isSafeInteger(priority)) throw new Error('请输入整数优先级');
+  if (priority !== null && (!Number.isSafeInteger(priority) || priority < 0))
+    throw new Error('优先级必须是非负整数');
   if (!state.priorityRevision) throw new Error(state.priorityError || '插件优先级文件不可编辑');
   const result = await api('/api/plugins/priority', {
     method: 'PUT',
@@ -1525,7 +1528,6 @@ async function runAction(kind, path, progress) {
 }
 async function handleEvent(item) {
   if (item.type === 'plugins') {
-    // 纯优先级调整不重载插件，只刷新列表，保留已打开的插件页面。
     if (item.priority_only) {
       await loadPlugins();
       return;

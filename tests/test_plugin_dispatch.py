@@ -196,6 +196,21 @@ def test_priority_file_missing_is_silent(tmp_path):
     assert OlivOS.pluginAPI.load_plugin_priority(str(tmp_path / 'missing.json')) == {}
 
 
+def test_priority_file_ignores_negative_value(tmp_path):
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text(json.dumps({'plugins': {'negative': {'priority': -1}}}), encoding='utf-8')
+    assert OlivOS.pluginAPI.load_plugin_priority(str(path)) == {}
+
+
+def test_negative_priority_override_is_ignored(dispatcher):
+    loader, _ = dispatcher
+    register(loader, 'alpha', Mock(), priority=30000)
+    register(loader, 'beta', Mock(), priority=20000)
+    order_list = OlivOS.pluginAPI.build_plugin_call_order(loader.plugin_models_dict, {'alpha': -1})
+    assert order_list == ['beta', 'alpha']
+    assert loader.plugin_models_dict['alpha']['priority_user'] is None
+
+
 def test_priority_file_broken_falls_back_to_defaults(tmp_path):
     path = tmp_path / 'plugin_priority.json'
     path.write_text('{not json', encoding='utf-8')

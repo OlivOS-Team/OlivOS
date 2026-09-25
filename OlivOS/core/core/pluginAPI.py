@@ -38,8 +38,6 @@ gProc = None
 plugin_priority_path = './conf/plugin_priority.json'
 plugin_priority_default = 10000
 
-# 覆盖文件由用户维护，加载器在热重载时会重新读取；
-# 锁只用于「重算并替换调用顺序」这一小段临界区，避免和 load_plugin_list 交错。
 gPluginPriorityLock = threading.RLock()
 
 
@@ -83,7 +81,7 @@ def load_plugin_priority(path=None, root='.'):
             entry_this = plugins[namespace_this]
             if type(entry_this) is dict:
                 entry_this = entry_this.get('priority')
-            if type(entry_this) is int:
+            if type(entry_this) is int and entry_this >= 0:
                 res[namespace_this] = entry_this
     except Exception:
         # traceback.print_exc()
@@ -112,7 +110,7 @@ def build_plugin_call_order(plugin_models_dict, overrides=None):
         if isinstance(priority_default_this, bool) or not isinstance(priority_default_this, (int, float)):
             priority_default_this = plugin_priority_default
         priority_user_this = overrides.get(namespace_this)
-        if type(priority_user_this) is not int:
+        if type(priority_user_this) is not int or priority_user_this < 0:
             priority_user_this = None
         priority_effective_this = priority_default_this
         if priority_user_this is not None:
@@ -649,7 +647,7 @@ class shallow(API.Proc_templet):
                     plugin_models_this.get('priority', plugin_priority_default)
                 )
                 priority_user_this = plugin_models_this.get('priority_user')
-                if type(priority_user_this) is not int:
+                if type(priority_user_this) is not int or priority_user_this < 0:
                     priority_user_this = None
                 priority_effective_this = plugin_models_this.get('priority_effective', priority_default_this)
                 tmp_plugin_order_list.append(plugin_models_this['namespace'])
@@ -1110,7 +1108,7 @@ class shallow(API.Proc_templet):
         for item in plugin_models_dict.values():
             if item['isOPK']:
                 removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
-        # 插件调用列表按照生效优先级排序；用户覆盖只影响调用顺序，不影响导入顺序。
+        # 插件调用列表按照生效优先级排序
         self.plugin_models_call_list = build_plugin_call_order(
             self.plugin_models_dict, load_plugin_priority()
         )
