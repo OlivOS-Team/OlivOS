@@ -63,7 +63,7 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | --- | --- | --- |
 | 账号配置 | `test_accounts.py` | 保存/读取、启停过滤、身份隔离、安全读取、端口分配 |
 | 消息结构 | `test_messages.py` | CQ/OP、OneBot V12、Milky、文本/提及/媒体/轻应用转换、无效输入 |
-| 插件调度 | `test_plugin_dispatch.py` | 调用顺序、阻断、平台过滤、异常捕获、未知账号和重载请求 |
+| 插件调度 | `test_plugin_dispatch.py` | 调用顺序与优先级覆盖、热重载、阻断、平台过滤、异常捕获、未知账号和重载请求 |
 | 插件 WebUI 资源 | `test_opk_webui_lifecycle.py` | 源码/OPK、路径与 namespace、init 资源、重载/卸载、文件占用、越界和链接限制 |
 | 账号与 SDK 边界 | `test_adapters.py` | 20 个适配器的账号映射、OneBot 消息/通知/请求、虚拟终端、活动时间、QQ webhook 验签 |
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
