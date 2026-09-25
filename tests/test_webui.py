@@ -86,10 +86,58 @@ def test_auth_and_rate_limit(host):
     assert host.token not in response.get_data(as_text=True)
 
 
+@pytest.mark.parametrize('path', [
+    ['password'], ['server', 'access_token'], ['extends', 'app_secret'],
+    ['extends', 'qsign-server', 0, 'key'],
+])
+def test_account_secrets_require_auth_and_are_not_cached(host, client, path):
+    bot = next(iter(host.accounts.values()))
+    expected = pageAPI.account_dict(bot)
+    assert host.app.test_client().get('/api/accounts').status_code == 401
+    response = client.get('/api/accounts')
+    actual = response.json['account'][0]
+    for key in path:
+        actual, expected = actual[key], expected[key]
+    assert actual == expected
+    assert response.headers['Cache-Control'] == 'no-store'
+
+
 def test_token_persisted_not_regenerated(host):
     other = serverAPI.server(root_path=host.root)
     assert other.token == host.token
     assert (host.root / 'conf/webui_token.txt').is_file()
+
+
+@pytest.mark.parametrize('token', ['1', '123456789'])
+def test_user_token_can_be_short(tmp_path, token):
+    token_path = tmp_path / 'conf/webui_token.txt'
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(token, encoding='utf-8')
+    service = serverAPI.server(root_path=tmp_path)
+    try:
+        client = service.app.test_client()
+        assert client.get('/api/status', headers={'X-Auth-Token': token}).status_code == 200
+        assert client.get('/api/status', headers={'X-Auth-Token': 'wrong'}).status_code == 401
+        assert token_path.read_text(encoding='utf-8') == token
+    finally:
+        service.on_terminate()
+
+
+@pytest.mark.parametrize('token', ['', ' \n\t'])
+def test_empty_token_does_not_authorize_missing_credentials(tmp_path, token):
+    token_path = tmp_path / 'conf/webui_token.txt'
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(token, encoding='utf-8')
+    service = serverAPI.server(root_path=tmp_path)
+    try:
+        client = service.app.test_client()
+        assert client.get('/api/status').status_code == 401
+        assert client.get('/api/status', headers={'X-Auth-Token': ''}).status_code == 401
+        # WebSocket 缺失凭据同样经过此认证入口。
+        assert service.authenticate('', '127.0.0.1') == 401
+        assert token_path.read_text(encoding='utf-8') == token
+    finally:
+        service.on_terminate()
 
 
 @pytest.mark.parametrize('legacy_path', ['data/webui_token', 'data/webui_token.txt'])
@@ -505,10 +553,10 @@ def test_account_roundtrip_preserves_secrets_and_emits_hot_reload(client, host):
     old = next(iter(host.accounts.values()))
     body = client.get('/api/accounts').json
     text = json.dumps(body)
-    assert old.password not in text and old.post_info.access_token not in text
-    assert old.extends['app_secret'] not in text
+    assert old.password in text and old.post_info.access_token in text
+    assert old.extends['app_secret'] in text
     row = body['account'][0]
-    assert row['password'] == pageAPI.MASK
+    assert row['password'] == old.password
     del row['password']
     del row['server']['access_token']
     row['enable'] = False

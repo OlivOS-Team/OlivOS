@@ -77,6 +77,37 @@ def test_napcat_at_keeps_metadata_out_of_match_string(qq, compatible):
     assert event.sdk_event.json['message'] == [segment]
 
 
+@pytest.mark.parametrize('kind', ['private', 'group'])
+@pytest.mark.parametrize('post_type', ['message', 'message_sent'])
+@pytest.mark.parametrize('model', OlivOS.onebotSDK.napcatModelMap)
+def test_napcat_string_face_matches_plugin_keyword(kind, post_type, model):
+    message = '[CQ:face,id=311,raw={"faceText":"&#91;打call&#93;"},chainCount=0]'
+    event = onebot_event(model=model, post_type=post_type, message_type=kind, sub_type='normal',
+                         group_id=7, user_id=42, message_id=8, message=message,
+                         raw_message=message, font=0, sender={'user_id': 42, 'nickname': 'tester'})
+    event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
+    event.get_Event_on_Plugin()
+    assert event.data.message == '[CQ:face,id=311]'
+    assert event.data.raw_message == '[CQ:face,id=311]'
+    assert event.data.extend['napcat_face_data'][0]['raw'] == '{"faceText":"[打call]"}'
+    assert event.data.extend['napcat_raw_message'] == message
+    assert event.sdk_event.json['message'] == message
+
+
+def test_napcat_string_decodes_only_after_splitting():
+    message = ('&#91;CQ:face,id=311&#93;&amp;#91;'
+               '[CQ:image,summary=&#91;动画&#93;,file=test.png,url=https://example.invalid/a?x=1&amp;y=2]'
+               '[CQ:at,qq=42,name=A&#44;B&#91;C&#93;][CQ:dice]')
+    event = onebot_event(model='napcat_default', post_type='message', message_type='group', sub_type='normal',
+                         group_id=7, user_id=42, message_id=8, message=message,
+                         raw_message=message, font=0, sender={'user_id': 42, 'nickname': 'tester'})
+    parsed = event.data.message_sdk
+    assert [item.type for item in parsed.data] == ['text', 'image', 'at', 'dice']
+    assert parsed.data[0].data['text'] == '[CQ:face,id=311]&#91;'
+    assert parsed.data[1].data['url'] == 'https://example.invalid/a?x=1&y=2'
+    assert parsed.data[2].data['name'] == 'A,B[C]'
+
+
 def test_non_napcat_keeps_original_face_and_image_fields():
     segments = [
         {'type': 'face', 'data': {'id': '311', 'raw': {'faceText': '[表情]'}}},
@@ -105,17 +136,25 @@ def test_non_napcat_keeps_original_face_and_image_fields():
     ('rps', {'result': 2}, '[CQ:rps]'),
 ])
 @pytest.mark.parametrize('post_type', ['message', 'message_sent'])
-def test_napcat_message_metadata_is_separate(kind, data, expected, post_type):
+@pytest.mark.parametrize('wire_format', ['array', 'string'])
+def test_napcat_message_metadata_is_separate(kind, data, expected, post_type, wire_format):
     segment = {'type': kind, 'data': {**data, 'raw': {'label': '[扩展],内容'}}}
+    message = [segment]
+    if wire_format == 'string':
+        segment['data'] = {key: json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value)
+                           for key, value in segment['data'].items()}
+        fields = [key + '=' + value.replace('&', '&amp;').replace('[', '&#91;')
+                  .replace(']', '&#93;').replace(',', '&#44;') for key, value in segment['data'].items()]
+        message = '[CQ:' + kind + ',' + ','.join(fields) + ']'
     event = onebot_event(model='napcat_default', post_type=post_type,
                          message_type='private', sub_type='friend', user_id=42,
-                         message_id=8, message=[segment], raw_message='', font=0,
+                         message_id=8, message=message, raw_message='', font=0,
                          sender={'user_id': 42, 'nickname': 'tester'})
     event.plugin_info.update(compatible_svn=190, message_mode_tx='old_string')
     event.get_Event_on_Plugin()
     assert event.data.message == expected
     assert event.data.extend[f'napcat_{kind}_data'] == [segment['data']]
-    assert event.data.extend['napcat_raw_message'] == [segment]
+    assert event.data.extend['napcat_raw_message'] == message
 
 
 @pytest.mark.parametrize('summary', ['[动画表情]', '[躺赢]', '', '[CQ:face,id=311]'])

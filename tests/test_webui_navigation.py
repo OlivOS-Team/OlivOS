@@ -150,22 +150,32 @@ def browser(navigation_host, tmp_path):
 
 
 @pytest.mark.browser
-def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser):
-    browser.driver.execute_script("state.draft = {server: {access_token: 'fixture-secret'}, extends: {}};"
-                                  "fieldInput({name: 'server.access_token', title: 'Token'}, $('account-fields'));")
+@pytest.mark.parametrize('field', ['password', 'server.access_token', 'appsecret', 'token', 'cookie', 'key'])
+def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser, field):
+    browser.driver.execute_script("""
+        const field = arguments[0];
+        state.draft = {password: 'fixture-secret', server: {access_token: 'fixture-secret'},
+          extends: {[field]: 'fixture-secret'}};
+        const attribute = ['password', 'server.access_token'].includes(field) ? 'data-field' : 'data-extend';
+        $('account-fields').replaceChildren();
+        fieldInput({name: field, title: 'Secret'}, $('account-fields'), attribute);
+    """, field)
     result = browser.driver.execute_async_script("""
         const done = arguments[0];
-        const input = document.querySelector('[data-field="server.access_token"]');
+        const input = document.querySelector('#account-fields input');
         const toggle = input.parentElement.querySelector('button');
         const initial = input.type;
+        const closed = toggle.innerHTML;
         toggle.click();
         setTimeout(() => {
           const shown = input.type;
+          const opened = toggle.innerHTML;
           toggle.click();
-          setTimeout(() => done([initial, shown, input.type, input.value, toggle.type]), 0);
+          setTimeout(() => done([initial, shown, input.type, input.value, toggle.type,
+            closed !== opened && toggle.innerHTML === closed]), 0);
         }, 0);
     """)
-    assert result == ['password', 'text', 'password', 'fixture-secret', 'button']
+    assert result == ['password', 'text', 'password', 'fixture-secret', 'button', True]
 
 
 @pytest.mark.browser

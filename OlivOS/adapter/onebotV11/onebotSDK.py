@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import json
 import copy
+import re
 import requests as req
 from urllib import parse
 import os
@@ -689,15 +690,42 @@ def get_Event_from_SDK(target_event):
             and target_event.base_info['type'] in ('message', 'message_sent')
             and target_event.data is not None):
         segments = target_event.sdk_event.json.get('message')
+        raw_message = copy.deepcopy(segments)
+        if isinstance(segments, str):
+            segments = parse_napcat_cq_message(segments)
         if isinstance(segments, list):
             message = get_napcat_message(segments)
             target_event.data.message_sdk = message
             target_event.data.raw_message_sdk = copy.deepcopy(message)
-            target_event.data.extend['napcat_raw_message'] = copy.deepcopy(segments)
+            target_event.data.extend['napcat_raw_message'] = raw_message
             for segment in segments:
                 if isinstance(segment, dict) and isinstance(segment.get('data'), dict):
                     key = f"napcat_{segment.get('type')}_data"
                     target_event.data.extend.setdefault(key, []).append(copy.deepcopy(segment['data']))
+
+
+def parse_napcat_cq_message(message):
+    """先切分 CQ 结构再解码，避免转义的括号、逗号改变消息边界。"""
+    def unescape(value, parameter=False):
+        if parameter:
+            value = value.replace('&#44;', ',')
+        return value.replace('&#91;', '[').replace('&#93;', ']').replace('&amp;', '&')
+
+    segments = []
+    offset = 0
+    for match in re.finditer(r'\[CQ:(\w+)((?:,[^\[\]]*)?)\]', message):
+        if match.start() > offset:
+            segments.append({'type': 'text', 'data': {'text': unescape(message[offset:match.start()])}})
+        fields = {}
+        for field in match.group(2).split(',')[1:]:
+            key, separator, value = field.partition('=')
+            if separator:
+                fields[key] = unescape(value, parameter=True)
+        segments.append({'type': match.group(1), 'data': fields})
+        offset = match.end()
+    if offset < len(message):
+        segments.append({'type': 'text', 'data': {'text': unescape(message[offset:])}})
+    return segments
 
 
 def get_napcat_message(segments):
