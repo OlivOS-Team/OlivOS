@@ -1,11 +1,3 @@
 {
-    "version": 1,
-    "plugins": {
-        "OlivaDiceCore": {
-            "priority": 100
-        },
-        "OlivaDiceOdyssey": {
-            "priority": 102
-        }
-    }
+    "version": 1
 }

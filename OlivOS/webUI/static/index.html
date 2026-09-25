@@ -218,6 +218,8 @@
             ><button id="open-plugin-folder">打开插件文件夹</button
             ><button id="reload-plugins" class="primary">重载插件</button>
           </div>
+          <p class="hint">优先级数字越小越优先，仅影响事件分发顺序，不会改变插件加载与 Init 顺序；修改后立即热生效。</p>
+          <p id="plugin-priority-error" class="hint danger" hidden></p>
           <div class="panel table-wrap">
             <table>
               <thead id="plugin-head"></thead>

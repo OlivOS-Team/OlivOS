@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from collections import deque
 from pathlib import Path
@@ -421,6 +422,54 @@ def runtime_status(host):
             'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
 
 
+PLUGIN_PRIORITY_PATH = 'conf/plugin_priority.json'
+PLUGIN_PRIORITY_LIMIT = 2 ** 31
+
+
+def load_plugin_priority_document(host):
+    """
+    读取用户优先级覆盖文件，返回 (document, error)。
+
+    document 保留文件里的全部字段，供读-改-写使用；文件缺失时给出空文档，
+    损坏时 document 为 None，避免 WebUI 随后覆盖用户原文件。
+    """
+    path = host.root / PLUGIN_PRIORITY_PATH
+    if not path.exists():
+        return {'version': 1, 'plugins': {}}, None
+    try:
+        document = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(document, dict) or not isinstance(document.get('plugins', {}), dict):
+            raise ValueError
+    except (OSError, ValueError):
+        return None, '插件优先级文件格式错误，请先修复 conf/plugin_priority.json'
+    document.setdefault('version', 1)
+    document.setdefault('plugins', {})
+    return document, None
+
+
+def plugin_priority_revision(document):
+    return hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
+
+
+def save_plugin_priority_document(host, document):
+    """原子写回优先级文件；与账号保存一致，保留一份 .webui-backup。"""
+    path = host.root / PLUGIN_PRIORITY_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.with_name(path.name + '.webui-backup').write_bytes(path.read_bytes())
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent,
+                                         prefix='.plugin-priority-', delete=False) as output:
+            temporary = Path(output.name)
+            json.dump(document, output, ensure_ascii=False, indent=4)
+            output.write('\n')
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
 def register_routes(host):
     app = host.app
 
@@ -604,8 +653,55 @@ def register_routes(host):
 
     @app.get('/api/plugins')
     def plugins():
+        document, error = load_plugin_priority_document(host)
         with host.lock:
-            return jsonify(shallow_plugin_data_dict=host.plugins, shallow_plugin_webui_list=host.plugin_pages)
+            payload = {
+                'shallow_plugin_data_dict': host.plugins,
+                'shallow_plugin_order_list': host.plugin_order,
+                'shallow_plugin_priority_dict': host.plugin_priority,
+                'shallow_plugin_webui_list': host.plugin_pages,
+                'revision': plugin_priority_revision(document) if document is not None else None,
+                'priority_error': error,
+            }
+        return jsonify(payload)
+
+    @app.put('/api/plugins/priority')
+    def plugin_priority():
+        body = request.get_json()
+        if not isinstance(body, dict) or not isinstance(body.get('revision'), str):
+            raise ValueError('提交前请读取插件列表及 revision')
+        changes = body.get('plugins')
+        if not isinstance(changes, dict) or not changes:
+            raise ValueError('没有需要保存的优先级修改')
+        for namespace, priority in changes.items():
+            if not isinstance(namespace, str) or not namespace:
+                raise ValueError('插件 namespace 无效')
+            if priority is not None and (
+                type(priority) is not int or not -PLUGIN_PRIORITY_LIMIT <= priority <= PLUGIN_PRIORITY_LIMIT
+            ):
+                raise ValueError('优先级必须是范围内的整数')
+        document, error = load_plugin_priority_document(host)
+        if document is None:
+            return jsonify(error=error), 409
+        if body['revision'] != plugin_priority_revision(document):
+            return jsonify(error='插件优先级已被其他窗口修改，请刷新后重试'), 409
+        entries = document['plugins']
+        for namespace, priority in changes.items():
+            if priority is None:
+                entries.pop(namespace, None)
+                continue
+            entry = entries.get(namespace)
+            if isinstance(entry, dict):
+                # 保留条目里的其他字段，为后续相对顺序扩展留出空间。
+                entry['priority'] = priority
+            else:
+                entries[namespace] = {'priority': priority}
+        save_plugin_priority_document(host, document)
+        host.send_control('send', {
+            'target': {'type': 'plugin', 'fliter': 'control_only'},
+            'data': {'action': 'plugin_priority_reload'},
+        })
+        return jsonify(ok=True, revision=plugin_priority_revision(document))
 
     @app.post('/api/plugins/open')
     def open_plugins():

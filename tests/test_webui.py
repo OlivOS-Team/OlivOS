@@ -772,7 +772,11 @@ def test_plugin_list_preserves_gui_and_adds_webui(host):
         'webui_root': str(host.root / 'plugin/app/demo')}}
     shallow.sendPluginList()
     packet = host.Proc_info.control_queue.get_nowait()
-    assert len(packet.key['data']['data']['shallow_plugin_data_dict']['demo']) == 7
+    payload = packet.key['data']['data']
+    assert len(payload['shallow_plugin_data_dict']['demo']) == 7
+    assert payload['shallow_plugin_order_list'] == ['demo']
+    assert payload['shallow_plugin_priority_dict']['demo']['effective'] == 1
+    assert payload['priority_only'] is False
     serverAPI.forward_packet(packet, {host.Proc_name: host})
     host.consume(host.Proc_info.rx_queue.get_nowait())
     assert host.plugin_pages[0]['namespace'] == 'demo'
@@ -783,6 +787,94 @@ def test_plugin_list_preserves_gui_and_adds_webui(host):
         host.consume(host.Proc_info.control_queue.get_nowait())
     event = host.snapshot('events')[-1]
     assert event['ready'] and event['started_at'] == shallow.Proc_data['webui_load_started']
+
+
+def write_plugin_priority(host, content):
+    path = host.root / pageAPI.PLUGIN_PRIORITY_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content if isinstance(content, str) else json.dumps(content), encoding='utf-8')
+    return path
+
+
+def test_plugin_list_reports_priority_order_and_revision(client, host):
+    write_plugin_priority(host, {'version': 1, 'plugins': {'demo': {'priority': 100}}})
+    send(host, {'action': 'update_data', 'data': {
+        'shallow_plugin_data_dict': {'demo': ['Demo', '1(1)', 'A', None, '', '', 100]},
+        'shallow_plugin_order_list': ['demo'],
+        'shallow_plugin_priority_dict': {'demo': {
+            'default': 30000, 'user': 100, 'effective': 100, 'source': 'user'}},
+    }})
+    result = client.get('/api/plugins').json
+    assert result['shallow_plugin_order_list'] == ['demo']
+    assert result['shallow_plugin_priority_dict']['demo']['effective'] == 100
+    assert result['priority_error'] is None
+    assert result['revision'] == pageAPI.plugin_priority_revision(
+        json.loads((host.root / pageAPI.PLUGIN_PRIORITY_PATH).read_text(encoding='utf-8')))
+
+
+def test_plugin_priority_update_writes_file_and_reloads_loader(client, host):
+    path = write_plugin_priority(host, {'version': 1, 'plugins': {
+        'demo': {'priority': 100, 'before': ['other']},
+        'other': {'priority': 200},
+    }})
+    revision = client.get('/api/plugins').json['revision']
+    response = client.put('/api/plugins/priority', json={
+        'revision': revision, 'plugins': {'demo': 50, 'other': None}})
+    assert response.status_code == 200
+    document = json.loads(path.read_text(encoding='utf-8'))
+    assert document['plugins']['demo'] == {'priority': 50, 'before': ['other']}
+    assert 'other' not in document['plugins']
+    assert response.json['revision'] == pageAPI.plugin_priority_revision(document)
+    assert path.with_name(path.name + '.webui-backup').exists()
+    packet = host.Proc_info.control_queue.get_nowait()
+    assert packet.action == 'send'
+    assert packet.key['target'] == {'type': 'plugin', 'fliter': 'control_only'}
+    assert packet.key['data'] == {'action': 'plugin_priority_reload'}
+
+
+def test_plugin_priority_update_rejects_stale_revision(client, host):
+    write_plugin_priority(host, {'version': 1, 'plugins': {}})
+    revision = client.get('/api/plugins').json['revision']
+    write_plugin_priority(host, {'version': 1, 'plugins': {'demo': {'priority': 1}}})
+    response = client.put('/api/plugins/priority', json={
+        'revision': revision, 'plugins': {'demo': 2}})
+    assert response.status_code == 409
+    document = json.loads((host.root / pageAPI.PLUGIN_PRIORITY_PATH).read_text(encoding='utf-8'))
+    assert document['plugins']['demo']['priority'] == 1
+
+
+def test_plugin_priority_update_creates_missing_file(client, host):
+    path = host.root / pageAPI.PLUGIN_PRIORITY_PATH
+    assert not path.exists()
+    revision = client.get('/api/plugins').json['revision']
+    response = client.put('/api/plugins/priority', json={
+        'revision': revision, 'plugins': {'demo': 100}})
+    assert response.status_code == 200
+    assert json.loads(path.read_text(encoding='utf-8')) == {
+        'version': 1, 'plugins': {'demo': {'priority': 100}}}
+
+
+@pytest.mark.parametrize('body', [
+    {'plugins': {'demo': 1}},
+    {'revision': 'stale'},
+    {'revision': 'stale', 'plugins': {}},
+    {'revision': 'stale', 'plugins': {'': 1}},
+    {'revision': 'stale', 'plugins': {'demo': True}},
+    {'revision': 'stale', 'plugins': {'demo': 1.5}},
+    {'revision': 'stale', 'plugins': {'demo': 'high'}},
+])
+def test_plugin_priority_update_rejects_invalid_body(client, body):
+    assert client.put('/api/plugins/priority', json=body).status_code == 400
+
+
+def test_plugin_priority_corrupted_file_blocks_edits(client, host):
+    path = write_plugin_priority(host, '{not json')
+    result = client.get('/api/plugins').json
+    assert result['revision'] is None and result['priority_error']
+    response = client.put('/api/plugins/priority', json={
+        'revision': 'anything', 'plugins': {'demo': 1}})
+    assert response.status_code == 409
+    assert path.read_text(encoding='utf-8') == '{not json'
 
 
 def test_packaging_and_shallow_config():
