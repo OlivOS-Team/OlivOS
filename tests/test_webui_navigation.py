@@ -1,6 +1,7 @@
 """真实浏览器验证插件分组、独立功能页面、保活及响应式侧栏。"""
 
 import os
+import json
 import queue
 import threading
 from pathlib import Path
@@ -392,3 +393,31 @@ def test_external_plugin_link_opens_separate_tab(browser):
     browser.wait.until(lambda _: len(browser.driver.window_handles) == 2)
     browser.driver.switch_to.window(browser.driver.window_handles[-1])
     browser.wait.until(lambda _: 'OK' in browser.find('body').text)
+
+
+@pytest.mark.browser
+def test_plugin_priority_editor_updates_order_and_file(browser):
+    host = browser.host
+    with host.lock:
+        host.plugin_order = ['multi', 'single']
+        host.plugin_priority = {
+            namespace: {'default': 20000, 'user': None, 'effective': 20000, 'source': 'default'}
+            for namespace in ('multi', 'single')
+        }
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+    row = browser.driver.execute_script('''
+        return [...document.querySelectorAll('#plugin-rows tr')]
+          .find(item => item.cells[0].textContent === '独立插件');
+    ''')
+    assert row is not None and '20000' in row.text
+    field = row.find_element('css selector', '.priority-input')
+    field.clear()
+    field.send_keys('100')
+    row.find_element('css selector', '.priority-editor button').click()
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        "return state.pluginPriority['single'] && state.pluginPriority['single'].effective === 100"))
+    document = json.loads((host.root / 'conf/plugin_priority.json').read_text(encoding='utf-8'))
+    assert document['plugins']['single'] == {'priority': 100}
+    assert browser.driver.execute_script('return state.pluginOrder[0]') == 'single'

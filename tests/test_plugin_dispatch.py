@@ -2,6 +2,7 @@
 
 import queue
 import json
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -20,12 +21,15 @@ def dispatcher():
     return loader, bot
 
 
-def register(loader, name, callback, support=None):
+def register(loader, name, callback, support=None, priority=30000):
     loader.plugin_models_call_list.append(name)
     loader.plugin_models_dict[name] = {
         'name': name, 'namespace': name,
         'support': support or [{'sdk': 'all', 'platform': 'all', 'model': 'all'}],
         'message_mode': 'olivos_string',
+        'priority': priority,
+        'version': '1', 'svn': 1, 'author': 'N/A', 'info': 'N/A',
+        'folder_path': '', 'menu_config': None,
         'model': SimpleNamespace(main=SimpleNamespace(Event=SimpleNamespace(group_message=callback))),
     }
 
@@ -124,3 +128,144 @@ def test_restart_request_uses_loader_queue(dispatcher):
     loader.set_restart()
     packet = loader.Proc_info.rx_queue.get_nowait()
     assert packet.action == 'restart_do' and packet.key == loader.Proc_name
+
+
+def test_call_order_without_override_matches_legacy_sort(dispatcher):
+    loader, _ = dispatcher
+    register(loader, 'beta', Mock(), priority=30000)
+    register(loader, 'alpha', Mock(), priority=30000)
+    register(loader, 'early', Mock(), priority=100)
+    order_list = OlivOS.pluginAPI.build_plugin_call_order(loader.plugin_models_dict)
+    assert order_list == ['early', 'alpha', 'beta']
+    assert loader.plugin_models_dict['alpha']['priority_default'] == 30000
+    assert loader.plugin_models_dict['alpha']['priority_user'] is None
+    assert loader.plugin_models_dict['alpha']['priority_effective'] == 30000
+
+
+def test_priority_override_only_changes_effective_order(dispatcher):
+    loader, _ = dispatcher
+    register(loader, 'alpha', Mock(), priority=30000)
+    register(loader, 'beta', Mock(), priority=20000)
+    model_before = loader.plugin_models_dict['alpha']['model']
+    loader.apply_plugin_priority(overrides={'alpha': 100})
+    assert loader.plugin_models_call_list == ['alpha', 'beta']
+    assert loader.plugin_models_dict['alpha']['priority'] == 30000
+    assert loader.plugin_models_dict['alpha']['priority_user'] == 100
+    assert loader.plugin_models_dict['alpha']['priority_effective'] == 100
+    assert loader.plugin_models_dict['alpha']['model'] is model_before
+    assert loader.plugin_models_dict['beta']['priority_user'] is None
+
+
+def test_hot_priority_change_affects_next_dispatch(dispatcher):
+    loader, bot = dispatcher
+    called = []
+    register(loader, 'alpha', lambda plugin_event, Proc: called.append('alpha'), priority=30000)
+    register(loader, 'beta', lambda plugin_event, Proc: called.append('beta'), priority=20000)
+    loader.apply_plugin_priority(overrides={})
+    loader.run_plugin(event_for(bot))
+    assert called == ['beta', 'alpha']
+    called.clear()
+    loader.apply_plugin_priority(overrides={'alpha': 100})
+    loader.run_plugin(event_for(bot))
+    assert called == ['alpha', 'beta']
+
+
+def test_priority_file_is_sparse_and_ignores_future_fields(tmp_path):
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text(json.dumps({
+        'version': 1,
+        'plugins': {
+            'valid': {'priority': 100},
+            'legacy': 200,
+            'future': {'before': ['valid']},
+        },
+    }), encoding='utf-8')
+    overrides = OlivOS.pluginAPI.load_plugin_priority(str(path))
+    assert overrides == {'valid': 100, 'legacy': 200}
+
+
+@pytest.mark.parametrize('entry', [{'priority': True}, {'priority': 'high'}, []])
+def test_priority_file_rejects_invalid_entry(tmp_path, entry):
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text(json.dumps({'version': 1, 'plugins': {'broken': entry}}), encoding='utf-8')
+    overrides = OlivOS.pluginAPI.load_plugin_priority(str(path))
+    assert overrides == {}
+
+
+def test_priority_file_missing_is_silent(tmp_path):
+    assert OlivOS.pluginAPI.load_plugin_priority(str(tmp_path / 'missing.json')) == {}
+
+
+def test_priority_file_ignores_negative_value(tmp_path):
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text(json.dumps({'plugins': {'negative': {'priority': -1}}}), encoding='utf-8')
+    assert OlivOS.pluginAPI.load_plugin_priority(str(path)) == {}
+
+
+def test_negative_priority_override_is_ignored(dispatcher):
+    loader, _ = dispatcher
+    register(loader, 'alpha', Mock(), priority=30000)
+    register(loader, 'beta', Mock(), priority=20000)
+    order_list = OlivOS.pluginAPI.build_plugin_call_order(loader.plugin_models_dict, {'alpha': -1})
+    assert order_list == ['beta', 'alpha']
+    assert loader.plugin_models_dict['alpha']['priority_user'] is None
+
+
+def test_priority_file_broken_falls_back_to_defaults(tmp_path):
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text('{not json', encoding='utf-8')
+    assert OlivOS.pluginAPI.load_plugin_priority(str(path)) == {}
+
+
+def test_priority_reload_packet_applies_file_and_notifies_gui(dispatcher, tmp_path, monkeypatch):
+    loader, _ = dispatcher
+    register(loader, 'alpha', Mock(), priority=30000)
+    register(loader, 'beta', Mock(), priority=20000)
+    path = tmp_path / 'plugin_priority.json'
+    path.write_text(json.dumps({'version': 1, 'plugins': {'alpha': {'priority': 100}}}),
+                    encoding='utf-8')
+    monkeypatch.setattr(OlivOS.pluginAPI, 'plugin_priority_path', str(path))
+    loader.on_control_rx(OlivOS.API.Control.packet('send', {
+        'data': {'action': 'plugin_priority_reload'}
+    }))
+    assert loader.plugin_models_call_list == ['alpha', 'beta']
+    packet = loader.Proc_info.control_queue.get_nowait()
+    assert packet.key['data']['action'] == 'update_data'
+    payload = packet.key['data']['data']
+    assert payload['priority_only'] is True
+    assert payload['shallow_plugin_order_list'] == ['alpha', 'beta']
+    assert payload['shallow_plugin_data_dict']['alpha'][6] == 100
+    assert payload['shallow_plugin_priority_dict']['alpha'] == {
+        'default': 30000, 'user': 100, 'effective': 100, 'source': 'user'}
+
+
+def test_load_plugin_list_applies_priority_file(tmp_path, monkeypatch, dispatcher):
+    loader, _ = dispatcher
+    loader.database = SimpleNamespace(_init_namespace=lambda namespace: None)
+    app_dir, tmp_dir = tmp_path / 'plugin/app', tmp_path / 'plugin/tmp'
+    for name, priority in (('PriorityAlpha', 30000), ('PriorityBeta', 20000)):
+        directory = app_dir / name
+        directory.mkdir(parents=True)
+        (directory / 'app.json').write_text(json.dumps({
+            'name': name, 'namespace': name, 'priority': priority,
+            'compatible_svn': OlivOS.infoAPI.OlivOS_SVN_Compatible, 'support': [],
+        }), encoding='utf-8')
+        (directory / '__init__.py').write_text('from . import main\n', encoding='utf-8')
+        (directory / 'main.py').write_text('class Event:\n    pass\n', encoding='utf-8')
+    (tmp_path / 'conf').mkdir()
+    (tmp_path / 'conf/plugin_priority.json').write_text(
+        json.dumps({'version': 1, 'plugins': {'PriorityAlpha': {'priority': 100}}}),
+        encoding='utf-8')
+    monkeypatch.setattr(OlivOS.pluginAPI, 'plugin_path', str(app_dir) + '/')
+    monkeypatch.setattr(OlivOS.pluginAPI, 'plugin_path_tmp', str(tmp_dir) + '/')
+    monkeypatch.syspath_prepend(str(app_dir))
+    try:
+        loader.load_plugin_list()
+        assert loader.plugin_models_call_list == ['PriorityAlpha', 'PriorityBeta']
+        assert loader.plugin_models_dict['PriorityAlpha']['priority'] == 30000
+        assert loader.plugin_models_dict['PriorityAlpha']['priority_user'] == 100
+        assert loader.plugin_models_dict['PriorityAlpha']['priority_effective'] == 100
+        assert loader.plugin_models_dict['PriorityBeta']['priority_user'] is None
+    finally:
+        for name in ('PriorityAlpha', 'PriorityBeta'):
+            sys.modules.pop(name, None)

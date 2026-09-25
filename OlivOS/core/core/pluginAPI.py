@@ -35,6 +35,11 @@ modelName = 'pluginAPI'
 
 gProc = None
 
+plugin_priority_path = './conf/plugin_priority.json'
+plugin_priority_default = 10000
+
+gPluginPriorityLock = threading.RLock()
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -53,6 +58,69 @@ def doOpkRemove(plugin_path, plugin_dir):
     if len(plugin_dir) > 4:
         if plugin_dir[-4:] == '.opk':
             removeDir(plugin_path + plugin_dir[:-4])
+
+
+def load_plugin_priority(path=None, root='.'):
+    """
+    读取用户优先级覆盖配置，缺省路径为 conf/plugin_priority.json。
+
+    配置文件是纯增量：只需要写被用户调整过的插件，未写到的插件
+    完全使用 app.json 中的默认优先级；文件缺失或损坏时视为没有覆盖。
+
+    Returns:
+        dict: {namespace: priority}
+    """
+    priority_path = plugin_priority_path if path is None else path
+    if not os.path.isabs(priority_path):
+        priority_path = os.path.join(root, priority_path)
+    res = {}
+    try:
+        with open(priority_path, 'r', encoding='utf-8') as priority_file:
+            plugins = json.loads(priority_file.read()).get('plugins', {})
+        for namespace_this in plugins:
+            entry_this = plugins[namespace_this]
+            if type(entry_this) is dict:
+                entry_this = entry_this.get('priority')
+            if type(entry_this) is int and entry_this >= 0:
+                res[namespace_this] = entry_this
+    except Exception:
+        # traceback.print_exc()
+        return res
+    return res
+
+
+def build_plugin_call_order(plugin_models_dict, overrides=None):
+    """
+    计算生效优先级与插件调用顺序，并把结果写回插件元数据。
+
+    排序键始终是 (生效优先级, namespace)：生效优先级 = 用户覆盖值（若有）
+    否则 app.json 默认值。
+    没有任何覆盖时，结果与历史排序 (priority, namespace) 完全一致。
+
+    Returns:
+        list: 按生效优先级升序排列的 namespace 列表
+    """
+    if overrides is None:
+        overrides = {}
+    order_list = []
+    for plugin_models_index_this in plugin_models_dict:
+        plugin_models_this = plugin_models_dict[plugin_models_index_this]
+        namespace_this = plugin_models_this.get('namespace', plugin_models_index_this)
+        priority_default_this = plugin_models_this.get('priority', plugin_priority_default)
+        if isinstance(priority_default_this, bool) or not isinstance(priority_default_this, (int, float)):
+            priority_default_this = plugin_priority_default
+        priority_user_this = overrides.get(namespace_this)
+        if type(priority_user_this) is not int or priority_user_this < 0:
+            priority_user_this = None
+        priority_effective_this = priority_default_this
+        if priority_user_this is not None:
+            priority_effective_this = priority_user_this
+        plugin_models_this['priority_default'] = priority_default_this
+        plugin_models_this['priority_user'] = priority_user_this
+        plugin_models_this['priority_effective'] = priority_effective_this
+        order_list.append((priority_effective_this, namespace_this))
+    order_list.sort()
+    return [item_this[1] for item_this in order_list]
 
 
 plugin_path = './plugin/app/'
@@ -246,6 +314,8 @@ class shallow(API.Proc_templet):
                 ):
                     if 'account_update' == packet.key['data']['action']:
                         self.set_restart()
+                    elif 'plugin_priority_reload' == packet.key['data']['action']:
+                        self.apply_plugin_priority()
 
     def set_restart(self):
         """重载插件
@@ -446,6 +516,46 @@ class shallow(API.Proc_templet):
                 ))
         self.plugin_models_call_list = new_list
 
+    def apply_plugin_priority(self, overrides=None):
+        """
+        重算插件调用顺序。
+
+        只替换 `plugin_models_call_list`，不会重新导入插件模块、不改变导入顺序；
+        `overrides=None` 时从 conf/plugin_priority.json 重新读取。
+
+        Args:
+            overrides (dict|None): {namespace: priority}，None 表示重新读取文件
+
+        Returns:
+            list: 新的调用顺序（namespace 列表）
+        """
+        if overrides is None:
+            overrides = load_plugin_priority()
+        with gPluginPriorityLock:
+            old_order_list = list(self.plugin_models_call_list)
+            self.plugin_models_call_list = build_plugin_call_order(self.plugin_models_dict, overrides)
+        if old_order_list != self.plugin_models_call_list:
+            old_index_dict = {}
+            for index_this, namespace_this in enumerate(old_order_list):
+                old_index_dict[namespace_this] = index_this
+            detail_list = []
+            for index_this, namespace_this in enumerate(self.plugin_models_call_list):
+                if old_index_dict.get(namespace_this) != index_this:
+                    detail_list.append('%s %s->%s' % (
+                        namespace_this,
+                        old_index_dict.get(namespace_this, '?'),
+                        index_this
+                    ))
+            self.log(2, OlivOS.L10NAPI.getTrans(
+                'OlivOS plugin shallow [{0}] priority order applied: {1}', [
+                    self.Proc_name,
+                    ', '.join(detail_list[:20])
+                ],
+                modelName
+            ))
+        self.sendPluginList(priority_only=True)
+        return self.plugin_models_call_list
+
     def run_plugin_data_release(self):
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
@@ -521,15 +631,32 @@ class shallow(API.Proc_templet):
                 ))
         return
 
-    def sendPluginList(self, ready=False):
+    def sendPluginList(self, ready=False, priority_only=False):
         tmp_plugin_list_send = []
         tmp_plugin_dict_send = {}
         tmp_plugin_webui_send = []
         tmp_plugin_webui_roots = {}
         tmp_plugin_webui_paths = {}
+        tmp_plugin_order_list = []
+        tmp_plugin_priority_dict = {}
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
                 plugin_models_this = self.plugin_models_dict[plugin_models_index_this]
+                priority_default_this = plugin_models_this.get(
+                    'priority_default',
+                    plugin_models_this.get('priority', plugin_priority_default)
+                )
+                priority_user_this = plugin_models_this.get('priority_user')
+                if type(priority_user_this) is not int or priority_user_this < 0:
+                    priority_user_this = None
+                priority_effective_this = plugin_models_this.get('priority_effective', priority_default_this)
+                tmp_plugin_order_list.append(plugin_models_this['namespace'])
+                tmp_plugin_priority_dict[plugin_models_this['namespace']] = {
+                    'default': priority_default_this,
+                    'user': priority_user_this,
+                    'effective': priority_effective_this,
+                    'source': 'user' if priority_user_this is not None else 'default'
+                }
                 webui_config = plugin_models_this.get('webui_config')
                 if isinstance(webui_config, list):
                     for entry in webui_config:
@@ -575,7 +702,7 @@ class shallow(API.Proc_templet):
                     tmp_plugin_list_this,
                     plugin_models_this['info'],
                     plugin_models_this.get('folder_path', ''),
-                    plugin_models_this['priority']
+                    priority_effective_this
                 ]
         self.sendControlEvent('send', {
             'target': {
@@ -588,9 +715,12 @@ class shallow(API.Proc_templet):
                     'load_started': self.Proc_data.get('webui_load_started', 0),
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
                     'shallow_plugin_data_dict': tmp_plugin_dict_send,
+                    'shallow_plugin_order_list': tmp_plugin_order_list,
+                    'shallow_plugin_priority_dict': tmp_plugin_priority_dict,
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,
                     'shallow_plugin_webui_roots': tmp_plugin_webui_roots,
-                    'shallow_plugin_webui_paths': tmp_plugin_webui_paths
+                    'shallow_plugin_webui_paths': tmp_plugin_webui_paths,
+                    'priority_only': priority_only
                 }
             }
         }
@@ -978,12 +1108,10 @@ class shallow(API.Proc_templet):
         for item in plugin_models_dict.values():
             if item['isOPK']:
                 removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
-        # 插件调用列表按照优先级排序
-        plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
-                                             key=lambda i: (i['priority'], i['namespace']))
-        self.plugin_models_call_list = []
-        for namespace_this in plugin_models_call_list_tmp:
-            self.plugin_models_call_list.append(namespace_this['namespace'])
+        # 插件调用列表按照生效优先级排序
+        self.plugin_models_call_list = build_plugin_call_order(
+            self.plugin_models_dict, load_plugin_priority()
+        )
         self.log(2, OlivOS.L10NAPI.getTrans(
             'Total count [{0}] OlivOS plugin is loaded by OlivOS plugin shallow [{1}]',
             [total_models_count, self.Proc_name],

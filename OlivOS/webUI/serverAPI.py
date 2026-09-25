@@ -106,6 +106,8 @@ class server(OlivOS.API.Proc_templet):
         self.sequence = 0
         self.terminals = {}
         self.plugins = {}
+        self.plugin_order = []
+        self.plugin_priority = {}
         self.plugin_pages = []
         self.plugin_roots = {}
         self.plugin_webui_paths = {}
@@ -255,6 +257,8 @@ class server(OlivOS.API.Proc_templet):
             update = data.get('data', {})
             with self.lock:
                 self.plugins = copy.deepcopy(update.get('shallow_plugin_data_dict', {}))
+                self.plugin_order = copy.deepcopy(update.get('shallow_plugin_order_list', []))
+                self.plugin_priority = copy.deepcopy(update.get('shallow_plugin_priority_dict', {}))
                 self.plugin_pages = copy.deepcopy(update.get('shallow_plugin_webui_list', []))
                 roots = update.get('shallow_plugin_webui_roots', {})
                 if roots or update.get('ready'):
@@ -264,6 +268,7 @@ class server(OlivOS.API.Proc_templet):
                     self.plugin_webui_paths = copy.deepcopy(update.get('shallow_plugin_webui_paths', {}))
                     self.prune_plugin_cache()
             self.publish('events', {'type': 'plugins', 'ready': update.get('ready', False),
+                                    'priority_only': update.get('priority_only', False),
                                     'started_at': update.get('load_started', 0)})
         elif action in TERMINAL_TYPES and data.get('hash'):
             bot_hash = data['hash']

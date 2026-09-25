@@ -45,6 +45,10 @@ const state = {
   revision: '',
   schema: null,
   plugins: {},
+  pluginOrder: [],
+  pluginPriority: {},
+  priorityRevision: '',
+  priorityError: '',
   pages: [],
   collapsedPluginGroups: new Set(),
   terminals: [],
@@ -998,33 +1002,119 @@ function safeURL(value) {
 async function loadPlugins() {
   const result = await api('/api/plugins');
   state.plugins = result.shallow_plugin_data_dict;
+  state.pluginOrder = result.shallow_plugin_order_list || [];
+  state.pluginPriority = result.shallow_plugin_priority_dict || {};
+  state.priorityRevision = result.revision || '';
+  state.priorityError = result.priority_error || '';
   state.pages = result.shallow_plugin_webui_list;
   renderPlugins();
   renderPluginNavigation();
 }
+function pluginEffectivePriority(namespace, plugin) {
+  const info = state.pluginPriority[namespace] || {};
+  return Number.isInteger(info.effective) ? info.effective : plugin[6] || 0;
+}
+// 与加载器的 (生效优先级, namespace) 排序保持一致。
+function namespaceCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function pluginEntries() {
+  const rank = new Map(state.pluginOrder.map((namespace, index) => [namespace, index]));
+  const fallback = (namespace, plugin) => state.pluginOrder.length + pluginEffectivePriority(namespace, plugin);
+  return Object.entries(state.plugins).sort((a, b) => {
+    const left = rank.has(a[0]) ? rank.get(a[0]) : fallback(a[0], a[1]);
+    const right = rank.has(b[0]) ? rank.get(b[0]) : fallback(b[0], b[1]);
+    return left - right || namespaceCompare(a[0], b[0]);
+  });
+}
+function sortedPluginOrder() {
+  return Object.keys(state.plugins).sort(
+    (a, b) => pluginEffectivePriority(a, state.plugins[a]) - pluginEffectivePriority(b, state.plugins[b]) ||
+      namespaceCompare(a, b),
+  );
+}
+function priorityCell(namespace, plugin, position) {
+  const info = state.pluginPriority[namespace] || {};
+  const effective = pluginEffectivePriority(namespace, plugin);
+  const user = Number.isInteger(info.user) ? info.user : null;
+  const cell = element('td', null, { class: 'priority-cell' });
+  const editor = element('div', null, { class: 'priority-editor' });
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '1';
+  input.min = '0';
+  input.value = String(effective);
+  input.className = 'priority-input';
+  input.setAttribute('aria-label', `${plugin[0]} 的优先级`);
+  input.disabled = !!state.priorityError;
+  const current = () => (
+    input.value !== '' && Number.isSafeInteger(Number(input.value)) && Number(input.value) >= 0
+      ? Number(input.value) : null
+  );
+  const apply = button('应用', () => savePluginPriority(namespace, current()));
+  const reset = button('默认', () => savePluginPriority(namespace, null));
+  apply.disabled = true;
+  reset.disabled = user === null || !!state.priorityError;
+  input.addEventListener('input', () => {
+    apply.disabled = current() === null || current() === effective;
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !apply.disabled) apply.click();
+  });
+  editor.append(input, apply, reset);
+  cell.append(editor);
+  const source = element('span', null, { class: 'priority-source' });
+  source.textContent = user === null
+    ? `第 ${position + 1} 位 · 默认 ${info.default ?? effective}`
+    : `第 ${position + 1} 位 · 用户 ${user}（默认 ${info.default ?? '—'}）`;
+  cell.append(source);
+  return cell;
+}
+async function savePluginPriority(namespace, priority) {
+  if (priority !== null && (!Number.isSafeInteger(priority) || priority < 0))
+    throw new Error('优先级必须是非负整数');
+  if (!state.priorityRevision) throw new Error(state.priorityError || '插件优先级文件不可编辑');
+  const result = await api('/api/plugins/priority', {
+    method: 'PUT',
+    body: { revision: state.priorityRevision, plugins: { [namespace]: priority } },
+  });
+  state.priorityRevision = result.revision || '';
+  const info = { ...(state.pluginPriority[namespace] || {}) };
+  info.default = info.default ?? state.plugins[namespace]?.[6] ?? 0;
+  info.user = priority;
+  info.effective = priority === null ? info.default : priority;
+  info.source = priority === null ? 'default' : 'user';
+  state.pluginPriority[namespace] = info;
+  state.pluginOrder = sortedPluginOrder();
+  renderPlugins();
+  notify(priority === null ? '已恢复默认优先级' : `优先级已更新为 ${priority}，正在热生效`);
+}
 function renderPlugins() {
   const header = element('tr');
-  for (const text of [...(state.showPath ? ['路径'] : []), '插件', '版本', '作者', '操作'])
+  for (const text of [...(state.showPath ? ['路径'] : []), '插件', '版本', '作者', '优先级', '操作'])
     header.append(element('th', text));
   $('plugin-head').replaceChildren(header);
   $('plugin-rows').replaceChildren();
-  const plugins = Object.entries(state.plugins).sort((a, b) => (a[1][6] || 0) - (b[1][6] || 0));
-  for (const [namespace, plugin] of plugins) {
+  $('plugin-priority-error').hidden = !state.priorityError;
+  $('plugin-priority-error').textContent = state.priorityError || '';
+  const plugins = pluginEntries();
+  plugins.forEach(([namespace, plugin], position) => {
     const row = element('tr');
     if (state.showPath)
       row.append(
         element('td', `/${plugin[5] ? `${plugin[5].replaceAll('\\', '/')}/` : ''}${namespace}`),
       );
     row.append(element('td', plugin[0]), element('td', plugin[1]), element('td', plugin[2]));
+    row.append(priorityCell(namespace, plugin, position));
     const cell = element('td');
     cell.append(button('菜单', () => pluginMenu(namespace)));
     row.append(cell);
     row.ondblclick = () => pluginMenu(namespace);
     $('plugin-rows').append(row);
-  }
+  });
   if (!plugins.length) {
     const row = element('tr');
-    row.append(element('td', '暂无已加载的插件。', { colspan: state.showPath ? 5 : 4 }));
+    row.append(element('td', '暂无已加载的插件。', { colspan: state.showPath ? 6 : 5 }));
     $('plugin-rows').append(row);
   }
   $('toggle-path').textContent = state.showPath ? '隐藏路径' : '显示路径';
@@ -1438,6 +1528,10 @@ async function runAction(kind, path, progress) {
 }
 async function handleEvent(item) {
   if (item.type === 'plugins') {
+    if (item.priority_only) {
+      await loadPlugins();
+      return;
+    }
     // The loader broadcasts an empty list before it is ready. Keep the current
     // iframe and navigation intact until the replacement plugins have loaded.
     if (!item.ready) return;
