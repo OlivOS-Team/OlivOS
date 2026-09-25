@@ -844,6 +844,8 @@ class server(OlivOS.API.Proc_templet):
                                   )
 
     def sendControlEventSend(self, action, data):
+        if action == 'send' and data.get('target', {}).get('type') == 'nativeWinUI':
+            data['data']['account_platform'] = self.Proc_data['bot_info_dict'].platform.copy()
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet(
@@ -1091,6 +1093,8 @@ def accountFix(bot_info_dict, logger_proc):
     releaseDir('./conf/gocqhttp')
     for bot_info_dict_this in bot_info_dict:
         bot_hash = bot_info_dict_this
+        if getattr(bot_info_dict[bot_hash], 'enable', True) is not True:
+            continue
         if (
             bot_info_dict[bot_hash].platform['sdk'] == 'onebot'
             and bot_info_dict[bot_hash].platform['platform'] == 'qq'

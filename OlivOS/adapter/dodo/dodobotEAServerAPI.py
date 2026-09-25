@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import time
 import json
+import multiprocessing
 import websockets
 import asyncio
 import requests as req
@@ -39,8 +40,30 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['debug_mode'] = debug_mode
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['platform_bot_info_dict'] = None
+        self._active_links = multiprocessing.Value('i', 0)
+
+    @property
+    def active_links(self):
+        return self._active_links.value
+
+    @property
+    def status_bot_info(self):
+        """供 WebUI 使用：只统计由本适配器负责的账号。"""
+        bot_info_dict = self.Proc_data['bot_info_dict']
+        if type(bot_info_dict) is not dict:
+            return {}
+        return {
+            bot_hash: bot for bot_hash, bot in bot_info_dict.items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'dodobot_ea'
+        }
 
     def run(self):
+        if type(self.Proc_data['bot_info_dict']) is not dict or not any(
+            getattr(bot_info_this, 'enable', True) is True
+            and bot_info_this.platform['sdk'] == 'dodobot_ea'
+            for bot_info_this in self.Proc_data['bot_info_dict'].values()
+        ):
+            return
         self.log(2, 'OlivOS dodobot ea server [' + self.Proc_name + '] is running')
         while True:
             headers = {
@@ -48,7 +71,8 @@ class server(OlivOS.API.Proc_templet):
                 'User-Agent': 'OlivOS/0.0.1'
             }
             msg_res = req.request("GET", OlivOS.dodobotEASDK.post_host + ':' + str(
-                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='')
+                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='',
+                timeout=OlivOS.webTool.OlivOS_http_timeout)
             try:
                 msg_res_obj = json.loads(msg_res.text)
                 if 'Code' in msg_res_obj:
@@ -66,17 +90,19 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
-                asyncio.get_event_loop().run_until_complete(self.run_websockets_rx_connect())
+                asyncio.run(self.run_websockets_rx_connect())
             time.sleep(self.Proc_info.scan_interval)
 
     def run_websockets_rx_connect_start(self):
-        asyncio.get_event_loop().run_until_complete(self.run_websockets_rx_connect())
+        asyncio.run(self.run_websockets_rx_connect())
 
     async def run_websockets_rx_connect(self):
         while True:
             try:
                 async with websockets.connect(OlivOS.dodobotEASDK.websocket_host + ':' + str(
                         OlivOS.dodobotEASDK.websocket_port)) as websocket:
+                    with self._active_links.get_lock():
+                        self._active_links.value += 1
                     while True:
                         tmp_recv_pkg = None
                         tmp_recv_pkg_data = None
@@ -98,6 +124,11 @@ class server(OlivOS.API.Proc_templet):
                         if tmp_recv_pkg_data is not None:
                             for bot_info_this in self.Proc_data['bot_info_dict']:
                                 bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+                                if (
+                                    getattr(bot_info_this_obj, 'enable', True) is not True
+                                    or bot_info_this_obj.platform['sdk'] != 'dodobot_ea'
+                                ):
+                                    continue
                                 if bot_info_this_obj.id in self.Proc_data['platform_bot_info_dict']:
                                     sdk_bot_info_this = OlivOS.dodobotEASDK.get_SDK_bot_info_from_Plugin_bot_info(
                                         bot_info_this_obj,
@@ -109,3 +140,6 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 time.sleep(self.Proc_info.scan_interval)
                 tmp_recv_pkg_data = None
+            finally:
+                with self._active_links.get_lock():
+                    self._active_links.value = max(0, self._active_links.value - 1)

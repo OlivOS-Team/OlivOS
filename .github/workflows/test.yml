@@ -1,0 +1,90 @@
+name: Test
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  functional:
+    name: Functional tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-26-intel]
+    env:
+      PYSTRAY_BACKEND: dummy
+      OLIVOS_WEBUI_BROWSER: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Verify macOS runner architecture
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          expected=${{ matrix.os == 'macos-26-intel' && 'x86_64' || 'arm64' }}
+          actual=$(uname -m)
+          if [[ $actual != $expected ]]; then
+            echo macOS运行器架构不匹配：预期$expected，实际$actual >&2
+            exit 1
+          fi
+      - name: Install test dependencies
+        run: python -m pip install ".[test${{ runner.os == 'Windows' && ',win' || '' }}]"
+      - name: Setup Chrome for browser tests
+        if: matrix.os == 'ubuntu-latest'
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+      - name: Configure browser paths
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "OLIVOS_CHROME_BINARY=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+          echo "OLIVOS_CHROMEDRIVER=${{ steps.chrome.outputs.chromedriver-path }}" >> "$GITHUB_ENV"
+      - name: Verify Chrome startup and capture diagnostics
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          mkdir -p test-results
+          probe_profile=$(mktemp -d)
+          if timeout 20s "$OLIVOS_CHROME_BINARY" --headless=new --no-first-run \
+            --user-data-dir="$probe_profile" --dump-dom about:blank \
+            > test-results/chrome-startup.html 2> test-results/chrome-startup.log; then
+            exit 0
+          fi
+          cat test-results/chrome-startup.log
+          # Ubuntu AppArmor can deny namespaces to the downloaded Chrome for Testing binary.
+          # Limit this fallback to the disposable CI browser, and only a confirmed sandbox failure.
+          if ! grep -Eiq 'No usable sandbox|Failed to move to new namespace|Running as root without --no-sandbox' \
+            test-results/chrome-startup.log; then
+            exit 1
+          fi
+          # Selenium verifies the fallback by opening real sessions; dump-dom can wait on
+          # background services in headless runners even after the browser has started.
+          echo 'OLIVOS_CHROME_NO_SANDBOX=1' >> "$GITHUB_ENV"
+      - name: Run functional tests with line and branch coverage
+        run: >-
+          python -m pytest --cov=OlivOS --cov-branch --cov-context=test
+          --cov-report=term --cov-report=xml:test-results/coverage.xml
+          --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json
+          --junitxml=test-results/junit.xml
+      - name: Summarize coverage
+        if: always()
+        run: python script/coverage_summary.py test-results/coverage.json
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: |
+            test-results/
+            .coverage
+          include-hidden-files: true

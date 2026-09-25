@@ -19,6 +19,15 @@ import platform
 if platform.system() == 'Windows':
     import winreg
 
+# 出站 HTTP 请求的默认超时,格式为 (connect, read) 秒。
+# requests 的 timeout 默认是 None,即「一直等」:连上之后对端不响应、或响应体
+# 传到一半卡住,都会永久阻塞。OlivOS 的 link 进程与 webhook 服务普遍基于 gevent
+# 且未 monkey patch,一次挂起会冻结整个进程(webhook 侧还会连带拖过开放平台
+# 3 秒 ACK 期限),因此所有出站调用都必须显式带上超时。
+OlivOS_http_timeout = (5.0, 20.0)
+# 上传/下载等涉及较大响应体的请求,给更宽的读超时
+OlivOS_http_timeout_transfer = (5.0, 60.0)
+
 
 def get_system_proxy():
     res = None

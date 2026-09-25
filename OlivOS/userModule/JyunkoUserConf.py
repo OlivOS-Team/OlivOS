@@ -114,9 +114,9 @@ def setGroupConf(group_id: 'int|str', keyConf: str, val: Any):
         writeInto(FILE_NAME, originalConf)
     tmpConf = readOut(FILE_NAME)
     try:
-        tmpLst = tmpConf[0]["gid"][str(group_id)]
+        tmpLst = tmpConf[1]["gid"][str(group_id)]
     except KeyError:
-        tmpLst = tmpConf[0]["gid"][str(group_id)] = {}
+        tmpLst = tmpConf[1]["gid"][str(group_id)] = {}
     tmpLst[keyConf] = val
     # TODO(简律纯/2022年12月9日): 多配置项的更改.
     writeInto(FILE_NAME, tmpConf)

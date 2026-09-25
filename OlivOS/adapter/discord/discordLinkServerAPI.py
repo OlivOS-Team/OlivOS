@@ -161,6 +161,9 @@ def accountFix(bot_info_dict, logger_proc):
     res = {}
     for bot_info_dict_this in bot_info_dict:
         bot_hash = bot_info_dict_this
+        if getattr(bot_info_dict[bot_hash], 'enable', True) is not True:
+            res[bot_hash] = bot_info_dict[bot_hash]
+            continue
         if bot_info_dict[bot_hash].platform['sdk'] == 'discord_link':
             this_msg = OlivOS.discordSDK.API.getMe(
                 OlivOS.discordSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
@@ -182,6 +185,7 @@ def accountFix(bot_info_dict, logger_proc):
             except Exception:
                 logger_proc.log(3, '[discord] account [' + str(
                     bot_info_dict[bot_hash].id) + '] not hit:\n' + traceback.format_exc())
+                res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
                 continue
         else:
             res[bot_info_dict_this] = bot_info_dict[bot_info_dict_this]

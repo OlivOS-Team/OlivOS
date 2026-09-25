@@ -41,6 +41,13 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_token_life_counter'] = 1000
         self.Proc_data['bot_info_token_life'] = {}
         self.Proc_data['bot_info_island_list'] = {}
+        self.activity = OlivOS.API.accountActivity({
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'fanbook_poll'
+        })
+
+    def account_activity(self):
+        return self.activity.snapshot()
 
     def run(self):
         self.log(2, 'OlivOS fanbook poll server [' + self.Proc_name + '] is running')
@@ -70,6 +77,8 @@ class server(OlivOS.API.Proc_templet):
                     self.log(3, skip_result, [
                         ('fanbookPollServer', 'default')
                     ])
+                else:
+                    self.activity.mark(bot_info_this)
                 if not flag_not_attach and not flag_first:
                     if bot_info_this in self.Proc_data['bot_info_first']:
                         try:
@@ -104,6 +113,9 @@ def accountFix(bot_info_dict, logger_proc):
     res = {}
     for bot_info_dict_this in bot_info_dict:
         bot_hash = bot_info_dict_this
+        if getattr(bot_info_dict[bot_hash], 'enable', True) is not True:
+            res[bot_hash] = bot_info_dict[bot_hash]
+            continue
         if bot_info_dict[bot_hash].platform['sdk'] == 'fanbook_poll':
             this_msg = OlivOS.fanbookSDK.API.getMe(
                 OlivOS.fanbookSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_dict[bot_hash]))
@@ -136,6 +148,7 @@ def accountFix(bot_info_dict, logger_proc):
                 continue
             except Exception:
                 logger_proc.log(2, '[fanbook] account [' + str(bot_info_dict[bot_hash].id) + '] not hit')
+                res[bot_info_dict[bot_hash].hash] = bot_info_dict[bot_hash]
                 continue
         else:
             res[bot_info_dict_this] = bot_info_dict[bot_info_dict_this]

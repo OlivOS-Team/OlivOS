@@ -18,5 +18,11 @@ from . import (
     qqGuildLinkServerAPI,
     qqGuildSDK,
     qqGuildv2LinkServerAPI,
+    qqGuildv2WebhookServerAPI,
     qqGuildv2SDK,
+    qqGuildv2SDKCommon,
+    qqGuildv2SDKGroup,
+    qqGuildv2SDKGuild,
+    qqGuildv2SDKGuildPrivate,
+    qqGuildv2SDKPrivate,
 )

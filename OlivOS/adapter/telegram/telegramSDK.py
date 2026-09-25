@@ -86,7 +86,10 @@ class send_telegram_post_json_T(object):
                 'Content-Type': 'application/json',
                 'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
             }
-            msg_res = req.request("POST", send_url, headers=headers, data=json_str_tmp)
+            msg_res = req.request(
+                "POST", send_url, headers=headers, data=json_str_tmp,
+                timeout=OlivOS.webTool.OlivOS_http_timeout
+            )
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:

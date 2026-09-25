@@ -41,6 +41,8 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
+        if not self.isAccountEnabled():
+            return
         self.log(2, 'OlivOS dodobot ea tx server [' + self.Proc_name + '] is running')
         while True:
             headers = {
@@ -48,7 +50,8 @@ class server(OlivOS.API.Proc_templet):
                 'User-Agent': 'OlivOS/0.0.1'
             }
             msg_res = req.request("GET", OlivOS.dodobotEASDK.post_host + ':' + str(
-                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='')
+                OlivOS.dodobotEASDK.post_port) + '/GetAccounts', headers=headers, data='',
+                timeout=OlivOS.webTool.OlivOS_http_timeout)
             try:
                 msg_res_obj = json.loads(msg_res.text)
                 if 'Code' in msg_res_obj:
@@ -66,7 +69,7 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 self.Proc_data['platform_bot_info_dict'] = None
             if self.Proc_data['platform_bot_info_dict'] is not None:
-                asyncio.get_event_loop().run_until_complete(self.run_websockets_tx_connect())
+                asyncio.run(self.run_websockets_tx_connect())
             time.sleep(self.Proc_info.scan_interval)
 
     class rx_packet(object):
@@ -75,7 +78,7 @@ class server(OlivOS.API.Proc_templet):
             self.data = data
 
     def run_websockets_tx_connect_start(self):
-        asyncio.get_event_loop().run_until_complete(self.run_websockets_tx_connect())
+        asyncio.run(self.run_websockets_tx_connect())
 
     async def run_websockets_tx_connect(self):
         while True:
@@ -90,6 +93,8 @@ class server(OlivOS.API.Proc_templet):
                                 rx_packet_data = self.Proc_info.rx_queue.get(block=False)
                                 if rx_packet_data.pkg_type == 'send':
                                     rx_packet_data_data = rx_packet_data.data
+                                    if not self.isAccountEnabled(rx_packet_data_data['Account']['Uid']):
+                                        continue
                                     if (
                                         rx_packet_data_data['Account']['Uid']
                                         in self.Proc_data['platform_bot_info_dict']
@@ -106,3 +111,13 @@ class server(OlivOS.API.Proc_templet):
             except Exception:
                 time.sleep(self.Proc_info.scan_interval)
                 continue
+
+    def isAccountEnabled(self, account_id=None):
+        if type(self.Proc_data['bot_info_dict']) is not dict:
+            return False
+        return any(
+            getattr(bot_info_this, 'enable', True) is True
+            and bot_info_this.platform['sdk'] == 'dodobot_ea'
+            and (account_id is None or str(bot_info_this.id) == str(account_id))
+            for bot_info_this in self.Proc_data['bot_info_dict'].values()
+        )

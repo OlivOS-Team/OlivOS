@@ -14,19 +14,15 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-import tkinter
 import base64
-import os
-import hashlib
-import random
-import shutil
-import platform
-import traceback
-import json
 import copy
-
-from tkinter import ttk
-from tkinter import messagebox
+import hashlib
+import os
+import platform
+import shutil
+import tkinter
+import traceback
+from tkinter import messagebox, ttk
 
 import OlivOS
 
@@ -129,7 +125,8 @@ class HostUI(object):
         self.rootMode = rootMode
         self.control_queue = control_queue
         self.res = False
-        self.UIData['Account_data'] = Account_data
+        # 运行中的编辑使用独立草稿，取消窗口时不能修改宿主账号对象。
+        self.UIData['Account_data'] = copy.deepcopy(Account_data) if asaycMode else Account_data
         self.UIData['flag_commit'] = False
         self.UIConfig.update(dictColorContext)
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
@@ -151,17 +148,44 @@ class HostUI(object):
         )
         self.UIObject['root'].configure(bg=self.UIConfig['color_001'])
 
-        self.UIObject['tree'] = ttk.Treeview(self.UIObject['root'])
+        self.UIObject['tree_style'] = ttk.Style(self.UIObject['root'])
+        self.UIObject['tree_style_name'] = 'OlivOSAccount.Treeview'
+        self.UIObject['tree_style'].configure(
+            self.UIObject['tree_style_name'],
+            rowheight=21
+        )
+        self.UIObject['tree_style'].map(
+            self.UIObject['tree_style_name'],
+            foreground=[('selected', '#FFFFFF')]
+        )
+        self.UIObject['tree'] = ttk.Treeview(
+            self.UIObject['root'],
+            style=self.UIObject['tree_style_name']
+        )
+        self.UIObject['tree_switch_dict'] = {}
         self.UIObject['tree']['show'] = 'headings'
         # self.UIObject['tree']['columns'] = ('ID', 'PLATFORM', 'SDK', 'MODEL')
-        self.UIObject['tree']['columns'] = ('ID', 'TYPE')
-        self.UIObject['tree'].column('ID', width=200)
-        self.UIObject['tree'].column('TYPE', width=200)
+        self.UIObject['tree']['columns'] = ('ENABLE', 'ID', 'TYPE')
+        self.UIObject['tree'].column(
+            'ENABLE',
+            width=69,
+            minwidth=69,
+            stretch=False,
+            anchor='center'
+        )
+        self.UIObject['tree'].column('ID', width=180)
+        self.UIObject['tree'].column('TYPE', width=230)
         # self.UIObject['tree'].column('PLATFORM', width=100)
         # self.UIObject['tree'].column('SDK', width=100)
         # self.UIObject['tree'].column('MODEL', width=100)
+        self.UIObject['tree'].heading('ENABLE', text='启用')
         self.UIObject['tree'].heading('ID', text='ID')
         self.UIObject['tree'].heading('TYPE', text='账号类型')
+        self.UIObject['tree'].tag_configure('account_disabled', foreground='#888888')
+        self.UIObject['tree'].bind('<<TreeviewSelect>>', self.tree_update_selected_color)
+        self.UIObject['tree'].bind('<Configure>', self.tree_switch_scroll, add='+')
+        # 固定启用列宽度，保留其他列的手动调整能力
+        self.UIObject['tree'].bind('<ButtonPress-1>', self.tree_block_enable_resize, add='+')
         # self.UIObject['tree'].heading('PLATFORM', text='PLATFORM')
         # self.UIObject['tree'].heading('SDK', text='SDK')
         # self.UIObject['tree'].heading('MODEL', text='MODEL')
@@ -176,7 +200,7 @@ class HostUI(object):
         self.UIObject['tree_yscroll'] = ttk.Scrollbar(
             self.UIObject['root'],
             orient="vertical",
-            command=self.UIObject['tree'].yview
+            command=self.tree_yview
         )
         self.UIObject['tree_yscroll'].place(
             x=500,
@@ -185,7 +209,7 @@ class HostUI(object):
             height=350
         )
         self.UIObject['tree'].configure(
-            yscrollcommand=self.UIObject['tree_yscroll'].set
+            yscrollcommand=self.tree_yscroll_set
         )
 
         self.tree_UI_Button_init(
@@ -260,8 +284,8 @@ class HostUI(object):
             font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_first_root_label_note_new'].place(
-            x=int(518/2 - 518/2),
-            y=int(400/2/2 + 20 - 200/2),
+            x=int(518 / 2 - 518 / 2),
+            y=int(400 / 2 / 2 + 20 - 200 / 2),
             width=518,
             height=200
         )
@@ -270,8 +294,8 @@ class HostUI(object):
             name='root_frame_first_root_Button_FIRST_NEW',
             text='创建一个账号',
             command=lambda: self.tree_edit('create'),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_first_root'
@@ -344,8 +368,8 @@ class HostUI(object):
             font=('等线', 16, 'bold')
         )
         self.UIObject['root_frame_skip_root_label_note_commit'].place(
-            x=int(518/2 - 518/2),
-            y=int(400/2/2 - 200/2),
+            x=int(518 / 2 - 518 / 2),
+            y=int(400 / 2 / 2 - 200 / 2),
             width=518,
             height=200
         )
@@ -354,8 +378,8 @@ class HostUI(object):
             name='root_frame_skip_root_Button_FIRST_COMMIT',
             text='是的，我要直接启动',
             command=lambda: self.account_data_commit(),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_skip_root'
@@ -366,8 +390,8 @@ class HostUI(object):
             name='root_frame_skip_root_Button_FIRST_COMMIT_BACK',
             text='我点错了，让我回去',
             command=lambda: self.frame_hide('root_frame_skip_root'),
-            x=int(518/2 - 250/2),
-            y=int(400/2 + 20 + 48 * 1 + 15 - 48/2),
+            x=int(518 / 2 - 250 / 2),
+            y=int(400 / 2 + 20 + 48 * 1 + 15 - 48 / 2),
             width=250,
             height=48,
             root='root_frame_skip_root'
@@ -429,26 +453,259 @@ class HostUI(object):
         self.UIObject['tree_rightkey_menu'].post(event.x_root, event.y_root)
 
     def tree_load(self):
+        self.tree_switch_clear()
         tmp_tree_item_children = self.UIObject['tree'].get_children()
         for tmp_tree_item_this in tmp_tree_item_children:
             self.UIObject['tree'].delete(tmp_tree_item_this)
         for Account_hash_this in self.UIData['Account_data']:
-            self.UIObject['tree'].insert(
+            item_id = self.UIObject['tree'].insert(
                 '',
                 0,
                 text=Account_hash_this,
                 values=(
+                    '',
                     self.UIData['Account_data'][Account_hash_this].id,
                     self.get_account_data_type_name(Account_hash_this)
                     # self.UIData['Account_data'][Account_hash_this].platform['platform'],
                     # self.UIData['Account_data'][Account_hash_this].platform['sdk'],
                     # self.UIData['Account_data'][Account_hash_this].platform['model']
+                ),
+                tags=(
+                    ()
+                    if getattr(self.UIData['Account_data'][Account_hash_this], 'enable', True) is True
+                    else ('account_disabled',)
                 )
             )
+            self.tree_switch_add(item_id, Account_hash_this)
+        self.UIObject['root'].update_idletasks()
+        self.tree_switch_refresh()
         if len(self.UIData['Account_data']) <= 0:
             self.frame_show('root_frame_first_root')
         else:
             self.frame_hide('root_frame_first_root')
+
+    def tree_switch_add(self, item_id, account_hash):
+        account = self.UIData['Account_data'][account_hash]
+        variable = tkinter.BooleanVar(
+            master=self.UIObject['root'],
+            value=getattr(account, 'enable', True) is True
+        )
+        switch = tkinter.Canvas(
+            self.UIObject['tree'],
+            highlightthickness=0,
+            borderwidth=0,
+            takefocus=False,
+            background='#FFFFFF',
+            cursor='arrow'
+        )
+        switch.bind(
+            '<Button-1>',
+            lambda event: self.tree_switch_click(event, account_hash)
+        )
+        switch.bind(
+            '<Motion>',
+            lambda event: self.tree_switch_motion(event, account_hash)
+        )
+        switch.bind('<Leave>', lambda event: switch.configure(cursor='arrow'))
+        self.UIObject['tree_switch_dict'][account_hash] = {
+            'item_id': item_id,
+            'variable': variable,
+            'widget': switch
+        }
+
+    def tree_switch_clear(self):
+        for switch_data in self.UIObject.get('tree_switch_dict', {}).values():
+            try:
+                switch_data['widget'].destroy()
+            except Exception:
+                pass
+        self.UIObject['tree_switch_dict'] = {}
+
+    def tree_switch_toggle(self, account_hash):
+        if (
+            account_hash not in self.UIData['Account_data']
+            or account_hash not in self.UIObject['tree_switch_dict']
+        ):
+            return
+        switch_data = self.UIObject['tree_switch_dict'][account_hash]
+        account = self.UIData['Account_data'][account_hash]
+        account.enable = switch_data['variable'].get() is True
+        self.UIObject['tree'].item(
+            switch_data['item_id'],
+            tags=(() if account.enable is True else ('account_disabled',))
+        )
+        self.UIObject['tree'].selection_set(switch_data['item_id'])
+        self.UIObject['tree'].focus(switch_data['item_id'])
+        self.tree_update_selected_color()
+
+    def tree_switch_click(self, event, account_hash):
+        switch_data = self.UIObject.get('tree_switch_dict', {}).get(account_hash)
+        if switch_data is None:
+            return 'break'
+        box_bounds = switch_data.get('box_bounds')
+        if box_bounds is not None and (
+            box_bounds[0] <= event.x <= box_bounds[2]
+            and box_bounds[1] <= event.y <= box_bounds[3]
+        ):
+            switch_data['variable'].set(not switch_data['variable'].get())
+            self.tree_switch_toggle(account_hash)
+        return 'break'
+
+    def tree_switch_motion(self, event, account_hash):
+        switch_data = self.UIObject.get('tree_switch_dict', {}).get(account_hash)
+        if switch_data is None:
+            return
+        box_bounds = switch_data.get('box_bounds')
+        cursor = 'hand2'
+        if box_bounds is None or not (
+            box_bounds[0] <= event.x <= box_bounds[2]
+            and box_bounds[1] <= event.y <= box_bounds[3]
+        ):
+            cursor = 'arrow'
+        switch_data['widget'].configure(cursor=cursor)
+
+    def tree_switch_refresh(self):
+        for switch_data in self.UIObject.get('tree_switch_dict', {}).values():
+            cell_bbox = self.UIObject['tree'].bbox(switch_data['item_id'], '#1')
+            if cell_bbox:
+                switch_width = min(25, cell_bbox[2])
+                switch_height = min(13, cell_bbox[3])
+                switch_data['widget'].place(
+                    x=cell_bbox[0] + (cell_bbox[2] - switch_width) // 2,
+                    y=cell_bbox[1] + (cell_bbox[3] - switch_height) // 2,
+                    width=switch_width,
+                    height=switch_height
+                )
+                switch_data['width'] = switch_width
+                switch_data['height'] = switch_height
+            else:
+                switch_data['widget'].place_forget()
+        self.tree_switch_update_appearance()
+
+    def tree_switch_update_appearance(self):
+        switch_dict = self.UIObject.get('tree_switch_dict', {})
+        if not switch_dict:
+            return
+        for switch_data in switch_dict.values():
+            self.tree_switch_draw(switch_data)
+
+    def tree_switch_draw(self, switch_data):
+        canvas = switch_data['widget']
+        canvas.delete('all')
+        width = switch_data.get('width', 25)
+        height = switch_data.get('height', 13)
+        item_id = switch_data['item_id']
+        canvas_background = '#FFFFFF'
+        selected = item_id in self.UIObject['tree'].selection()
+        if selected:
+            canvas_background = self.UIObject['tree_style'].lookup(
+                self.UIObject['tree_style_name'],
+                'background',
+                ('selected',)
+            ) or '#0078D7'
+        canvas.configure(background=canvas_background)
+
+        enabled = switch_data['variable'].get() is True
+        track_color = '#00A0EA' if enabled else '#A9AEB3'
+        if selected:
+            track_outline_color = '#FFFFFF'
+        else:
+            track_outline_color = '#005B86' if enabled else '#555C62'
+        track_pixel_runs = (
+            (4, 20),
+            (2, 22),
+            (1, 23),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (0, 24),
+            (1, 23),
+            (2, 22),
+            (4, 20)
+        )
+        for pixel_top, (pixel_left, pixel_right) in enumerate(track_pixel_runs):
+            canvas.create_rectangle(
+                pixel_left,
+                pixel_top,
+                pixel_right + 1,
+                pixel_top + 1,
+                fill=track_outline_color,
+                outline=''
+            )
+        track_fill_pixel_runs = (
+            None,
+            (4, 20),
+            (3, 21),
+            (2, 22),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (1, 23),
+            (2, 22),
+            (3, 21),
+            (4, 20),
+            None
+        )
+        for pixel_top, pixel_run in enumerate(track_fill_pixel_runs):
+            if pixel_run is None:
+                continue
+            pixel_left, pixel_right = pixel_run
+            canvas.create_rectangle(
+                pixel_left,
+                pixel_top,
+                pixel_right + 1,
+                pixel_top + 1,
+                fill=track_color,
+                outline=''
+            )
+        knob_size = height - 4
+        knob_left = width - knob_size - 2 if enabled else 2
+        canvas.create_oval(
+            knob_left,
+            2,
+            knob_left + knob_size - 1,
+            knob_size + 1,
+            fill='#FFFFFF',
+            outline=''
+        )
+        switch_data['box_bounds'] = (0, 0, width - 1, height - 1)
+
+    def tree_switch_scroll(self, event=None):
+        self.UIObject['root'].after_idle(self.tree_switch_refresh)
+
+    def tree_block_enable_resize(self, event):
+        tree = self.UIObject['tree']
+        if (
+            tree.identify_region(event.x, event.y) == 'separator'
+            and tree.identify_column(event.x) == '#1'
+        ):
+            return 'break'
+
+    def tree_yview(self, *args):
+        self.UIObject['tree'].yview(*args)
+        self.tree_switch_refresh()
+
+    def tree_yscroll_set(self, first, last):
+        self.UIObject['tree_yscroll'].set(first, last)
+        self.UIObject['root'].after_idle(self.tree_switch_refresh)
+
+    def tree_update_selected_color(self, event=None):
+        selected_item_list = self.UIObject['tree'].selection()
+        selected_foreground = '#FFFFFF'
+        if selected_item_list:
+            account_hash = self.UIObject['tree'].item(selected_item_list[0], 'text')
+            account = self.UIData['Account_data'].get(account_hash)
+            if account is not None and getattr(account, 'enable', True) is not True:
+                selected_foreground = '#888888'
+        self.UIObject['tree_style'].map(
+            self.UIObject['tree_style_name'],
+            foreground=[('selected', selected_foreground)]
+        )
+        self.tree_switch_update_appearance()
 
     def tree_edit(self, action):
         hash_key_how = None
@@ -482,6 +739,12 @@ class HostUI(object):
         self.res = True
         if type(self.callbackData) is dict:
             self.callbackData['res'] = self.res
+        try:
+            OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dirs(
+                self.UIData['Account_data']
+            )
+        except Exception:
+            pass
         sendAccountUpdate(self, self.control_queue, self.UIData['Account_data'])
         self.UIObject['root'].destroy()
 
@@ -531,6 +794,7 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_host_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Server_port_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Server_access_token_StringVar': tkinter.StringVar(),
+            'edit_root_Entry_Webhook_callback_StringVar': tkinter.StringVar(),
             'edit_root_Combobox_Account_type_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend_StringVar': tkinter.StringVar(),
             'edit_root_Entry_Extend2_StringVar': tkinter.StringVar(),
@@ -559,355 +823,7 @@ class TreeEditUI(object):
             ],
             'edit_root_Entry_qsign_list': [],
             'edit_root_Entry_qsign_num': 1,
-            'edit_root_Combobox_dict': {
-                'type_list': OlivOS.accountMetadataAPI.accountTypeList,
-                'type_note_list': {
-                    'QQ/GoCq/安卓手表': '密码留空即尝试使用扫码登录',
-                    'QQ/GoCq/旧': '密码留空即尝试使用扫码登录',
-                    'QQ/Wq/安卓手表': '密码留空即尝试使用扫码登录',
-                    'QQ/Wq/旧': '密码留空即尝试使用扫码登录',
-                    '微信/ComWeChat': '启动后需要再运行特定版本微信',
-                    'Hack.Chat': '密码可以留空',
-                    'RED协议': 'HTTP可以不填，反正也没实现',
-                    'QQ/OPQ/默认': '已弃用',
-                    'QQ/OPQ/指定端口': '已弃用',
-                    'QQ/OPQ/指定端口/旧': '已弃用',
-                    'QQ/NapCat/默认': '需要已经安装不低于9.9.22版本QQ',
-                    'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
-                    'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ',
-                    'QQ官方/公域/V2': '请确保已经添加IP白名单',
-                    'QQ官方/公域/V2/纯频道': '请确保已经添加IP白名单',
-                    'QQ官方/公域/V2/指定intents': '请确保已经添加IP白名单',
-                    'QQ官方/私域/V2': '请确保已经添加IP白名单',
-                    'QQ官方/私域/V2/指定intents': '请确保已经添加IP白名单'
-                },
-                'type_clear_note_list': {
-                    'QQ/GoCq/默认': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/安卓手机': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/安卓平板': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/安卓手表': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/iPad': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/iMac': './conf/gocqhttp/{bothash}',
-                    'QQ/GoCq/旧': './conf/gocqhttp/{bothash}',
-                    'QQ/Wq/安卓手表': './conf/walleq/{bothash}',
-                    'QQ/Wq/安卓手机': './conf/walleq/{bothash}',
-                    'QQ/Wq/安卓平板': './conf/walleq/{bothash}',
-                    'QQ/Wq/旧': './conf/walleq/{bothash}',
-                    'QQ/OPQ/默认': './conf/OPQBot/{bothash}',
-                    'QQ/OPQ/指定端口': './conf/OPQBot/{bothash}',
-                    'QQ/OPQ/指定端口/旧': './conf/OPQBot/{bothash}',
-                    'QQ/NapCat/默认': './conf/napcat/{bothash}',
-                    'QQ/NapCat/9.9.11': './conf/napcat/{bothash}',
-                    'QQ/NapCat/旧': './conf/napcat/{bothash}'
-                },
-                'type_extend_note_list': {
-                    # 'QQ/GoCq/默认': ['签名服务器', 'sign-server'],
-                    # 'QQ/GoCq/安卓手机': ['签名服务器', 'sign-server'],
-                    # 'QQ/GoCq/安卓平板': ['签名服务器', 'sign-server'],
-                    # 'QQ/GoCq/旧': ['签名服务器', 'sign-server']
-                    'RED协议': ['HTTP地址'],
-                    '钉钉': ["AppKey", "AppSecret"],
-                    'Hack.Chat/私有': ["WS地址"]
-                },
-                'type_extends_name_note_list': {
-                    # 'QQ/GoCq/默认': ['签名服务器', 'KEY'],
-                    # 'QQ/GoCq/安卓手机': ['签名服务器', 'KEY'],
-                    # 'QQ/GoCq/安卓平板': ['签名服务器', 'KEY'],
-                    # 'QQ/GoCq/旧': ['签名服务器', 'KEY']
-                    'RED协议': ['HTTP地址'],
-                    '钉钉': ["AppKey", "AppSecret"],
-                    'Hack.Chat/私有': ["WS地址"]
-                },
-                'type_extends_note_list': {
-                    # 'QQ/GoCq/默认': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    # 'QQ/GoCq/安卓手机': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    # 'QQ/GoCq/安卓平板': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    # 'QQ/GoCq/旧': {'签名服务器': 'sign-server', 'KEY': 'key'},
-                    'RED协议': {'HTTP地址': 'http-path'},
-                    '钉钉': {"AppKey": 'app_key', "AppSecret": "app_secret"},
-                    'Hack.Chat/私有': {"WS地址": 'ws_path'}
-                },
-                'type_qsign_array_note_list': {
-                    'QQ/GoCq/默认': {'地址': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/安卓手机': {'地址': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/安卓平板': {'地址': 'sign-server', 'KEY': 'key'},
-                    'QQ/GoCq/旧': {'地址': 'sign-server', 'KEY': 'key'}
-                },
-                # 各类账号组合的匹配与注册表
-                # 原本为合并格式，并在此处维护
-                # type: [platform, sdk, model, server_auto, server_type, {data_dict}]
-                # 现拆分为两个表，使用时合并，以便于维护
-                # type: [platform, sdk, model, server_auto, server_type] + [{data_dict}]
-                # 前半位于 OlivOS.accountMetadataAPI
-                # 后半位于此处
-                'type_mapping_list': {},
-                'type_mapping_list_Entry_slot': {
-                    'onebotV11/Http': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV11/Http/NapCat': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV11/Http/LLOneBot': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV11/Http/Lagrange': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV11/Http/Shamrock': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV11/Http/消息段': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'onebotV12/正向WS': {
-                        '账号': 'edit_root_Entry_ID',
-                        '地址': 'edit_root_Entry_Server_host',
-                        '端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'RED协议': {
-                        '账号': 'edit_root_Entry_ID',
-                        'WS地址': 'edit_root_Entry_Server_host',
-                        'WS端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'OPQBot/正向WS': {
-                        'QQ号': 'edit_root_Entry_ID',
-                        '服务地址': 'edit_root_Entry_Server_host',
-                        '服务端口': 'edit_root_Entry_Server_port',
-                    },
-                    'QQ/OPQ/默认': {
-                        'QQ号': 'edit_root_Entry_ID',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'QQ/OPQ/指定端口': {
-                        'QQ号': 'edit_root_Entry_ID',
-                        '服务端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'QQ/OPQ/指定端口/旧': {
-                        'QQ号': 'edit_root_Entry_ID',
-                        '服务端口': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                    },
-                    'QQ/NapCat/默认': {
-                        'QQ号': 'edit_root_Entry_ID',
-                    },
-                    'QQ/NapCat/9.9.11': {
-                        'QQ号': 'edit_root_Entry_ID',
-                    },
-                    'QQ/NapCat/旧': {
-                        'QQ号': 'edit_root_Entry_ID',
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                        '服务端口': 'edit_root_Entry_Server_port',
-                    },
-                    'QQ/GoCq/默认': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/安卓手机': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/安卓平板': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/安卓手表': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/iPad': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/iMac': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/GoCq/旧': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/默认': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/安卓手机': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/安卓平板': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/安卓手表': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/iPad': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/iMac': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    'QQ/Wq/旧': {
-                        '账号': 'edit_root_Entry_ID',
-                        '密码': 'edit_root_Entry_Password',
-                    },
-                    '微信/ComWeChat': {
-                        '微信号': 'edit_root_Entry_ID'
-                    },
-                    'KOOK': {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    },
-                    'KOOK/消息兼容': {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    },
-                    '黑盒语音': {
-                        '机器人ID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    },
-                    '米游社/大别野/公域': {
-                        'Bot_Id': 'edit_root_Entry_ID',
-                        'Secret': 'edit_root_Entry_Password',
-                        'Pub_Key': 'edit_root_Entry_Server_access_token'
-                    },
-                    '米游社/大别野/私域': {
-                        'Bot_Id': 'edit_root_Entry_ID',
-                        'Secret': 'edit_root_Entry_Password',
-                        'Pub_Key': 'edit_root_Entry_Server_access_token'
-                    },
-                    '米游社/大别野/沙盒': {
-                        'Bot_Id': 'edit_root_Entry_ID',
-                        'Secret': 'edit_root_Entry_Password',
-                        'Pub_Key': 'edit_root_Entry_Server_access_token',
-                        '别野号': 'edit_root_Entry_Server_port'
-                    },
-                    'B站直播间/游客': {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    },
-                    'B站直播间/登录': {
-                        '直播间ID': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/公域/V1': {
-                        'AppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/私域/V1': {
-                        'AppID': 'edit_root_Entry_ID',
-                        '机器人令牌': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/公域/V2': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/公域/V2/纯频道': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/公域/V2/指定intents': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token',
-                        'intents': 'edit_root_Entry_Server_port'
-                    },
-                    'QQ官方/私域/V2': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/私域/V2/指定intents': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token',
-                        'intents': 'edit_root_Entry_Server_port'
-                    },
-                    'QQ官方/沙盒/V2': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token'
-                    },
-                    'QQ官方/沙盒/V2/指定intents': {
-                        'AppID': 'edit_root_Entry_ID',
-                        'AppSecret': 'edit_root_Entry_Server_access_token',
-                        'intents': 'edit_root_Entry_Server_port'
-                    },
-                    'Telegram': {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    },
-                    'Discord': {
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    },
-                    'Discord/指定intents': {
-                        'TOKEN': 'edit_root_Entry_Server_access_token',
-                        'intents': 'edit_root_Entry_Server_port'
-                    },
-                    '渡渡语音/Dodo/V2': {
-                        'BotID': 'edit_root_Entry_ID',
-                        'Bot私钥': 'edit_root_Entry_Server_access_token'
-                    },
-                    '渡渡语音/Dodo/V1': {
-                        'BotID': 'edit_root_Entry_ID',
-                        'Bot私钥': 'edit_root_Entry_Server_access_token'
-                    },
-                    'Fanbook': {
-                        'Token': 'edit_root_Entry_Server_access_token'
-                    },
-                    'Hack.Chat': {
-                        '房间名称': 'edit_root_Entry_Server_host',
-                        'Bot名称': 'edit_root_Entry_Server_access_token',
-                        '密码': 'edit_root_Entry_Password'
-                    },
-                    'Hack.Chat/私有': {
-                        '房间名称': 'edit_root_Entry_Server_host',
-                        'Bot名称': 'edit_root_Entry_Server_access_token',
-                        '密码': 'edit_root_Entry_Password'
-                    },
-                    '虚拟终端': {
-                        '账号': 'edit_root_Entry_ID'
-                    },
-                    '接口终端': {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port'
-                    },
-                    'FF14终端': {
-                        '账号': 'edit_root_Entry_ID',
-                        '端口': 'edit_root_Entry_Server_port',
-                        '回调端口': 'edit_root_Entry_Server_access_token'
-                    },
-                    "钉钉": {
-                        "Robot Code": 'edit_root_Entry_ID'
-                    },
-                    '自定义': {
-                        'ID': 'edit_root_Entry_ID',
-                        'PASSWORD': 'edit_root_Entry_Password',
-                        'HOST': 'edit_root_Entry_Server_host',
-                        'PORT': 'edit_root_Entry_Server_port',
-                        'TOKEN': 'edit_root_Entry_Server_access_token'
-                    },
-                },
-                'platform_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform,
-                'platform_sdk_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform_sdk,
-                'platform_sdk_model_list': OlivOS.accountMetadataAPI.accountTypeDataList_platform_sdk_model,
-            },
+            'edit_root_Combobox_dict': OlivOS.accountMetadataAPI.getAccountEditorMetadata(),
             'edit_root_Combobox_Server_auto_list': OlivOS.accountMetadataAPI.accountTypeDataList_server_auto,
             'edit_root_Combobox_Server_type_list': OlivOS.accountMetadataAPI.accountTypeDataList_server_type
         }
@@ -946,247 +862,28 @@ class TreeEditUI(object):
                 self.UIData[edit_root_Entry_Extend_this + '_StringVar'].get()
                 for edit_root_Entry_Extend_this in self.UIData['edit_root_Entry_Extend_list']
             ]
-            if (
-                tmp_platform_platform == 'qq'
-                and tmp_platform_sdk == 'onebot'
-                and tmp_platform_model in OlivOS.flaskServerAPI.gCheckList
-                and tmp_server_auto == 'True'
-            ):
-                if tmp_host == '':
-                    tmp_host = 'http://127.0.0.1'
-                if tmp_port == '':
-                    tmp_port = '58000'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if (
-                tmp_platform_platform in ['qq', 'wechat']
-                and tmp_platform_sdk == 'onebot'
-                and tmp_platform_model in OlivOS.onebotV12LinkServerAPI.gCheckList
-                and tmp_server_auto == 'True'
-            ):
-                if tmp_host == '':
-                    tmp_host = 'ws://127.0.0.1'
-                if tmp_port == '':
-                    tmp_port = '58001'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if (
-                tmp_platform_platform == 'qq'
-                and tmp_platform_sdk == 'onebot'
-                and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
-                and tmp_server_auto == 'False'
-            ):
-                if tmp_host == '':
-                    tmp_host = '127.0.0.1'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if (
-                tmp_platform_platform == 'qq'
-                and tmp_platform_sdk == 'onebot'
-                and tmp_platform_model in OlivOS.OPQBotLinkServerAPI.gCheckList
-                and tmp_server_auto == 'True'
-            ):
-                if tmp_host == '':
-                    tmp_host = '127.0.0.1'
-                if tmp_platform_model in [
-                    'opqbot_auto'
-                ]:
-                    if tmp_port == '':
-                        tmp_port = '8086'
-            if (
-                tmp_platform_platform == 'qqGuild'
-                and tmp_platform_sdk == 'qqGuild_link'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'qqGuild'
-                and tmp_platform_sdk == 'qqGuildv2_link'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_platform_model not in [
-                    'public_intents',
-                    'private_intents',
-                    'sandbox_intents'
-                ]:
-                    if tmp_port == '':
-                        tmp_port = '0'
-            if (
-                tmp_platform_platform == 'mhyVila'
-                and tmp_platform_sdk == 'mhyVila_link'
-            ):
-                tmp_id = tmp_id.strip('\n')
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-                if tmp_platform_model in ['public', 'private']:
-                    tmp_port = '0'
-                try:
-                    tmp_access_token_new = json.loads(tmp_access_token)
-                    if type(tmp_access_token_new) is str:
-                        tmp_access_token = tmp_access_token_new
-                except Exception:
-                    pass
-                    # traceback.print_exc()
-            if (
-                tmp_platform_platform == 'telegram'
-                and tmp_platform_sdk == 'telegram_poll'
-            ):
-                if tmp_id == '':
-                    if len(tmp_access_token.split('.')) > 0:
-                        tmp_id = tmp_access_token.split('.')[0]
-                    if len(tmp_id) <= 0 or not tmp_id.isdigit():
-                        tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'https://api.telegram.org'
-                if tmp_port == '':
-                    tmp_port = '443'
-            if (
-                tmp_platform_platform == 'discord'
-                and tmp_platform_sdk == 'discord_link'
-            ):
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_platform_model not in [
-                    'intents'
-                ]:
-                    if tmp_port == '':
-                        tmp_port = '0'
-            if (
-                tmp_platform_platform == 'kaiheila'
-                and tmp_platform_sdk == 'kaiheila_link'
-            ):
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'xiaoheihe'
-                and tmp_platform_sdk == 'xiaoheihe_link'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'biliLive'
-                and tmp_platform_sdk == 'biliLive_link'
-            ):
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16) % 100000000000000
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'fanbook'
-                and tmp_platform_sdk == 'fanbook_poll'
-            ):
-                if tmp_id == '':
-                    tmp_id = int(getHash(tmp_access_token), 16)
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'dodo'
-                and tmp_platform_sdk == 'dodo_poll'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'dodo'
-                and tmp_platform_sdk == 'dodo_link'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'terminal'
-                and tmp_platform_sdk == 'terminal_link'
-                and tmp_platform_model == 'default'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if (
-                tmp_platform_platform == 'terminal'
-                and tmp_platform_sdk == 'terminal_link'
-                and tmp_platform_model == 'postapi'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
-            if (
-                tmp_platform_platform == 'terminal'
-                and tmp_platform_sdk == 'terminal_link'
-                and tmp_platform_model == 'ff14'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-            if (
-                tmp_platform_platform == 'hackChat'
-                and tmp_platform_sdk == 'hackChat_link'
-                and tmp_platform_model in ['default', 'private']
-            ):
-                if tmp_id == '':
-                    tmp_id = random.randint(1000000000, 9999999999)
-                if tmp_port == '':
-                    tmp_port = '0'
-            if (
-                tmp_platform_platform == 'dingtalk'
-                and tmp_platform_sdk == 'dingtalk_link'
-                and tmp_platform_model == 'default'
-            ):
-                if tmp_password == '':
-                    tmp_password = 'NONEED'
-                if tmp_host == '':
-                    tmp_host = 'NONEED'
-                if tmp_port == '':
-                    tmp_port = '0'
-                if tmp_access_token == '':
-                    tmp_access_token = 'NONEED'
+            tmp_fields = OlivOS.accountAPI.normalizeAccountFields({
+                'id': tmp_id,
+                'password': tmp_password,
+                'server_auto': tmp_server_auto,
+                'server_type': tmp_server_type,
+                'host': tmp_host,
+                'port': tmp_port,
+                'access_token': tmp_access_token,
+                'platform_sdk': tmp_platform_sdk,
+                'platform_platform': tmp_platform_platform,
+                'platform_model': tmp_platform_model,
+            })
+            tmp_id = tmp_fields['id']
+            tmp_password = tmp_fields['password']
+            tmp_server_auto = tmp_fields['server_auto']
+            tmp_server_type = tmp_fields['server_type']
+            tmp_host = tmp_fields['host']
+            tmp_port = tmp_fields['port']
+            tmp_access_token = tmp_fields['access_token']
+            tmp_platform_sdk = tmp_fields['platform_sdk']
+            tmp_platform_platform = tmp_fields['platform_platform']
+            tmp_platform_model = tmp_fields['platform_model']
             if not checkByListEmptyOr([
                 tmp_id,
                 tmp_server_auto,
@@ -1215,6 +912,15 @@ class TreeEditUI(object):
                     platform_platform=tmp_platform_platform,
                     platform_model=tmp_platform_model
                 )
+                if (
+                    tmp_action == 'update'
+                    and self.hash_key in self.UIData['Account_data']
+                ):
+                    tmp_res_bot_info.enable = getattr(
+                        self.UIData['Account_data'][self.hash_key],
+                        'enable',
+                        True
+                    )
                 type_this = self.get_type_name(
                     tmp_platform_platform,
                     tmp_platform_sdk,
@@ -1269,6 +975,10 @@ class TreeEditUI(object):
                     self.hash_key,
                     tmp_res_bot_info
                 ]
+                if OlivOS.qqGuildv2SDK.is_qqGuildv2_webhook_account(tmp_res_bot_info):
+                    OlivOS.qqGuildv2WebhookServerAPI.ensure_qqGuildv2_webhook_ssl_dir(
+                        tmp_res_bot_info.id
+                    )
             else:
                 miss_key_list = []
                 tmp_check_list = [
@@ -1417,6 +1127,10 @@ class TreeEditUI(object):
             self.UIObject[obj_name].configure(
                 show='●'
             )
+        if mode == 'READONLY':
+            self.UIObject[obj_name].configure(
+                state='readonly'
+            )
         self.UIObject[obj_name].place(
             x=x,
             y=y,
@@ -1467,6 +1181,40 @@ class TreeEditUI(object):
         elif target == 'edit_root_Combobox_qsign_protocal':
             self.tree_edit_UI_Combobox_update(action, 'qsign_protocal')
 
+    def tree_edit_UI_webhook_callback_refresh(self, event=None):
+        try:
+            tmp_appid = self.UIData['edit_root_Entry_ID_StringVar'].get()
+            self.UIData['edit_root_Entry_Webhook_callback_StringVar'].set(
+                OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_listen_url(tmp_appid)
+            )
+        except Exception:
+            pass
+        try:
+            tmp_certdir = './conf/ssl'
+            tmp_conf = OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_server_conf()
+            if tmp_conf.get('certdir', None) not in [None, '']:
+                tmp_certdir = str(tmp_conf.get('certdir'))
+            tmp_appid = self.UIData['edit_root_Entry_ID_StringVar'].get()
+            tmp_show_appid = '{AppID}'
+            if tmp_appid is not None and str(tmp_appid).strip() != '':
+                tmp_show_appid = str(tmp_appid).strip()
+            if 'edit_root_Label_type_note_3' in self.UIObject:
+                self.UIObject['edit_root_Label_type_note_3'].configure(
+                    text='请将证书放到 %s/%s/' % (str(tmp_certdir), tmp_show_appid)
+                )
+        except Exception:
+            pass
+
+    def tree_edit_UI_webhook_copy(self):
+        try:
+            self.tree_edit_UI_webhook_callback_refresh()
+            tmp_url = self.UIData['edit_root_Entry_Webhook_callback_StringVar'].get()
+            self.UIObject['edit_root'].clipboard_clear()
+            self.UIObject['edit_root'].clipboard_append(tmp_url)
+            self.UIObject['edit_root'].update()
+        except Exception:
+            pass
+
     def tree_edit_UI_type_clear_note_GEN(self, tmp_type: str):
         def tree_edit_UI_type_clear_note():
             if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
@@ -1497,6 +1245,11 @@ class TreeEditUI(object):
             'edit_root_Entry_Server_host',
             'edit_root_Entry_Server_port',
             'edit_root_Entry_Server_access_token',
+            'edit_root_Entry_Webhook_callback',
+            'edit_root_Button_Webhook_copy',
+            'edit_root_Label_type_note_2',
+            'edit_root_Label_type_note_3',
+            'edit_root_Label_type_note_4',
             'edit_root_Combobox_platform',
             'edit_root_Combobox_sdk',
             'edit_root_Combobox_model',
@@ -1602,7 +1355,7 @@ class TreeEditUI(object):
                         obj_root='edit_root',
                         obj_name=self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][entry_this],
                         str_name=self.UIData['edit_root_Combobox_dict']['type_mapping_list'][tmp_type][5][
-                                     entry_this] + '_StringVar',
+                            entry_this] + '_StringVar',
                         x=100,
                         y=40 + count * (24 + 6),
                         width=200,
@@ -1611,6 +1364,47 @@ class TreeEditUI(object):
                         title=entry_this,
                         mode=tmp_mode
                     )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                if tmp_type.startswith('QQ官方/') and tmp_type.endswith('/Webhook'):
+                    tmp_webhook_y = 40 + count * (24 + 6)
+                    self.tree_edit_UI_webhook_callback_refresh()
+                    self.tree_edit_UI_Entry_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Entry_Webhook_callback',
+                        str_name='edit_root_Entry_Webhook_callback_StringVar',
+                        x=100,
+                        y=tmp_webhook_y,
+                        width=200,
+                        height=24,
+                        action=self.action,
+                        title='回调',
+                        mode='READONLY'
+                    )
+                    self.tree_UI_Button_init(
+                        name='edit_root_Button_Webhook_copy',
+                        text='复制',
+                        command=self.tree_edit_UI_webhook_copy,
+                        x=310,
+                        y=tmp_webhook_y,
+                        width=70,
+                        height=24
+                    )
+                    if 'edit_root_Entry_ID' in self.UIObject:
+                        self.UIObject['edit_root_Entry_ID'].bind(
+                            '<KeyRelease>',
+                            self.tree_edit_UI_webhook_callback_refresh
+                        )
+                        self.UIObject['edit_root_Entry_ID'].bind(
+                            '<FocusOut>',
+                            self.tree_edit_UI_webhook_callback_refresh
+                        )
+                    if not getattr(self, '_webhook_id_trace', False):
+                        self.UIData['edit_root_Entry_ID_StringVar'].trace(
+                            'w',
+                            lambda *args: self.tree_edit_UI_webhook_callback_refresh()
+                        )
+                        self._webhook_id_trace = True
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
                 if (
@@ -1656,6 +1450,49 @@ class TreeEditUI(object):
                     )
                     self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
                     count += 1
+                if tmp_type.startswith('QQ官方/') and tmp_type.endswith('/Webhook'):
+                    tmp_certdir = './conf/ssl'
+                    try:
+                        tmp_certdir = OlivOS.qqGuildv2WebhookServerAPI.get_qqGuildv2_webhook_server_conf().get(
+                            'certdir',
+                            tmp_certdir
+                        )
+                    except Exception:
+                        pass
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_2',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='请将0.0.0.0改为公网服务器地址'
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_3',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='请将证书放到 %s/{AppID}/' % str(tmp_certdir)
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_Label_init(
+                        obj_root='edit_root',
+                        obj_name='edit_root_Label_type_note_4',
+                        x=15,
+                        y=40 + count * (24 + 6),
+                        width=400 - 15 * 2,
+                        height=24,
+                        title='建议使用域名并自动续期'
+                    )
+                    self.UIObject['edit_root'].geometry('400x%s' % (count * (24 + 6) + 100 + 10))
+                    count += 1
+                    self.tree_edit_UI_webhook_callback_refresh()
                 if tmp_type in self.UIData['edit_root_Combobox_dict']['type_clear_note_list']:
                     self.tree_UI_Button_init(
                         name='edit_root_Button_type_clear_note',

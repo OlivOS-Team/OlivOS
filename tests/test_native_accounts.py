@@ -1,0 +1,127 @@
+"""Tray account management and the existing hot-reload control bus."""
+
+import os
+import queue
+from unittest.mock import Mock
+
+import pytest
+
+import OlivOS
+
+pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Windows account GUI')
+
+
+@pytest.fixture
+def account_editor():
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='terminal_link', platform_platform='terminal', platform_model='default')
+    accounts = {bot.hash: bot}
+    control = queue.Queue()
+    editor = OlivOS.multiLoginUIAPI.HostUI('test', accounts, asaycMode=True, control_queue=control)
+    editor.tree_load = Mock()
+    editor.UIObject['root'] = Mock()
+    return editor, accounts, control
+
+
+def test_tray_account_management_starts_existing_edit_workflow():
+    control = queue.Queue()
+    dock = OlivOS.nativeWinUIAPI.dock(control_queue=control, bot_info_dict={})
+    entry = next(item for item in dock.UIData['shallow_menu_list'] if item[0] == '账号管理')
+    entry[1]()
+    packet = control.get_nowait()
+    assert packet.action == 'call_system_event'
+    assert packet.key['action'] == ['account_edit_asayc_start', 'account_edit_asayc_do']
+
+
+def test_cancelling_account_edit_keeps_running_account_objects(account_editor):
+    editor, accounts, control = account_editor
+    key = next(iter(accounts))
+    editor.UIData['Account_data'][key].enable = False
+    editor.UIData['Account_data'][key].extends['draft'] = True
+    editor.tree_edit_commit(['delete', key, None])
+    assert accounts[key].enable is True
+    assert 'draft' not in accounts[key].extends
+    assert control.empty()
+
+
+@pytest.mark.parametrize('action', ['create', 'update', 'delete'])
+def test_account_editor_updates_draft_list(account_editor, action):
+    editor, accounts, _ = account_editor
+    old = next(iter(accounts))
+    new = OlivOS.API.bot_info_T(id=10002)
+    editor.tree_edit_commit([action, old, new])
+    draft = editor.UIData['Account_data']
+    assert (new.hash in draft) is (action != 'delete')
+    assert (old in draft) is (action == 'create')
+    editor.tree_load.assert_called_once()
+
+
+def test_account_save_requests_persistence_then_hot_reload(account_editor):
+    editor, accounts, control = account_editor
+    key = next(iter(accounts))
+    editor.UIData['Account_data'][key].enable = False
+    editor.account_data_commit()
+    packets = [control.get_nowait() for _ in range(4)]
+    assert [packet.action for packet in packets] == [
+        'call_system_event', 'call_account_update', 'call_system_stop_type_event', 'call_system_event']
+    assert packets[0].key['action'] == ['account_edit_asayc_end']
+    assert packets[1].key['data'][key].enable is False
+    assert packets[2].key['action'] == packets[3].key['action'] == ['account_update']
+    steps = OlivOS.bootDataAPI.default_Conf['system']['event']['account_edit_asayc_end']
+    assert 'OlivOS_account_config_save' in steps and 'OlivOS_account_config_update' in steps
+    assert editor.UIData['flag_commit'] is True
+    editor.UIObject['root'].destroy.assert_called_once()
+
+
+def test_terminal_model_switch_uses_launcher_init_and_closes_old():
+    import copy
+
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model='napcat_show')
+    inbox = queue.Queue()
+    dock = OlivOS.nativeWinUIAPI.dock(
+        rx_queue=inbox, control_queue=queue.Queue(), bot_info_dict={bot.hash: bot})
+    dock.updateShallowMenuList = Mock()
+    dock.startNapCatTerminalUI = Mock()
+    window = Mock(bot=copy.deepcopy(bot))
+    dock.UIObject['root_napcat_terminal'][bot.hash] = window
+    window.stop.side_effect = lambda: dock.UIObject['root_napcat_terminal'].pop(bot.hash)
+    changed = copy.deepcopy(bot)
+    changed.platform['model'] = 'napcat_default'
+    packet = OlivOS.API.Control.packet('send', {'data': {
+        'action': 'account_update', 'data': {bot.hash: changed}}})
+    dock.on_control_rx(packet)
+    window.stop.assert_not_called()
+    dock.mainrun()
+    window.stop.assert_called_once()
+    dock.startNapCatTerminalUI.assert_not_called()
+    inbox.put(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'napcat', 'event': 'init', 'hash': bot.hash, 'account_platform': bot.platform}}))
+    dock.mainrun()
+    assert inbox.empty()
+    dock.on_control_rx(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'account_update', 'data': {bot.hash: bot}}}))
+    dock.mainrun()
+    inbox.put(OlivOS.API.Control.packet('send', {'data': {
+        'action': 'napcat', 'event': 'init', 'hash': bot.hash, 'account_platform': bot.platform}}))
+    dock.mainrun()
+    dock.mainrun()
+    dock.startNapCatTerminalUI.assert_called_once_with(bot.hash)
+
+
+@pytest.mark.parametrize('module,model', [
+    ('libNapCatEXEModelAPI', 'napcat_show'), ('libEXEModelAPI', 'gocqhttp_show'),
+    ('libWQEXEModelAPI', 'walleq_show'), ('libCWCBEXEModelAPI', 'ComWeChatBotClient'),
+    ('libOPQBotEXEModelAPI', 'opqbot_auto'), ('virtualTerminalLinkServerAPI', 'default'),
+])
+def test_launcher_init_carries_account_snapshot(module, model):
+    bot = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='onebot', platform_platform='qq', platform_model=model)
+    control = queue.Queue()
+    launcher = getattr(OlivOS, module).server('test', control_queue=control, bot_info_dict=bot)
+    launcher.send_init_event()
+    packet = control.get_nowait()
+    assert packet.key['data']['event'] == 'init'
+    assert packet.key['data']['account_platform'] == bot.platform
+    bot.platform['model'] = 'changed'
+    assert packet.key['data']['account_platform']['model'] == model

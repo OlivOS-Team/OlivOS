@@ -230,9 +230,12 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request("GET", send_url, headers=headers, timeout=OlivOS.webTool.OlivOS_http_timeout)
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:

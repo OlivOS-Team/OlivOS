@@ -16,5 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 from . import (
     flaskServerAPI,
+    onebotV11LinkServerAPI,
+    onebotV11HostServerAPI,
     onebotSDK,
 )

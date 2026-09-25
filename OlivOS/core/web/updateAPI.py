@@ -64,8 +64,11 @@ def OlivOSUpdateGet(
     control_queue=None
 ):
     res = False
+    check_started = time.time()
+    check_status = 'unsupported'
     architecture_num = platform.architecture()[0]
     if platform.system() == 'Windows':
+        check_status = 'error'
         clear_bat()
         exe_name = 'OlivOS.exe'
         if flagChackOnly:
@@ -83,11 +86,12 @@ def OlivOSUpdateGet(
             down_url = None
             if down_url_obj is not None:
                 try:
-                    if (
-                        type(down_url_obj['version']['OlivOS'][architecture_num]['svn']) is int
-                        and down_url_obj['version']['OlivOS'][architecture_num]['svn'] > OlivOS.infoAPI.OlivOS_SVN
-                    ):
+                    latest_svn = down_url_obj['version']['OlivOS'][architecture_num]['svn']
+                    if type(latest_svn) is not int:
+                        raise ValueError('invalid update version')
+                    if latest_svn > OlivOS.infoAPI.OlivOS_SVN:
                         down_url = down_url_obj['version']['OlivOS'][architecture_num]['path']
+                        check_status = 'available'
                         if flagChackOnly:
                             logger_proc.log(
                                 3, L10NAPI.getTrans('OlivOS update found, please try update.', [], modelName)
@@ -109,9 +113,11 @@ def OlivOSUpdateGet(
                         else:
                             logger_proc.log(3, L10NAPI.getTrans('OlivOS update found.', [], modelName))
                     else:
+                        check_status = 'latest'
                         down_url_obj = None
                         logger_proc.log(2, L10NAPI.getTrans('OlivOS already latest.', [], modelName))
                 except Exception:
+                    check_status = 'error'
                     down_url = None
                     logger_proc.log(
                         3, L10NAPI.getTrans('check OlivOS update api error, skip update replace.', [], modelName)
@@ -145,6 +151,11 @@ def OlivOSUpdateGet(
                     'OlivOS running in src mode, skip update replace.', [], modelName
                 )
             )
+    if flagChackOnly and control_queue is not None:
+        control_queue.put(OlivOS.API.Control.packet('send', {
+            'target': {'type': 'webUI'},
+            'data': {'action': 'update_check_result', 'status': check_status, 'started_at': check_started},
+        }), block=False)
     return res
 
 
@@ -295,7 +306,10 @@ def GETHttpFile(url, path):
         'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
     }
     try:
-        msg_res = req.request("GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy())
+        msg_res = req.request(
+            "GET", send_url, headers=headers, proxies=OlivOS.webTool.get_system_proxy(),
+            timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+        )
         releaseToDirForFile(path)
         with open(path, 'wb+') as tmp:
             tmp.write(msg_res.content)
