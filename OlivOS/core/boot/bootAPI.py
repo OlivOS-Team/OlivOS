@@ -106,6 +106,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
         except Exception:
             preLoadPrint(f"patch config from [{patch_conf_path}] ... not hit")
             releaseDir('./conf')
+            # 若 config.json 不存在，自动释放最小模板供用户参照编辑
+            if not os.path.exists(patch_conf_path):
+                try:
+                    default_patch_conf = {
+                        "system": {
+                            "name": "OlivOS"
+                        }
+                    }
+                    with open(patch_conf_path, 'w', encoding='utf-8') as patch_conf_f:
+                        json.dump(default_patch_conf, patch_conf_f, indent=4, ensure_ascii=False)
+                    preLoadPrint(f'release default [{patch_conf_path}] ... done')
+                except Exception:
+                    preLoadPrint(f'release default [{patch_conf_path}] ... failed')
             preLoadPrint('patch config from default ... done')
         else:
             basic_conf = get_patch_config(basic_conf, patch_conf)
@@ -1340,6 +1353,9 @@ def patch_config_by_path(basic_conf: dict, patch_conf: dict, path: list):
         for idx in range(len(path)):
             if idx == len(path) - 1:
                 break
+            # patch_conf 缺失该路径节点时安全跳过，避免 KeyError
+            if path[idx] not in patch_conf_this:
+                return
             basic_conf_this = basic_conf_this[path[idx]]
             patch_conf_this = patch_conf_this[path[idx]]
         conf_key = path[-1]
