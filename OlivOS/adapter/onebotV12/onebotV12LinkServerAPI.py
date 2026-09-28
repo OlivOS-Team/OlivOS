@@ -84,9 +84,13 @@ class server(OlivOS.API.Proc_templet):
         ).start()
         while True:
             try:
-                self.Proc_data['extend_data']['websocket_url'] = '%s:%d/' % (
+                websocket_url = '%s:%d/' % (
                     self.Proc_data['bot_info_dict'].post_info.host,
                     self.Proc_data['bot_info_dict'].post_info.port
+                )
+                self.Proc_data['extend_data']['websocket_url'] = OlivOS.webTool.append_access_token_query(
+                    websocket_url,
+                    self.Proc_data['bot_info_dict'].post_info.access_token
                 )
             except Exception:
                 self.Proc_data['extend_data']['websocket_url'] = None
@@ -139,8 +143,12 @@ class server(OlivOS.API.Proc_templet):
 
     def run_websocket_rx_connect_start(self):
         websocket.enableTrace(False)
+        token_headers = OlivOS.webTool.access_token_headers(
+            self.Proc_data['bot_info_dict'].post_info.access_token
+        )
         ws = websocket.WebSocketApp(
             self.Proc_data['extend_data']['websocket_url'],
+            header=['%s: %s' % (key, value) for key, value in token_headers.items()],
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,

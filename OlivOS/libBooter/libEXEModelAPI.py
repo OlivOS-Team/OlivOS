@@ -1030,7 +1030,11 @@ database: # 数据库相关设置
 
         self.config_file_format['uin'] = str(self.bot_info_dict.id)
         self.config_file_format['password'] = self.bot_info_dict.password
-        self.config_file_format['access-token'] = self.bot_info_dict.post_info.access_token
+        # YAML 单引号内的 TOKEN：花括号会破坏 str.format，单引号需写成两个。
+        access_token = str(self.bot_info_dict.post_info.access_token or '')
+        self.config_file_format['access-token'] = (
+            access_token.replace('{', '{{').replace('}', '}}').replace("'", "''")
+        )
         tmp_host = self.bot_info_dict.post_info.host
         for prefix in [
             'http://',

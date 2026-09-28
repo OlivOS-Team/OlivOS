@@ -146,12 +146,8 @@ class send_onebot_post_json_T(object):
                     protocol_header = ''
                 else:
                     protocol_header = 'http://'
-                token_str = ''
-                token_dict = {}
-                if len(self.bot_info.access_token) > 0:
-                    token_str = f'?access_token={self.bot_info.access_token}'
-                    token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
-                send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
+                send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}'
+                send_url = OlivOS.webTool.append_access_token_query(send_url, self.bot_info.access_token)
 
                 if self.bot_info.debug_mode:
                     if self.bot_info.debug_logger is not None:
@@ -160,7 +156,7 @@ class send_onebot_post_json_T(object):
                 headers = {
                     'Content-Type': 'application/json'
                 }
-                headers.update(token_dict)
+                headers.update(OlivOS.webTool.access_token_headers(self.bot_info.access_token))
                 msg_res = req.request(
                     "POST", send_url, headers=headers, data=json_str_tmp.encode('utf-8'),
                     timeout=OlivOS.webTool.OlivOS_http_timeout
@@ -279,17 +275,13 @@ class api_templet(object):
                 protocol_header = ''
             else:
                 protocol_header = 'http://'
-            token_str = ''
-            token_dict = {}
-            if len(self.bot_info.access_token) > 0:
-                token_str = f'?access_token={self.bot_info.access_token}'
-                token_dict = {'Authorization': f'Bearer {self.bot_info.access_token}'}
-            send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}{token_str}'
+            send_url = f'{protocol_header}{self.bot_info.host}:{self.bot_info.port}/{self.node_ext}'
+            send_url = OlivOS.webTool.append_access_token_query(send_url, self.bot_info.access_token)
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
                     self.bot_info.debug_logger.log(0, self.node_ext + ': GET request')
             headers = {}
-            headers.update(token_dict)
+            headers.update(OlivOS.webTool.access_token_headers(self.bot_info.access_token))
             msg_res = req.request("GET", send_url, headers=headers, timeout=OlivOS.webTool.OlivOS_http_timeout)
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:

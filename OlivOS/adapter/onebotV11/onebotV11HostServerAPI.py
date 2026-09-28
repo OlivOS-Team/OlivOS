@@ -71,7 +71,7 @@ class ServerConf:
         if parsed.hostname is not None:
             host = parsed.hostname
         port = post_info.port
-        token = post_info.access_token
+        token = OlivOS.webTool.normalize_access_token(post_info.access_token)
         route = None
         return cls(host=host, port=port, token=token, route=route)
 
@@ -282,17 +282,24 @@ class server(OlivOS.API.Proc_templet):
         token = self.conf.token
         if not token:
             return None
-        auth_header = request.headers.get('Authorization')
-        if auth_header != f"Bearer {token}" and auth_header != token:
-            client_token = auth_header.replace('Bearer ', '') if auth_header else 'None'
-            self.on_unauth(client_token)
-            return Response(
-                http.HTTPStatus.UNAUTHORIZED,
-                reason_phrase='Unauthorized',
-                headers=Headers(),
-                body=b'Unauthorized'
-            )
-        return None
+        headers = getattr(request, 'headers', None)
+        path = getattr(request, 'path', None) or getattr(request, 'url', '') or ''
+        if OlivOS.webTool.access_token_matches(token, headers=headers, url=path):
+            return None
+        auth_header = None
+        if headers is not None:
+            getter = getattr(headers, 'get', None)
+            auth_header = getter('Authorization') if getter is not None else None
+        client_token = auth_header.replace('Bearer ', '') if auth_header else (
+            OlivOS.webTool.access_token_from_url(path) or 'None'
+        )
+        self.on_unauth(client_token)
+        return Response(
+            http.HTTPStatus.UNAUTHORIZED,
+            reason_phrase='Unauthorized',
+            headers=Headers(),
+            body=b'Unauthorized'
+        )
 
     async def session(self, ws_conn: websockets.ServerConnection) -> None:
         """会话管理器

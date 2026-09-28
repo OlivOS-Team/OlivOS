@@ -65,7 +65,9 @@ class ServerConf:
         else:
             ws_url = f"ws://{host}:{port}/event"
             http_url = f"http://{host}:{port}/api"
-        token = post_info.access_token
+        token = OlivOS.webTool.normalize_access_token(post_info.access_token)
+        ws_url = OlivOS.webTool.append_access_token_query(ws_url, token)
+        http_url = OlivOS.webTool.append_access_token_query(http_url, token)
         return cls(ws_url=ws_url, http_url=http_url, host=host, port=port, token=token)
 
 
@@ -166,8 +168,7 @@ class server(OlivOS.API.Proc_templet):
         """主运行循环"""
         timeout = aiohttp.ClientTimeout(total=30)
         headers = {'Content-Type': 'application/json'}
-        if self.conf.token:
-            headers['Authorization'] = f'Bearer {self.conf.token}'
+        headers.update(OlivOS.webTool.access_token_headers(self.conf.token))
         while self.running_event.is_set():
             try:
                 async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
