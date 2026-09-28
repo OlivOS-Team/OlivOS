@@ -21,7 +21,7 @@ import threading
 import websockets
 import traceback
 from dataclasses import dataclass
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 import OlivOS
 
@@ -76,10 +76,10 @@ class ServerConf:
             url = f"{scheme}://{host}:55001{route}"
         else:
             url = f"{scheme}://{host}:{port}{route}"
-        token = post_info.access_token
+        token = OlivOS.webTool.normalize_access_token(post_info.access_token)
         if token is None:
-            params = parse_qs(parsed.query)
-            token = params.get('access_token', [None])[0]
+            token = OlivOS.webTool.access_token_from_query(parsed.query)
+        url = OlivOS.webTool.append_access_token_query(url, token)
         return cls(url=url, host=host, port=port, token=token, route=route)
 
 
@@ -269,12 +269,11 @@ class server(OlivOS.API.Proc_templet):
 
     async def __link_to_server(self) -> None:
         """WS连接逻辑"""
-        url = self.conf.url
+        url = OlivOS.webTool.append_access_token_query(self.conf.url, self.conf.token)
         headers = {
             'Content-Type': 'application/json'
         }
-        if self.conf.token:
-            headers['Authorization'] = f'Bearer {self.conf.token}'
+        headers.update(OlivOS.webTool.access_token_headers(self.conf.token))
         try:
             try:
                 self.ws_conn = await websockets.connect(url, additional_headers=headers)

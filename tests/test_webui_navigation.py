@@ -139,12 +139,20 @@ def browser(navigation_host, tmp_path):
         wait.until(lambda _: driver.execute_script('return !!window.pageIdentity'))
         return driver.execute_script('return window.pageIdentity')
 
+    def wait_plugin_events():
+        wait.until(lambda _: driver.execute_script(
+            'return state.seenEvents.has(arguments[0])', navigation_host.sequence))
+        driver.execute_async_script(
+            'const done = arguments[0];'
+            'Promise.resolve(state.pluginEventChain).then(() => done(true), () => done(true));')
+
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
         find('#token').send_keys(navigation_host.token)
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
-        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select, host=navigation_host)
+        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select,
+                              wait_plugin_events=wait_plugin_events, host=navigation_host)
     finally:
         driver.quit()
 
@@ -198,7 +206,7 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
 
 
 @pytest.mark.browser
-def test_plugin_restart_restores_the_open_page(browser):
+def test_plugin_restart_hides_pages_then_restores_the_open_page(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('before restart')
     browser.driver.switch_to.default_content()
@@ -208,24 +216,58 @@ def test_plugin_restart_restores_the_open_page(browser):
         browser.host.plugins = {}
         browser.host.plugin_pages = []
         browser.host.publish('events', {'type': 'plugins', 'ready': False})
-    browser.wait.until(lambda _: browser.driver.execute_script(
-        'return state.seenEvents.has(arguments[0])', browser.host.sequence))
-    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
-    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
-    assert browser.driver.execute_script('return window.pageIdentity') == identity
-    browser.driver.switch_to.default_content()
-    browser.driver.execute_script('state.frame.dataset.testIdentity = arguments[0]', 'before')
+    browser.wait_plugin_events()
+    assert not browser.driver.execute_script(
+        'return !!state.frame || !!document.querySelector("#plugin-links .plugin-link-entry")')
+    assert browser.driver.execute_script('return !!state.pluginReload')
     with browser.host.lock:
         browser.host.plugins = plugins
         browser.host.plugin_pages = pages
         browser.host.publish('events', {'type': 'plugins', 'ready': True})
     browser.wait.until(lambda _: browser.driver.execute_script(
-        'return state.frame?.isConnected && !state.frame.hidden && '
-        'state.frame.dataset.testIdentity !== arguments[1] && state.framePath === arguments[0]',
-        'webui/index.html', 'before'))
+        'return state.frame?.isConnected && !state.frame.hidden && state.framePath === arguments[0]',
+        'webui/index.html'))
     browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
     browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.driver.execute_script('return window.pageIdentity') != identity
     assert browser.find('#draft').get_attribute('value') == ''
+
+
+@pytest.mark.browser
+def test_stale_plugin_not_ready_event_keeps_open_page(browser):
+    identity = browser.select()
+    browser.find('#draft').send_keys('keep me')
+    browser.driver.switch_to.default_content()
+    with browser.host.lock:
+        browser.host.publish('events', {'type': 'plugins', 'ready': False})
+    browser.wait_plugin_events()
+    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
+    assert browser.find('.plugin-link-entry[data-plugin-namespace="multi"]').is_displayed()
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    assert browser.driver.execute_script('return window.pageIdentity') == identity
+    assert browser.find('#draft').get_attribute('value') == 'keep me'
+
+
+@pytest.mark.browser
+def test_reload_action_hides_open_page_before_ready(browser):
+    identity = browser.select()
+    browser.driver.switch_to.default_content()
+    result = browser.driver.execute_async_script(
+        'const done = arguments[0];'
+        'runAction("reload", "/api/plugins/reload", "正在重载插件…")'
+        '.then(() => done(true), (error) => done(String(error && error.message || error)));')
+    assert result is True
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return !!state.pluginReload && !state.frame && '
+        '!document.querySelector("#plugin-links .plugin-link-entry")'))
+    with browser.host.lock:
+        browser.host.publish('events', {'type': 'plugins', 'ready': True})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.frame?.isConnected && !state.frame.hidden && state.framePath === arguments[0]',
+        'webui/index.html'))
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.driver.execute_script('return window.pageIdentity') != identity
 
 
 @pytest.mark.browser

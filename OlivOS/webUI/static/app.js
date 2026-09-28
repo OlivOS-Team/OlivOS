@@ -76,6 +76,9 @@ const state = {
   sessionRefresh: null,
   sessionCheckedAt: 0,
   actions: { reload: null, update: null },
+  pluginReload: null,
+  pluginListGeneration: 0,
+  pluginEventChain: Promise.resolve(),
 };
 const titles = {
   dashboard: '仪表盘',
@@ -311,6 +314,9 @@ function resetLogin(message = '') {
   state.draft = null;
   state.schema = null;
   state.plugins = {};
+  state.pages = [];
+  state.pluginReload = null;
+  state.pluginListGeneration++;
   state.terminals = [];
   state.selected = null;
   for (const kind of Object.keys(state.actions)) clearAction(kind);
@@ -1015,11 +1021,64 @@ function safeURL(value) {
   }
 }
 async function loadPlugins() {
+  const generation = ++state.pluginListGeneration;
   const result = await api('/api/plugins');
-  state.plugins = result.shallow_plugin_data_dict;
-  state.pages = result.shallow_plugin_webui_list;
+  if (generation !== state.pluginListGeneration) return result;
+  const plugins = result.shallow_plugin_data_dict || {};
+  // 重载未完成时宿主可能仍是旧列表；不要把已经收起的菜单和页面刷回来。
+  if (state.pluginReload && Object.keys(plugins).length) return result;
+  state.plugins = plugins;
+  state.pages = result.shallow_plugin_webui_list || [];
   renderPlugins();
   renderPluginNavigation();
+  return result;
+}
+function pluginPageRestoreTarget() {
+  if (state.page !== 'plugin-page' || !state.frameNamespace || !state.framePath) return null;
+  return { namespace: state.frameNamespace, path: state.framePath };
+}
+function suspendPluginPages() {
+  if (!state.pluginReload) {
+    state.pluginReload = {
+      navigation: state.navigationGeneration,
+      active: pluginPageRestoreTarget(),
+      hadFrames: state.frames.size > 0,
+    };
+  }
+  state.pluginListGeneration++;
+  if (state.frames.size) destroyFrames();
+  $('menu-dialog').close();
+  if (state.page === 'plugin-page') $('page-title').textContent = '插件页面';
+  state.plugins = {};
+  state.pages = [];
+  renderPlugins();
+  renderPluginNavigation();
+}
+async function restorePluginsAfterReload() {
+  const pending = state.pluginReload;
+  state.pluginReload = null;
+  const navigation = pending?.navigation ?? state.navigationGeneration;
+  const active = pending?.active ?? pluginPageRestoreTarget();
+  const hadFrames = pending?.hadFrames || state.frames.size > 0;
+  if (state.frames.size) destroyFrames();
+  await loadPlugins();
+  if (active && navigation === state.navigationGeneration && state.page === 'plugin-page') {
+    const page = state.pages.find((entry) => embeddedPluginPage(entry) &&
+      entry.namespace === active.namespace && entry.path === active.path);
+    if (page) {
+      try {
+        await openPluginPage(page);
+        notify('插件已重载，当前插件页面已自动重新打开；未保存的内容可能需要重新填写。');
+      } catch (error) {
+        notifyError(error);
+      }
+    } else {
+      await navigate('plugins');
+      notify('插件已重载，原插件页面已不可用，请从列表重新选择。');
+    }
+  } else if (hadFrames) {
+    notify('插件已重载，缓存的插件页面已刷新。');
+  }
 }
 function renderPlugins() {
   const header = element('tr');
@@ -1448,6 +1507,7 @@ async function runAction(kind, path, progress) {
     const result = await api(path, { method: 'POST' });
     if (state.actions[kind] !== pending) return;
     pending.startedAt = result.started_at;
+    if (kind === 'reload') suspendPluginPages();
     if (pending.result) finishAction(kind, pending.result);
   } catch (error) {
     if (state.actions[kind] !== pending) return;
@@ -1455,38 +1515,28 @@ async function runAction(kind, path, progress) {
     if (state.token) showActionResult(kind, error.message || String(error));
   }
 }
+async function onPluginsEvent(item) {
+  if (!item.ready) {
+    // 加载器未就绪时会广播空列表。只有宿主当前也确实为空才收起菜单和页面；
+    // 会话重连回放旧事件时宿主仍有插件，忽略以免长时间运行后丢页。
+    const generation = ++state.pluginListGeneration;
+    const result = await api('/api/plugins');
+    if (generation !== state.pluginListGeneration) return;
+    if (Object.keys(result.shallow_plugin_data_dict || {}).length) return;
+    suspendPluginPages();
+    return;
+  }
+  await restorePluginsAfterReload();
+  finishAction('reload', {
+    started_at: item.started_at,
+    message: `插件重载完成，当前已加载 ${Object.keys(state.plugins).length} 个插件。`,
+  });
+}
 async function handleEvent(item) {
   if (item.type === 'plugins') {
-    // The loader broadcasts an empty list before it is ready. Keep the current
-    // iframe and navigation intact until the replacement plugins have loaded.
-    if (!item.ready) return;
-    const navigation = state.navigationGeneration;
-    const active = state.page === 'plugin-page' && state.frame
-      ? { namespace: state.frameNamespace, path: state.framePath } : null;
-    const hadFrames = state.frames.size > 0;
-    if (hadFrames) destroyFrames();
-    await loadPlugins();
-    if (active && navigation === state.navigationGeneration && state.page === 'plugin-page') {
-      const page = state.pages.find(entry => embeddedPluginPage(entry) &&
-        entry.namespace === active.namespace && entry.path === active.path);
-      if (page) {
-        try {
-          await openPluginPage(page);
-          notify('插件已重载，当前插件页面已自动重新打开；未保存的内容可能需要重新填写。');
-        } catch (error) {
-          notifyError(error);
-        }
-      } else {
-        await navigate('plugins');
-        notify('插件已重载，原插件页面已不可用，请从列表重新选择。');
-      }
-    } else if (hadFrames) {
-      notify('插件已重载，缓存的插件页面已刷新。');
-    }
-    if (item.ready) finishAction('reload', {
-      started_at: item.started_at,
-      message: `插件重载完成，当前已加载 ${Object.keys(state.plugins).length} 个插件。`,
-    });
+    const run = () => onPluginsEvent(item);
+    state.pluginEventChain = state.pluginEventChain.then(run, run);
+    await state.pluginEventChain;
   } else if (item.type === 'accounts') {
     if (!state.dirty) await loadAccounts();
     await loadTerminals();
