@@ -105,7 +105,10 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                 patch_conf = json.loads(patch_conf_f.read())
         except Exception:
             preLoadPrint(f"patch config from [{patch_conf_path}] ... not hit")
-            releaseDir('./conf')
+            # 确保 patch_conf_path 的父目录存在，支持自定义嵌套路径
+            patch_conf_dir = os.path.dirname(patch_conf_path)
+            if patch_conf_dir:
+                releaseDir(patch_conf_dir)
             # 若 config.json 不存在，自动释放最小模板供用户参照编辑
             if not os.path.exists(patch_conf_path):
                 try:
