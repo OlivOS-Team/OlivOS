@@ -15,7 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 # 将免构建前端写入 staticData.py，无需修改 spec。该文件由 main/dev 合并后的 CI 自动重新生成，PR 请勿携带其改动。
-# 本地调试前端请设 OLIVOS_WEBUI_STATIC 指向 OlivOS/webUI/static，直接读取源码资源。
+# 嵌入产物仅供盘上无 static 目录的部署形态（pip/打包）回退；源码运行直接服务 OlivOS/webUI/static。
 
 import base64
 from pathlib import Path

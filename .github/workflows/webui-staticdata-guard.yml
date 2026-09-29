@@ -12,5 +12,5 @@ jobs:
       - name: Reject PR changes to staticData.py
         run: |
           echo '::error::OlivOS/webUI/staticData.py 是免构建前端的嵌入产物，由目标分支合并后的 CI 自动生成，PR 请勿携带该文件的改动。'
-          echo '请在 PR 分支执行 git restore --source=<合并基点> -- OlivOS/webUI/staticData.py 并提交（合并基点可用 git merge-base <目标分支> HEAD 取得）；本地调试前端请设置环境变量 OLIVOS_WEBUI_STATIC 指向 OlivOS/webUI/static。'
+          echo '请在 PR 分支执行 git restore --source=<合并基点> -- OlivOS/webUI/staticData.py 并提交（合并基点可用 git merge-base <目标分支> HEAD 取得）；源码运行默认直接服务 OlivOS/webUI/static，无需重新生成该文件。'
           exit 1

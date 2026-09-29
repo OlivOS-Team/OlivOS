@@ -106,7 +106,7 @@ pip install .[py37]
 python main.py
 ```
 + 调试 WebUI 前端  
-`OlivOS/webUI/staticData.py` 为免构建前端的嵌入产物，由 CI 在合并入 `main`/`dev` 后自动重新生成，贡献时请勿在 PR 中携带该文件的改动；本地调试前端可设置环境变量 `OLIVOS_WEBUI_STATIC` 指向 `OlivOS/webUI/static`，直接读取源码资源而无需重新生成。  
+`OlivOS/webUI/staticData.py` 为免构建前端的嵌入产物，仅供 pip/打包等盘上无 `OlivOS/webUI/static` 的形态回退使用，由 CI 在合并入 `main`/`dev` 后自动重新生成，贡献时请勿在 PR 中携带该文件的改动；源码运行默认直接服务 `OlivOS/webUI/static`，改前端刷新即生效，无需重新生成（`OLIVOS_WEBUI_STATIC` 仍可用于指向其他前端目录）。  
 可选启用本地提交拦截（误暂存该文件时 commit 直接报错）：`git config core.hooksPath script/git-hooks`
 
 ### Pypi版本
