@@ -33,5 +33,15 @@ jobs:
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add OlivOS/webUI/staticData.py
             git commit -m 'chore(webUI): 合并后自动重新生成 staticData.py [skip ci]'
-            git push origin HEAD:${{ github.ref_name }}
+            # 并发 push 时远端可能已前进，rebase 到最新 HEAD 并按新树重新生成后再推
+            git push origin HEAD:${{ github.ref_name }} || {
+              git fetch origin ${{ github.ref_name }}
+              git rebase FETCH_HEAD
+              python ./script/embed_webui.py
+              if ! git diff --quiet -- OlivOS/webUI/staticData.py; then
+                git add OlivOS/webUI/staticData.py
+                git commit --amend --no-edit
+              fi
+              git push origin HEAD:${{ github.ref_name }}
+            }
           fi
