@@ -14,7 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
-# 将免构建前端写入 staticData.py；发布前运行一次，无需修改 spec。
+# 将免构建前端写入 staticData.py，无需修改 spec。该文件由 main/dev 合并后的 CI 自动重新生成，PR 请勿携带其改动；本地调试前端请设 OLIVOS_WEBUI_STATIC 指向 OlivOS/webUI/static。
 
 import base64
 from pathlib import Path

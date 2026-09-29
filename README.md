@@ -105,6 +105,8 @@ pip install .[py37]
 ```
 python main.py
 ```
++ 调试 WebUI 前端  
+`OlivOS/webUI/staticData.py` 为免构建前端的嵌入产物，由 CI 在合并入 `main`/`dev` 后自动重新生成，贡献时请勿在 PR 中携带该文件的改动；本地调试前端可设置环境变量 `OLIVOS_WEBUI_STATIC` 指向 `OlivOS/webUI/static`，直接读取源码资源而无需重新生成。
 
 ### Pypi版本
 OlivOS的核心组件部分已经被充分集成，并作为Pypi库进行了发布，你同样也可以使用`pip`来获取这个版本并将OlivOS作为库加以使用。  
