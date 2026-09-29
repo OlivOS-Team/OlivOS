@@ -53,6 +53,8 @@ setuptools.setup(
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),
+    include_package_data=True,
+    package_data={'OlivOS.webUI': ['static/*']},
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: GNU Affero General Public License v3',
