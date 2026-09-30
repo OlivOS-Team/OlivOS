@@ -32,7 +32,7 @@ import aiohttp
 import pytest
 
 import OlivOS
-from OlivOS.webUI import pageAPI, serverAPI, staticData
+from OlivOS.webUI import pageAPI, serverAPI
 
 
 def account(account_id=10001):
@@ -158,7 +158,8 @@ def test_logo_is_available_before_login(host):
     response = client.get('/static/logo.png')
     assert response.status_code == 200
     assert response.mimetype == 'image/png'
-    assert response.data == base64.b64decode(staticData.FILES['logo.png'])
+    logo = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static/logo.png'
+    assert response.data == logo.read_bytes()
     html = client.get('/').get_data(as_text=True)
     assert 'conf/webui_token.txt' in html
     assert html.count('class="brand-logo"') == 2
@@ -834,11 +835,9 @@ def test_plugin_list_preserves_gui_and_adds_webui(host):
 
 
 def test_packaging_and_shallow_config():
-    root = Path(__file__).resolve().parents[1]
-    for name, encoded in staticData.FILES.items():
-        source = root / 'OlivOS/webUI/static' / name
-        expected = source.read_bytes() if source.suffix == '.png' else source.read_text(encoding='utf-8').encode()
-        assert base64.b64decode(encoded) == expected
+    static_root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static'
+    for name in serverAPI.STATIC_ASSET_NAMES:
+        assert (static_root / name).is_file()
     user_config = {'system': {}, 'models': {}}
     assert 'OlivOS_webUI' not in user_config.get('models', {})
     patched = OlivOS.bootAPI.get_patch_config(copy.deepcopy(OlivOS.bootDataAPI.default_Conf), user_config)

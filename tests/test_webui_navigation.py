@@ -3,13 +3,12 @@
 import os
 import queue
 import threading
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import OlivOS
-from OlivOS.webUI import resourceAPI, serverAPI, staticData
+from OlivOS.webUI import resourceAPI, serverAPI
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -39,14 +38,6 @@ window.addEventListener('message', event => {
   document.getElementById('reply').textContent = event.data.payload.text;
 });
 </script></html>'''
-
-
-def test_embedded_navigation_assets_match_sources():
-    import base64
-
-    root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static'
-    for name in ('app.js', 'style.css'):
-        assert base64.b64decode(staticData.FILES[name]) == root.joinpath(name).read_text(encoding='utf-8').encode()
 
 
 @pytest.fixture
