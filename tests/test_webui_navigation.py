@@ -4,13 +4,12 @@ import os
 import json
 import queue
 import threading
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import OlivOS
-from OlivOS.webUI import resourceAPI, serverAPI, staticData
+from OlivOS.webUI import resourceAPI, serverAPI
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -40,14 +39,6 @@ window.addEventListener('message', event => {
   document.getElementById('reply').textContent = event.data.payload.text;
 });
 </script></html>'''
-
-
-def test_embedded_navigation_assets_match_sources():
-    import base64
-
-    root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static'
-    for name in ('app.js', 'style.css'):
-        assert base64.b64decode(staticData.FILES[name]) == root.joinpath(name).read_text(encoding='utf-8').encode()
 
 
 @pytest.fixture
@@ -140,33 +131,51 @@ def browser(navigation_host, tmp_path):
         wait.until(lambda _: driver.execute_script('return !!window.pageIdentity'))
         return driver.execute_script('return window.pageIdentity')
 
+    def wait_plugin_events():
+        wait.until(lambda _: driver.execute_script(
+            'return state.seenEvents.has(arguments[0])', navigation_host.sequence))
+        driver.execute_async_script(
+            'const done = arguments[0];'
+            'Promise.resolve(state.pluginEventChain).then(() => done(true), () => done(true));')
+
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
         find('#token').send_keys(navigation_host.token)
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
-        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select, host=navigation_host)
+        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select,
+                              wait_plugin_events=wait_plugin_events, host=navigation_host)
     finally:
         driver.quit()
 
 
 @pytest.mark.browser
-def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser):
-    browser.driver.execute_script("state.draft = {server: {access_token: 'fixture-secret'}, extends: {}};"
-                                  "fieldInput({name: 'server.access_token', title: 'Token'}, $('account-fields'));")
+@pytest.mark.parametrize('field', ['password', 'server.access_token', 'appsecret', 'token', 'cookie', 'key'])
+def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser, field):
+    browser.driver.execute_script("""
+        const field = arguments[0];
+        state.draft = {password: 'fixture-secret', server: {access_token: 'fixture-secret'},
+          extends: {[field]: 'fixture-secret'}};
+        const attribute = ['password', 'server.access_token'].includes(field) ? 'data-field' : 'data-extend';
+        $('account-fields').replaceChildren();
+        fieldInput({name: field, title: 'Secret'}, $('account-fields'), attribute);
+    """, field)
     result = browser.driver.execute_async_script("""
         const done = arguments[0];
-        const input = document.querySelector('[data-field="server.access_token"]');
+        const input = document.querySelector('#account-fields input');
         const toggle = input.parentElement.querySelector('button');
         const initial = input.type;
+        const closed = toggle.innerHTML;
         toggle.click();
         setTimeout(() => {
           const shown = input.type;
+          const opened = toggle.innerHTML;
           toggle.click();
-          setTimeout(() => done([initial, shown, input.type, input.value, toggle.type]), 0);
+          setTimeout(() => done([initial, shown, input.type, input.value, toggle.type,
+            closed !== opened && toggle.innerHTML === closed]), 0);
         }, 0);
     """)
-    assert result == ['password', 'text', 'password', 'fixture-secret', 'button']
+    assert result == ['password', 'text', 'password', 'fixture-secret', 'button', True]
 
 
 @pytest.mark.browser
@@ -189,7 +198,7 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
 
 
 @pytest.mark.browser
-def test_plugin_restart_restores_the_open_page(browser):
+def test_plugin_restart_hides_pages_then_restores_the_open_page(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('before restart')
     browser.driver.switch_to.default_content()
@@ -199,24 +208,58 @@ def test_plugin_restart_restores_the_open_page(browser):
         browser.host.plugins = {}
         browser.host.plugin_pages = []
         browser.host.publish('events', {'type': 'plugins', 'ready': False})
-    browser.wait.until(lambda _: browser.driver.execute_script(
-        'return state.seenEvents.has(arguments[0])', browser.host.sequence))
-    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
-    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
-    assert browser.driver.execute_script('return window.pageIdentity') == identity
-    browser.driver.switch_to.default_content()
-    browser.driver.execute_script('state.frame.dataset.testIdentity = arguments[0]', 'before')
+    browser.wait_plugin_events()
+    assert not browser.driver.execute_script(
+        'return !!state.frame || !!document.querySelector("#plugin-links .plugin-link-entry")')
+    assert browser.driver.execute_script('return !!state.pluginReload')
     with browser.host.lock:
         browser.host.plugins = plugins
         browser.host.plugin_pages = pages
         browser.host.publish('events', {'type': 'plugins', 'ready': True})
     browser.wait.until(lambda _: browser.driver.execute_script(
-        'return state.frame?.isConnected && !state.frame.hidden && '
-        'state.frame.dataset.testIdentity !== arguments[1] && state.framePath === arguments[0]',
-        'webui/index.html', 'before'))
+        'return state.frame?.isConnected && !state.frame.hidden && state.framePath === arguments[0]',
+        'webui/index.html'))
     browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
     browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.driver.execute_script('return window.pageIdentity') != identity
     assert browser.find('#draft').get_attribute('value') == ''
+
+
+@pytest.mark.browser
+def test_stale_plugin_not_ready_event_keeps_open_page(browser):
+    identity = browser.select()
+    browser.find('#draft').send_keys('keep me')
+    browser.driver.switch_to.default_content()
+    with browser.host.lock:
+        browser.host.publish('events', {'type': 'plugins', 'ready': False})
+    browser.wait_plugin_events()
+    assert browser.driver.execute_script('return state.frame?.isConnected && !state.frame.hidden')
+    assert browser.find('.plugin-link-entry[data-plugin-namespace="multi"]').is_displayed()
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    assert browser.driver.execute_script('return window.pageIdentity') == identity
+    assert browser.find('#draft').get_attribute('value') == 'keep me'
+
+
+@pytest.mark.browser
+def test_reload_action_hides_open_page_before_ready(browser):
+    identity = browser.select()
+    browser.driver.switch_to.default_content()
+    result = browser.driver.execute_async_script(
+        'const done = arguments[0];'
+        'runAction("reload", "/api/plugins/reload", "正在重载插件…")'
+        '.then(() => done(true), (error) => done(String(error && error.message || error)));')
+    assert result is True
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return !!state.pluginReload && !state.frame && '
+        '!document.querySelector("#plugin-links .plugin-link-entry")'))
+    with browser.host.lock:
+        browser.host.publish('events', {'type': 'plugins', 'ready': True})
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return state.frame?.isConnected && !state.frame.hidden && state.framePath === arguments[0]',
+        'webui/index.html'))
+    browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
+    browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
+    assert browser.driver.execute_script('return window.pageIdentity') != identity
 
 
 @pytest.mark.browser

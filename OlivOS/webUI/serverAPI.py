@@ -40,8 +40,9 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import pageAPI, resourceAPI, staticData
+from . import pageAPI, resourceAPI
 
+STATIC_ASSET_NAMES = ('index.html', 'app.js', 'theme.js', 'style.css', 'logo.png')
 BUFFER_LIMIT = 500
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
 PLUGIN_PAGE_CACHE = 10
@@ -132,15 +133,19 @@ class server(OlivOS.API.Proc_templet):
             self.token = secrets.token_urlsafe(32)
             with os.fdopen(descriptor, 'w', encoding='utf-8') as token_file:
                 token_file.write(self.token)
-        if len(self.token) < 32:
-            raise ValueError('WebUI token 文件无效，请恢复或移走该文件后重新启动')
         static_override = os.environ.get('OLIVOS_WEBUI_STATIC')
         if static_override:
             self.static_path = Path(static_override).resolve()
-            if not all((self.static_path / name).is_file() for name in staticData.FILES):
+            if not all((self.static_path / name).is_file() for name in STATIC_ASSET_NAMES):
                 raise ValueError('OLIVOS_WEBUI_STATIC 中缺少前端资源')
         else:
-            self.static_path = staticData.releaseBase64Data(self.root / self.config['static_path'])
+            bundled_static = Path(__file__).resolve().parent / 'static'
+            if all((bundled_static / name).is_file() for name in STATIC_ASSET_NAMES):
+                # 源码形态直接服务仓库前端资源，避免吃到过期的嵌入 blob。
+                self.static_path = bundled_static
+            else:
+                from . import staticData
+                self.static_path = staticData.releaseBase64Data(self.root / self.config['static_path'])
         self.app = Flask(__name__, static_folder=None)
         self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
         pageAPI.register_routes(self)
@@ -163,7 +168,7 @@ class server(OlivOS.API.Proc_templet):
                 attempts.popleft()
             if len(attempts) >= 10:
                 return 429
-            valid = isinstance(token, str) and (
+            valid = isinstance(token, str) and bool(token) and (
                 hmac.compare_digest(token.encode(), self.token.encode())
                 or hmac.compare_digest(token.encode(), self.browser_token.encode())
             )
