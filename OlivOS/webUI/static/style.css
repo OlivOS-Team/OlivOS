@@ -985,3 +985,11 @@ dialog::backdrop {
 .secret-input { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .secret-input input { flex: 1; min-width: 0; width: 100%; }
 .secret-toggle { flex: 0 0 auto; padding: 8px 10px; }
+/* 插件优先级编辑。 */
+.hint { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.hint.danger { color: var(--danger); }
+.priority-cell { white-space: nowrap; }
+.priority-editor { display: flex; align-items: center; gap: 6px; }
+.priority-input { width: 110px; min-width: 90px; padding: 6px 8px; }
+.priority-editor button { padding: 6px 10px; }
+.priority-source { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }

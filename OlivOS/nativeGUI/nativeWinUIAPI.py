@@ -18,6 +18,7 @@ import OlivOS
 
 import base64
 import os
+import json
 import pystray
 import tkinter
 import tkinter.messagebox
@@ -46,6 +47,7 @@ dictColorContext = {
 
 gTerminalDataMax = 128
 gTerminalDataStep = 8
+gPluginPriorityLimit = 2 ** 31
 
 
 class dock(OlivOS.API.Proc_templet):
@@ -758,13 +760,13 @@ class dock(OlivOS.API.Proc_templet):
 
     def updateShallowMenuAccountListSend(self):
         self.sendRxEvent('send', {
-                'target': {
-                    'type': 'nativeWinUI'
-                },
-                'data': {
-                    'action': 'update_account_list'
-                }
+            'target': {
+                'type': 'nativeWinUI'
+            },
+            'data': {
+                'action': 'update_account_list'
             }
+        }
         )
 
     def updateShallowMenuList(self):
@@ -1245,6 +1247,77 @@ class dock(OlivOS.API.Proc_templet):
             }
         )
 
+    def pluginPriorityInfo(self, pluginNameSpace):
+        priority_dict = self.UIData.get('shallow_plugin_priority_dict', {})
+        return priority_dict.get(pluginNameSpace, {})
+
+    def sendPluginPriority(self, pluginNameSpace, priority):
+        """写入 conf/plugin_priority.json 并让插件加载器热生效；priority=None 表示恢复默认。"""
+        priority_path = os.path.join(self.webui_root, OlivOS.pluginAPI.plugin_priority_path)
+        try:
+            with open(priority_path, 'r', encoding='utf-8') as priority_file:
+                document = json.loads(priority_file.read())
+            if not isinstance(document, dict) or not isinstance(document.get('plugins', {}), dict):
+                raise ValueError
+        except FileNotFoundError:
+            document = {'version': 1, 'plugins': {}}
+        except (OSError, ValueError):
+            tkinter.messagebox.showerror('插件优先级', '插件优先级文件格式错误，请先修复 conf/plugin_priority.json')
+            return False
+        document.setdefault('version', 1)
+        document.setdefault('plugins', {})
+        if priority is None:
+            document['plugins'].pop(pluginNameSpace, None)
+        elif isinstance(document['plugins'].get(pluginNameSpace), dict):
+            document['plugins'][pluginNameSpace]['priority'] = priority
+        else:
+            document['plugins'][pluginNameSpace] = {'priority': priority}
+        try:
+            os.makedirs(os.path.dirname(priority_path), exist_ok=True)
+            with open(priority_path, 'w', encoding='utf-8') as priority_file:
+                json.dump(document, priority_file, ensure_ascii=False, indent=4)
+                priority_file.write('\n')
+        except OSError as e:
+            tkinter.messagebox.showerror('插件优先级', '插件优先级保存失败: %s' % str(e))
+            return False
+        self.sendControlEventSend(
+            'send', {
+                'target': {
+                    'type': 'plugin',
+                    'fliter': 'control_only'
+                },
+                'data': {
+                    'action': 'plugin_priority_reload'
+                }
+            }
+        )
+        return True
+
+    def setPluginPriorityTop(self, pluginNameSpace):
+        priority_dict = self.UIData.get('shallow_plugin_priority_dict', {})
+        priority_list = [
+            item_this.get('effective') for item_this in priority_dict.values()
+            if type(item_this.get('effective')) is int
+        ]
+        if len(priority_list) > 0:
+            priority_top = min(priority_list) - 1
+            if priority_top < 0:
+                tkinter.messagebox.showerror('插件优先级', '已有插件使用优先级 0，无法再靠前。')
+                return
+            self.sendPluginPriority(pluginNameSpace, priority_top)
+
+    def setPluginPriorityBottom(self, pluginNameSpace):
+        priority_dict = self.UIData.get('shallow_plugin_priority_dict', {})
+        priority_list = [
+            item_this.get('effective') for item_this in priority_dict.values()
+            if type(item_this.get('effective')) is int
+        ]
+        if len(priority_list) > 0:
+            self.sendPluginPriority(pluginNameSpace, max(priority_list) + 1)
+
+    def resetPluginPriority(self, pluginNameSpace):
+        self.sendPluginPriority(pluginNameSpace, None)
+
     def sendControlEventSend(self, action, data):
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
@@ -1476,7 +1549,7 @@ class BaseTerminalUI:
         self.UIObject['tree']['show'] = 'headings'
         self.UIObject['tree']['columns'] = ('DATA',)
         # 计算列宽（基于窗口宽度）
-        width = int(self.WINDOW_SIZE.split('x')[0]) - 15*2 - 18 - 5
+        width = int(self.WINDOW_SIZE.split('x')[0]) - 15 * 2 - 18 - 5
         self.UIObject['tree'].column('DATA', width=width)
         self.UIObject['tree'].heading('DATA', text='日志')
         self.UIObject['tree']['selectmode'] = 'browse'
@@ -1551,16 +1624,16 @@ class BaseTerminalUI:
     def _get_input_y(self):
         """输入框的Y坐标（基于窗口高度）"""
         height = int(self.WINDOW_SIZE.split('x')[1])
-        return height - 15*1 - 24
+        return height - 15 * 1 - 24
 
     def _get_input_width(self):
         """输入框宽度"""
         width = int(self.WINDOW_SIZE.split('x')[0])
-        return width - 15*2
+        return width - 15 * 2
 
     def _get_button_x(self):
         width = int(self.WINDOW_SIZE.split('x')[0])
-        return width - 15*2 - 5
+        return width - 15 * 2 - 5
 
     def _get_input_label_text(self):
         """输入框前的标签文字（一般不需要）"""
@@ -2185,33 +2258,33 @@ class VirtualTerminalUI(BaseTerminalUI):
             # 账号名称
             self._root_Entry_init(
                 obj_root='root', obj_name='root_entry_user_name', str_name='StringVar_user_name',
-                x=15+80, y=15+30*0, width_t=80, width=300-15*2-80, height=24,
+                x=15 + 80, y=15 + 30 * 0, width_t=80, width=300 - 15 * 2 - 80, height=24,
                 action=None, title='账号名称:\t'
             )
             # 账号ID
             self._root_Entry_init(
                 obj_root='root', obj_name='root_entry_user_id', str_name='StringVar_user_id',
-                x=15+80, y=15+30*1, width_t=80, width=300-15*2-80, height=24,
+                x=15 + 80, y=15 + 30 * 1, width_t=80, width=300 - 15 * 2 - 80, height=24,
                 action=None, title='账号ID:\t'
             )
             # 是否为群复选框
             self.UIData['BoolVar_flag_group'] = tkinter.BooleanVar()
             self._root_Checkbutton_init(
                 obj_root='root', obj_name='root_checkbutton_flag_group', str_name='BoolVar_flag_group',
-                x=15+80, y=15+30*2, width_t=80, width=300-15*2-80, height=24,
+                x=15 + 80, y=15 + 30 * 2, width_t=80, width=300 - 15 * 2 - 80, height=24,
                 action=lambda: self.UIData['BoolVar_flag_group'].set(not self.UIData['BoolVar_flag_group'].get()),
                 title='是否为群:\t'
             )
             # 群组ID
             self._root_Entry_init(
                 obj_root='root', obj_name='root_entry_group_id', str_name='StringVar_group_id',
-                x=15+80, y=15+30*3, width_t=80, width=300-15*2-80, height=24,
+                x=15 + 80, y=15 + 30 * 3, width_t=80, width=300 - 15 * 2 - 80, height=24,
                 action=None, title='群组ID:\t'
             )
             # 群组角色下拉框
             self._root_ComboBox_init(
                 obj_root='root', obj_name='root_combobox_group_role', str_name='StringVar_group_role',
-                x=15+80, y=15+30*4, width_t=80, width=300-15*2-80, height=24,
+                x=15 + 80, y=15 + 30 * 4, width_t=80, width=300 - 15 * 2 - 80, height=24,
                 action=["owner", "admin", "member", "unknown"], title='群组角色:\t'
             )
             # 加载现有数据
@@ -2220,9 +2293,9 @@ class VirtualTerminalUI(BaseTerminalUI):
         def _build_save_button(self):
             self._root_Button_init(
                 name='root_button_save', text='保存并返回', command=self._save_and_close,
-                x=15+80, y=15+30*5, width=300-15*2-80, height=24
+                x=15 + 80, y=15 + 30 * 5, width=300 - 15 * 2 - 80, height=24
             )
-            self.UIObject['root_button_save'].place(x=15+80, y=15+30*5, width=300-15*2-80, height=24)
+            self.UIObject['root_button_save'].place(x=15 + 80, y=15 + 30 * 5, width=300 - 15 * 2 - 80, height=24)
 
         def _init_style(self):
             self.UIData['style'] = ttk.Style(self.UIObject['root'])
@@ -2238,7 +2311,7 @@ class VirtualTerminalUI(BaseTerminalUI):
             # 简化版复选框初始化
             self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
             self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
-            self.UIObject[obj_name + '=Label'].place(x=x-width_t, y=y, width=width_t, height=height)
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
             self.UIObject[obj_name] = ttk.Checkbutton(
                 self.UIObject[obj_root],
                 variable=self.UIData[str_name],
@@ -2251,7 +2324,7 @@ class VirtualTerminalUI(BaseTerminalUI):
         def _root_ComboBox_init(self, obj_root, obj_name, str_name, x, y, width_t, width, height, action, title=''):
             self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
             self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
-            self.UIObject[obj_name + '=Label'].place(x=x-width_t, y=y, width=width_t, height=height)
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
             self.UIData[str_name] = tkinter.StringVar()
             self.UIObject[obj_name] = ttk.Combobox(
                 self.UIObject[obj_root], textvariable=self.UIData[str_name], values=action, state='readonly'
@@ -2266,7 +2339,7 @@ class VirtualTerminalUI(BaseTerminalUI):
             # 带标签的Entry
             self.UIObject[obj_name + '=Label'] = tkinter.Label(self.UIObject[obj_root], text=title)
             self.UIObject[obj_name + '=Label'].configure(bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'])
-            self.UIObject[obj_name + '=Label'].place(x=x-width_t, y=y, width=width_t, height=height)
+            self.UIObject[obj_name + '=Label'].place(x=x - width_t, y=y, width=width_t, height=height)
             self.UIData[str_name] = tkinter.StringVar()
             self.UIObject[obj_name] = tkinter.Entry(self.UIObject[obj_root], textvariable=self.UIData[str_name])
             self.UIObject[obj_name].configure(bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0)
@@ -2556,7 +2629,7 @@ class pluginManageUI(object):
             x=530,
             y=85,
             width=140,
-            height=300
+            height=240
         )
         self.UIData['root_Label_INFO_StringVar'].set('未选定插件')
 
@@ -2564,6 +2637,16 @@ class pluginManageUI(object):
             name='root_Button_RESTART',
             text='重载插件',
             command=lambda: self.sendPluginRestart(),
+            x=530,
+            y=(500 - 34 - 15 - 40 * 3),
+            width=140,
+            height=34
+        )
+
+        self.tree_UI_Button_init(
+            name='root_Button_PRIORITY',
+            text='修改优先级',
+            command=lambda: self.startPluginPriorityEdit(),
             x=530,
             y=(500 - 34 - 15 - 40 * 2),
             width=140,
@@ -2636,7 +2719,11 @@ class pluginManageUI(object):
             if self.root.UIData['shallow_plugin_data_dict'] is not None:
                 tmp_plugin_menu_dict = self.root.UIData['shallow_plugin_data_dict']
 
-                # 收集所有插件并按优先级排序
+                # 收集所有插件并按生效顺序排列
+                priority_order = self.root.UIData.get('shallow_plugin_order_list', [])
+                priority_rank = {}
+                for order_index, order_namespace in enumerate(priority_order):
+                    priority_rank[order_namespace] = order_index
                 plugin_list = []
                 for plugin_namespace in tmp_plugin_menu_dict:
                     plugin_this = tmp_plugin_menu_dict[plugin_namespace]
@@ -2660,8 +2747,11 @@ class pluginManageUI(object):
                         'full_path': full_path
                     })
 
-                # 按优先级排序
-                sorted_plugins = sorted(plugin_list, key=lambda x: x['priority'])
+                # 缺少生效顺序时回退到优先级排序
+                sorted_plugins = sorted(plugin_list, key=lambda x: (
+                    priority_rank.get(x['namespace'], len(priority_rank) + x['priority']),
+                    x['namespace']
+                ))
 
                 # 插入到树中
                 for plugin_data in sorted_plugins:
@@ -2773,6 +2863,99 @@ class pluginManageUI(object):
             if action == '<Leave>':
                 self.UIObject[name].configure(bg=self.UIConfig['color_003'])
 
+    def startPluginPriorityEdit(self, pluginNameSpace=None):
+        """打开优先级编辑窗口。"""
+        if pluginNameSpace is None:
+            selected_item = self.UIObject['tree'].focus()
+            pluginNameSpace = self.UIData['item_namespace_map'].get(selected_item, None)
+        if not pluginNameSpace or pluginNameSpace not in self.root.UIData['shallow_plugin_data_dict']:
+            tkinter.messagebox.showinfo('插件优先级', '请先选择一个插件。')
+            return
+        priority_info = self.root.pluginPriorityInfo(pluginNameSpace)
+        priority_effective = priority_info.get('effective')
+        if type(priority_effective) is not int:
+            priority_effective = OlivOS.pluginAPI.plugin_priority_default
+
+        dialog = tkinter.Toplevel(self.UIObject['root'])
+        dialog.title('修改插件优先级')
+        dialog.geometry('420x210')
+        dialog.resizable(width=False, height=False)
+        dialog.configure(bg=self.UIConfig['color_001'])
+        dialog.transient(self.UIObject['root'])
+        dialog.grab_set()
+
+        def dialog_button(text, command, x):
+            node = tkinter.Button(
+                dialog, text=text, command=command, bd=0,
+                activebackground=self.UIConfig['color_002'],
+                activeforeground=self.UIConfig['color_001'],
+                bg=self.UIConfig['color_003'],
+                fg=self.UIConfig['color_004'],
+                relief='groove'
+            )
+            node.bind('<Enter>', lambda event: node.configure(bg=self.UIConfig['color_006']))
+            node.bind('<Leave>', lambda event: node.configure(bg=self.UIConfig['color_003']))
+            node.place(x=x, y=160, width=120, height=34)
+            return node
+
+        def close_dialog():
+            try:
+                dialog.grab_release()
+            except tkinter.TclError:
+                pass
+            dialog.destroy()
+
+        def commit_priority(priority):
+            if self.root.sendPluginPriority(pluginNameSpace, priority):
+                close_dialog()
+
+        def commit_priority_input():
+            try:
+                priority_value = int(self.UIData['plugin_priority_edit_value'].get().strip())
+            except ValueError:
+                tkinter.messagebox.showerror('插件优先级', '请输入整数优先级。')
+                return
+            if not 0 <= priority_value <= gPluginPriorityLimit:
+                tkinter.messagebox.showerror('插件优先级', '优先级必须是非负整数。')
+                return
+            commit_priority(priority_value)
+
+        tkinter.Label(
+            dialog, text=self.root.UIData['shallow_plugin_data_dict'][pluginNameSpace][0],
+            bg=self.UIConfig['color_001'], fg=self.UIConfig['color_004'], anchor='w'
+        ).place(x=20, y=15, width=380, height=24)
+        tkinter.Label(
+            dialog, text='优先级数字越小越优先；优先级只影响事件分发顺序，不会改变插件加载顺序。',
+            bg=self.UIConfig['color_001'], fg=self.UIConfig['color_002'],
+            justify='left', anchor='nw', wraplength=380
+        ).place(x=20, y=45, width=380, height=36)
+        tkinter.Label(
+            dialog, text='优先级', bg=self.UIConfig['color_001'],
+            fg=self.UIConfig['color_004'], anchor='w'
+        ).place(x=20, y=90, width=60, height=30)
+        self.UIData['plugin_priority_edit_value'] = tkinter.StringVar(dialog, value=str(priority_effective))
+        priority_entry = tkinter.Entry(
+            dialog, textvariable=self.UIData['plugin_priority_edit_value'],
+            bg=self.UIConfig['color_004'], fg=self.UIConfig['color_005'], bd=0, font=('TkDefaultFont 12')
+        )
+        priority_entry.place(x=90, y=90, width=310, height=30)
+        priority_entry.focus_set()
+        priority_entry.select_range(0, tkinter.END)
+        tkinter.Label(
+            dialog,
+            text='插件默认优先级：%s；点击“恢复默认”可删除本条覆盖。' % priority_info.get(
+                'default', priority_effective
+            ),
+            bg=self.UIConfig['color_001'], fg=self.UIConfig['color_002'], anchor='w'
+        ).place(x=20, y=125, width=380, height=20)
+        dialog_button('确定', commit_priority_input, 20)
+        dialog_button('恢复默认', lambda: commit_priority(None), 150)
+        dialog_button('取消', close_dialog, 280)
+        priority_entry.bind('<Return>', lambda event: commit_priority_input())
+        dialog.bind('<Escape>', lambda event: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        dialog.iconbitmap('./resource/tmp_favoricon.ico')
+
     def treeSelect(self, name, event):
         if name == 'tree':
             selected_item = self.UIObject['tree'].focus()
@@ -2790,9 +2973,19 @@ class pluginManageUI(object):
             tmp_priority_str = 'N/A'
             if plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
                 plugin_menu_now = self.root.UIData['shallow_plugin_data_dict'][plugin_namespace_now]
-                # 获取优先级
-                if len(plugin_menu_now) > 6:
-                    tmp_priority_str = str(plugin_menu_now[6])
+                # 获取生效优先级与用户覆盖值
+                priority_info = self.root.pluginPriorityInfo(plugin_namespace_now)
+                priority_effective = priority_info.get('effective')
+                if type(priority_effective) is not int and len(plugin_menu_now) > 6:
+                    priority_effective = plugin_menu_now[6]
+                if type(priority_info.get('user')) is int:
+                    tmp_priority_str = '%s（用户 %s / 默认 %s）' % (
+                        priority_effective,
+                        priority_info['user'],
+                        priority_info.get('default', 'N/A')
+                    )
+                elif type(priority_effective) is int:
+                    tmp_priority_str = '%s（默认）' % priority_effective
                 # 获取介绍
                 if type(plugin_menu_now[4]) is str:
                     if plugin_menu_now[4] != 'N/A':
@@ -2821,7 +3014,26 @@ class pluginManageUI(object):
 
         if plugin_namespace_now and plugin_namespace_now in self.root.UIData['shallow_plugin_data_dict']:
             plugin_menu_now = self.root.UIData['shallow_plugin_data_dict'][plugin_namespace_now]
-            if type(plugin_menu_now[3]) is list:
+            priority_info = self.root.pluginPriorityInfo(plugin_namespace_now)
+            self.UIObject['tree_rightkey_menu'].add_command(
+                label='修改优先级...',
+                command=lambda: self.startPluginPriorityEdit(plugin_namespace_now)
+            )
+            self.UIObject['tree_rightkey_menu'].add_command(
+                label='置顶',
+                command=lambda: self.root.setPluginPriorityTop(plugin_namespace_now)
+            )
+            self.UIObject['tree_rightkey_menu'].add_command(
+                label='置底',
+                command=lambda: self.root.setPluginPriorityBottom(plugin_namespace_now)
+            )
+            if type(priority_info.get('user')) is int:
+                self.UIObject['tree_rightkey_menu'].add_command(
+                    label='恢复默认优先级',
+                    command=lambda: self.root.resetPluginPriority(plugin_namespace_now)
+                )
+            self.UIObject['tree_rightkey_menu'].add_separator()
+            if type(plugin_menu_now[3]) is list and len(plugin_menu_now[3]) > 0:
                 for plugin_menu_this in plugin_menu_now[3]:
                     self.UIObject['tree_rightkey_menu'].add_command(
                         label=plugin_menu_this[0],
@@ -2831,7 +3043,7 @@ class pluginManageUI(object):
                         )
                     )
             else:
-                self.UIObject['tree_rightkey_menu'].add_command(label='无选项', command=None)
+                self.UIObject['tree_rightkey_menu'].add_command(label='无插件菜单', command=None)
         else:
             self.UIObject['tree_rightkey_menu'].add_command(label='未找到插件', command=None)
 

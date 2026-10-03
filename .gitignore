@@ -20,6 +20,7 @@ data/webui/
 conf/*.webui-backup
 tmp/
 
+.venv/
 .pytest_cache/
 .ruff_cache/
 .coverage*

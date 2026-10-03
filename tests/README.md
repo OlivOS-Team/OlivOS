@@ -63,7 +63,7 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | --- | --- | --- |
 | 账号配置 | `test_accounts.py` | 保存/读取、启停过滤、身份隔离、安全读取、端口分配 |
 | 消息结构 | `test_messages.py` | CQ/OP、OneBot V12、Milky、文本/提及/媒体/轻应用转换、无效输入 |
-| 插件调度 | `test_plugin_dispatch.py` | 调用顺序、阻断、平台过滤、异常捕获、未知账号和重载请求 |
+| 插件调度 | `test_plugin_dispatch.py` | 调用顺序与优先级覆盖、热重载、阻断、平台过滤、异常捕获、未知账号和重载请求 |
 | 插件 WebUI 资源 | `test_opk_webui_lifecycle.py` | 源码/OPK、路径与 namespace、init 资源、重载/卸载、文件占用、越界和链接限制 |
 | 账号与 SDK 边界 | `test_adapters.py` | 20 个适配器的账号映射、OneBot 消息/通知/请求、虚拟终端、活动时间、QQ webhook 验签 |
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
@@ -76,9 +76,10 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 日志 | `test_logging.py` | 文本清理、队列满、等级过滤、文件批量写入、GUI 转发 |
 | 原生终端 | `test_native_terminal.py` | 坏历史记录、特殊字符串、控件异常、限频与轮转、后续记录继续显示 |
 | 原生账号管理 | `test_native_accounts.py` | 托盘入口、编辑草稿隔离、新建/修改/删除、保存与热重载总线 |
-| WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态、日志与终端、插件事件、监听端口和重启反馈 |
+| 原生插件管理 | `test_native_plugins.py` | 生效顺序展示、用户/默认优先级标签、修改/置顶/置底/恢复默认与热重载 |
+| WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态、日志与终端、插件事件、优先级编辑、监听端口和重启反馈 |
 | WebUI 登录 | `test_webui_auth.py` | 凭据生命周期、并发登录、重启、错误提示、短暂断网和跨标签退出 |
-| WebUI 导航 | `test_webui_navigation.py` | 分组、重名、页面保活、消息回包、关闭、刷新恢复、响应布局、外部链接 |
+| WebUI 导航 | `test_webui_navigation.py` | 分组、重名、页面保活、消息回包、关闭、刷新恢复、响应布局、外部链接、优先级编辑 |
 | WebUI 环境配置 | `test_webui_environment.py` | 监听覆盖、无效输入、端口 0 与实际监听地址 |
 | 插件消息桥 | `test_webui_plugin_template.py` | 宿主菜单事件、浏览器 payload、会话隔离回包，无相邻仓库依赖 |
 
