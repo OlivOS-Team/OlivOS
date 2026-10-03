@@ -35,6 +35,7 @@ gCheckList = [
     'napcat_hide',
     'napcat_show',
     'napcat_show_new',
+    'napcat_show_new_9_9_19',
     'napcat_show_old'
 ]
 
@@ -162,7 +163,8 @@ class server(OlivOS.API.Proc_templet):
         if self.Proc_data['bot_info_dict'].platform['model'] in [
             'napcat',
             'napcat_show',
-            'napcat_show_new'
+            'napcat_show_new',
+            'napcat_show_new_9_9_19'
         ]:
             self.send_init_event()
         while self.flag_run:
@@ -459,6 +461,8 @@ class server(OlivOS.API.Proc_templet):
         )
 
     def sendControlEventSend(self, action, data):
+        if action == 'send' and data.get('target', {}).get('type') == 'nativeWinUI':
+            data['data']['account_platform'] = self.Proc_data['bot_info_dict'].platform.copy()
         if self.Proc_info.control_queue is not None:
             self.Proc_info.control_queue.put(
                 OlivOS.API.Control.packet(

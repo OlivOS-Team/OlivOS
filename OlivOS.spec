@@ -25,7 +25,9 @@ a = Analysis(
     hiddenimports=[
         'websockets.legacy.auth',
         'websockets.legacy.client',
-        'websockets.legacy.server'
+        'websockets.legacy.server',
+        'cryptography',
+        'cryptography.hazmat.primitives.asymmetric.ed25519'
     ],
     hookspath=['./hook'],
     runtime_hooks=[],

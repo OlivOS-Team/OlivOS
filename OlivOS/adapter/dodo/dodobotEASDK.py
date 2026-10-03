@@ -113,6 +113,15 @@ class event(object):
 
 # 支持OlivOS API事件生成的映射实现
 def get_Event_from_SDK(target_event):
+    payload = target_event.sdk_event.json
+    if (
+        not isinstance(payload, dict)
+        or not all(key in payload for key in ('FromChannel', 'Uid', 'Content', 'OriginalContent', 'Id', 'NickName'))
+        or not isinstance(payload['Content'], str)
+        or not isinstance(payload['OriginalContent'], str)
+    ):
+        target_event.active = False
+        return
     target_event.base_info['time'] = target_event.sdk_event.base_info['time']
     target_event.base_info['self_id'] = target_event.sdk_event.base_info['self_id']
     target_event.base_info['type'] = target_event.sdk_event.base_info['post_type']

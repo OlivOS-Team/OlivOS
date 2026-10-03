@@ -97,6 +97,16 @@ class BiliLiveBot(OlivOS.thirdPartyModule.blivedm.BLiveClient):
         handler = SDKHandler()
         self.add_handler(handler)
 
+    async def _on_ws_connect(self):
+        await super()._on_ws_connect()
+        if self.Proc is not None:
+            self.Proc.mark_live_link(True)
+
+    async def _on_ws_close(self):
+        await super()._on_ws_close()
+        if self.Proc is not None:
+            self.Proc.mark_live_link(False)
+
 
 class SDKHandler(OlivOS.thirdPartyModule.blivedm.BaseHandler):
     async def _on_danmaku(self, client: BiliLiveBot, message: OlivOS.thirdPartyModule.blivedm.models.DanmakuMessage):

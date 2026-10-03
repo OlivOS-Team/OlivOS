@@ -193,9 +193,12 @@ class api_templet(object):
 
             msg_res = None
             if req_type == 'POST':
-                msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                msg_res = req.request(
+                    "POST", send_url, headers=headers, data=payload,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                )
             elif req_type == 'GET':
-                msg_res = req.request("GET", send_url, headers=headers)
+                msg_res = req.request("GET", send_url, headers=headers, timeout=OlivOS.webTool.OlivOS_http_timeout)
 
             if self.bot_info.debug_mode:
                 if self.bot_info.debug_logger is not None:
@@ -311,7 +314,10 @@ class API(object):
 
                 msg_res = None
                 if req_type == 'POST':
-                    msg_res = req.request("POST", send_url, headers=headers, data=payload)
+                    msg_res = req.request(
+                        "POST", send_url, headers=headers, data=payload,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout
+                    )
 
                 self.res = msg_res.text
                 return msg_res.text
@@ -605,7 +611,10 @@ class event_action(object):
                         'User-Agent': OlivOS.infoAPI.OlivOS_Header_UA
                     }
                     msg_res = None
-                    msg_res = req.request("GET", send_url, headers=headers)
+                    msg_res = req.request(
+                        "GET", send_url, headers=headers,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout_transfer
+                    )
                     pic_file = msg_res.content
 
                 else:

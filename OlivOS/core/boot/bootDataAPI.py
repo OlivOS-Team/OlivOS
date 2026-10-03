@@ -25,6 +25,7 @@ default_Conf = {
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
+            "OlivOS_webUI",
             "OlivOS_astralqsign_lib_exe_model",
             "OlivOS_gocqhttp_lib_exe_model",
             "OlivOS_walleq_lib_exe_model",
@@ -35,12 +36,16 @@ default_Conf = {
             "OlivOS_OPQBot_link",
             "OlivOS_qqRed_link",
             "OlivOS_dingtalk_link",
+            "OlivOS_onebotV11_link",
+            "OlivOS_onebotV11_host",
             "OlivOS_plugin",
             "OlivOS_virtual_terminal_link",
             "OlivOS_flask_post_rx",
             "OlivOS_onebotV12_link",
+            "OlivOS_milky_auto",
             "OlivOS_qqGuild_link",
             "OlivOS_qqGuildv2_link",
+            "OlivOS_qqGuildv2_webhook",
             "OlivOS_discord_link",
             "OlivOS_telegram_poll",
             "OlivOS_fanbook_poll",
@@ -84,10 +89,14 @@ default_Conf = {
                 "OlivOS_qqRed_link",
                 "OlivOS_dingtalk_link",
                 "OlivOS_virtual_terminal_link",
+                "OlivOS_onebotV11_link",
+                "OlivOS_onebotV11_host",
+                "OlivOS_milky_auto",
                 "OlivOS_flask_post_rx",
                 "OlivOS_onebotV12_link",
                 "OlivOS_qqGuild_link",
                 "OlivOS_qqGuildv2_link",
+                "OlivOS_qqGuildv2_webhook",
                 "OlivOS_discord_link",
                 "OlivOS_telegram_poll",
                 "OlivOS_fanbook_poll",
@@ -111,10 +120,14 @@ default_Conf = {
                 "qqRed_link",
                 "dingtalk_link",
                 "terminal_link",
+                "onebotV11_link",
+                "onebotV11_host",
+                "milky_auto",
                 "flask_post_rx",
                 "onebotV12_link",
                 "qqGuild_link",
                 "qqGuildv2_link",
+                "qqGuildv2_webhook",
                 "discord_link",
                 "telegram_poll",
                 "fanbook_poll",
@@ -135,6 +148,7 @@ default_Conf = {
         "OlivOS_logger_queue",
         "OlivOS_dodobot_rx_queue",
         "OlivOS_nativeUI_rx_queue",
+        "OlivOS_webUI_rx_queue",
         "OlivOS_gocqhttp_lib_rx_queue",
         "OlivOS_walleq_lib_rx_queue",
         "OlivOS_cwcb_lib_rx_queue",
@@ -144,11 +158,35 @@ default_Conf = {
         "OlivOS_hackChat_queue",
         "OlivOS_OPQBot_queue",
         "OlivOS_biliLive_queue",
-        "OlivOS_onebotv12_queue",
+        "OlivOS_onebotV11_link_queue",
+        "OlivOS_onebotV11_host_queue",
+        "OlivOS_milky_auto_queue",
+        "OlivOS_onebotV12_queue",
         "OlivOS_qqRed_queue",
         "OlivOS_dingtalk_queue"
     ],
     "models": {
+        "OlivOS_webUI": {
+            "enable": True,
+            "name": "OlivOS_webUI",
+            "type": "webUI",
+            "interval": 0.02,
+            "dead_interval": 1,
+            "proc_mode": "threading",
+            "rx_queue": "OlivOS_webUI_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "server": {
+                "auto": False,
+                "type": "http",
+                "host": "127.0.0.1",
+                "port": 20480,
+                "token_path": "./conf/webui_token.txt",
+                "static_path": "./data/webui/static",
+                "buffer_limit": 500,
+                "plugin_page_cache": 10
+            }
+        },
         "OlivOS_sleep": {
             "enable": True,
             "name": "OlivOS_sleep",
@@ -240,7 +278,8 @@ default_Conf = {
             "mode": [
                 "console_color",
                 "logfile",
-                "native"
+                "native",
+                "web"
             ],
             "fliter": [2, 3, 4, 5]
         },
@@ -288,6 +327,30 @@ default_Conf = {
                 "port": 55001
             }
         },
+        "OlivOS_onebotV11_link": {
+            "enable": True,
+            "name": "OlivOS_onebotV11_link",
+            "type": "onebotV11_link",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_onebotV11_link_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_onebotV11_host": {
+            "enable": True,
+            "name": "OlivOS_onebotV11_host",
+            "type": "onebotV11_host",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_onebotV11_host_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
         "OlivOS_onebotV12_link": {
             "enable": True,
             "name": "OlivOS_onebotV12_link",
@@ -296,6 +359,18 @@ default_Conf = {
             "dead_interval": 1,
             "rx_queue": "OlivOS_onebotv12_queue",
             "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False
+        },
+        "OlivOS_milky_auto" : {
+            "enable": True,
+            "name": "OlivOS_milky_auto",
+            "type": "milky_auto",
+            "interval": 0.002,
+            "dead_interval": 1,
+            "rx_queue": "OlivOS_milky_auto_queue",
+            "tx_queue": "OlivOS_rx_queue",
+            "control_queue": "OlivOS_control_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False
         },
@@ -320,6 +395,26 @@ default_Conf = {
             "tx_queue": "OlivOS_rx_queue",
             "logger_proc": "OlivOS_logger",
             "debug": False
+        },
+        "OlivOS_qqGuildv2_webhook": {
+            "enable": True,
+            "name": "OlivOS_qqGuildv2_webhook",
+            "type": "qqGuildv2_webhook",
+            "interval": 0.2,
+            "dead_interval": 1,
+            "rx_queue": None,
+            "tx_queue": "OlivOS_rx_queue",
+            "logger_proc": "OlivOS_logger",
+            "debug": False,
+            "server": {
+                "auto": False,
+                "host": "0.0.0.0",
+                "port": 8080,
+                "xpath": "/OlivOSQQGuildv2Webhook",
+                "certdir": "./conf/ssl",
+                "cert": "./conf/ssl/cert.pem",
+                "key": "./conf/ssl/key.pem"
+            }
         },
         "OlivOS_discord_link": {
             "enable": True,
