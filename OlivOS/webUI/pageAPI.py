@@ -189,7 +189,7 @@ def load_accounts(host):
                 raise ValueError
         except (ValueError, AttributeError) as error:
             raise ValueError('账号文件格式错误，请先修复原文件') from error
-        return OlivOS.accountAPI.Account.load(str(host.account_path), _AccountReadLogger(host))
+        return OlivOS.accountAPI.Account.load(str(host.account_path), _AccountReadLogger(host), strict=True)
     return copy.deepcopy(host.accounts)
 
 

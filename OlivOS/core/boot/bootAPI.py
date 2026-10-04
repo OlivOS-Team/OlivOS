@@ -978,7 +978,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         OlivOS.accountAPI.Account.save(
                             path=basic_conf_models_this['data']['path'],
                             Account_data=account_bot_info_dict,
-                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
+                            logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                            protect_existing=True
                         )
                     elif basic_conf_models_this['type'] == 'gocqhttp_lib_exe_model':
                         if platform.system() == 'Windows':
