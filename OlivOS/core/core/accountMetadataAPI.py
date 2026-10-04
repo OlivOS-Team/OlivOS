@@ -285,7 +285,7 @@ accountTypeDataList_platform_sdk_model = {
             'napcat_show_old',
             'napcat_default',
             'llonebot_default',
-            'lagrange_default'
+            'lagrange_default',
             'milky_default',
             'yogurt_milky',
             'llonebot_milky',
