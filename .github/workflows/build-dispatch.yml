@@ -7,8 +7,10 @@ on:
         type: choice
         options:
           - windows-latest
+          - windows-11-arm
           - ubuntu-latest
           - macos-latest
+          - macos-26-intel
         default: windows-latest
       python-version:
         required: true
@@ -65,7 +67,15 @@ on:
         default: false
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    needs: lint
+    uses: ./.github/workflows/test.yml
+
   build-windows:
+    needs: test
     uses: ./.github/workflows/build-task-windows.yml
     with:
       name: OlivOS-Win
@@ -79,6 +89,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-linux:
+    needs: test
     uses: ./.github/workflows/build-task-linux.yml
     with:
       name: OlivOS-Linux
@@ -92,6 +103,7 @@ jobs:
       debug: ${{ inputs.debug }}
 
   build-macos:
+    needs: test
     uses: ./.github/workflows/build-task-macos.yml
     with:
       name: OlivOS-MacOS

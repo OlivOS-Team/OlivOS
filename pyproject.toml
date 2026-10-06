@@ -25,13 +25,16 @@ dependencies = [
     "Flask",
     "Werkzeug==2.2.2",
     "gevent",
-    "Pillow==9.3.0; platform_python_implementation != 'PyPy'",
+    "Pillow==9.3.0; platform_python_implementation != 'PyPy' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "Pillow==10.4.0; platform_python_implementation != 'PyPy' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "Pillow>=11.2.1; platform_python_implementation == 'PyPy'",
     "psutil",
     "pystray",
     "requests",
     "requests-toolbelt",
     "rsa",
+    "cryptography; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "cryptography==46.0.0; sys_platform == 'win32' and platform_machine == 'ARM64'",
     "websocket-client",
     "websockets",
     "aiohttp",
@@ -40,8 +43,8 @@ dependencies = [
     "pyjson5",
     "pywebview>=4.0.2",
     "filetype",
-    "grpcio",
-    "grpcio-tools",
+    "grpcio; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "grpcio-tools; sys_platform != 'win32' or platform_machine != 'ARM64'",
     "protobuf",
 ]
 
@@ -56,6 +59,7 @@ py37 = [
     "requests==2.28.1",
     "requests-toolbelt==0.9.1",
     "rsa==4.9",
+    "cryptography==3.4.8",
     "websocket-client==1.4.2",
     "websockets==10.1",
     "aiohttp==3.7.4",
@@ -81,7 +85,8 @@ pypywin = [
 # 打包工具
 build = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10'",
+    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "nuitka==2.8.10",
     "setuptools>=63.2.0",
 ]
@@ -89,7 +94,8 @@ build = [
 # pyinstaller打包工具
 pyinstaller = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10'",
+    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
     "setuptools>=63.2.0",
 ]
 
@@ -116,6 +122,8 @@ extend = [
     "prompt-toolkit",
     "regex",
     "rich",
+    "openai>=0.28.1,<1.0; python_version < '3.8'",
+    "openai>=1,<2; python_version >= '3.8'",
 ]
 
 # 开发工具
@@ -124,6 +132,13 @@ dev = [
     "black",
     "flake8",
     "ruff"
+]
+
+# 功能测试与覆盖率；浏览器验证单独按标记选择。
+test = [
+    "pytest>=7.4,<9",
+    "pytest-cov>=5,<7",
+    "selenium>=4.20,<5",
 ]
 
 [project.urls]
@@ -173,3 +188,39 @@ skip-magic-trailing-comma = false
 
 [tool.uv]
 python-preference = "managed"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "browser: real Chrome browser tests (OLIVOS_WEBUI_BROWSER=1)",
+    "native_gui: Windows native Tk terminal tests",
+]
+
+[tool.coverage.run]
+source = ["OlivOS"]
+branch = true
+relative_files = true
+omit = [
+    "OlivOS/thirdPartyModule/*",
+    "*/OlivOS/thirdPartyModule/*",
+    "OlivOS/core/inlineData/*",
+    "*/OlivOS/core/inlineData/*",
+    "OlivOS/webUI/staticData.py",
+    "*/OlivOS/webUI/staticData.py",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+omit = [
+    "OlivOS/thirdPartyModule/*",
+    "*/OlivOS/thirdPartyModule/*",
+    "OlivOS/core/inlineData/*",
+    "*/OlivOS/core/inlineData/*",
+    "OlivOS/webUI/staticData.py",
+    "*/OlivOS/webUI/staticData.py",
+]
+
+[tool.coverage.html]
+show_contexts = true

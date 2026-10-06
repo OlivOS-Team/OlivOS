@@ -35,6 +35,11 @@ modelName = 'pluginAPI'
 
 gProc = None
 
+plugin_priority_path = './conf/plugin_priority.json'
+plugin_priority_default = 10000
+
+gPluginPriorityLock = threading.RLock()
+
 
 def releaseDir(dir_path):
     if not os.path.exists(dir_path):
@@ -55,6 +60,69 @@ def doOpkRemove(plugin_path, plugin_dir):
             removeDir(plugin_path + plugin_dir[:-4])
 
 
+def load_plugin_priority(path=None, root='.'):
+    """
+    读取用户优先级覆盖配置，缺省路径为 conf/plugin_priority.json。
+
+    配置文件是纯增量：只需要写被用户调整过的插件，未写到的插件
+    完全使用 app.json 中的默认优先级；文件缺失或损坏时视为没有覆盖。
+
+    Returns:
+        dict: {namespace: priority}
+    """
+    priority_path = plugin_priority_path if path is None else path
+    if not os.path.isabs(priority_path):
+        priority_path = os.path.join(root, priority_path)
+    res = {}
+    try:
+        with open(priority_path, 'r', encoding='utf-8') as priority_file:
+            plugins = json.loads(priority_file.read()).get('plugins', {})
+        for namespace_this in plugins:
+            entry_this = plugins[namespace_this]
+            if type(entry_this) is dict:
+                entry_this = entry_this.get('priority')
+            if type(entry_this) is int and entry_this >= 0:
+                res[namespace_this] = entry_this
+    except Exception:
+        # traceback.print_exc()
+        return res
+    return res
+
+
+def build_plugin_call_order(plugin_models_dict, overrides=None):
+    """
+    计算生效优先级与插件调用顺序，并把结果写回插件元数据。
+
+    排序键始终是 (生效优先级, namespace)：生效优先级 = 用户覆盖值（若有）
+    否则 app.json 默认值。
+    没有任何覆盖时，结果与历史排序 (priority, namespace) 完全一致。
+
+    Returns:
+        list: 按生效优先级升序排列的 namespace 列表
+    """
+    if overrides is None:
+        overrides = {}
+    order_list = []
+    for plugin_models_index_this in plugin_models_dict:
+        plugin_models_this = plugin_models_dict[plugin_models_index_this]
+        namespace_this = plugin_models_this.get('namespace', plugin_models_index_this)
+        priority_default_this = plugin_models_this.get('priority', plugin_priority_default)
+        if isinstance(priority_default_this, bool) or not isinstance(priority_default_this, (int, float)):
+            priority_default_this = plugin_priority_default
+        priority_user_this = overrides.get(namespace_this)
+        if type(priority_user_this) is not int or priority_user_this < 0:
+            priority_user_this = None
+        priority_effective_this = priority_default_this
+        if priority_user_this is not None:
+            priority_effective_this = priority_user_this
+        plugin_models_this['priority_default'] = priority_default_this
+        plugin_models_this['priority_user'] = priority_user_this
+        plugin_models_this['priority_effective'] = priority_effective_this
+        order_list.append((priority_effective_this, namespace_this))
+    order_list.sort()
+    return [item_this[1] for item_this in order_list]
+
+
 plugin_path = './plugin/app/'
 plugin_path_tmp = './plugin/tmp/'
 releaseDir(plugin_path)
@@ -70,7 +138,7 @@ sys.path.append('./lib/DLLs')
 class shallow(API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
-                 treading_mode='full', restart_gate=10000, enable_auto_restart=False):
+                 treading_mode='full', restart_gate=10000, enable_auto_restart=False, enable_gui=True):
         API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -87,6 +155,7 @@ class shallow(API.Proc_templet):
         if plugin_func_dict is None:
             plugin_func_dict = {}
         self.Proc_config['debug_mode'] = debug_mode
+        self.Proc_config['enable_gui'] = enable_gui
         self.Proc_config['treading_mode'] = treading_mode
         self.Proc_config['shallow_dict'] = {}
         self.Proc_config['ready_for_restart'] = False
@@ -99,11 +168,52 @@ class shallow(API.Proc_templet):
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
-        self.database = None
+        self.database: OlivOS.userModule.UserConfDB.DataBaseAPI = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
             self.sdk_event = sdk_event
+
+    def get_plugin_event_context(self, plugin_identity):
+        if plugin_identity is None:
+            return None
+        plugin_identity = str(plugin_identity)
+        plugin_models = list(self.plugin_models_dict.values())
+
+        plugin_model = self.plugin_models_dict.get(plugin_identity)
+        if plugin_model is None:
+            namespace_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('namespace', '')) == plugin_identity
+            ]
+            if len(namespace_matches) == 1:
+                plugin_model = namespace_matches[0]
+        if plugin_model is None:
+            name_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('name', '')) == plugin_identity
+            ]
+            if len(name_matches) == 1:
+                plugin_model = name_matches[0]
+        if plugin_model is None:
+            module_matches = [
+                model_this
+                for model_this in plugin_models
+                if str(model_this.get('module_name', '')) == plugin_identity
+            ]
+            if len(module_matches) == 1:
+                plugin_model = module_matches[0]
+        if plugin_model is None:
+            return None
+        return {
+            'namespace': plugin_model.get('namespace'),
+            'message_mode': plugin_model.get(
+                'message_mode',
+                OlivOS.infoAPI.OlivOS_message_mode_tx_default
+            )
+        }
 
     def __init_GUI(self):
         if platform.system() == 'Windows':
@@ -122,6 +232,7 @@ class shallow(API.Proc_templet):
 
     def run(self):
         OlivOS.pluginAPI.gProc = self
+        self.Proc_data['webui_load_started'] = time.time()
         self.sendPluginList()
         releaseDir('./plugin')
         releaseDir('./plugin/app')
@@ -135,7 +246,9 @@ class shallow(API.Proc_templet):
         releaseDir('./data/images')
         releaseDir('./data/videos')
         releaseDir('./data/audios')
-        threading.Thread(target=self.__init_GUI).start()
+        releaseDir('./data/files')
+        if self.Proc_config['enable_gui']:
+            threading.Thread(target=self.__init_GUI).start()
         # self.set_check_update()
         time.sleep(1)  # 此处延迟用于在终端第一次启动时等待终端初始化，避免日志丢失，后续需要用异步(控制包流程)方案替代
         self.database = (
@@ -145,7 +258,7 @@ class shallow(API.Proc_templet):
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS plugin shallow [{0}] is running', [self.Proc_name], modelName))
-        self.sendPluginList()
+        self.sendPluginList(ready=True)
         rx_count = 0
         while True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
@@ -173,7 +286,11 @@ class shallow(API.Proc_templet):
                         # 在运行过 save 指令后，将配置数据库关闭
                         self.database.stop()
                     elif rx_packet_data.action == 'send':
-                        self.menu_queue.append(rx_packet_data)
+                        webui_event = rx_packet_data.key.get('data', {}).get('webui')
+                        if webui_event or platform.system() != 'Windows' or not self.Proc_config['enable_gui']:
+                            self.run_plugin(rx_packet_data)
+                        else:
+                            self.menu_queue.append(rx_packet_data)
                 else:
                     if self.Proc_config['treading_mode'] == 'none':
                         self.run_plugin(rx_packet_data.sdk_event)
@@ -197,8 +314,14 @@ class shallow(API.Proc_templet):
                 ):
                     if 'account_update' == packet.key['data']['action']:
                         self.set_restart()
+                    elif 'plugin_priority_reload' == packet.key['data']['action']:
+                        self.apply_plugin_priority()
 
     def set_restart(self):
+        """重载插件
+
+        该接口可以重启整个插件加载器，并重新加载这个插件。
+        """
         self.log(2, OlivOS.L10NAPI.getTrans(
             'OlivOS plugin shallow [{0}] call restart', [
                 self.Proc_name
@@ -217,6 +340,13 @@ class shallow(API.Proc_templet):
         self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_get'), block=False)
 
     def get_plugin_list(self):
+        """获取插件列表
+
+        该接口可以获得一个由插件的`namespace`填充的`list`，这可以让你知道当前的`OlivOS`上存在哪些插件。
+
+        Returns:
+            list: 插件列表，Defaults to []
+        """
         return self.plugin_models_call_list
 
     def get_main_root(self):
@@ -342,6 +472,8 @@ class shallow(API.Proc_templet):
                     plugin_model.main.Event.group_lucky_king(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_honor':
                     plugin_model.main.Event.group_honor(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'friend_add':
+                    plugin_model.main.Event.friend_add(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'friend_add_request':
                     plugin_model.main.Event.friend_add_request(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_add_request':
@@ -383,6 +515,46 @@ class shallow(API.Proc_templet):
                     modelName
                 ))
         self.plugin_models_call_list = new_list
+
+    def apply_plugin_priority(self, overrides=None):
+        """
+        重算插件调用顺序。
+
+        只替换 `plugin_models_call_list`，不会重新导入插件模块、不改变导入顺序；
+        `overrides=None` 时从 conf/plugin_priority.json 重新读取。
+
+        Args:
+            overrides (dict|None): {namespace: priority}，None 表示重新读取文件
+
+        Returns:
+            list: 新的调用顺序（namespace 列表）
+        """
+        if overrides is None:
+            overrides = load_plugin_priority()
+        with gPluginPriorityLock:
+            old_order_list = list(self.plugin_models_call_list)
+            self.plugin_models_call_list = build_plugin_call_order(self.plugin_models_dict, overrides)
+        if old_order_list != self.plugin_models_call_list:
+            old_index_dict = {}
+            for index_this, namespace_this in enumerate(old_order_list):
+                old_index_dict[namespace_this] = index_this
+            detail_list = []
+            for index_this, namespace_this in enumerate(self.plugin_models_call_list):
+                if old_index_dict.get(namespace_this) != index_this:
+                    detail_list.append('%s %s->%s' % (
+                        namespace_this,
+                        old_index_dict.get(namespace_this, '?'),
+                        index_this
+                    ))
+            self.log(2, OlivOS.L10NAPI.getTrans(
+                'OlivOS plugin shallow [{0}] priority order applied: {1}', [
+                    self.Proc_name,
+                    ', '.join(detail_list[:20])
+                ],
+                modelName
+            ))
+        self.sendPluginList(priority_only=True)
+        return self.plugin_models_call_list
 
     def run_plugin_data_release(self):
         for plugin_models_index_this in self.plugin_models_call_list:
@@ -459,12 +631,44 @@ class shallow(API.Proc_templet):
                 ))
         return
 
-    def sendPluginList(self):
+    def sendPluginList(self, ready=False, priority_only=False):
         tmp_plugin_list_send = []
         tmp_plugin_dict_send = {}
+        tmp_plugin_webui_send = []
+        tmp_plugin_webui_roots = {}
+        tmp_plugin_webui_paths = {}
+        tmp_plugin_order_list = []
+        tmp_plugin_priority_dict = {}
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
                 plugin_models_this = self.plugin_models_dict[plugin_models_index_this]
+                priority_default_this = plugin_models_this.get(
+                    'priority_default',
+                    plugin_models_this.get('priority', plugin_priority_default)
+                )
+                priority_user_this = plugin_models_this.get('priority_user')
+                if type(priority_user_this) is not int or priority_user_this < 0:
+                    priority_user_this = None
+                priority_effective_this = plugin_models_this.get('priority_effective', priority_default_this)
+                tmp_plugin_order_list.append(plugin_models_this['namespace'])
+                tmp_plugin_priority_dict[plugin_models_this['namespace']] = {
+                    'default': priority_default_this,
+                    'user': priority_user_this,
+                    'effective': priority_effective_this,
+                    'source': 'user' if priority_user_this is not None else 'default'
+                }
+                webui_config = plugin_models_this.get('webui_config')
+                if isinstance(webui_config, list):
+                    for entry in webui_config:
+                        if not isinstance(entry, dict) or not isinstance(entry.get('title'), str):
+                            continue
+                        if entry.get('type') not in ('iframe', 'link'):
+                            continue
+                        tmp_plugin_webui_send.append(dict(entry, namespace=plugin_models_this['namespace']))
+                    tmp_plugin_webui_roots[plugin_models_this['namespace']] = plugin_models_this.get('webui_root', '')
+                    tmp_plugin_webui_paths[plugin_models_this['namespace']] = plugin_models_this.get(
+                        'webui_resources', []
+                    )
                 tmp_plugin_list_this = None
                 if plugin_models_this['menu_config'] is not None:
                     plugin_models_this_menu = plugin_models_this['menu_config']
@@ -498,7 +702,7 @@ class shallow(API.Proc_templet):
                     tmp_plugin_list_this,
                     plugin_models_this['info'],
                     plugin_models_this.get('folder_path', ''),
-                    plugin_models_this['priority']
+                    priority_effective_this
                 ]
         self.sendControlEvent('send', {
             'target': {
@@ -507,12 +711,20 @@ class shallow(API.Proc_templet):
             'data': {
                 'action': 'update_data',
                 'data': {
+                    'ready': ready,
+                    'load_started': self.Proc_data.get('webui_load_started', 0),
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
-                    'shallow_plugin_data_dict': tmp_plugin_dict_send
+                    'shallow_plugin_data_dict': tmp_plugin_dict_send,
+                    'shallow_plugin_order_list': tmp_plugin_order_list,
+                    'shallow_plugin_priority_dict': tmp_plugin_priority_dict,
+                    'shallow_plugin_webui_list': tmp_plugin_webui_send,
+                    'shallow_plugin_webui_roots': tmp_plugin_webui_roots,
+                    'shallow_plugin_webui_paths': tmp_plugin_webui_paths,
+                    'priority_only': priority_only
                 }
             }
         }
-                              )
+        )
         self.sendControlEvent('send', {
             'target': {
                 'type': 'nativeWinUI'
@@ -521,7 +733,7 @@ class shallow(API.Proc_templet):
                 'action': 'start_shallow'
             }
         }
-                              )
+        )
 
     def sendControlEvent(self, action, data):
         if self.Proc_info.control_queue is not None:
@@ -582,6 +794,8 @@ class shallow(API.Proc_templet):
         return plugin_list
 
     def load_plugin_list(self):
+        from OlivOS.webUI import resourceAPI
+
         total_models_count = 0
         self.plugin_models_dict = {}
         skip_result = ''
@@ -678,6 +892,7 @@ class shallow(API.Proc_templet):
                             }
                             if 'menu_config' in plugin_models_app_conf:
                                 plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
+                            plugin_models_dict_this['webui_config'] = plugin_models_app_conf.get('webui_config')
                             if 'message_mode' in plugin_models_app_conf:
                                 plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
                             else:
@@ -742,6 +957,12 @@ class shallow(API.Proc_templet):
                                     )
                                     removeDir(os.path.join(plugin_path_tmp, plugin_dir_this))
                                     plugin_dir_this = plugin_namespace
+                                plugin_models_dict_this['module_name'] = plugin_namespace
+
+                            # OPK 可能已按 namespace 移动，记录最终导入目录。
+                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.join(
+                                plugin_path_tmp if flag_is_opk else plugin_path, plugin_dir_this
+                            ))
 
                             # 完成配置数据库中对应插件命名空间的表格页初始化
                             self.database._init_namespace(plugin_models_dict_this['namespace'])
@@ -793,7 +1014,10 @@ class shallow(API.Proc_templet):
                     plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
                 )
                 # 获取插件所在的父目录
-                plugin_folder_path = plugin_models_dict_this.get('folder_path', '')
+                plugin_folder_path = (
+                    os.path.dirname(plugin_dir_this) if flag_is_opk
+                    else plugin_models_dict_this.get('folder_path', '')
+                )
                 if plugin_folder_path:
                     # 插件在子目录中,需要将父目录添加到 sys.path
                     if flag_is_opk:
@@ -862,17 +1086,32 @@ class shallow(API.Proc_templet):
                     [plugin_namespace, self.Proc_name, skip_result]
                 ))
 
-        # 清理opk格式插件缓存
-        for plugin_models_dict_this in plugin_models_dict:
-            if plugin_models_dict[plugin_models_dict_this]['isOPK']:
-                plugin_dir = plugin_models_dict[plugin_models_dict_this].get('plugin_dir', plugin_models_dict_this)
-                removeDir(os.path.join(plugin_path_tmp, plugin_dir))
-        # 插件调用列表按照优先级排序
-        plugin_models_call_list_tmp = sorted(self.plugin_models_dict.values(),
-                                             key=lambda i: (i['priority'], i['namespace']))
-        self.plugin_models_call_list = []
-        for namespace_this in plugin_models_call_list_tmp:
-            self.plugin_models_call_list.append(namespace_this['namespace'])
+        # 页面资源在全部 init 完成后生成独立快照，导入缓存随后正常清理。
+        for namespace, plugin in self.plugin_models_dict.items():
+            if not isinstance(plugin.get('webui_config'), list):
+                continue
+            try:
+                source = plugin['webui_root']
+                resources, pages = resourceAPI.declaration(source, plugin['appconf'])
+                if not resourceAPI.valid_namespace(namespace):
+                    raise ValueError('Invalid WebUI namespace')
+                if plugin_models_dict[namespace]['isOPK'] and resources:
+                    runtime_root = os.path.dirname(os.path.dirname(os.path.abspath(plugin_path_tmp)))
+                    plugin['webui_root'] = resourceAPI.build_cache(runtime_root, source, namespace, resources)
+                elif plugin_models_dict[namespace]['isOPK']:
+                    plugin['webui_root'] = ''
+                plugin.update(webui_resources=resources, webui_config=pages)
+            except (OSError, ValueError, RuntimeError) as error:
+                plugin.update(webui_resources=[], webui_config=[], webui_root='')
+                self.log(4, f'WebUI resources [{namespace}]: {error}')
+        # 只回收本次 OPK 的解包目录，保留 tmp 根目录及其他插件的临时文件。
+        for item in plugin_models_dict.values():
+            if item['isOPK']:
+                removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
+        # 插件调用列表按照生效优先级排序
+        self.plugin_models_call_list = build_plugin_call_order(
+            self.plugin_models_dict, load_plugin_priority()
+        )
         self.log(2, OlivOS.L10NAPI.getTrans(
             'Total count [{0}] OlivOS plugin is loaded by OlivOS plugin shallow [{1}]',
             [total_models_count, self.Proc_name],

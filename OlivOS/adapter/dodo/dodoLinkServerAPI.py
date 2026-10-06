@@ -47,6 +47,8 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['platform_bot_info_dict'] = None
 
     def run(self):
+        if getattr(self.Proc_data['bot_info_dict'], 'enable', True) is not True:
+            return
         self.log(2, 'OlivOS dodo link server [' + self.Proc_name + '] is running')
         while True:
             api_obj = OlivOS.dodoLinkSDK.API.getGateway(

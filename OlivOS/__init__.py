@@ -10,7 +10,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
-@Copyright :   (C) 2020-2025, OlivOS-Team
+@Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   None
 '''
 
@@ -42,16 +42,22 @@ from .core.web import webTool
 from . import thirdPartyModule
 
 from . import adapter
+from .adapter.onebotV11 import onebotV11LinkServerAPI
+from .adapter.onebotV11 import onebotV11HostServerAPI
 from .adapter.onebotV11 import flaskServerAPI
 from .adapter.onebotV12 import onebotV12SDK
 from .adapter.onebotV12 import onebotV12LinkServerAPI
 from .adapter.onebotV11 import onebotSDK
+from .adapter.milky import milkySDK
+from .adapter.milky import milkyType
+from .adapter.milky import milkyAutoServerAPI
 from .adapter.virtualTerminal import virtualTerminalSDK
 from .adapter.virtualTerminal import virtualTerminalLinkServerAPI
 from .adapter.qqGuild import qqGuildSDK
 from .adapter.qqGuild import qqGuildLinkServerAPI
 from .adapter.qqGuild import qqGuildv2SDK
 from .adapter.qqGuild import qqGuildv2LinkServerAPI
+from .adapter.qqGuild import qqGuildv2WebhookServerAPI
 from .adapter.red import qqRedSDK
 from .adapter.red import qqRedLinkServerAPI
 from .adapter.OPQBot import OPQBotSDK
@@ -97,3 +103,6 @@ if platform.system() == 'Windows':
     from .libBooter import libAstralQsignEXEModelAPI
 
 from . import userModule
+
+from . import webUI
+from .webUI import serverAPI, pageAPI

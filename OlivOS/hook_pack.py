@@ -39,6 +39,9 @@ import yaml
 # pyjson5
 import pyjson5
 
+# cryptography (qqGuildv2 webhook Ed25519)
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 # openpyxl
 import openpyxl
 

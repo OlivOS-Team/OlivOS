@@ -15,9 +15,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 
-OlivOS_Version = '0.11.90'
-OlivOS_SVN = 210
-OlivOS_Version_Slogan = '白龙'
+OlivOS_Version = '1.0.0'
+OlivOS_SVN = 300
+OlivOS_Version_Slogan = '妖刀村正'
 
 # Compatible    <= Plugin[compatible_svn]                 : Compatible
 # OldCompatible <= Plugin[compatible_svn] < Compatible    : OldCompatible Warn

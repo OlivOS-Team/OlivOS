@@ -38,6 +38,7 @@ setuptools.setup(
         'websocket-client',
         'pillow==9.3.0',
         'rsa',
+        'cryptography',
         'requests_toolbelt',
         'pystray',
         'aiohttp',
@@ -52,6 +53,8 @@ setuptools.setup(
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),
+    include_package_data=True,
+    package_data={'OlivOS.webUI': ['static/*']},
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: GNU Affero General Public License v3',

@@ -25,6 +25,7 @@ from . import (
     mhyVila,
     onebotV11,
     onebotV12,
+    milky,
     OPQBot,
     qqGuild,
     red,

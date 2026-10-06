@@ -40,8 +40,21 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_data['bot_info_token_life_counter'] = 1000
         self.Proc_data['bot_info_token_life'] = {}
         self.Proc_data['bot_info_island_list'] = {}
+        self.activity = OlivOS.API.accountActivity({
+            bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
+            if isinstance(bot, OlivOS.API.bot_info_T) and bot.platform['sdk'] == 'dodo_poll'
+        })
+
+    def account_activity(self):
+        return self.activity.snapshot()
 
     def run(self):
+        if type(self.Proc_data['bot_info_dict']) is not dict or not any(
+            getattr(bot_info_this, 'enable', True) is True
+            and bot_info_this.platform['sdk'] == 'dodo_poll'
+            for bot_info_this in self.Proc_data['bot_info_dict'].values()
+        ):
+            return
         self.log(2, 'OlivOS dodo poll server [' + self.Proc_name + '] is running')
         while True:
             time.sleep(self.Proc_info.scan_interval)
@@ -51,6 +64,8 @@ class server(OlivOS.API.Proc_templet):
         for bot_info_this in self.Proc_data['bot_info_dict']:
             flag_not_attach = False
             bot_info_this_obj = self.Proc_data['bot_info_dict'][bot_info_this]
+            if getattr(bot_info_this_obj, 'enable', True) is not True:
+                continue
             if bot_info_this_obj.platform['sdk'] == 'dodo_poll':
                 sdk_bot_info_this = OlivOS.dodoSDK.get_SDK_bot_info_from_Plugin_bot_info(bot_info_this_obj)
                 if bot_info_this in self.Proc_data['bot_info_update_id']:
@@ -112,6 +127,8 @@ class server(OlivOS.API.Proc_templet):
                         sdk_api_res_2 = sdk_api_tmp_2.do_api()
                     except Exception:
                         flag_not_attach_2 = True
+                    else:
+                        self.activity.mark(bot_info_this)
                     if not flag_not_attach_2:
                         try:
                             res_obj_2 = json.loads(sdk_api_res_2)

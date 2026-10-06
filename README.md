@@ -105,6 +105,9 @@ pip install .[py37]
 ```
 python main.py
 ```
++ 调试 WebUI 前端  
+免构建前端资源位于 `OlivOS/webUI/static`，源码运行与 pip 安装均直接服务该目录，改前端刷新即生效，无需任何生成步骤（`OLIVOS_WEBUI_STATIC` 可用于指向其他前端目录）。  
+`OlivOS/webUI/staticData.py` 是把这些资源 base64 内嵌的产物，仅供 PyInstaller 打包（盘上无 `static` 目录）时回退使用；它不入 Git 跟踪，由 `script/embed_webui.py` 在打包流程中按需生成，本地开发无需关心。
 
 ### Pypi版本
 OlivOS的核心组件部分已经被充分集成，并作为Pypi库进行了发布，你同样也可以使用`pip`来获取这个版本并将OlivOS作为库加以使用。  
