@@ -431,6 +431,27 @@ def test_plugin_navigation_layout_fits_viewport(browser, width, theme):
 
 
 @pytest.mark.browser
+@pytest.mark.parametrize('width', [320, 390, 1440])
+def test_dashboard_version_card_keeps_slogan_within_viewport(browser, width):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.click('[data-page="dashboard"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.querySelector(".card-version .version-slogan")?.textContent',
+    ) == OlivOS.infoAPI.OlivOS_Version_Slogan)
+    assert driver.execute_script(
+        'return document.querySelector(".card-version .version-value").textContent',
+    ) == OlivOS.infoAPI.OlivOS_Version_Short
+    # 版本号折行、简称省略号截断，版本卡自身不能把整页撑出横向滚动条。
+    assert driver.execute_script("""
+        const card = document.querySelector('.card-version');
+        return [card.scrollWidth <= card.clientWidth + 1,
+                document.documentElement.scrollWidth <= innerWidth];
+    """) == [True, True]
+
+
+@pytest.mark.browser
 def test_external_plugin_link_opens_separate_tab(browser):
     browser.click('.plugin-link-external')
     browser.wait.until(lambda _: len(browser.driver.window_handles) == 2)

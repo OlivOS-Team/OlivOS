@@ -509,7 +509,8 @@ header h1 {
 }
 .cards {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  /* 版本卡多分一点宽度，让「版本号 + 版本简称」两行都能完整显示。 */
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -530,6 +531,15 @@ header h1 {
 .card .version-value {
   font-size: 20px;
   padding-top: 4px;
+}
+/* 版本简称标识大版本；放不下时省略号截断，完整内容看 title。 */
+.card .version-slogan {
+  display: block;
+  min-width: 0;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .card span {
   color: var(--muted);
@@ -959,10 +969,17 @@ dialog::backdrop {
     display: inline;
   }
   .cards {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .card {
     padding: 12px;
+  }
+  /* 320px 宽的屏上两列各只剩约 116px 内容宽度，缩一档字号避免版本号被折断。 */
+  .card strong {
+    font-size: 22px;
+  }
+  .card .version-value {
+    font-size: 18px;
   }
   .form-grid {
     grid-template-columns: 1fr;
@@ -982,14 +999,49 @@ dialog::backdrop {
   }
 }
 /* 密钥显隐按钮与输入框保持同一行。 */
-.secret-input { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.secret-input input { flex: 1; min-width: 0; width: 100%; }
-.secret-toggle { flex: 0 0 auto; padding: 8px 10px; }
+.secret-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.secret-input input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+.secret-toggle {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+}
 /* 插件优先级编辑。 */
-.hint { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
-.hint.danger { color: var(--danger); }
-.priority-cell { white-space: nowrap; }
-.priority-editor { display: flex; align-items: center; gap: 6px; }
-.priority-input { width: 110px; min-width: 90px; padding: 6px 8px; }
-.priority-editor button { padding: 6px 10px; }
-.priority-source { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.hint.danger {
+  color: var(--danger);
+}
+.priority-cell {
+  white-space: nowrap;
+}
+.priority-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.priority-input {
+  width: 110px;
+  min-width: 90px;
+  padding: 6px 8px;
+}
+.priority-editor button {
+  padding: 6px 10px;
+}
+.priority-source {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}

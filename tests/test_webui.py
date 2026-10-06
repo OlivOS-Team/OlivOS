@@ -179,6 +179,13 @@ def test_all_rest_routes(client, host):
         assert host.Proc_info.control_queue.get_nowait().action == action
 
 
+def test_status_exposes_version_and_slogan(client, host):
+    # 仪表盘版本卡要同时显示版本号与标识大版本的简称。
+    status = client.get('/api/status').json
+    assert status['version'] == OlivOS.infoAPI.OlivOS_Version_Short
+    assert status['version_slogan'] == OlivOS.infoAPI.OlivOS_Version_Slogan
+
+
 def test_log_display_setting_changes_webui_history_not_original_logs(client, host):
     message = 'User: [OP:at,id=42,name=Alice][OP:face,id=311][OP:poke,id=123456]'
     send(host, {'action': 'logger', 'event': 'log', 'data': {
