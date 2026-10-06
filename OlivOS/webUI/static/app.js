@@ -269,8 +269,9 @@ async function login(ev, token = null) {
     startEventStream(result.cursor);
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (state.page === 'dashboard') refreshStatus().then(() => ensureSession()).catch(notifyError);
-      else {
+      if (state.page === 'dashboard') {
+        refreshStatus().then(() => ensureSession()).catch(notifyError);
+      } else {
         checkAuthentication();
         if (state.page === 'logs') loadLogDisplay().catch(notifyError);
       }
@@ -293,7 +294,10 @@ async function login(ev, token = null) {
   }
 }
 async function logout() {
-  const pending = api('/api/logout', { method: 'POST', body: { session: state.session } }).catch(() => {});
+  const pending = api('/api/logout', {
+    method: 'POST',
+    body: { session: state.session },
+  }).catch(() => {});
   resetLogin();
   await pending;
 }
@@ -359,13 +363,22 @@ async function checkAuthentication() {
   }
 }
 function startEventStream(cursor) {
-  stream('events', `/ws/events?session=${encodeURIComponent(state.session)}&since=${cursor}`,
-    eventBatch, (text) => { $('connection').textContent = text; });
+  stream(
+    'events',
+    `/ws/events?session=${encodeURIComponent(state.session)}&since=${cursor}`,
+    eventBatch,
+    (text) => {
+      $('connection').textContent = text;
+    },
+  );
 }
 async function ensureSession(force = false) {
   if (state.sessionRefresh) return state.sessionRefresh;
   if (!force && state.session && Date.now() - state.sessionCheckedAt < 60000) return;
-  const pending = api('/api/session', { method: 'POST', body: { session: state.session } }).then(result => {
+  const pending = api('/api/session', {
+    method: 'POST',
+    body: { session: state.session },
+  }).then((result) => {
     const changed = state.session !== result.session;
     state.session = result.session;
     state.sessionCheckedAt = Date.now();
@@ -418,7 +431,10 @@ async function restorePage() {
     return navigate('plugins');
   }
   if (saved?.page === 'terminals') {
-    state.selected = state.terminals.find((item) => item.model === saved.model && item.hash === saved.hash) || null;
+    state.selected =
+      state.terminals.find(
+        (item) => item.model === saved.model && item.hash === saved.hash,
+      ) || null;
   }
   await navigate(Object.keys(titles).includes(saved?.page) ? saved.page : 'dashboard');
 }
@@ -445,26 +461,40 @@ async function navigate(page) {
     if (state.selected) openTerminal(state.selected);
   }
 }
+// 版本简称标识大版本，与版本号分两行显示；横向空间不够时简称按省略号截断，
+// 完整内容留在 title 上，窄屏也不会把卡片撑破。
+function versionCard(version, slogan) {
+  const card = element('div', null, { class: 'panel card card-version' });
+  card.append(element('span', '版本'));
+  card.append(element('strong', version, { class: 'version-value' }));
+  if (slogan) card.append(element('span', slogan, { class: 'version-slogan', title: slogan }));
+  return card;
+}
+function uptimeText(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor(seconds / 3600) % 24;
+  const minutes = Math.floor(seconds / 60) % 60;
+  return `运行时长：${days} 天 ${hours} 时 ${minutes} 分 ${seconds % 60} 秒`;
+}
 async function refreshStatus() {
   const status = await api('/api/status');
   if (Number.isInteger(status.plugin_page_cache)) {
     state.frameCacheLimit = Math.max(1, status.plugin_page_cache);
     trimFrames();
   }
-  $('status-cards').replaceChildren();
-  for (const [label, value, valueClass = ''] of [
-    ['版本', status.version, 'version-value'],
+  const cards = $('status-cards');
+  cards.replaceChildren();
+  cards.append(versionCard(status.version, status.version_slogan));
+  for (const [label, value] of [
     ['账号', status.accounts],
     ['启用', status.enabled],
     ['在线', status.online],
   ]) {
     const card = element('div', null, { class: 'panel card' });
-    card.append(element('span', label), element('strong', value, { class: valueClass }));
-    $('status-cards').append(card);
+    card.append(element('span', label), element('strong', value));
+    cards.append(card);
   }
-  const seconds = status.uptime;
-  $('runtime').textContent =
-    `运行时长：${Math.floor(seconds / 86400)} 天 ${Math.floor(seconds / 3600) % 24} 时 ${Math.floor(seconds / 60) % 60} 分 ${seconds % 60} 秒`;
+  $('runtime').textContent = uptimeText(status.uptime);
   $('online-note').textContent = status.unknown
     ? `${status.unknown} 个启用账号尚无可用的连接状态：`
     : '';
@@ -724,9 +754,16 @@ function addSecretToggle(input) {
   input.replaceWith(wrapper);
   const eye = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   for (const [name, value] of Object.entries({
-    viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none',
-    stroke: 'currentColor', 'stroke-width': '2', 'aria-hidden': 'true',
-  })) eye.setAttribute(name, value);
+    viewBox: '0 0 24 24',
+    width: '20',
+    height: '20',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'aria-hidden': 'true',
+  })) {
+    eye.setAttribute(name, value);
+  }
   const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   outline.setAttribute('d', 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z');
   const pupil = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -875,16 +912,18 @@ function renderOutput(container, lines, follow, logMode = false) {
   const scrollTop = container.scrollTop;
   container.replaceChildren();
   for (const line of lines) {
-    let text = logMode
-      ? (state.logMessageMode === 'cq' ? line.cq_text : line.op_text) ?? line.text ?? ''
-      : line.text ?? '';
+    let text = line.text ?? '';
     if (logMode) {
+      const formatted = state.logMessageMode === 'cq' ? line.cq_text : line.op_text;
+      text = formatted ?? text;
       const timestamp =
         typeof line.time === 'number'
           ? new Date(line.time * 1000).toLocaleString()
           : line.time || '';
       text = `${timestamp ? `[${timestamp}] ` : ''}[${levels[line.level] || 'INFO'}] ${text}`;
-    } else if (line.name) text = `${line.name}：${text}`;
+    } else if (line.name) {
+      text = `${line.name}：${text}`;
+    }
     text = String(text).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
     container.append(
       element('div', text, {
@@ -931,7 +970,9 @@ async function openLogs() {
   await loadLogDisplay();
   const selected = selectedLogLevels();
   if (!selected.length) return;
-  const query = `level=${encodeURIComponent(selected.length === Object.keys(levels).length ? '' : selected.join(','))}`;
+  // 全选等价于不过滤，后端约定用空 level 表示。
+  const filter = selected.length === Object.keys(levels).length ? '' : selected.join(',');
+  const query = `level=${encodeURIComponent(filter)}`;
   const result = await api(`/api/logs?${query}`);
   if (generation !== logGeneration || state.page !== 'logs') return;
   state.limit = result.limit;
@@ -957,10 +998,9 @@ async function loadTerminals() {
     state.terminals[0] ||
     null;
   renderTerminals();
-  if (state.page === 'terminals' && state.selected &&
-      (previous?.hash !== state.selected.hash || previous?.model !== state.selected.model)) {
-    openTerminal(state.selected);
-  }
+  const switched =
+    previous?.hash !== state.selected?.hash || previous?.model !== state.selected?.model;
+  if (state.page === 'terminals' && state.selected && switched) openTerminal(state.selected);
 }
 function renderTerminals() {
   $('terminal-tabs').replaceChildren();
@@ -1098,7 +1138,8 @@ function namespaceCompare(a, b) {
 }
 function pluginEntries() {
   const rank = new Map(state.pluginOrder.map((namespace, index) => [namespace, index]));
-  const fallback = (namespace, plugin) => state.pluginOrder.length + pluginEffectivePriority(namespace, plugin);
+  const fallback = (namespace, plugin) =>
+    state.pluginOrder.length + pluginEffectivePriority(namespace, plugin);
   return Object.entries(state.plugins).sort((a, b) => {
     const left = rank.has(a[0]) ? rank.get(a[0]) : fallback(a[0], a[1]);
     const right = rank.has(b[0]) ? rank.get(b[0]) : fallback(b[0], b[1]);
@@ -1107,7 +1148,8 @@ function pluginEntries() {
 }
 function sortedPluginOrder() {
   return Object.keys(state.plugins).sort(
-    (a, b) => pluginEffectivePriority(a, state.plugins[a]) - pluginEffectivePriority(b, state.plugins[b]) ||
+    (a, b) =>
+      pluginEffectivePriority(a, state.plugins[a]) - pluginEffectivePriority(b, state.plugins[b]) ||
       namespaceCompare(a, b),
   );
 }
@@ -1125,10 +1167,11 @@ function priorityCell(namespace, plugin, position) {
   input.className = 'priority-input';
   input.setAttribute('aria-label', `${plugin[0]} 的优先级`);
   input.disabled = !!state.priorityError;
-  const current = () => (
-    input.value !== '' && Number.isSafeInteger(Number(input.value)) && Number(input.value) >= 0
-      ? Number(input.value) : null
-  );
+  const current = () => {
+    if (input.value === '') return null;
+    const value = Number(input.value);
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  };
   const apply = button('应用', () => savePluginPriority(namespace, current()));
   const reset = button('默认', () => savePluginPriority(namespace, null));
   apply.disabled = true;
@@ -1142,9 +1185,10 @@ function priorityCell(namespace, plugin, position) {
   editor.append(input, apply, reset);
   cell.append(editor);
   const source = element('span', null, { class: 'priority-source' });
+  const rank = `第 ${position + 1} 位`;
   source.textContent = user === null
-    ? `第 ${position + 1} 位 · 默认 ${info.default ?? effective}`
-    : `第 ${position + 1} 位 · 用户 ${user}（默认 ${info.default ?? '—'}）`;
+    ? `${rank} · 默认 ${info.default ?? effective}`
+    : `${rank} · 用户 ${user}（默认 ${info.default ?? '—'}）`;
   cell.append(source);
   return cell;
 }
@@ -1169,8 +1213,15 @@ async function savePluginPriority(namespace, priority) {
 }
 function renderPlugins() {
   const header = element('tr');
-  for (const text of [...(state.showPath ? ['路径'] : []), '插件', '版本', '作者', '优先级', '操作'])
-    header.append(element('th', text));
+  const columns = [
+    ...(state.showPath ? ['路径'] : []),
+    '插件',
+    '版本',
+    '作者',
+    '优先级',
+    '操作',
+  ];
+  for (const text of columns) header.append(element('th', text));
   $('plugin-head').replaceChildren(header);
   $('plugin-rows').replaceChildren();
   $('plugin-priority-error').hidden = !state.priorityError;
@@ -1178,10 +1229,11 @@ function renderPlugins() {
   const plugins = pluginEntries();
   plugins.forEach(([namespace, plugin], position) => {
     const row = element('tr');
-    if (state.showPath)
-      row.append(
-        element('td', `/${plugin[5] ? `${plugin[5].replaceAll('\\', '/')}/` : ''}${namespace}`),
-      );
+    if (state.showPath) {
+      // plugin[5] 是插件所在的上级目录，Windows 分隔符统一成正斜杠再拼相对路径。
+      const prefix = plugin[5] ? `${plugin[5].replaceAll('\\', '/')}/` : '';
+      row.append(element('td', `/${prefix}${namespace}`));
+    }
     row.append(element('td', plugin[0]), element('td', plugin[1]), element('td', plugin[2]));
     row.append(priorityCell(namespace, plugin, position));
     const cell = element('td');
@@ -1216,28 +1268,39 @@ function pluginMenu(namespace) {
 function pluginPagePath(page) {
   const path = page.path;
   if (typeof path !== 'string' || /[\\:*?"<>|\u0000-\u001f]/.test(path)) return null;
-  if (path.split('/').some(part => !part || part.startsWith('.') || /[ .]$/.test(part))) return null;
-  return path;
+  const invalid = path
+    .split('/')
+    .some((part) => !part || part.startsWith('.') || /[ .]$/.test(part));
+  return invalid ? null : path;
 }
 function embeddedPluginPage(page) {
   return page.type === 'iframe' && typeof page.path === 'string' && pluginPagePath(page) !== null;
 }
 function pluginPageLabel(page) {
-  const pages = state.pages.filter(item => embeddedPluginPage(item) || (item.type === 'link' && safeURL(item.url)));
+  const pages = state.pages.filter(
+    (item) => embeddedPluginPage(item) || (item.type === 'link' && safeURL(item.url)),
+  );
   const name = state.plugins[page.namespace]?.[0] || page.namespace;
-  const duplicateName = pages.some(item => item.namespace !== page.namespace &&
-    (state.plugins[item.namespace]?.[0] || item.namespace) === name);
-  const siblings = pages.filter(item => item.namespace === page.namespace);
+  const duplicateName = pages.some(
+    (item) =>
+      item.namespace !== page.namespace &&
+      (state.plugins[item.namespace]?.[0] || item.namespace) === name,
+  );
+  const siblings = pages.filter((item) => item.namespace === page.namespace);
   let label = duplicateName ? `${name}（${page.namespace}）` : name;
   if (siblings.length > 1 || page.title !== name) label += ` / ${page.title}`;
-  if (siblings.filter(item => item.title === page.title).length > 1)
+  if (siblings.filter((item) => item.title === page.title).length > 1) {
     label += `（${page.type === 'iframe' ? page.path : page.url}）`;
+  }
   return label;
 }
 function appendPluginPage(container, page) {
   if (page.type === 'link') {
     const entry = element('a', page.title, {
-      href: page.url, target: '_blank', rel: 'noopener noreferrer', class: 'plugin-link-external',
+      href: page.url,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+      class: 'plugin-link-external',
     });
     container.append(entry);
     return entry;
@@ -1263,8 +1326,9 @@ function renderPluginNavigation() {
     if (!groups.has(page.namespace)) groups.set(page.namespace, []);
     groups.get(page.namespace).push(page);
   }
-  for (const namespace of state.collapsedPluginGroups)
+  for (const namespace of state.collapsedPluginGroups) {
     if ((groups.get(namespace)?.length || 0) < 2) state.collapsedPluginGroups.delete(namespace);
+  }
   const names = new Map();
   for (const namespace of groups.keys()) {
     const name = state.plugins[namespace]?.[0] || namespace;
@@ -1276,13 +1340,16 @@ function renderPluginNavigation() {
     const name = state.plugins[namespace]?.[0] || namespace;
     const label = element('span', null, { class: 'plugin-group-label' });
     label.append(element('span', name, { class: 'plugin-group-name' }));
-    if (names.get(name) > 1)
+    if (names.get(name) > 1) {
       label.append(element('span', namespace, { class: 'plugin-group-namespace' }));
+    }
     if (pages.length === 1) {
       const page = pages[0];
       const entry = appendPluginPage(group, page);
       entry.classList.add('plugin-single-entry');
-      if (page.title !== name) label.append(element('span', page.title, { class: 'plugin-single-title' }));
+      if (page.title !== name) {
+        label.append(element('span', page.title, { class: 'plugin-single-title' }));
+      }
       entry.replaceChildren(label);
       $('plugin-links').append(group);
       continue;
@@ -1296,17 +1363,28 @@ function renderPluginNavigation() {
     toggle.append(
       element('span', '▾', { class: 'disclosure-arrow', 'aria-hidden': 'true' }),
       label,
-      element('span', String(pages.length), { class: 'plugin-group-count', 'aria-label': `${pages.length} 个页面` }),
+      element('span', String(pages.length), {
+        class: 'plugin-group-count',
+        'aria-label': `${pages.length} 个页面`,
+      }),
     );
     const children = element('div', null, {
-      id, class: 'plugin-group-children', role: 'group', 'aria-labelledby': toggle.id,
+      id,
+      class: 'plugin-group-children',
+      role: 'group',
+      'aria-labelledby': toggle.id,
     });
     const titles = new Map();
     for (const page of pages) titles.set(page.title, (titles.get(page.title) || 0) + 1);
     for (const page of pages) {
       const entry = appendPluginPage(children, page);
-      if (titles.get(page.title) > 1)
-        entry.append(element('span', page.type === 'iframe' ? page.path : page.url, { class: 'plugin-entry-path' }));
+      if (titles.get(page.title) > 1) {
+        entry.append(
+          element('span', page.type === 'iframe' ? page.path : page.url, {
+            class: 'plugin-entry-path',
+          }),
+        );
+      }
     }
     group.append(toggle, children);
     setPluginGroupExpanded(group, !state.collapsedPluginGroups.has(namespace));
@@ -1330,7 +1408,8 @@ function setPluginGroupExpanded(group, expanded) {
 }
 function syncPluginSelection() {
   $('plugin-links').querySelectorAll('.plugin-link-entry').forEach((entry) => {
-    const active = entry.dataset.pluginNamespace === state.frameNamespace &&
+    const active =
+      entry.dataset.pluginNamespace === state.frameNamespace &&
       entry.dataset.pluginPath === state.framePath;
     const cached = state.frames.has(
       frameKey(entry.dataset.pluginNamespace, entry.dataset.pluginPath),
@@ -1350,11 +1429,15 @@ function syncPluginSelection() {
     toggle.classList.toggle('contains-cached', !!group.querySelector('.plugin-link-entry.cached'));
   });
   const count = state.frames.size;
-  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
   const close = $('plugin-pages-close');
   close.hidden = count === 0;
-  close.title = count ? `关闭全部插件页面（${pluginCount} 个插件，${count} 个页面）` : '关闭全部插件页面';
+  close.title = count
+    ? `关闭全部插件页面（${framePluginCount()} 个插件，${count} 个页面）`
+    : '关闭全部插件页面';
   close.setAttribute('aria-label', close.title);
+}
+function framePluginCount() {
+  return new Set([...state.frames.values()].map((entry) => entry.namespace)).size;
 }
 function closePluginPage(page) {
   const key = frameKey(page.namespace, page.path);
@@ -1367,7 +1450,7 @@ function closePluginPage(page) {
 function closePluginPages() {
   const count = state.frames.size;
   if (!count) return;
-  const pluginCount = new Set([...state.frames.values()].map(entry => entry.namespace)).size;
+  const pluginCount = framePluginCount();
   destroyFrames();
   notify(`已关闭全部插件页面（${pluginCount} 个插件，共 ${count} 个页面）。`);
   if (state.page === 'plugin-page') navigate('plugins').catch(notifyError);
@@ -1492,9 +1575,11 @@ async function openPluginPage(page) {
   entry.frame.title = page.title;
   touchFrame(key);
   showFrame(entry);
-  for (const group of $('plugin-links').querySelectorAll('.plugin-page-group'))
-    if (group.dataset.pluginNamespace === page.namespace && group.querySelector('.plugin-group-toggle'))
-      setPluginGroupExpanded(group, true);
+  // 打开页面时把它所属的分组展开，否则侧栏里看不到当前页在哪。
+  for (const group of $('plugin-links').querySelectorAll('.plugin-page-group')) {
+    if (group.dataset.pluginNamespace !== page.namespace) continue;
+    if (group.querySelector('.plugin-group-toggle')) setPluginGroupExpanded(group, true);
+  }
   trimFrames();
   $('page-title').textContent = page.title;
   rememberPage();
@@ -1505,7 +1590,9 @@ async function openExternalPage(page) {
   const title = page.title || '插件页面';
   state.externalPage = { url: page.url, title };
   state.externalFrame = element('iframe', null, {
-    src: page.url, title, sandbox: externalSandbox,
+    src: page.url,
+    title,
+    sandbox: externalSandbox,
   });
   $('plugin-frame-container').append(state.externalFrame);
   rememberPage();
@@ -1560,14 +1647,21 @@ window.addEventListener('message', async (ev) => {
     });
   } catch (error) {
     state.requests.delete(data.request_id);
-    postToFrame(entry, { type: 'olivos:plugin_reply', request_id: data.request_id, error: error.message });
+    postToFrame(entry, {
+      type: 'olivos:plugin_reply',
+      request_id: data.request_id,
+      error: error.message,
+    });
   }
 });
+// 同一个操作在插件页和仪表盘各有一个按钮，禁用状态必须同步。
+function actionButtons(kind) {
+  return kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
+}
 function clearAction(kind) {
   clearTimeout(state.actions[kind]?.timer);
   state.actions[kind] = null;
-  const buttons = kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
-  for (const id of buttons) $(id).disabled = false;
+  for (const id of actionButtons(kind)) $(id).disabled = false;
 }
 function showActionResult(kind, message) {
   // 结果用非阻塞提示条呈现，避免重载这类高频操作反复弹出模态窗口。
@@ -1586,8 +1680,7 @@ async function runAction(kind, path, progress) {
   if (state.actions[kind]) return;
   const pending = { startedAt: null, result: null, timer: null };
   state.actions[kind] = pending;
-  const buttons = kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
-  for (const id of buttons) $(id).disabled = true;
+  for (const id of actionButtons(kind)) $(id).disabled = true;
   notify(progress);
   pending.timer = setTimeout(() => {
     clearAction(kind);
@@ -1650,13 +1743,21 @@ async function handleEvent(item) {
       error: '检查更新失败，请检查网络连接或稍后重试。',
       unsupported: '当前平台暂不支持内置更新检查，请前往 GitHub 查看最新版本。',
     };
-    finishAction('update', { started_at: item.started_at, message: messages[item.status] || messages.error });
+    finishAction('update', {
+      started_at: item.started_at,
+      message: messages[item.status] || messages.error,
+    });
     await refreshStatus();
   } else if (item.type === 'plugin_reply' && state.requests.has(item.request_id)) {
     const entry = state.frames.get(state.requests.get(item.request_id));
     state.requests.delete(item.request_id);
-    if (entry && entry.namespace === item.namespace)
-      postToFrame(entry, { type: 'olivos:plugin_reply', request_id: item.request_id, payload: item.payload });
+    if (entry && entry.namespace === item.namespace) {
+      postToFrame(entry, {
+        type: 'olivos:plugin_reply',
+        request_id: item.request_id,
+        payload: item.payload,
+      });
+    }
   } else if (item.type === 'open_page' && safeURL(item.url)) {
     await openExternalPage(item);
   }
@@ -1665,8 +1766,9 @@ function eventBatch(items) {
   for (const item of items) {
     if (state.seenEvents.has(item.sequence)) continue;
     state.seenEvents.add(item.sequence);
-    if (state.seenEvents.size > state.limit * 2)
+    if (state.seenEvents.size > state.limit * 2) {
       state.seenEvents.delete(state.seenEvents.values().next().value);
+    }
     handleEvent(item).catch(notifyError);
   }
 }

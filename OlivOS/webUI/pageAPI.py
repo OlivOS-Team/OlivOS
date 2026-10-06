@@ -415,8 +415,10 @@ def runtime_status(host):
               else 'offline' if key in known else 'unknown')
         for key, bot in accounts.items()
     }
-    return {'version': OlivOS.infoAPI.OlivOS_Version_Short, 'accounts': len(accounts),
-            'enabled': len(enabled), 'online': len(online & enabled), 'unknown': len(unknown),
+    return {'version': OlivOS.infoAPI.OlivOS_Version_Short,
+            'version_slogan': OlivOS.infoAPI.OlivOS_Version_Slogan,
+            'accounts': len(accounts), 'enabled': len(enabled),
+            'online': len(online & enabled), 'unknown': len(unknown),
             'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
             'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
             'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}

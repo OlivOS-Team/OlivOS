@@ -77,9 +77,9 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 原生终端 | `test_native_terminal.py` | 坏历史记录、特殊字符串、控件异常、限频与轮转、后续记录继续显示 |
 | 原生账号管理 | `test_native_accounts.py` | 托盘入口、编辑草稿隔离、新建/修改/删除、保存与热重载总线 |
 | 原生插件管理 | `test_native_plugins.py` | 生效顺序展示、用户/默认优先级标签、修改/置顶/置底/恢复默认与热重载 |
-| WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态、日志与终端、插件事件、优先级编辑、监听端口和重启反馈 |
+| WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态（含版本号与版本简称）、日志与终端、插件事件、优先级编辑、监听端口和重启反馈 |
 | WebUI 登录 | `test_webui_auth.py` | 凭据生命周期、并发登录、重启、错误提示、短暂断网和跨标签退出 |
-| WebUI 导航 | `test_webui_navigation.py` | 分组、重名、页面保活、消息回包、关闭、刷新恢复、响应布局、外部链接、优先级编辑 |
+| WebUI 导航 | `test_webui_navigation.py` | 分组、重名、页面保活、消息回包、关闭、刷新恢复、响应布局（含仪表盘版本卡窄屏不溢出）、外部链接、优先级编辑 |
 | WebUI 环境配置 | `test_webui_environment.py` | 监听覆盖、无效输入、端口 0 与实际监听地址 |
 | 插件消息桥 | `test_webui_plugin_template.py` | 宿主菜单事件、浏览器 payload、会话隔离回包，无相邻仓库依赖 |
 
