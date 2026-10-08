@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "olivos"
-version = "0.11.83"
+version = "1.0.0"
 description = "OlivOS / Witness Union，一个强大的跨平台交互栈与机器人框架"
 readme = "README.md"
 requires-python = ">=3.7"
