@@ -187,6 +187,20 @@ def test_plugin_navigation_groups_multiple_entries_and_directly_opens_single(bro
 
 
 @pytest.mark.browser
+def test_plugin_navigation_always_shows_namespace_and_uses_page_title_for_single(browser):
+    browser.driver.switch_to.default_content()
+    multi = browser.find('.plugin-page-group[data-plugin-namespace="multi"]')
+    single = browser.find('.plugin-page-group[data-plugin-namespace="single"]')
+    assert multi.find_element('css selector', '.plugin-group-namespace').text == 'multi'
+    assert single.find_element('css selector', '.plugin-group-name').text == '功能首页'
+    assert single.find_element('css selector', '.plugin-group-namespace').text == 'single'
+    assert single.find_element('css selector', '.plugin-single-entry').get_attribute('title') == '独立插件'
+    child = multi.find_element('css selector', '[data-plugin-path="webui/settings/index.html"]')
+    assert child.get_attribute('title') == '配置管理'
+    assert child.get_attribute('aria-label') == '配置管理（multi）'
+
+
+@pytest.mark.browser
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('retained')
