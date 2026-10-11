@@ -1384,8 +1384,10 @@ function renderPluginNavigation() {
       entry.title = page.title;
       entry.setAttribute('aria-label', `${page.title}（${namespace}）`);
       if (titles.get(page.title) > 1) {
+        const path = page.type === 'iframe' ? page.path : page.url;
+        entry.setAttribute('aria-label', `${page.title}（${namespace}） / ${path}`);
         entry.append(
-          element('span', page.type === 'iframe' ? page.path : page.url, {
+          element('span', path, {
             class: 'plugin-entry-path',
           }),
         );

@@ -375,12 +375,19 @@ def test_duplicate_plugin_and_page_names_are_disambiguated(browser):
     with browser.host.lock:
         browser.host.plugins['single'][0] = browser.host.plugins['multi'][0]
         for page in browser.host.plugin_pages:
-            if page.get('path') == 'webui/tools/index.html':
+            if page.get('path') == 'webui/tools/index.html' or page['type'] == 'link':
                 page['title'] = '配置管理'
     browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: browser.driver.execute_script(
         'return document.querySelectorAll(".plugin-group-namespace").length') == 2)
-    assert browser.driver.execute_script('return document.querySelectorAll(".plugin-entry-path").length') == 2
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll(".plugin-entry-path").length') == 3)
+    group = '.plugin-page-group[data-plugin-namespace="multi"]'
+    for path in ('webui/settings/index.html', 'webui/tools/index.html'):
+        entry = browser.find(f'{group} [data-plugin-path="{path}"]')
+        assert entry.accessible_name == f'配置管理（multi） / {path}'
+    link = browser.find(f'{group} .plugin-link-external')
+    assert link.accessible_name == f'配置管理（multi） / {link.get_attribute("href")}'
     browser.select('webui/tools/index.html')
     browser.driver.switch_to.default_content()
     title = browser.find('[data-plugin-path="webui/tools/index.html"]').find_element('xpath', '..')
