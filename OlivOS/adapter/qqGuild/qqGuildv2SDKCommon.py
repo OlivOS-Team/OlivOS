@@ -210,7 +210,8 @@ qqEventReplyTypes = {
 }
 qqAsyncAcceptedCodes = {304023, 304024}
 qqPassiveFallbackErrorCodes = {
-    'msg_id': {304103, 40034005, 40034024, 40034128},
+    # 40034031：msgid 已经过期，清除被动回复凭据后尝试主动发送。
+    'msg_id': {304103, 40034005, 40034024, 40034031, 40034128},
     'event_id': {40034025, 40034026, 40034027, 40034128}
 }
 qqLocalPassiveFallbackErrors = {

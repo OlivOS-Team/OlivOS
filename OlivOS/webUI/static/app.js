@@ -1312,6 +1312,8 @@ function appendPluginPage(container, page) {
   // 每个页面单独关闭；只有已保活（还在缓存里）的条目才显示这个 ×。
   const close = button('×', () => closePluginPage(page), 'plugin-link-close');
   const label = pluginPageLabel(page);
+  entry.title = page.title;
+  entry.setAttribute('aria-label', page.title);
   close.title = `关闭：${label}`;
   close.setAttribute('aria-label', `关闭 ${label}`);
   row.append(entry, close);
@@ -1329,28 +1331,29 @@ function renderPluginNavigation() {
   for (const namespace of state.collapsedPluginGroups) {
     if ((groups.get(namespace)?.length || 0) < 2) state.collapsedPluginGroups.delete(namespace);
   }
-  const names = new Map();
-  for (const namespace of groups.keys()) {
-    const name = state.plugins[namespace]?.[0] || namespace;
-    names.set(name, (names.get(name) || 0) + 1);
-  }
   for (const [namespace, pages] of groups) {
     const group = element('div', null, { class: 'plugin-page-group' });
     group.dataset.pluginNamespace = namespace;
     const name = state.plugins[namespace]?.[0] || namespace;
     const label = element('span', null, { class: 'plugin-group-label' });
-    label.append(element('span', name, { class: 'plugin-group-name' }));
-    if (names.get(name) > 1) {
-      label.append(element('span', namespace, { class: 'plugin-group-namespace' }));
-    }
+    const groupName = element('span', name, { class: 'plugin-group-name' });
+    groupName.title = name;
+    const groupNamespace = element('span', namespace, { class: 'plugin-group-namespace' });
+    groupNamespace.title = namespace;
+    label.append(groupName, groupNamespace);
     if (pages.length === 1) {
       const page = pages[0];
       const entry = appendPluginPage(group, page);
       entry.classList.add('plugin-single-entry');
-      if (page.title !== name) {
-        label.append(element('span', page.title, { class: 'plugin-single-title' }));
-      }
-      entry.replaceChildren(label);
+      const pageLabel = element('span', null, { class: 'plugin-group-label' });
+      const pageName = element('span', page.title, { class: 'plugin-group-name' });
+      pageName.title = page.title;
+      const pageNamespace = element('span', namespace, { class: 'plugin-group-namespace' });
+      pageNamespace.title = namespace;
+      pageLabel.append(pageName, pageNamespace);
+      entry.replaceChildren(pageLabel);
+      entry.title = name;
+      entry.setAttribute('aria-label', `${page.title}（${namespace}）`);
       $('plugin-links').append(group);
       continue;
     }
@@ -1378,9 +1381,13 @@ function renderPluginNavigation() {
     for (const page of pages) titles.set(page.title, (titles.get(page.title) || 0) + 1);
     for (const page of pages) {
       const entry = appendPluginPage(children, page);
+      entry.title = page.title;
+      entry.setAttribute('aria-label', `${page.title}（${namespace}）`);
       if (titles.get(page.title) > 1) {
+        const path = page.type === 'iframe' ? page.path : page.url;
+        entry.setAttribute('aria-label', `${page.title}（${namespace}） / ${path}`);
         entry.append(
-          element('span', page.type === 'iframe' ? page.path : page.url, {
+          element('span', path, {
             class: 'plugin-entry-path',
           }),
         );
