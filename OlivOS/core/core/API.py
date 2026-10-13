@@ -448,6 +448,13 @@ class Event(object):
                     ['user_id', self.data.user_id],
                     ['target_id', self.data.target_id]
                 ])
+            elif self.plugin_info['func_type'] == 'button_click':
+                tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
+                    ['host_id', self.data.host_id],
+                    ['group_id', self.data.group_id],
+                    ['user_id', self.data.user_id],
+                    ['button_id', self.data.button_id]
+                ])
             elif self.plugin_info['func_type'] == 'group_lucky_king':
                 tmp_globalMetaTableTemp_patch = OlivOS.metadataAPI.getPairMapping([
                     ['group_id', self.data.group_id],
@@ -651,6 +658,19 @@ class Event(object):
             self.group_id = group_id
             self.user_id = user_id
             self.target_id = target_id
+
+    class button_click(object):
+        def __init__(
+            self, user_id, button_id=None, button_data=None,
+            group_id=None, host_id=None, message_id=None, flag_lazy=True
+        ):
+            self.user_id = user_id
+            self.button_id = button_id
+            self.button_data = button_data
+            self.group_id = group_id
+            self.host_id = host_id
+            self.message_id = message_id
+            self.extend = {}
 
     class group_lucky_king(object):
         def __init__(self, group_id, user_id, target_id, flag_lazy=True):

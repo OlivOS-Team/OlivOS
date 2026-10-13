@@ -53,6 +53,7 @@ globalMetaTableTemp = {
     'host_id': 'N/A',
     'operator_id': 'N/A',
     'target_id': 'N/A',
+    'button_id': 'N/A',
     'name': 'N/A',
     'action': 'N/A',
     'duration': 'N/A',
@@ -87,6 +88,7 @@ globalMetaTable = {
     ),
     'event_private_message_recall_log': 'User({user_id}) Message_id({message_id})',
     'event_poke_log': 'Group({group_id}) User({user_id}) -> Target({target_id})',
+    'event_button_click_log': 'Host({host_id}) Group({group_id}) User({user_id}) Button({button_id})',
     'event_group_lucky_king_log': 'Group({group_id}) User({user_id}) -> Target({target_id})',
     'event_group_honor_log': 'Group({group_id}) User({user_id}) Type({type})',
     'event_friend_add_request_log': 'User({user_id}) Flag({flag}) : {comment}',
@@ -153,6 +155,10 @@ eventLogMetaTable = {
     'poke': {
         'level': 2,
         'message_key': 'event_poke_log'
+    },
+    'button_click': {
+        'level': 2,
+        'message_key': 'event_button_click_log'
     },
     'group_lucky_king': {
         'level': 2,

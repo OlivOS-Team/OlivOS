@@ -159,7 +159,7 @@ qqRecallEventTypes = {
     'DIRECT_MESSAGE_DELETE'
 }
 # 对不上 OlivOS 标准事件的平台事件:在 SDK 层解析并记录
-# (event_action.get_unhandled_events 可查),不投递到插件层。
+# (event_action.get_unhandled_events 可查); INTERACTION_CREATE 的按钮另行投递。
 qqInternalEventTypes = {
     'GUILD_CREATE', 'GUILD_UPDATE', 'GUILD_DELETE',
     'CHANNEL_CREATE', 'CHANNEL_UPDATE', 'CHANNEL_DELETE',
@@ -250,6 +250,10 @@ sdkRxMessageContentMaxLen = 4096
 sdkUnhandledEventInfo = {}
 sdkUnhandledEventLock = threading.Lock()
 sdkUnhandledEventMaxSize = 200
+# ACK 限制在途请求与排队任务,保持插件调度非阻塞。
+sdkInteractionAckMaxConcurrency = 8
+sdkInteractionAckMaxPending = 32
+sdkInteractionAckMaxQueueAge = 5.0
 # 用户信息缓存:消息/事件/mentions 中出现过的用户,按各类 openid 建索引,
 # 记录昵称/角色/union_openid 等,供 get_stranger_info / at 昵称补全使用。
 sdkUserInfo = {}
@@ -2633,6 +2637,65 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
             message_obj.data_raw = copy.deepcopy(message_obj.data)
 
 
+class _InteractionAckPool(object):
+    def __init__(self, max_workers=sdkInteractionAckMaxConcurrency, max_pending=sdkInteractionAckMaxPending):
+        self.max_workers = max_workers
+        self.max_pending = max_pending
+        self.pending = deque()
+        self.lock = threading.Lock()
+        self.workers = 0
+
+    def submit(self, bot_info, interaction_id, code=0):
+        with self.lock:
+            if len(self.pending) >= self.max_pending:
+                return False
+            self.pending.append((
+                time.monotonic(), event_action._ack_interaction_plant, bot_info, interaction_id, code
+            ))
+            if self.workers < self.max_workers:
+                self.workers += 1
+                try:
+                    threading.Thread(target=self._run, name='qqGuildv2-interaction-ack', daemon=True).start()
+                except Exception:
+                    self.workers -= 1
+                    self.pending.pop()
+                    traceback.print_exc()
+                    return False
+        return True
+
+    def _run(self):
+        while True:
+            with self.lock:
+                if not self.pending:
+                    self.workers -= 1
+                    return
+                queued_at, callback, bot_info, interaction_id, code = self.pending.popleft()
+            try:
+                # 网络阻塞后不继续发送积压的旧应答;仅限制排队时间,不替代 HTTP 超时。
+                if time.monotonic() - queued_at <= sdkInteractionAckMaxQueueAge:
+                    callback(bot_info, interaction_id, code)
+            except Exception:
+                traceback.print_exc()
+
+
+_interaction_ack_pool = _InteractionAckPool()
+
+
+def _get_qq_interaction_info(event_data):
+    if not isinstance(event_data, dict):
+        return None, None, None
+    interaction_id = event_data.get('id', None)
+    if not isinstance(interaction_id, str) or interaction_id == '':
+        interaction_id = None
+    interaction_data = event_data.get('data', None)
+    if not isinstance(interaction_data, dict):
+        interaction_data = {}
+    interaction_type = event_data.get('type', None)
+    if interaction_type is None:
+        interaction_type = interaction_data.get('type', None)
+    return interaction_id, interaction_type, interaction_data.get('resolved', None)
+
+
 def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
     if not isinstance(event_data, dict):
         return None
@@ -2645,6 +2708,11 @@ def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
     elif event_type == 'GROUP_JOIN_REQUEST':
         event_data_id = event_data.get('join_request_id', None)
         event_data_index = event_data.get('group_openid', '')
+    elif event_type == 'INTERACTION_CREATE':
+        event_data_id, interaction_type, resolved = _get_qq_interaction_info(event_data)
+        if interaction_type not in [11, 12] or (interaction_type == 11 and not isinstance(resolved, dict)):
+            return None
+        event_data_index = ''
     else:
         return None
     if event_data_id is None or str(event_data_id) == '':
@@ -3486,28 +3554,77 @@ def get_Event_from_SDK(target_event):
             'host_group_id': str(deleted_message.get('guild_id', ''))
         }
     elif target_event.sdk_event.payload.data.t == 'INTERACTION_CREATE':
-        # 互动事件(按钮回调等):对不上 OlivOS 标准事件,留在 SDK 层记录;
-        # 后台自动应答 code=0,避免用户端一直转圈提示"操作失败"。
         target_event.active = False
-        _record_unhandled_qq_event(
-            plugin_event_bot_hash,
-            'INTERACTION_CREATE',
-            target_event.sdk_event.payload.data.id,
-            event_data
-        )
-        interaction_id = None
-        if isinstance(event_data, dict):
-            interaction_id = event_data.get('id', None)
-        if interaction_id is not None and str(interaction_id) != '':
+        interaction_id, interaction_type, resolved = _get_qq_interaction_info(event_data)
+        if interaction_id is not None and interaction_type == 11 and isinstance(resolved, dict):
+            # 回调按钮走独立通知,不把 button_data 当成普通消息或指令解析。
+            scene = event_data.get('scene', None)
+            if scene not in ['group', 'c2c', 'guild']:
+                chat_type = event_data.get('chat_type', None)
+                if chat_type == 1:
+                    scene = 'group'
+                elif chat_type == 2:
+                    scene = 'c2c'
+                elif chat_type == 0 or event_data.get('channel_id', None):
+                    scene = 'guild'
+                elif event_data.get('group_openid', None):
+                    scene = 'group'
+                elif event_data.get('user_openid', None):
+                    scene = 'c2c'
+            user_id, group_id, host_id, chat_type, chat_id = None, None, None, None, None
+            if scene == 'group':
+                user_id = event_data.get('group_member_openid', None)
+                group_id = event_data.get('group_openid', None)
+                chat_type, chat_id = 'qq_group', group_id
+            elif scene == 'c2c':
+                user_id = event_data.get('user_openid', None)
+                chat_type, chat_id = 'qq_private', user_id
+            elif scene == 'guild':
+                user_id = resolved.get('user_id', None)
+                group_id = event_data.get('channel_id', None)
+                host_id = event_data.get('guild_id', None)
+                chat_type, chat_id = 'guild_channel', group_id
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'button_click'
+            target_event.data = target_event.button_click(
+                user_id,
+                button_id=resolved.get('button_id', None),
+                button_data=resolved.get('button_data', None),
+                group_id=group_id,
+                host_id=host_id,
+                message_id=resolved.get('message_id', None)
+            )
+            target_event.data.extend = {
+                'flag_from_qq': scene in ['group', 'c2c'],
+                'flag_from_direct': scene == 'c2c',
+                'chat_type': chat_type,
+                'chat_id': chat_id,
+                'interaction_id': interaction_id,
+                # d.id 用于被动消息和互动应答;外层 payload.id 可能带事件名前缀。
+                'event_id': interaction_id,
+                'qq_auto_ack': False
+            }
+        else:
+            _record_unhandled_qq_event(
+                plugin_event_bot_hash,
+                'INTERACTION_CREATE',
+                target_event.sdk_event.payload.data.id,
+                event_data
+            )
+        # 按钮和快捷菜单安排 code=0 应答;其他互动无需 ACK,同一 id 只安排一次。
+        if interaction_id is not None and (target_event.active or interaction_type == 12):
             tmp_ack_bot_info = bot_info_T(
                 target_event.sdk_event.base_info['self_id'],
                 target_event.sdk_event.base_info['token']
             )
-            threading.Thread(
-                target=event_action._ack_interaction_plant,
-                args=(tmp_ack_bot_info, str(interaction_id), 0),
-                daemon=True
-            ).start()
+            ack_scheduled = _interaction_ack_pool.submit(tmp_ack_bot_info, str(interaction_id))
+            if target_event.active:
+                target_event.data.extend['qq_auto_ack'] = ack_scheduled
+            if not ack_scheduled and target_event.log_func is not None:
+                target_event.log_func(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS qqGuildv2SDK interaction ACK skipped: queue full or worker start failed',
+                    [], modelName
+                ), [(modelName, 'default')])
     elif target_event.sdk_event.payload.data.t in qqInternalEventTypes:
         # 其余对不上 OlivOS 标准事件的平台事件:解析后留在 SDK 层环形缓存
         target_event.active = False
@@ -3535,7 +3652,7 @@ def get_Event_from_SDK(target_event):
         if payload_data.s is not None:
             target_event.data.extend['qq_payload_seq'] = payload_data.s
         if event_id is not None:
-            target_event.data.extend['event_id'] = str(event_id)
+            target_event.data.extend.setdefault('event_id', str(event_id))
             target_event.data.extend['qq_payload_id'] = str(event_id)
 
 
@@ -4834,7 +4951,7 @@ class event_action_common(object):
 
     # ============ 未映射平台事件查询 ============
     def get_unhandled_events(target_event, limit=50, flag_clear=False):
-        # 取本 bot 未映射到 OlivOS 标准事件的平台事件(INTERACTION_CREATE、
+        # 取本 bot 未映射到 OlivOS 标准事件的平台事件(非按钮 INTERACTION_CREATE、
         # MESSAGE_AUDIT_*、REACTION、FORUM、GUILD/CHANNEL 变更等),按时间正序。
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         bot_hash = str(target_event.bot_info.hash)

@@ -468,6 +468,8 @@ class shallow(API.Proc_templet):
                     plugin_model.main.Event.private_message_recall(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'poke':
                     plugin_model.main.Event.poke(plugin_event=plugin_event, Proc=self)
+                elif plugin_event.plugin_info['func_type'] == 'button_click':
+                    plugin_model.main.Event.button_click(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_lucky_king':
                     plugin_model.main.Event.group_lucky_king(plugin_event=plugin_event, Proc=self)
                 elif plugin_event.plugin_info['func_type'] == 'group_honor':
