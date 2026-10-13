@@ -69,7 +69,7 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
-| QQ 官方机器人按钮 | `test_qqguildv2_interactions.py` | 回调按钮投递、群/单聊/频道上下文、原始数据、自动 ACK 与去重、被动回复及异常载荷 |
+| QQ 官方机器人按钮 | `test_qqguildv2_interactions.py` | 回调按钮投递、群/单聊/频道上下文、原始数据、自动 ACK 与去重、并发/队列上限与过期、异常恢复、被动回复及异常载荷 |
 | QQ 官方机器人分享链接 | `test_qqguildv2_share_links.py` | 请求构造、输入限制与服务端失败响应 |
 | 协议启动器 | `test_protocol_booters.py` | Windows 启动器日志路由、NapCat 配置生成，不运行外部程序 |
 | 数据存储 | `test_user_database.py`, `test_legacy_config.py` | SQLite 持久化/隔离/并发/序列化，以及旧用户/群配置接口 |

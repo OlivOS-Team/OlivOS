@@ -48,6 +48,7 @@ def bot(request, monkeypatch):
     for name in ['qqEventDedupeCache', 'sdkSubSelfInfo', 'sdkUnhandledEventInfo', 'sdkEventidinfo']:
         monkeypatch.setattr(common, name, {})
     monkeypatch.setattr(common.req, 'request', Mock(side_effect=AssertionError('Unexpected network call')))
+    monkeypatch.setattr(common, '_interaction_ack_pool', common._InteractionAckPool())
     return bot
 
 
@@ -126,6 +127,118 @@ def test_button_click_reaches_plugin_with_original_data(
     assert ack[1].wait(1)
     ack[0].assert_called_once()
     assert ack[0].call_args.args[1:] == ('interaction-1', 0)
+
+
+def test_button_flood_bounds_ack_workers_and_queue_without_blocking_plugins(bot, monkeypatch):
+    monkeypatch.setattr(common, '_interaction_ack_pool', common._InteractionAckPool(max_workers=2, max_pending=2))
+    release = threading.Event()
+    started = threading.Condition()
+    ack_ids = []
+    delivered = []
+    original_threads = set(threading.enumerate())
+
+    def slow_ack(bot_info, interaction_id, code):
+        with started:
+            ack_ids.append(interaction_id)
+            started.notify_all()
+        assert release.wait(3)
+
+    monkeypatch.setattr(SDK.event_action, '_ack_interaction_plant', slow_ack)
+    loader = loader_for(bot, [('probe', {'button_click': lambda plugin_event, Proc: delivered.append(
+        (plugin_event.data.extend['interaction_id'], plugin_event.data.extend['qq_auto_ack'])
+    )}, None)])
+
+    def dispatch(index):
+        body = button_body()
+        body['id'] = 'flood-%s' % index
+        loader.run_plugin(interaction(bot, body))
+
+    try:
+        for index in range(2):
+            dispatch(index)
+        with started:
+            assert started.wait_for(lambda: len(ack_ids) == 2, timeout=1)
+        for index in range(2, 12):
+            dispatch(index)
+        assert len(delivered) == 12
+        assert [scheduled for _, scheduled in delivered] == [True] * 4 + [False] * 8
+        assert len(ack_ids) == 2
+        assert len(set(threading.enumerate()) - original_threads) == 2
+    finally:
+        release.set()
+        for thread in set(threading.enumerate()) - original_threads:
+            thread.join(2)
+    assert sorted(ack_ids) == ['flood-0', 'flood-1', 'flood-2', 'flood-3']
+    dispatch(12)
+    for thread in set(threading.enumerate()) - original_threads:
+        thread.join(2)
+    assert delivered[-1] == ('flood-12', True)
+    assert ack_ids[-1] == 'flood-12'
+
+
+def test_ack_worker_recovers_after_request_exception(bot, monkeypatch, capsys):
+    monkeypatch.setattr(common, '_interaction_ack_pool', common._InteractionAckPool(max_workers=1, max_pending=1))
+    request = Mock(side_effect=[RuntimeError('simulated ACK failure'), None])
+    monkeypatch.setattr(SDK.event_action, '_ack_interaction_plant', request)
+    original_threads = set(threading.enumerate())
+    for index in range(2):
+        body = button_body()
+        body['id'] = 'recover-%s' % index
+        event = OlivOS.API.Event(interaction(bot, body))
+        assert event.active and event.data.extend['qq_auto_ack']
+        for thread in set(threading.enumerate()) - original_threads:
+            thread.join(2)
+    assert request.call_count == 2
+    assert 'simulated ACK failure' in capsys.readouterr().err
+
+
+def test_ack_thread_start_failure_keeps_button_delivery_and_releases_capacity(bot, ack, monkeypatch, capsys):
+    logger = Mock()
+    with monkeypatch.context() as patch:
+        thread = Mock()
+        thread.start.side_effect = RuntimeError('simulated thread start failure')
+        patch.setattr(common.threading, 'Thread', Mock(return_value=thread))
+        event = OlivOS.API.Event(interaction(bot, button_body()), logger)
+    assert event.active and event.data.extend['qq_auto_ack'] is False
+    ack[0].assert_not_called()
+    assert any(call.args[0] == 3 for call in logger.call_args_list)
+    assert 'simulated thread start failure' in capsys.readouterr().err
+    body = button_body()
+    body['id'] = 'retry-new-interaction'
+    event = OlivOS.API.Event(interaction(bot, body))
+    assert event.data.extend['qq_auto_ack']
+    assert ack[1].wait(1)
+
+
+def test_ack_pool_discards_expired_queued_requests(bot, monkeypatch):
+    pool = common._InteractionAckPool(max_workers=1, max_pending=1)
+    release, started = threading.Event(), threading.Event()
+    ack_ids = []
+    now = [10.0]
+    original_threads = set(threading.enumerate())
+
+    def slow_ack(bot_info, interaction_id, code):
+        ack_ids.append(interaction_id)
+        if interaction_id == 'running':
+            started.set()
+            assert release.wait(3)
+
+    monkeypatch.setattr(SDK.event_action, '_ack_interaction_plant', slow_ack)
+    monkeypatch.setattr(common.time, 'monotonic', lambda: now[0])
+    try:
+        assert pool.submit(None, 'running')
+        assert started.wait(1)
+        assert pool.submit(None, 'expired')
+        now[0] += common.sdkInteractionAckMaxQueueAge + 1
+    finally:
+        release.set()
+        for thread in set(threading.enumerate()) - original_threads:
+            thread.join(2)
+    assert ack_ids == ['running']
+    assert pool.submit(None, 'fresh')
+    for thread in set(threading.enumerate()) - original_threads:
+        thread.join(2)
+    assert ack_ids == ['running', 'fresh']
 
 
 @pytest.mark.parametrize('scene,chat_type,fields,target_type,chat_id,user_id,group_id,host_id', SCENES)

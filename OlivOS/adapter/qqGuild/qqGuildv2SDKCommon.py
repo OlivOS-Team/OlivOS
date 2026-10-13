@@ -250,6 +250,10 @@ sdkRxMessageContentMaxLen = 4096
 sdkUnhandledEventInfo = {}
 sdkUnhandledEventLock = threading.Lock()
 sdkUnhandledEventMaxSize = 200
+# ACK 限制在途请求与排队任务,保持插件调度非阻塞。
+sdkInteractionAckMaxConcurrency = 8
+sdkInteractionAckMaxPending = 32
+sdkInteractionAckMaxQueueAge = 5.0
 # 用户信息缓存:消息/事件/mentions 中出现过的用户,按各类 openid 建索引,
 # 记录昵称/角色/union_openid 等,供 get_stranger_info / at 昵称补全使用。
 sdkUserInfo = {}
@@ -2633,6 +2637,50 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
             message_obj.data_raw = copy.deepcopy(message_obj.data)
 
 
+class _InteractionAckPool(object):
+    def __init__(self, max_workers=sdkInteractionAckMaxConcurrency, max_pending=sdkInteractionAckMaxPending):
+        self.max_workers = max_workers
+        self.max_pending = max_pending
+        self.pending = deque()
+        self.lock = threading.Lock()
+        self.workers = 0
+
+    def submit(self, bot_info, interaction_id, code=0):
+        with self.lock:
+            if len(self.pending) >= self.max_pending:
+                return False
+            self.pending.append((
+                time.monotonic(), event_action._ack_interaction_plant, bot_info, interaction_id, code
+            ))
+            if self.workers < self.max_workers:
+                self.workers += 1
+                try:
+                    threading.Thread(target=self._run, name='qqGuildv2-interaction-ack', daemon=True).start()
+                except Exception:
+                    self.workers -= 1
+                    self.pending.pop()
+                    traceback.print_exc()
+                    return False
+        return True
+
+    def _run(self):
+        while True:
+            with self.lock:
+                if not self.pending:
+                    self.workers -= 1
+                    return
+                queued_at, callback, bot_info, interaction_id, code = self.pending.popleft()
+            try:
+                # 网络阻塞后不继续发送积压的旧应答;仅限制排队时间,不替代 HTTP 超时。
+                if time.monotonic() - queued_at <= sdkInteractionAckMaxQueueAge:
+                    callback(bot_info, interaction_id, code)
+            except Exception:
+                traceback.print_exc()
+
+
+_interaction_ack_pool = _InteractionAckPool()
+
+
 def _get_qq_interaction_info(event_data):
     if not isinstance(event_data, dict):
         return None, None, None
@@ -3554,7 +3602,7 @@ def get_Event_from_SDK(target_event):
                 'interaction_id': interaction_id,
                 # d.id 用于被动消息和互动应答;外层 payload.id 可能带事件名前缀。
                 'event_id': interaction_id,
-                'qq_auto_ack': True
+                'qq_auto_ack': False
             }
         else:
             _record_unhandled_qq_event(
@@ -3563,17 +3611,20 @@ def get_Event_from_SDK(target_event):
                 target_event.sdk_event.payload.data.id,
                 event_data
             )
-        # 按钮和快捷菜单自动应答成功;其他互动无需 ACK,且同一 id 只能应答一次。
+        # 按钮和快捷菜单安排 code=0 应答;其他互动无需 ACK,同一 id 只安排一次。
         if interaction_id is not None and (target_event.active or interaction_type == 12):
             tmp_ack_bot_info = bot_info_T(
                 target_event.sdk_event.base_info['self_id'],
                 target_event.sdk_event.base_info['token']
             )
-            threading.Thread(
-                target=event_action._ack_interaction_plant,
-                args=(tmp_ack_bot_info, str(interaction_id), 0),
-                daemon=True
-            ).start()
+            ack_scheduled = _interaction_ack_pool.submit(tmp_ack_bot_info, str(interaction_id))
+            if target_event.active:
+                target_event.data.extend['qq_auto_ack'] = ack_scheduled
+            if not ack_scheduled and target_event.log_func is not None:
+                target_event.log_func(3, OlivOS.L10NAPI.getTrans(
+                    'OlivOS qqGuildv2SDK interaction ACK skipped: queue full or worker start failed',
+                    [], modelName
+                ), [(modelName, 'default')])
     elif target_event.sdk_event.payload.data.t in qqInternalEventTypes:
         # 其余对不上 OlivOS 标准事件的平台事件:解析后留在 SDK 层环形缓存
         target_event.active = False
