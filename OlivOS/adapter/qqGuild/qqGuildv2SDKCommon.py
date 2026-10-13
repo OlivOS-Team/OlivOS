@@ -159,7 +159,7 @@ qqRecallEventTypes = {
     'DIRECT_MESSAGE_DELETE'
 }
 # 对不上 OlivOS 标准事件的平台事件:在 SDK 层解析并记录
-# (event_action.get_unhandled_events 可查),不投递到插件层。
+# (event_action.get_unhandled_events 可查); INTERACTION_CREATE 的按钮另行投递。
 qqInternalEventTypes = {
     'GUILD_CREATE', 'GUILD_UPDATE', 'GUILD_DELETE',
     'CHANNEL_CREATE', 'CHANNEL_UPDATE', 'CHANNEL_DELETE',
@@ -2633,6 +2633,21 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
             message_obj.data_raw = copy.deepcopy(message_obj.data)
 
 
+def _get_qq_interaction_info(event_data):
+    if not isinstance(event_data, dict):
+        return None, None, None
+    interaction_id = event_data.get('id', None)
+    if not isinstance(interaction_id, str) or interaction_id == '':
+        interaction_id = None
+    interaction_data = event_data.get('data', None)
+    if not isinstance(interaction_data, dict):
+        interaction_data = {}
+    interaction_type = event_data.get('type', None)
+    if interaction_type is None:
+        interaction_type = interaction_data.get('type', None)
+    return interaction_id, interaction_type, interaction_data.get('resolved', None)
+
+
 def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
     if not isinstance(event_data, dict):
         return None
@@ -2645,6 +2660,11 @@ def _get_qq_event_dedupe_key(bot_id, event_type, event_data):
     elif event_type == 'GROUP_JOIN_REQUEST':
         event_data_id = event_data.get('join_request_id', None)
         event_data_index = event_data.get('group_openid', '')
+    elif event_type == 'INTERACTION_CREATE':
+        event_data_id, interaction_type, resolved = _get_qq_interaction_info(event_data)
+        if interaction_type not in [11, 12] or (interaction_type == 11 and not isinstance(resolved, dict)):
+            return None
+        event_data_index = ''
     else:
         return None
     if event_data_id is None or str(event_data_id) == '':
@@ -3486,19 +3506,65 @@ def get_Event_from_SDK(target_event):
             'host_group_id': str(deleted_message.get('guild_id', ''))
         }
     elif target_event.sdk_event.payload.data.t == 'INTERACTION_CREATE':
-        # 互动事件(按钮回调等):对不上 OlivOS 标准事件,留在 SDK 层记录;
-        # 后台自动应答 code=0,避免用户端一直转圈提示"操作失败"。
         target_event.active = False
-        _record_unhandled_qq_event(
-            plugin_event_bot_hash,
-            'INTERACTION_CREATE',
-            target_event.sdk_event.payload.data.id,
-            event_data
-        )
-        interaction_id = None
-        if isinstance(event_data, dict):
-            interaction_id = event_data.get('id', None)
-        if interaction_id is not None and str(interaction_id) != '':
+        interaction_id, interaction_type, resolved = _get_qq_interaction_info(event_data)
+        if interaction_id is not None and interaction_type == 11 and isinstance(resolved, dict):
+            # 回调按钮走独立通知,不把 button_data 当成普通消息或指令解析。
+            scene = event_data.get('scene', None)
+            if scene not in ['group', 'c2c', 'guild']:
+                chat_type = event_data.get('chat_type', None)
+                if chat_type == 1:
+                    scene = 'group'
+                elif chat_type == 2:
+                    scene = 'c2c'
+                elif chat_type == 0 or event_data.get('channel_id', None):
+                    scene = 'guild'
+                elif event_data.get('group_openid', None):
+                    scene = 'group'
+                elif event_data.get('user_openid', None):
+                    scene = 'c2c'
+            user_id, group_id, host_id, chat_type, chat_id = None, None, None, None, None
+            if scene == 'group':
+                user_id = event_data.get('group_member_openid', None)
+                group_id = event_data.get('group_openid', None)
+                chat_type, chat_id = 'qq_group', group_id
+            elif scene == 'c2c':
+                user_id = event_data.get('user_openid', None)
+                chat_type, chat_id = 'qq_private', user_id
+            elif scene == 'guild':
+                user_id = resolved.get('user_id', None)
+                group_id = event_data.get('channel_id', None)
+                host_id = event_data.get('guild_id', None)
+                chat_type, chat_id = 'guild_channel', group_id
+            target_event.active = True
+            target_event.plugin_info['func_type'] = 'button_click'
+            target_event.data = target_event.button_click(
+                user_id,
+                button_id=resolved.get('button_id', None),
+                button_data=resolved.get('button_data', None),
+                group_id=group_id,
+                host_id=host_id,
+                message_id=resolved.get('message_id', None)
+            )
+            target_event.data.extend = {
+                'flag_from_qq': scene in ['group', 'c2c'],
+                'flag_from_direct': scene == 'c2c',
+                'chat_type': chat_type,
+                'chat_id': chat_id,
+                'interaction_id': interaction_id,
+                # d.id 用于被动消息和互动应答;外层 payload.id 可能带事件名前缀。
+                'event_id': interaction_id,
+                'qq_auto_ack': True
+            }
+        else:
+            _record_unhandled_qq_event(
+                plugin_event_bot_hash,
+                'INTERACTION_CREATE',
+                target_event.sdk_event.payload.data.id,
+                event_data
+            )
+        # 按钮和快捷菜单自动应答成功;其他互动无需 ACK,且同一 id 只能应答一次。
+        if interaction_id is not None and (target_event.active or interaction_type == 12):
             tmp_ack_bot_info = bot_info_T(
                 target_event.sdk_event.base_info['self_id'],
                 target_event.sdk_event.base_info['token']
@@ -3535,7 +3601,7 @@ def get_Event_from_SDK(target_event):
         if payload_data.s is not None:
             target_event.data.extend['qq_payload_seq'] = payload_data.s
         if event_id is not None:
-            target_event.data.extend['event_id'] = str(event_id)
+            target_event.data.extend.setdefault('event_id', str(event_id))
             target_event.data.extend['qq_payload_id'] = str(event_id)
 
 
@@ -4834,7 +4900,7 @@ class event_action_common(object):
 
     # ============ 未映射平台事件查询 ============
     def get_unhandled_events(target_event, limit=50, flag_clear=False):
-        # 取本 bot 未映射到 OlivOS 标准事件的平台事件(INTERACTION_CREATE、
+        # 取本 bot 未映射到 OlivOS 标准事件的平台事件(非按钮 INTERACTION_CREATE、
         # MESSAGE_AUDIT_*、REACTION、FORUM、GUILD/CHANNEL 变更等),按时间正序。
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         bot_hash = str(target_event.bot_info.hash)
