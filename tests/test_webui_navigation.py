@@ -222,6 +222,28 @@ def test_plugin_menu_dialog_shows_namespace_priority_and_info(browser):
 
 
 @pytest.mark.browser
+def test_plugin_menu_priority_refreshes_while_dialog_open(browser):
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+    browser.driver.execute_script('''
+        const row = [...document.querySelectorAll('#plugin-rows tr')]
+          .find(item => item.cells[0].textContent === '独立插件');
+        row.cells[row.cells.length - 1].querySelector('button').click();
+    ''')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.getElementById("menu-dialog").open'))
+    assert browser.find('#menu-priority').text == '1（默认）'
+    # 模拟另一个会话调整优先级：宿主只广播 priority_only，弹窗需要跟着刷新。
+    with browser.host.lock:
+        browser.host.plugin_priority['single'] = {
+            'default': 1, 'user': 50, 'effective': 50, 'source': 'user'}
+        browser.host.publish('events', {'type': 'plugins', 'ready': True, 'priority_only': True})
+    browser.wait.until(
+        lambda _: browser.find('#menu-priority').text == '50（用户 50 / 默认 1）')
+
+
+@pytest.mark.browser
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('retained')
