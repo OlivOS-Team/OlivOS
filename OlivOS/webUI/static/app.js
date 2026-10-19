@@ -1132,6 +1132,13 @@ function pluginEffectivePriority(namespace, plugin) {
   const info = state.pluginPriority[namespace] || {};
   return Number.isInteger(info.effective) ? info.effective : plugin[6] || 0;
 }
+// 与 GUI 侧边栏同一套文案，避免两个界面读到的优先级说法不一致。
+function pluginPriorityText(namespace, plugin) {
+  const info = state.pluginPriority[namespace] || {};
+  const effective = pluginEffectivePriority(namespace, plugin);
+  if (!Number.isInteger(info.user)) return `${effective}（默认）`;
+  return `${effective}（用户 ${info.user} / 默认 ${info.default ?? effective}）`;
+}
 // 与加载器的 (生效优先级, namespace) 排序保持一致。
 function namespaceCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -1252,6 +1259,9 @@ function renderPlugins() {
 function pluginMenu(namespace) {
   const plugin = state.plugins[namespace];
   $('menu-title').textContent = plugin[0];
+  // 插件名可能重复，信息区固定按 命名空间 / 优先级 / 介绍 展示，与 GUI 侧边栏一致。
+  $('menu-namespace').textContent = namespace;
+  $('menu-priority').textContent = pluginPriorityText(namespace, plugin);
   $('menu-info').textContent = plugin[4];
   $('menu-items').replaceChildren();
   for (const item of plugin[3] || [])

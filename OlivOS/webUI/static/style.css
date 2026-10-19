@@ -866,6 +866,21 @@ dialog::backdrop {
   align-items: end;
   margin: 10px 0;
 }
+/* 插件菜单信息区：命名空间 / 优先级 / 介绍，行间距统一。 */
+.plugin-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0 0 20px;
+  align-items: baseline;
+}
+.plugin-meta dt {
+  color: var(--muted);
+}
+.plugin-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 #menu-items {
   display: flex;
   flex-direction: column;

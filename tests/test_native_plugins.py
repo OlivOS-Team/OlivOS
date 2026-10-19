@@ -74,6 +74,7 @@ def manager():
     view = nativeWinUIAPI.pluginManageUI('test', root=dock, logger_proc=Mock(), key='0')
     view.UIObject['tree'] = FakeTree()
     view.UIData['root_Label_PRIORITY_StringVar'] = FakeVar()
+    view.UIData['root_Label_NAMESPACE_StringVar'] = FakeVar()
     view.UIData['root_Label_INFO_StringVar'] = FakeVar()
     return dock, view
 
@@ -93,6 +94,17 @@ def test_plugin_manager_priority_label_shows_user_and_default(manager):
     view.UIObject['tree'].focus('item1')
     view.treeSelect('tree', None)
     assert view.UIData['root_Label_PRIORITY_StringVar'].get() == '30000（默认）'
+
+
+def test_plugin_manager_sidebar_shows_namespace(manager):
+    _, view = manager
+    view.tree_load()
+    view.UIObject['tree'].focus('item0')
+    view.treeSelect('tree', None)
+    assert view.UIData['root_Label_NAMESPACE_StringVar'].get() == 'beta'
+    view.UIObject['tree'].focus('item1')
+    view.treeSelect('tree', None)
+    assert view.UIData['root_Label_NAMESPACE_StringVar'].get() == 'alpha'
 
 
 def test_plugin_priority_set_writes_override_and_reloads_loader(manager, tmp_path):

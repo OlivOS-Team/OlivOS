@@ -201,6 +201,27 @@ def test_plugin_navigation_always_shows_namespace_and_uses_page_title_for_single
 
 
 @pytest.mark.browser
+def test_plugin_menu_dialog_shows_namespace_priority_and_info(browser):
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+    browser.driver.execute_script('''
+        const row = [...document.querySelectorAll('#plugin-rows tr')]
+          .find(item => item.cells[0].textContent === '独立插件');
+        row.cells[row.cells.length - 1].querySelector('button').click();
+    ''')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.getElementById("menu-dialog").open'))
+    assert browser.find('#menu-title').text == '独立插件'
+    labels = browser.driver.execute_script(
+        'return [...document.querySelectorAll("#menu-meta dt")].map(item => item.textContent)')
+    assert labels == ['命名空间', '优先级', '介绍']
+    assert browser.find('#menu-namespace').text == 'single'
+    assert browser.find('#menu-priority').text == '1（默认）'
+    assert browser.find('#menu-info').text == '分组导航测试'
+
+
+@pytest.mark.browser
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('retained')
