@@ -4274,7 +4274,7 @@ class event_action_common(object):
         """
         parsed = parse.urlparse(url)
         if parsed.scheme not in ['http', 'https'] or not parsed.hostname:
-            raise ValueError('image URL must use HTTP(S) with a hostname')
+            raise ValueError('图片 URL 必须是带主机名的 HTTP(S) 地址')
         try:
             addresses = {
                 item[4][0]
@@ -4283,14 +4283,14 @@ class event_action_common(object):
                 )
             }
         except OSError as exc:
-            raise ValueError('image URL hostname cannot be resolved') from exc
+            raise ValueError('图片 URL 域名无法解析') from exc
         for address in addresses:
             ip = ipaddress.ip_address(address)
             if (
                 ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
                 or ip.is_multicast or ip.is_unspecified
             ):
-                raise ValueError('image URL must resolve to a public address')
+                raise ValueError('图片 URL 必须解析到公网地址')
         return sorted(addresses)
 
     def _validate_public_image_url(url):
@@ -4302,7 +4302,8 @@ class event_action_common(object):
         hostname = parse.urlparse(url).hostname
         original_getaddrinfo = socket.getaddrinfo
 
-        def pinned_getaddrinfo(host, port, family=0, type_=0, proto=0, flags=0):
+        def pinned_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            # 参数名必须与标准库一致（urllib3 以 type= 关键字传参），否则会 TypeError。
             if host == hostname:
                 # 数值 IP 直接给出 sockaddr，不再走系统解析，彻底钉死连接目标；
                 # 端口为 0 时由底层按默认端口处理， family/type/proto 原样透传。
@@ -4326,7 +4327,7 @@ class event_action_common(object):
                     ))
                 if pinned:
                     return pinned
-            return original_getaddrinfo(host, port, family, type_, proto, flags)
+            return original_getaddrinfo(host, port, family, type, proto, flags)
 
         with qqMarkdownImageFetchLock:
             socket.getaddrinfo = pinned_getaddrinfo
@@ -4353,7 +4354,7 @@ class event_action_common(object):
                     # "解析校验通过 → 实际连接"之间把域名换到内网地址。
                     addresses = event_action._resolve_public_image_addresses(request_url)
                     if not addresses:
-                        raise ValueError('image URL must resolve to a public address')
+                        raise ValueError('图片 URL 必须解析到公网地址')
                     response = event_action._fetch_markdown_image_with_addresses(
                         request_url, addresses
                     )
@@ -4365,40 +4366,40 @@ class event_action_common(object):
                     status = None if response is None else response.status_code
                     if response is not None:
                         response.close()
-                    return None, None, 'image download failed with HTTP %s' % status
+                    return None, None, '图片下载失败: HTTP %s' % status
                 content_length = response.headers.get('Content-Length')
                 if content_length is not None and int(content_length) > max_size:
                     response.close()
-                    return None, None, 'image exceeds the 10 MB Markdown asset limit'
+                    return None, None, '图片超过 10MB 素材上限'
                 chunks = []
                 total_size = 0
                 for chunk in response.iter_content(64 * 1024):
                     total_size += len(chunk)
                     if total_size > max_size:
                         response.close()
-                        return None, None, 'image exceeds the 10 MB Markdown asset limit'
+                        return None, None, '图片超过 10MB 素材上限'
                     chunks.append(chunk)
                 file_data = b''.join(chunks)
                 file_name = os.path.basename(parse.unquote(parse.urlparse(request_url).path))
                 response.close()
             except Exception as exc:
-                return None, None, 'image download failed: %s' % exc
+                return None, None, '图片下载失败: %s' % exc
         else:
             try:
                 file_data = event_action._read_markdown_resource_data(resource, 10 * 1024 * 1024)
                 file_name = os.path.basename(parse.unquote(parsed.path or resource))
             except Exception as exc:
-                return None, None, 'image read failed: %s' % exc
+                return None, None, '图片读取失败: %s' % exc
         if len(file_data) > 10 * 1024 * 1024:
-            return None, None, 'image exceeds the 10 MB Markdown asset limit'
+            return None, None, '图片超过 10MB 素材上限'
         try:
             with Image.open(io.BytesIO(file_data)) as image:
                 width, height = image.size
                 image_format = image.format
             if image_format is None:
-                return None, None, 'image format is unsupported'
+                return None, None, '图片格式不受支持'
         except Exception as exc:
-            return None, None, 'image decode failed: %s' % exc
+            return None, None, '图片解码失败: %s' % exc
         extension = os.path.splitext(file_name)[1].lower()
         extension_mime = {
             '.png': ('PNG', 'image/png'),
@@ -4412,10 +4413,10 @@ class event_action_common(object):
                 'PNG': '.png', 'JPEG': '.jpg', 'GIF': '.gif', 'WEBP': '.webp'
             }.get(image_format)
         if extension not in extension_mime:
-            return None, None, 'image format must be png, jpeg, gif or webp'
+            return None, None, '图片格式必须是 png/jpeg/gif/webp'
         expected_format, content_type = extension_mime[extension]
         if image_format != expected_format:
-            return None, None, 'image extension does not match its content type'
+            return None, None, '图片扩展名与内容格式不一致'
         if file_name == '' or os.path.splitext(file_name)[1].lower() != extension:
             file_name = 'image' + extension
         return {
@@ -4434,21 +4435,21 @@ class event_action_common(object):
         if resource.startswith('base64://'):
             encoded = resource[9:]
             if len(encoded) > max_size * 2:
-                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                raise ValueError('图片超过 10MB 素材上限')
             data = base64.b64decode(encoded.encode('utf-8'))
             if len(data) > max_size:
-                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                raise ValueError('图片超过 10MB 素材上限')
             return data
         if resource.startswith('data:') and ',' in resource:
             data_meta, data_raw = resource.split(',', 1)
             if data_meta.endswith(';base64'):
                 if len(data_raw) > max_size * 2:
-                    raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                    raise ValueError('图片超过 10MB 素材上限')
                 data = base64.b64decode(data_raw.encode('utf-8'))
             else:
                 data = parse.unquote_to_bytes(data_raw)
             if len(data) > max_size:
-                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                raise ValueError('图片超过 10MB 素材上限')
             return data
         parsed = parse.urlparse(resource)
         if parsed.scheme == 'file':
@@ -4469,7 +4470,7 @@ class event_action_common(object):
                     break
                 total_size += len(chunk)
                 if total_size > max_size:
-                    raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                    raise ValueError('图片超过 10MB 素材上限')
                 chunks.append(chunk)
         return b''.join(chunks)
 
@@ -4695,7 +4696,7 @@ class event_action_common(object):
         replacements = {}
         for name, resource in local_images.items():
             if not isinstance(name, str) or name == '':
-                return None, None, 'local image names must be non-empty strings'
+                return None, None, '本地图片名不能为空字符串'
             image_data, _, error = event_action._read_markdown_image(target_event, resource)
             if error is not None:
                 return None, list(uploaded.values()), '%s: %s' % (name, error)
@@ -4774,17 +4775,17 @@ class event_action_common(object):
             elif isinstance(segment, OlivOS.messageAPI.PARA.image):
                 resource = event_action._get_message_resource(segment)
                 if resource is None:
-                    return None, 'image resource is empty'
+                    return None, '图片资源为空'
                 name = 'image_%s' % len(image_segments)
                 image_sources[name] = resource
                 image_segments.append(name)
                 content_parts.append(('image', name))
             else:
-                return None, 'mixed Markdown message contains unsupported media: %s' % (
+                return None, '混发 Markdown 含不支持的媒体段: %s' % (
                     type(segment).__name__
                 )
         if not image_segments or not has_text_content:
-            return None, 'message is not a text and image mixture'
+            return None, '消息不是图文混排'
         replacements, uploaded, error = event_action._upload_markdown_images(
             target_event,
             image_sources

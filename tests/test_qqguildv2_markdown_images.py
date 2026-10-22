@@ -105,7 +105,7 @@ def test_manual_markdown_upload_failure_falls_back_to_image_message(monkeypatch)
     monkeypatch.setattr(
         SDK.event_action,
         '_upload_markdown_images',
-        Mock(return_value=(None, [], 'cover: image exceeds the 10 MB Markdown asset limit'))
+        Mock(return_value=(None, [], 'cover: 图片超过 10MB 素材上限'))
     )
     send = Mock(return_value={'active': True, 'data': {'message_ids': ['fallback-id']}})
     monkeypatch.setattr(SDK.event_action, 'send_qq_msg', send)
@@ -120,7 +120,7 @@ def test_manual_markdown_upload_failure_falls_back_to_image_message(monkeypatch)
     )
 
     assert result['active'] is True
-    assert result['data']['markdown_fallback'].startswith('cover: image exceeds')
+    assert result['data']['markdown_fallback'].startswith('cover: 图片超过')
     message = send.call_args.args[2]
     assert isinstance(message.data[0], OlivOS.messageAPI.PARA.text)
     assert message.data[0].data['text'] == '# Report\n'
@@ -227,7 +227,7 @@ def test_remote_markdown_image_rejects_private_network_targets(monkeypatch):
     monkeypatch.setattr(
         SDK.event_action,
         '_validate_public_image_url',
-        Mock(side_effect=ValueError('image URL must resolve to a public address'))
+        Mock(side_effect=ValueError('图片 URL 必须解析到公网地址'))
     )
 
     image, _, error = SDK.event_action._read_markdown_image(
@@ -235,7 +235,7 @@ def test_remote_markdown_image_rejects_private_network_targets(monkeypatch):
     )
 
     assert image is None
-    assert 'public address' in error
+    assert '公网地址' in error
     request.assert_not_called()
 
 
@@ -261,7 +261,7 @@ def test_remote_markdown_image_download_stops_at_size_limit(monkeypatch):
     )
 
     assert image is None
-    assert '10 MB' in error
+    assert '10MB' in error
     response.close.assert_called_once()
     assert request.call_args.kwargs['stream'] is True
     assert request.call_args.kwargs['allow_redirects'] is False
@@ -312,7 +312,7 @@ def test_mixed_markdown_rejects_real_media_segments_with_type_name(monkeypatch):
     )
 
     assert result is None
-    assert 'unsupported media' in error
+    assert '不支持的媒体段' in error
     assert 'video' in error
 
 
