@@ -249,6 +249,12 @@ def test_remote_markdown_image_download_stops_at_size_limit(monkeypatch):
     )
     request = Mock(return_value=response)
     monkeypatch.setattr(common.req, 'get', request)
+    # 不依赖真实 DNS：下载走"解析→校验→钉住解析"流程，这里直接给出合法解析结果。
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_resolve_public_image_addresses',
+        Mock(return_value=['203.0.113.10'])
+    )
 
     image, _, error = SDK.event_action._read_markdown_image(
         _target_event(), 'https://example.invalid/large.png'
@@ -281,6 +287,20 @@ def test_force_active_mixed_message_does_not_reuse_passive_ids(monkeypatch):
     assert call.call_args.kwargs['reply_msg_id'] is None
     assert call.call_args.kwargs['event_id'] is None
     assert call.call_args.kwargs['force_active'] is True
+
+
+def test_force_active_conflicts_with_msg_id_even_without_local_images():
+    """互斥校验不限定 local_images：不带本地图也必须报错，不能静默丢弃 msg_id。"""
+    result = SDK.event_action.create_markdown_message(
+        _target_event(),
+        'qq_group',
+        'group',
+        {'content': 'hello'},
+        msg_id='reply-id',
+        force_active=True
+    )
+
+    assert result['data']['error'] == 'force_active cannot be combined with msg_id or event_id'
 
 
 def test_media_upload_error_log_includes_platform_code_and_message():
@@ -359,6 +379,191 @@ def test_complete_retries_platform_internal_error(monkeypatch):
     assert uploaded['image_id'] == 'id-1'
     assert FakeComplete.calls == 2
     common.time.sleep.assert_called_once()
+
+
+def test_upload_5xx_restarts_pipeline_with_new_prepare(monkeypatch):
+    """直传 5xx 后预签名 URL 已被消耗，必须整段重跑并以新 upload_id 完成。"""
+    monkeypatch.setattr(common.time, 'sleep', Mock())
+
+    class FakePrepare:
+        calls = 0
+
+        def __init__(self, bot_info=None):
+            self.data = SimpleNamespace(
+                file_name=None, file_size=None, content_type=None, md5=None, sha1=None
+            )
+            self.res_code = 200
+
+        def do_api(self, req_type='POST'):
+            FakePrepare.calls += 1
+            self.res = json.dumps({
+                'upload_id': 'u%d' % FakePrepare.calls,
+                'presigned_url': 'https://cos.example.invalid/x'
+            })
+            return self.res
+
+    class FakeUpload:
+        calls = 0
+
+        def __init__(self, url=None, content_type=None, file_data=None):
+            self.res_code = None
+            self.res = ''
+            self.res_headers = {'ETag': '"%s"' % ('a' * 32)}
+
+        def do_api(self, req_type='PUT'):
+            FakeUpload.calls += 1
+            if FakeUpload.calls == 1:
+                # 第一次直传服务端内部错误（可重试）。
+                self.res_code = 502
+                self.res = 'upstream error'
+            else:
+                self.res_code = 200
+            return self.res
+
+    class FakeComplete:
+        submitted_upload_ids = []
+
+        def __init__(self, bot_info=None):
+            self.data = SimpleNamespace(upload_id=None, md5=None)
+            self.res_code = 200
+            self.res = json.dumps({'image_id': 'id-1', 'url': 'qqbot-media://image/v1/t'})
+
+        def do_api(self, req_type='POST'):
+            FakeComplete.submitted_upload_ids.append(self.data.upload_id)
+            return self.res
+
+    monkeypatch.setattr(SDK.API, 'prepareMediaImage', FakePrepare)
+    monkeypatch.setattr(SDK.API, 'uploadMediaImage', FakeUpload)
+    monkeypatch.setattr(SDK.API, 'completeMediaImage', FakeComplete)
+
+    uploaded, error = SDK.event_action._upload_markdown_image(
+        _target_event(),
+        {
+            'bytes': b'image', 'file_name': 'image.png', 'content_type': 'image/png',
+            'width': 20, 'height': 10, 'md5': 'a' * 32, 'sha1': 'b' * 40
+        }
+    )
+
+    assert error is None
+    assert uploaded['image_id'] == 'id-1'
+    # 整段重跑：prepare 两次，complete 用的是第二轮的新 upload_id。
+    assert FakePrepare.calls == 2
+    assert FakeUpload.calls == 2
+    assert FakeComplete.submitted_upload_ids == ['u2']
+
+
+def test_complete_md5_mismatch_restarts_pipeline_with_new_upload_id(monkeypatch):
+    """complete 报 40035003（md5 比对失败）时单步重试无意义，整段重跑换新任务。"""
+    monkeypatch.setattr(common.time, 'sleep', Mock())
+
+    class FakePrepare:
+        calls = 0
+
+        def __init__(self, bot_info=None):
+            self.data = SimpleNamespace(
+                file_name=None, file_size=None, content_type=None, md5=None, sha1=None
+            )
+            self.res_code = 200
+
+        def do_api(self, req_type='POST'):
+            FakePrepare.calls += 1
+            self.res = json.dumps({
+                'upload_id': 'u%d' % FakePrepare.calls,
+                'presigned_url': 'https://cos.example.invalid/x'
+            })
+            return self.res
+
+    class FakeUpload:
+        def __init__(self, url=None, content_type=None, file_data=None):
+            self.res_code = 200
+            self.res = ''
+            self.res_headers = {'ETag': '"%s"' % ('a' * 32)}
+
+        def do_api(self, req_type='PUT'):
+            return self.res
+
+    class FakeComplete:
+        calls = 0
+
+        def __init__(self, bot_info=None):
+            self.data = SimpleNamespace(upload_id=None, md5=None)
+            self.res_code = None
+            self.res = None
+
+        def do_api(self, req_type='POST'):
+            FakeComplete.calls += 1
+            if FakeComplete.calls == 1:
+                self.res_code = 400
+                self.res = json.dumps({'code': 40035003, 'message': 'MD5 校验失败'})
+            else:
+                self.res_code = 200
+                self.res = json.dumps({'image_id': 'id-1', 'url': 'qqbot-media://image/v1/t'})
+            return self.res
+
+    monkeypatch.setattr(SDK.API, 'prepareMediaImage', FakePrepare)
+    monkeypatch.setattr(SDK.API, 'uploadMediaImage', FakeUpload)
+    monkeypatch.setattr(SDK.API, 'completeMediaImage', FakeComplete)
+
+    uploaded, error = SDK.event_action._upload_markdown_image(
+        _target_event(),
+        {
+            'bytes': b'image', 'file_name': 'image.png', 'content_type': 'image/png',
+            'width': 20, 'height': 10, 'md5': 'a' * 32, 'sha1': 'b' * 40
+        }
+    )
+
+    assert error is None
+    assert uploaded['image_id'] == 'id-1'
+    assert FakePrepare.calls == 2
+
+
+def test_upload_pipeline_gives_up_after_retry_budget(monkeypatch):
+    """持续 5xx 时按重试预算止损，最终返回失败原因；prepare 只跑整段两次。"""
+    monkeypatch.setattr(common.time, 'sleep', Mock())
+    # 预算收紧，避免真实等待。
+    monkeypatch.setattr(common, 'qqMediaImageApiRetryBudget', 0.05)
+
+    class FakePrepare:
+        calls = 0
+
+        def __init__(self, bot_info=None):
+            self.data = SimpleNamespace(
+                file_name=None, file_size=None, content_type=None, md5=None, sha1=None
+            )
+            self.res_code = 200
+
+        def do_api(self, req_type='POST'):
+            FakePrepare.calls += 1
+            self.res = json.dumps({
+                'upload_id': 'u%d' % FakePrepare.calls,
+                'presigned_url': 'https://cos.example.invalid/x'
+            })
+            return self.res
+
+    class FakeUpload:
+        def __init__(self, url=None, content_type=None, file_data=None):
+            self.res_code = 500
+            self.res = 'server error'
+            self.res_headers = {}
+
+        def do_api(self, req_type='PUT'):
+            return self.res
+
+    monkeypatch.setattr(SDK.API, 'prepareMediaImage', FakePrepare)
+    monkeypatch.setattr(SDK.API, 'uploadMediaImage', FakeUpload)
+
+    uploaded, error = SDK.event_action._upload_markdown_image(
+        _target_event(),
+        {
+            'bytes': b'image', 'file_name': 'image.png', 'content_type': 'image/png',
+            'width': 20, 'height': 10, 'md5': 'a' * 32, 'sha1': 'b' * 40
+        }
+    )
+
+    assert uploaded is None
+    assert '图片直传图片失败' in error
+    # PUT 不做同 URL 重试，两轮整段（各一次 prepare + 一次 PUT）后止损。
+    assert FakePrepare.calls == 2
 
 
 def test_prepare_does_not_retry_quota_exceeded(monkeypatch):

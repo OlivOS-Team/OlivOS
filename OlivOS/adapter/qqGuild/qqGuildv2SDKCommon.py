@@ -227,17 +227,32 @@ qqLocalPassiveFallbackErrors = {
     'passive event reply count exceeded'
 }
 # 40035006：素材接口服务端内部错误（COS 处理、链接生成等失败），官方文档写可稍后重试。
-qqMediaImageRetryErrorCodes = {40035006}
-qqMediaImageApiRetryMax = 2
-qqMediaImageApiRetryDelay = 0.2
+# 40035003：complete 阶段 md5 与 COS ETag 比对失败，多块对象或 ETag 缺失回退可能触发。
+qqMediaImageRetryErrorCodes = {40035003, 40035006}
+# 素材接口重试按总时长预算而非固定次数：官方只说"可稍后重试"，
+# COS 内部错误通常亚秒恢复，固定 1 次 0.2 秒经常不够；预算兜底防止无限等待。
+qqMediaImageApiRetryBudget = 2.5  # 单阶段（prepare/直传/complete）重试总时长预算（秒）
+qqMediaImageApiRetryBaseDelay = 0.2  # 首次重试间隔（秒），之后指数退避（0.2/0.4/0.8…）
+qqMediaImagePutTimeout = 120.0  # 素材直传 PUT 的请求超时；10MB 大图在慢网下 20 秒全局超时不够
 qqMarkdownImageStageNames = {
     'prepare': '申请上传',
     'upload': '直传图片',
     'complete': '完成上传'
 }
+# 富媒体（分片）上传各阶段的中文名，用于失败日志。
+qqUploadStageNames = {
+    'direct': '直传',
+    'upload_prepare': '预上传',
+    'upload_part': '分片上传',
+    'upload_part_put': '分片直传',
+    'upload_part_finish': '分片确认',
+    'chunk_merge': '分片合并'
+}
 qqEventDedupeCache = {}
 qqEventDedupeLock = threading.Lock()
 qqEventDedupeTTL = 120.0
+# 远程图片下载"钉住 DNS 解析"窗口的互斥锁（见 event_action._fetch_markdown_image_with_addresses）。
+qqMarkdownImageFetchLock = threading.Lock()
 qqEventDedupeMaxSize = 10000
 # 消息内容缓存:收到/发出的消息按 message_id 暂存,供 get_msg 取引用文本。
 # QQ 群/C2C 无"获取指定消息"官方接口,该缓存是取引用文本的唯一来源;频道可回源官方接口。
@@ -4250,6 +4265,79 @@ class event_action_common(object):
         except Exception:
             traceback.print_exc()
 
+    def _resolve_public_image_addresses(url):
+        """
+        解析并校验远程图片域名，返回全部公网 IP（升序）。
+        校验不通过时抛 ValueError，由调用方转成下载失败。
+        """
+        parsed = parse.urlparse(url)
+        if parsed.scheme not in ['http', 'https'] or not parsed.hostname:
+            raise ValueError('image URL must use HTTP(S) with a hostname')
+        try:
+            addresses = {
+                item[4][0]
+                for item in socket.getaddrinfo(
+                    parsed.hostname, parsed.port, type=socket.SOCK_STREAM
+                )
+            }
+        except OSError as exc:
+            raise ValueError('image URL hostname cannot be resolved') from exc
+        for address in addresses:
+            ip = ipaddress.ip_address(address)
+            if (
+                ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified
+            ):
+                raise ValueError('image URL must resolve to a public address')
+        return sorted(addresses)
+
+    def _validate_public_image_url(url):
+        event_action._resolve_public_image_addresses(url)
+
+    # 远程图片下载极少并发；用全局锁串行化"钉住 DNS 解析"的窗口，避免影响
+    # 其他线程的解析行为。窗口内只有目标域名被钉到已校验的 IP，其余域名照常解析。
+    def _fetch_markdown_image_with_addresses(url, addresses):
+        hostname = parse.urlparse(url).hostname
+        original_getaddrinfo = socket.getaddrinfo
+
+        def pinned_getaddrinfo(host, port, family=0, type_=0, proto=0, flags=0):
+            if host == hostname:
+                # 数值 IP 直接给出 sockaddr，不再走系统解析，彻底钉死连接目标；
+                # 端口为 0 时由底层按默认端口处理， family/type/proto 原样透传。
+                pinned = []
+                for address in addresses:
+                    try:
+                        addr_info = ipaddress.ip_address(address)
+                    except ValueError:
+                        continue
+                    sockaddr = (
+                        (str(addr_info), port)
+                        if addr_info.version == 4
+                        else (str(addr_info), port, 0, 0)
+                    )
+                    pinned.append((
+                        socket.AF_INET if addr_info.version == 4 else socket.AF_INET6,
+                        socket.SOCK_STREAM,
+                        6,  # IPPROTO_TCP
+                        '',
+                        sockaddr
+                    ))
+                if pinned:
+                    return pinned
+            return original_getaddrinfo(host, port, family, type_, proto, flags)
+
+        with qqMarkdownImageFetchLock:
+            socket.getaddrinfo = pinned_getaddrinfo
+            try:
+                return req.get(
+                    url,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout,
+                    allow_redirects=False,
+                    stream=True
+                )
+            finally:
+                socket.getaddrinfo = original_getaddrinfo
+
     def _read_markdown_image(target_event, resource):
         resource = str(resource)
         parsed = parse.urlparse(resource)
@@ -4259,12 +4347,13 @@ class event_action_common(object):
                 request_url = resource
                 response = None
                 for _ in range(3):
-                    event_action._validate_public_image_url(request_url)
-                    response = req.get(
-                        request_url,
-                        timeout=OlivOS.webTool.OlivOS_http_timeout,
-                        allow_redirects=False,
-                        stream=True
+                    # 校验与请求必须基于同一次解析结果，否则 DNS 重绑定可以在
+                    # "解析校验通过 → 实际连接"之间把域名换到内网地址。
+                    addresses = event_action._resolve_public_image_addresses(request_url)
+                    if not addresses:
+                        raise ValueError('image URL must resolve to a public address')
+                    response = event_action._fetch_markdown_image_with_addresses(
+                        request_url, addresses
                     )
                     if response.status_code not in [301, 302, 303, 307, 308]:
                         break
@@ -4339,23 +4428,6 @@ class event_action_common(object):
             'sha256': hashlib.sha256(file_data).hexdigest()
         }, None, None
 
-    def _validate_public_image_url(url):
-        parsed = parse.urlparse(url)
-        if parsed.scheme not in ['http', 'https'] or not parsed.hostname:
-            raise ValueError('image URL must use HTTP(S) with a hostname')
-        host = parsed.hostname
-        try:
-            addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port, type=socket.SOCK_STREAM)}
-        except OSError as exc:
-            raise ValueError('image URL hostname cannot be resolved') from exc
-        for address in addresses:
-            ip = ipaddress.ip_address(address)
-            if (
-                ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified
-            ):
-                raise ValueError('image URL must resolve to a public address')
-
     def _read_markdown_resource_data(resource, max_size):
         if resource.startswith('base64://'):
             encoded = resource[9:]
@@ -4422,22 +4494,44 @@ class event_action_common(object):
             init_api_json(api_obj.res)
         ) in qqMediaImageRetryErrorCodes
 
-    def _retry_markdown_image_api(do_call, is_success):
+    def _retry_markdown_image_api(do_call, is_success, should_retry=None):
+        # 按总时长预算重试（指数退避），而不是固定次数：素材接口的临时故障
+        # （40035006/5xx/429）恢复时间不定，预算兜底避免打穿后直接失败。
+        # should_retry 可按阶段覆盖默认判定（如 complete 的 md5 不符不重试）。
         api_obj = None
         extra = None
-        for attempt in range(qqMediaImageApiRetryMax):
+        deadline = time.monotonic() + qqMediaImageApiRetryBudget
+        attempt = 0
+        while True:
             api_obj = do_call()
+            attempt += 1
             succeeded, extra = is_success(api_obj)
             if succeeded:
                 return api_obj, extra
+            delay = qqMediaImageApiRetryBaseDelay * (2 ** (attempt - 1))
+            retryable = (
+                event_action._should_retry_markdown_image_api(api_obj)
+                if should_retry is None
+                else should_retry(api_obj)
+            )
             if (
-                attempt + 1 < qqMediaImageApiRetryMax
-                and event_action._should_retry_markdown_image_api(api_obj)
+                time.monotonic() + delay > deadline
+                or not retryable
             ):
-                time.sleep(qqMediaImageApiRetryDelay)
-                continue
-            break
+                break
+            time.sleep(delay)
         return api_obj, extra
+
+    def _complete_stage_retryable(api_obj):
+        # 40035003 是 md5 与 COS ETag 不一致：同 md5 重试永远得到同样结果，
+        # 重试无意义，交给外层整段重启换新上传与 ETag；其余可重试错误照常。
+        if api_obj is None or api_obj.res_code is None:
+            return True
+        if api_obj.res_code >= 500 or api_obj.res_code == 429:
+            return True
+        return event_action._get_api_error_code(
+            init_api_json(api_obj.res)
+        ) == 40035006
 
     def _format_markdown_image_api_failure(stage, api_obj):
         status = 'n/a' if api_obj is None or api_obj.res_code is None else str(api_obj.res_code)
@@ -4463,80 +4557,109 @@ class event_action_common(object):
     def _upload_markdown_image(target_event, image_data):
         bot_info = get_SDK_bot_info_from_Event(target_event)
 
-        def prepare_once():
-            prepare = API.prepareMediaImage(bot_info)
-            prepare.data.file_name = image_data['file_name']
-            prepare.data.file_size = len(image_data['bytes'])
-            prepare.data.content_type = image_data['content_type']
-            prepare.data.md5 = image_data['md5']
-            prepare.data.sha1 = image_data['sha1']
-            prepare.do_api('POST')
-            return prepare
+        # complete 的 md5 依赖直传阶段的 ETag；一旦 prepare 的 upload_id 被消耗，
+        # 后续阶段失败时只能整段重来（重新 prepare 换新 upload_id），不能只重发单步。
+        def upload_pipeline():
+            def prepare_once():
+                prepare = API.prepareMediaImage(bot_info)
+                prepare.data.file_name = image_data['file_name']
+                prepare.data.file_size = len(image_data['bytes'])
+                prepare.data.content_type = image_data['content_type']
+                prepare.data.md5 = image_data['md5']
+                prepare.data.sha1 = image_data['sha1']
+                prepare.do_api('POST')
+                return prepare
 
-        def prepare_ok(api_obj):
-            data = event_action._api_response_data(api_obj)
-            ok = (
-                event_action._markdown_image_api_http_ok(api_obj)
-                and data is not None
-                and data.get('upload_id')
-                and data.get('presigned_url')
+            def prepare_ok(api_obj):
+                data = event_action._api_response_data(api_obj)
+                ok = (
+                    event_action._markdown_image_api_http_ok(api_obj)
+                    and data is not None
+                    and data.get('upload_id')
+                    and data.get('presigned_url')
+                )
+                return ok, data if ok else None
+
+            prepare, prepared = event_action._retry_markdown_image_api(prepare_once, prepare_ok)
+            if prepared is None:
+                return None, None, event_action._format_markdown_image_api_failure('prepare', prepare), prepare
+
+            def upload_once():
+                upload = API.uploadMediaImage(
+                    prepared['presigned_url'],
+                    image_data['content_type'],
+                    image_data['bytes']
+                )
+                upload.do_api('PUT')
+                return upload
+
+            def upload_ok(api_obj):
+                if not event_action._markdown_image_api_http_ok(api_obj):
+                    return False, None
+                try:
+                    etag = api_obj.res_headers.get('ETag')
+                except Exception:
+                    etag = None
+                if etag is None or str(etag).strip().strip('"') == '':
+                    # 文档口径：单文件直传的 ETag 即文件 md5，缺头时回退本地 md5。
+                    etag = image_data.get('md5')
+                if etag is None or str(etag).strip().strip('"') == '':
+                    return False, None
+                return True, str(etag).strip().strip('"').lower()
+
+            upload, etag = event_action._retry_markdown_image_api(
+                upload_once,
+                upload_ok,
+                # 预签名 URL 一经 PUT 就算被使用，COS 侧对已用 URL 重传行为不可靠：
+                # 5xx 时直接失败，交给外层整段重启（重新 prepare 换新 URL）。
+                should_retry=lambda api_obj: False
             )
-            return ok, data if ok else None
+            if etag is None:
+                return None, None, event_action._format_markdown_image_api_failure('upload', upload), upload
 
-        prepare, prepared = event_action._retry_markdown_image_api(prepare_once, prepare_ok)
-        if prepared is None:
-            return None, event_action._format_markdown_image_api_failure('prepare', prepare)
+            def complete_once():
+                complete = API.completeMediaImage(bot_info)
+                complete.data.upload_id = prepared['upload_id']
+                complete.data.md5 = etag
+                complete.do_api('POST')
+                return complete
 
-        def upload_once():
-            upload = API.uploadMediaImage(
-                prepared['presigned_url'],
-                image_data['content_type'],
-                image_data['bytes']
+            def complete_ok(api_obj):
+                data = event_action._api_response_data(api_obj)
+                ok = (
+                    event_action._markdown_image_api_http_ok(api_obj)
+                    and data is not None
+                    and data.get('url')
+                    and data.get('image_id')
+                )
+                return ok, data if ok else None
+
+            complete, completed = event_action._retry_markdown_image_api(
+                complete_once,
+                complete_ok,
+                should_retry=event_action._complete_stage_retryable
             )
-            upload.do_api('PUT')
-            return upload
+            if completed is None:
+                return (
+                    None,
+                    None,
+                    event_action._format_markdown_image_api_failure('complete', complete),
+                    complete
+                )
+            return {
+                'image_id': str(completed['image_id']),
+                'url': str(completed['url'])
+            }, None, None, complete
 
-        def upload_ok(api_obj):
-            if not event_action._markdown_image_api_http_ok(api_obj):
-                return False, None
-            try:
-                etag = api_obj.res_headers.get('ETag')
-            except Exception:
-                etag = None
-            if etag is None or str(etag).strip().strip('"') == '':
-                etag = image_data.get('md5')
-            if etag is None or str(etag).strip().strip('"') == '':
-                return False, None
-            return True, str(etag).strip().strip('"').lower()
-
-        upload, etag = event_action._retry_markdown_image_api(upload_once, upload_ok)
-        if etag is None:
-            return None, event_action._format_markdown_image_api_failure('upload', upload)
-
-        def complete_once():
-            complete = API.completeMediaImage(bot_info)
-            complete.data.upload_id = prepared['upload_id']
-            complete.data.md5 = etag
-            complete.do_api('POST')
-            return complete
-
-        def complete_ok(api_obj):
-            data = event_action._api_response_data(api_obj)
-            ok = (
-                event_action._markdown_image_api_http_ok(api_obj)
-                and data is not None
-                and data.get('url')
-                and data.get('image_id')
-            )
-            return ok, data if ok else None
-
-        complete, completed = event_action._retry_markdown_image_api(complete_once, complete_ok)
-        if completed is None:
-            return None, event_action._format_markdown_image_api_failure('complete', complete)
-        return {
-            'image_id': str(completed['image_id']),
-            'url': str(completed['url'])
-        }, None
+        # 直传已占用预签名 URL 后再失败（5xx/40035003/40035006），或 complete 不可重试地失败
+        # （如 md5 比对 40035003 用尽预算），upload_id 都已失效，整段重新 prepare 再试一次。
+        # 服务端只校验扩展名与 content_type，实际内容不变，重跑是幂等的。
+        # 永久性错误（配额 40035007、格式 40035001/40035002 等）重跑也无济于事，直接失败。
+        uploaded, _, error, last_api = upload_pipeline()
+        if error is not None and event_action._should_retry_markdown_image_api(last_api):
+            event_action._log_markdown_image(target_event, '%s；重新申请上传后整段重试' % error)
+            uploaded, _, error, _ = upload_pipeline()
+        return uploaded, error
 
     def _delete_markdown_images(target_event, image_records):
         bot_info = get_SDK_bot_info_from_Event(target_event)
@@ -4677,9 +4800,16 @@ class event_action_common(object):
         if result.get('active', False):
             event_action._delete_markdown_images(target_event, uploaded)
         elif status is None or status >= 500:
+            # 结果不确定时保留素材，避免"其实发出去了又删掉"；
+            # 素材会占用 100 张配额，需人工确认后用查询/删除接口清理。
             event_action._log_markdown_image(
                 target_event,
-                'Markdown 发送结果不确定，已保留临时图片'
+                'Markdown 发送结果不确定 (HTTP %s)，已保留临时图片；'
+                '如确认未发出，请用素材查询/删除接口 (GET /v2/media-images、'
+                'DELETE /v2/media-images/{image_id}/delete) 释放 image_id: %s' % (
+                    'n/a' if status is None else status,
+                    ', '.join(str(image.get('image_id', '?')) for image in (uploaded or [])) or '无'
+                )
             )
         else:
             event_action._delete_markdown_images(target_event, uploaded)
@@ -4724,15 +4854,17 @@ class event_action_common(object):
         if chat_type not in ['qq_group', 'qq_private', 'guild_channel', 'guild_private']:
             res_data['data']['error'] = 'unsupported chat_type'
             return res_data
+        if force_active and (msg_id is not None or event_id is not None):
+            # 互斥校验不限定 local_images：不带本地图时同样生效，
+            # 避免静默丢弃 msg_id/event_id 让调用方误以为被动回复会生效。
+            res_data['data']['error'] = 'force_active cannot be combined with msg_id or event_id'
+            return res_data
         if local_images is not None:
             if chat_type not in ['qq_group', 'qq_private']:
                 res_data['data']['error'] = 'local_images only supports qq_group and qq_private'
                 return res_data
             if type(local_images) is not dict or len(local_images) == 0:
                 res_data['data']['error'] = 'local_images must be a non-empty dict'
-                return res_data
-            if force_active and (msg_id is not None or event_id is not None):
-                res_data['data']['error'] = 'force_active cannot be combined with msg_id or event_id'
                 return res_data
         if chat_id is None or str(chat_id) == '':
             res_data['data']['error'] = 'chat_id is required'
@@ -4901,9 +5033,16 @@ class event_action_common(object):
             if res_data.get('active', False):
                 event_action._delete_markdown_images(target_event, uploaded)
             elif result_status is None or result_status >= 500:
+                # 结果不确定时保留素材，避免"其实发出去了又删掉"；
+                # 素材会占用 100 张配额，需人工确认后用查询/删除接口清理。
                 event_action._log_markdown_image(
                     target_event,
-                    'Markdown 发送结果不确定，已保留临时图片'
+                    'Markdown 发送结果不确定 (HTTP %s)，已保留临时图片；'
+                    '如确认未发出，请用素材查询/删除接口 (GET /v2/media-images、'
+                    'DELETE /v2/media-images/{image_id}/delete) 释放 image_id: %s' % (
+                        'n/a' if result_status is None else result_status,
+                        ', '.join(str(image.get('image_id', '?')) for image in (uploaded or [])) or '无'
+                    )
                 )
             else:
                 event_action._delete_markdown_images(target_event, uploaded)
@@ -6258,8 +6397,8 @@ class event_action_common(object):
         try:
             target_event.log_func(
                 3,
-                'OlivOS qqGuildv2SDK QQ media upload [%s] failed: %s' % (
-                    str(stage),
+                'OlivOS qqGuildv2SDK 富媒体上传 [%s] 失败: %s' % (
+                    qqUploadStageNames.get(str(stage), str(stage)),
                     ' | '.join(detail_parts)
                 ),
                 [
@@ -7411,7 +7550,7 @@ class API_common(object):
                     'PUT', self.upload_url,
                     headers={'Content-Type': self.content_type},
                     data=self.file_data,
-                    timeout=OlivOS.webTool.OlivOS_http_timeout
+                    timeout=qqMediaImagePutTimeout
                 )
                 self.res = response.text
                 self.res_code = response.status_code

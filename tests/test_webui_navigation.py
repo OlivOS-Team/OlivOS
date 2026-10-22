@@ -533,8 +533,10 @@ def test_plugin_priority_editor_updates_order_and_file(browser):
             for namespace in ('multi', 'single')
         }
     browser.click('[data-page="plugins"]')
+    # 登录时已用空优先级渲染过一轮列表，行数条件对旧渲染同样成立；
+    # 必须等点击触发的 loadPlugins 把 20000 拉回 state 后再断言，否则会读到旧渲染。
     browser.wait.until(lambda _: browser.driver.execute_script(
-        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+        "return state.pluginPriority['single']?.effective === 20000"))
     row = browser.driver.execute_script('''
         return [...document.querySelectorAll('#plugin-rows tr')]
           .find(item => item.cells[0].textContent === '独立插件');

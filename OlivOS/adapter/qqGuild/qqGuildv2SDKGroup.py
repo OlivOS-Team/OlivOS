@@ -113,6 +113,13 @@ class event_action_group(object):
                         target_event,
                         '%s；回退到原有图文发送流程' % markdown_error
                     )
+                elif markdown_error is not None:
+                    # 上传失败时 _send_markdown_mixed_message 返回 (None, error)，
+                    # 必须在回退前把原因记下来，否则表现为静默降级、无从排查。
+                    event_action._log_markdown_image(
+                        target_event,
+                        '%s；回退到原有图文发送流程' % markdown_error
+                    )
         if force_active:
             # Event.send 是主动发送语义，不能复用当前事件的被动回复凭据。
             msg_id = None
@@ -319,9 +326,9 @@ class event_action_group(object):
         try:
             target_event.log_func(
                 2 if flag_success else 3,
-                'OlivOS qqGuildv2SDK QQ %s %s message response: HTTP %s %s' % (
-                    chat_type,
-                    send_mode,
+                'OlivOS qqGuildv2SDK QQ %s %s消息响应: HTTP %s %s' % (
+                    '私聊' if chat_type == 'direct' else '群聊',
+                    '被动回复' if send_mode == 'reply' else '主动发送',
                     res_code_text,
                     res_text
                 ),
