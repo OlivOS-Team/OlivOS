@@ -68,7 +68,8 @@ class event_action_group(object):
         flag_direct=False,
         quote_msg_id=None,
         event_id=None,
-        force_active=False
+        force_active=False,
+        allow_markdown=True
     ):
         chat_type = 'qq_private' if flag_direct else 'qq_group'
         if chat_id is None or str(chat_id) == '':
@@ -85,6 +86,32 @@ class event_action_group(object):
                 'send',
                 'msg_id and event_id are mutually exclusive'
             )
+        if allow_markdown and chat_type in ['qq_group', 'qq_private']:
+            has_text = any(
+                isinstance(item, (OlivOS.messageAPI.PARA.text, OlivOS.messageAPI.PARA.at))
+                for item in message.data
+            )
+            has_image = any(
+                isinstance(item, OlivOS.messageAPI.PARA.image)
+                for item in message.data
+            )
+            if has_text and has_image:
+                markdown_result, markdown_error = event_action._send_markdown_mixed_message(
+                    target_event,
+                    chat_type,
+                    chat_id,
+                    message,
+                    reply_msg_id=reply_msg_id,
+                    quote_msg_id=quote_msg_id,
+                    event_id=event_id
+                )
+                if markdown_result is not None:
+                    if markdown_error is None:
+                        return markdown_result
+                    event_action._log_markdown_image(
+                        target_event,
+                        '%s; falling back to the existing image message flow' % markdown_error
+                    )
         if force_active:
             # Event.send 是主动发送语义，不能复用当前事件的被动回复凭据。
             msg_id = None
