@@ -101,16 +101,17 @@ class event_action_group(object):
                     chat_type,
                     chat_id,
                     message,
-                    reply_msg_id=reply_msg_id,
+                    reply_msg_id=None if force_active else reply_msg_id,
                     quote_msg_id=quote_msg_id,
-                    event_id=event_id
+                    event_id=None if force_active else event_id,
+                    force_active=force_active
                 )
                 if markdown_result is not None:
                     if markdown_error is None:
                         return markdown_result
                     event_action._log_markdown_image(
                         target_event,
-                        '%s; falling back to the existing image message flow' % markdown_error
+                        '%s；回退到原有图文发送流程' % markdown_error
                     )
         if force_active:
             # Event.send 是主动发送语义，不能复用当前事件的被动回复凭据。

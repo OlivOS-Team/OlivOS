@@ -18,10 +18,12 @@ import base64
 import copy
 import hashlib
 import io
+import ipaddress
 import json
 import mimetypes
 import os
 import re
+import socket
 import threading
 import time
 import traceback
@@ -223,6 +225,15 @@ qqLocalPassiveFallbackErrors = {
     'passive reply count exceeded',
     'passive event reply cache is full',
     'passive event reply count exceeded'
+}
+# 40035006：素材接口服务端内部错误（COS 处理、链接生成等失败），官方文档写可稍后重试。
+qqMediaImageRetryErrorCodes = {40035006}
+qqMediaImageApiRetryMax = 2
+qqMediaImageApiRetryDelay = 0.2
+qqMarkdownImageStageNames = {
+    'prepare': '申请上传',
+    'upload': '直传图片',
+    'complete': '完成上传'
 }
 qqEventDedupeCache = {}
 qqEventDedupeLock = threading.Lock()
@@ -4228,8 +4239,8 @@ class event_action_common(object):
         try:
             if target_event.log_func is not None:
                 target_event.log_func(
-                    2,
-                    'OlivOS qqGuildv2SDK Markdown image: %s' % message,
+                    3,
+                    'OlivOS qqGuildv2SDK Markdown 图片: %s' % message,
                     [
                         (target_event.getBotIDStr(), 'default'),
                         (modelName, 'default'),
@@ -4244,19 +4255,46 @@ class event_action_common(object):
         parsed = parse.urlparse(resource)
         if parsed.scheme in ['http', 'https']:
             try:
-                response = req.get(
-                    resource,
-                    timeout=OlivOS.webTool.OlivOS_http_timeout
-                )
-                if response.status_code < 200 or response.status_code >= 300:
-                    return None, None, 'image download failed with HTTP %s' % response.status_code
-                file_data = response.content
-                file_name = os.path.basename(parse.unquote(parsed.path))
+                max_size = 10 * 1024 * 1024
+                request_url = resource
+                response = None
+                for _ in range(3):
+                    event_action._validate_public_image_url(request_url)
+                    response = req.get(
+                        request_url,
+                        timeout=OlivOS.webTool.OlivOS_http_timeout,
+                        allow_redirects=False,
+                        stream=True
+                    )
+                    if response.status_code not in [301, 302, 303, 307, 308]:
+                        break
+                    request_url = parse.urljoin(request_url, response.headers.get('Location', ''))
+                    response.close()
+                if response is None or response.status_code < 200 or response.status_code >= 300:
+                    status = None if response is None else response.status_code
+                    if response is not None:
+                        response.close()
+                    return None, None, 'image download failed with HTTP %s' % status
+                content_length = response.headers.get('Content-Length')
+                if content_length is not None and int(content_length) > max_size:
+                    response.close()
+                    return None, None, 'image exceeds the 10 MB Markdown asset limit'
+                chunks = []
+                total_size = 0
+                for chunk in response.iter_content(64 * 1024):
+                    total_size += len(chunk)
+                    if total_size > max_size:
+                        response.close()
+                        return None, None, 'image exceeds the 10 MB Markdown asset limit'
+                    chunks.append(chunk)
+                file_data = b''.join(chunks)
+                file_name = os.path.basename(parse.unquote(parse.urlparse(request_url).path))
+                response.close()
             except Exception as exc:
                 return None, None, 'image download failed: %s' % exc
         else:
             try:
-                file_data = event_action._get_local_resource_data(resource, 'images')
+                file_data = event_action._read_markdown_resource_data(resource, 10 * 1024 * 1024)
                 file_name = os.path.basename(parse.unquote(parsed.path or resource))
             except Exception as exc:
                 return None, None, 'image read failed: %s' % exc
@@ -4295,10 +4333,71 @@ class event_action_common(object):
             'content_type': content_type,
             'width': width,
             'height': height,
+            'alt': os.path.splitext(file_name)[0] or 'image',
             'md5': hashlib.md5(file_data).hexdigest(),
             'sha1': hashlib.sha1(file_data).hexdigest(),
             'sha256': hashlib.sha256(file_data).hexdigest()
         }, None, None
+
+    def _validate_public_image_url(url):
+        parsed = parse.urlparse(url)
+        if parsed.scheme not in ['http', 'https'] or not parsed.hostname:
+            raise ValueError('image URL must use HTTP(S) with a hostname')
+        host = parsed.hostname
+        try:
+            addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port, type=socket.SOCK_STREAM)}
+        except OSError as exc:
+            raise ValueError('image URL hostname cannot be resolved') from exc
+        for address in addresses:
+            ip = ipaddress.ip_address(address)
+            if (
+                ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified
+            ):
+                raise ValueError('image URL must resolve to a public address')
+
+    def _read_markdown_resource_data(resource, max_size):
+        if resource.startswith('base64://'):
+            encoded = resource[9:]
+            if len(encoded) > max_size * 2:
+                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+            data = base64.b64decode(encoded.encode('utf-8'))
+            if len(data) > max_size:
+                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+            return data
+        if resource.startswith('data:') and ',' in resource:
+            data_meta, data_raw = resource.split(',', 1)
+            if data_meta.endswith(';base64'):
+                if len(data_raw) > max_size * 2:
+                    raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                data = base64.b64decode(data_raw.encode('utf-8'))
+            else:
+                data = parse.unquote_to_bytes(data_raw)
+            if len(data) > max_size:
+                raise ValueError('image exceeds the 10 MB Markdown asset limit')
+            return data
+        parsed = parse.urlparse(resource)
+        if parsed.scheme == 'file':
+            file_path = parse.unquote(parsed.path)
+            if parsed.netloc != '':
+                file_path = '//' + parsed.netloc + file_path
+            if re.match(r'^/[a-zA-Z]:/', file_path):
+                file_path = file_path[1:]
+        else:
+            file_path = resource
+        file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+        chunks = []
+        total_size = 0
+        with open(file_path, 'rb') as file_obj:
+            while True:
+                chunk = file_obj.read(64 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size:
+                    raise ValueError('image exceeds the 10 MB Markdown asset limit')
+                chunks.append(chunk)
+        return b''.join(chunks)
 
     def _api_response_data(api_obj):
         raw_obj = init_api_json(api_obj.res)
@@ -4307,54 +4406,133 @@ class event_action_common(object):
         data = raw_obj.get('data', raw_obj)
         return data if isinstance(data, dict) else None
 
+    def _markdown_image_api_http_ok(api_obj):
+        return (
+            api_obj is not None
+            and api_obj.res_code is not None
+            and 200 <= api_obj.res_code < 300
+        )
+
+    def _should_retry_markdown_image_api(api_obj):
+        if api_obj is None or api_obj.res_code is None:
+            return True
+        if api_obj.res_code >= 500 or api_obj.res_code == 429:
+            return True
+        return event_action._get_api_error_code(
+            init_api_json(api_obj.res)
+        ) in qqMediaImageRetryErrorCodes
+
+    def _retry_markdown_image_api(do_call, is_success):
+        api_obj = None
+        extra = None
+        for attempt in range(qqMediaImageApiRetryMax):
+            api_obj = do_call()
+            succeeded, extra = is_success(api_obj)
+            if succeeded:
+                return api_obj, extra
+            if (
+                attempt + 1 < qqMediaImageApiRetryMax
+                and event_action._should_retry_markdown_image_api(api_obj)
+            ):
+                time.sleep(qqMediaImageApiRetryDelay)
+                continue
+            break
+        return api_obj, extra
+
+    def _format_markdown_image_api_failure(stage, api_obj):
+        status = 'n/a' if api_obj is None or api_obj.res_code is None else str(api_obj.res_code)
+        response = '无响应'
+        if api_obj is not None and api_obj.res is not None:
+            response = str(api_obj.res)
+        if len(response) > 1000:
+            response = response[:1000] + '...'
+        raw_obj = init_api_json(None if api_obj is None else api_obj.res)
+        if isinstance(raw_obj, dict):
+            error_code = event_action._get_api_error_code(raw_obj)
+            error_message = raw_obj.get('message', raw_obj.get('msg'))
+            if error_code is not None:
+                response = '%s (error_code=%s)' % (response, error_code)
+            if error_message is not None:
+                response = '%s (message=%s)' % (response, str(error_message)[:500])
+        return '图片%s失败: HTTP %s 响应: %s' % (
+            qqMarkdownImageStageNames.get(stage, stage),
+            status,
+            response
+        )
+
     def _upload_markdown_image(target_event, image_data):
         bot_info = get_SDK_bot_info_from_Event(target_event)
-        prepare = API.prepareMediaImage(bot_info)
-        prepare.data.file_name = image_data['file_name']
-        prepare.data.file_size = len(image_data['bytes'])
-        prepare.data.content_type = image_data['content_type']
-        prepare.data.md5 = image_data['md5']
-        prepare.data.sha1 = image_data['sha1']
-        prepare.do_api('POST')
-        prepared = event_action._api_response_data(prepare)
-        if (
-            prepare.res_code is None
-            or not 200 <= prepare.res_code < 300
-            or prepared is None
-            or not prepared.get('upload_id')
-            or not prepared.get('presigned_url')
-        ):
-            return None, 'image upload preparation failed (HTTP %s)' % prepare.res_code
-        upload = API.uploadMediaImage(
-            prepared['presigned_url'],
-            image_data['content_type'],
-            image_data['bytes']
-        )
-        upload.do_api('PUT')
-        try:
-            etag = upload.res_headers.get('ETag')
-        except Exception:
-            etag = None
-        if (
-            upload.res_code is None
-            or not 200 <= upload.res_code < 300
-            or etag is None
-        ):
-            return None, 'image binary upload failed (HTTP %s)' % upload.res_code
-        etag = str(etag).strip().strip('"').lower()
-        complete = API.completeMediaImage(bot_info)
-        complete.data.upload_id = prepared['upload_id']
-        complete.data.md5 = etag
-        complete.do_api('POST')
-        completed = event_action._api_response_data(complete)
-        if (
-            complete.res_code is None
-            or not 200 <= complete.res_code < 300
-            or completed is None
-            or not completed.get('url')
-            or not completed.get('image_id')
-        ):
-            return None, 'image upload completion failed (HTTP %s)' % complete.res_code
+
+        def prepare_once():
+            prepare = API.prepareMediaImage(bot_info)
+            prepare.data.file_name = image_data['file_name']
+            prepare.data.file_size = len(image_data['bytes'])
+            prepare.data.content_type = image_data['content_type']
+            prepare.data.md5 = image_data['md5']
+            prepare.data.sha1 = image_data['sha1']
+            prepare.do_api('POST')
+            return prepare
+
+        def prepare_ok(api_obj):
+            data = event_action._api_response_data(api_obj)
+            ok = (
+                event_action._markdown_image_api_http_ok(api_obj)
+                and data is not None
+                and data.get('upload_id')
+                and data.get('presigned_url')
+            )
+            return ok, data if ok else None
+
+        prepare, prepared = event_action._retry_markdown_image_api(prepare_once, prepare_ok)
+        if prepared is None:
+            return None, event_action._format_markdown_image_api_failure('prepare', prepare)
+
+        def upload_once():
+            upload = API.uploadMediaImage(
+                prepared['presigned_url'],
+                image_data['content_type'],
+                image_data['bytes']
+            )
+            upload.do_api('PUT')
+            return upload
+
+        def upload_ok(api_obj):
+            if not event_action._markdown_image_api_http_ok(api_obj):
+                return False, None
+            try:
+                etag = api_obj.res_headers.get('ETag')
+            except Exception:
+                etag = None
+            if etag is None or str(etag).strip().strip('"') == '':
+                etag = image_data.get('md5')
+            if etag is None or str(etag).strip().strip('"') == '':
+                return False, None
+            return True, str(etag).strip().strip('"').lower()
+
+        upload, etag = event_action._retry_markdown_image_api(upload_once, upload_ok)
+        if etag is None:
+            return None, event_action._format_markdown_image_api_failure('upload', upload)
+
+        def complete_once():
+            complete = API.completeMediaImage(bot_info)
+            complete.data.upload_id = prepared['upload_id']
+            complete.data.md5 = etag
+            complete.do_api('POST')
+            return complete
+
+        def complete_ok(api_obj):
+            data = event_action._api_response_data(api_obj)
+            ok = (
+                event_action._markdown_image_api_http_ok(api_obj)
+                and data is not None
+                and data.get('url')
+                and data.get('image_id')
+            )
+            return ok, data if ok else None
+
+        complete, completed = event_action._retry_markdown_image_api(complete_once, complete_ok)
+        if completed is None:
+            return None, event_action._format_markdown_image_api_failure('complete', complete)
         return {
             'image_id': str(completed['image_id']),
             'url': str(completed['url'])
@@ -4364,20 +4542,27 @@ class event_action_common(object):
         bot_info = get_SDK_bot_info_from_Event(target_event)
         for image in image_records:
             try:
-                delete = API.deleteMediaImage(bot_info)
-                delete.metadata.image_id = image['image_id']
-                delete.do_api('DELETE')
-                if delete.res_code is None or not 200 <= delete.res_code < 300:
+                def delete_once(image_id=image['image_id']):
+                    delete = API.deleteMediaImage(bot_info)
+                    delete.metadata.image_id = image_id
+                    delete.do_api('DELETE')
+                    return delete
+
+                delete, _ = event_action._retry_markdown_image_api(
+                    delete_once,
+                    lambda api_obj: (event_action._markdown_image_api_http_ok(api_obj), None)
+                )
+                if not event_action._markdown_image_api_http_ok(delete):
                     event_action._log_markdown_image(
                         target_event,
-                        'temporary image cleanup failed for image_id=%s (HTTP %s)' % (
-                            image['image_id'], delete.res_code
+                        '临时图片清理失败: image_id=%s，重试后仍失败 (HTTP %s)' % (
+                            image['image_id'], None if delete is None else delete.res_code
                         )
                     )
             except Exception as exc:
                 event_action._log_markdown_image(
                     target_event,
-                    'temporary image cleanup failed: %s' % exc
+                    '临时图片清理失败: %s' % exc
                 )
 
     def _upload_markdown_images(target_event, local_images):
@@ -4401,7 +4586,8 @@ class event_action_common(object):
                 }
             image = uploaded[digest]
             replacements[name] = '![%s #%spx #%spx](%s)' % (
-                name, image['width'], image['height'], image['url']
+                event_action._escape_markdown_text(name),
+                image['width'], image['height'], image['url']
             )
         return replacements, list(uploaded.values()), None
 
@@ -4424,6 +4610,17 @@ class event_action_common(object):
             segments.append(OlivOS.messageAPI.PARA.text(content[cursor:]))
         return OlivOS.messageAPI.Message_templet('olivos_para', segments)
 
+    def _escape_markdown_text(text):
+        return re.sub(r'([\\`*_[\]{}<>#()+.!|~-])', r'\\\1', str(text))
+
+    def _replace_markdown_image_markers(content, replacements):
+        if not replacements:
+            return content
+        pattern = re.compile(
+            r'\{\{(' + '|'.join(re.escape(name) for name in sorted(replacements, key=len, reverse=True)) + r')\}\}'
+        )
+        return pattern.sub(lambda match: replacements[match.group(1)], content)
+
     def _send_markdown_mixed_message(
         target_event,
         chat_type,
@@ -4431,7 +4628,8 @@ class event_action_common(object):
         message,
         reply_msg_id=None,
         quote_msg_id=None,
-        event_id=None
+        event_id=None,
+        force_active=False
     ):
         content_parts = []
         image_sources = {}
@@ -4440,10 +4638,10 @@ class event_action_common(object):
         for segment in message.data:
             if isinstance(segment, OlivOS.messageAPI.PARA.text):
                 text_content = segment.OP()
-                content_parts.append(text_content)
+                content_parts.append(('text', event_action._escape_markdown_text(text_content)))
                 has_text_content = has_text_content or text_content.strip() != ''
             elif isinstance(segment, OlivOS.messageAPI.PARA.at):
-                content_parts.append(markdown_tag.at_para(segment, flag_qq=True))
+                content_parts.append(('text', markdown_tag.at_para(segment, flag_qq=True)))
                 has_text_content = True
             elif isinstance(segment, OlivOS.messageAPI.PARA.image):
                 resource = event_action._get_message_resource(segment)
@@ -4452,7 +4650,7 @@ class event_action_common(object):
                 name = 'image_%s' % len(image_segments)
                 image_sources[name] = resource
                 image_segments.append(name)
-                content_parts.append('{{%s}}' % name)
+                content_parts.append(('image', name))
             else:
                 return None, 'mixed Markdown message contains unsupported media'
         if not image_segments or not has_text_content:
@@ -4464,9 +4662,10 @@ class event_action_common(object):
         if error is not None:
             event_action._delete_markdown_images(target_event, uploaded or [])
             return None, error
-        content = ''.join(content_parts)
-        for name, markdown_image in replacements.items():
-            content = content.replace('{{%s}}' % name, markdown_image)
+        content = ''.join(
+            replacements[value] if part_type == 'image' else value
+            for part_type, value in content_parts
+        )
         result = event_action.create_markdown_message(
             target_event,
             chat_type,
@@ -4474,7 +4673,8 @@ class event_action_common(object):
             {'content': content},
             msg_id=reply_msg_id,
             event_id=event_id,
-            quote_msg_id=quote_msg_id
+            quote_msg_id=quote_msg_id,
+            force_active=force_active
         )
         status = result.get('data', {}).get('http_status')
         if result.get('active', False):
@@ -4482,14 +4682,13 @@ class event_action_common(object):
         elif status is None or status >= 500:
             event_action._log_markdown_image(
                 target_event,
-                'Markdown send result is uncertain; temporary images were retained'
+                'Markdown 发送结果不确定，已保留临时图片'
             )
         else:
             event_action._delete_markdown_images(target_event, uploaded)
             event_action._log_markdown_image(
                 target_event,
-                'Markdown send was rejected (HTTP %s); falling back to the existing image message flow'
-                % status
+                'Markdown 发送被拒绝 (HTTP %s)，回退到原有图文发送流程' % status
             )
             fallback_result = event_action.send_qq_msg(
                 target_event,
@@ -4499,10 +4698,11 @@ class event_action_common(object):
                 flag_direct=chat_type == 'qq_private',
                 quote_msg_id=quote_msg_id,
                 event_id=event_id,
+                force_active=force_active,
                 allow_markdown=False
             )
             fallback_result.setdefault('data', {})['markdown_fallback'] = (
-                'Markdown send rejected (HTTP %s)' % status
+                'Markdown 发送被拒绝 (HTTP %s)' % status
             )
             return fallback_result, None
         return result, None
@@ -4517,7 +4717,8 @@ class event_action_common(object):
         keyboard=None,
         quote_msg_id=None,
         force_verify_image_resource=None,
-        local_images=None
+        local_images=None,
+        force_active=False
     ):
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         res_data['data']['chat_type'] = str(chat_type)
@@ -4532,6 +4733,9 @@ class event_action_common(object):
                 return res_data
             if type(local_images) is not dict or len(local_images) == 0:
                 res_data['data']['error'] = 'local_images must be a non-empty dict'
+                return res_data
+            if force_active and (msg_id is not None or event_id is not None):
+                res_data['data']['error'] = 'force_active cannot be combined with msg_id or event_id'
                 return res_data
         if chat_id is None or str(chat_id) == '':
             res_data['data']['error'] = 'chat_id is required'
@@ -4589,6 +4793,7 @@ class event_action_common(object):
             )
             return res_data
         markdown = copy.deepcopy(markdown)
+        fallback_markdown_content = markdown.get('content', None)
         if local_images is not None:
             markdown_content = markdown.get('content', None)
             if not isinstance(markdown_content, str):
@@ -4610,7 +4815,7 @@ class event_action_common(object):
                 event_action._delete_markdown_images(target_event, uploaded or [])
                 event_action._log_markdown_image(
                     target_event,
-                    '%s; falling back to the existing image message flow' % upload_error
+                    '%s；回退到原有图文发送流程' % upload_error
                 )
                 fallback_message = event_action._markdown_image_fallback_message(
                     markdown_content,
@@ -4627,12 +4832,15 @@ class event_action_common(object):
                     flag_direct=chat_type == 'qq_private',
                     quote_msg_id=quote_msg_id,
                     event_id=event_id,
+                    force_active=force_active,
                     allow_markdown=False
                 )
                 fallback_result.setdefault('data', {})['markdown_fallback'] = upload_error
                 return fallback_result
-            for name, markdown_image in replacements.items():
-                markdown_content = markdown_content.replace('{{%s}}' % name, markdown_image)
+            markdown_content = event_action._replace_markdown_image_markers(
+                markdown_content,
+                replacements
+            )
             markdown['content'] = markdown_content
         else:
             uploaded = []
@@ -4645,13 +4853,16 @@ class event_action_common(object):
             )
 
         if chat_type in ['qq_group', 'qq_private']:
-            msg_id, event_id = event_action._resolve_qq_passive_ids(
-                target_event,
-                chat_type,
-                chat_id,
-                msg_id=msg_id,
-                event_id=event_id
-            )
+            if force_active:
+                msg_id, event_id = None, None
+            else:
+                msg_id, event_id = event_action._resolve_qq_passive_ids(
+                    target_event,
+                    chat_type,
+                    chat_id,
+                    msg_id=msg_id,
+                    event_id=event_id
+                )
             allow_active_fallback = (
                 msg_id is not None or event_id is not None
             )
@@ -4695,17 +4906,17 @@ class event_action_common(object):
             elif result_status is None or result_status >= 500:
                 event_action._log_markdown_image(
                     target_event,
-                    'Markdown send result is uncertain; temporary images were retained'
+                    'Markdown 发送结果不确定，已保留临时图片'
                 )
             else:
                 event_action._delete_markdown_images(target_event, uploaded)
                 event_action._log_markdown_image(
                     target_event,
-                    'Markdown send was rejected (HTTP %s); falling back to the existing image message flow'
+                    'Markdown 发送被拒绝 (HTTP %s)，回退到原有图文发送流程'
                     % result_status
                 )
                 fallback_message = event_action._markdown_image_fallback_message(
-                    markdown.get('content', ''),
+                    fallback_markdown_content,
                     local_images
                 )
                 if fallback_message is not None:
@@ -4717,10 +4928,11 @@ class event_action_common(object):
                         flag_direct=chat_type == 'qq_private',
                         quote_msg_id=quote_msg_id,
                         event_id=event_id,
+                        force_active=force_active,
                         allow_markdown=False
                     )
                     fallback_result.setdefault('data', {})['markdown_fallback'] = (
-                        'Markdown send rejected (HTTP %s)' % result_status
+                        'Markdown 发送被拒绝 (HTTP %s)' % result_status
                     )
                     return fallback_result
 
@@ -4733,7 +4945,7 @@ class event_action_common(object):
                 target_event.log_func(
                     3,
                     (
-                        'OlivOS qqGuildv2SDK Markdown message response: '
+                        'OlivOS qqGuildv2SDK Markdown 消息响应: '
                         f'HTTP {response_code} {response_text}'
                     ),
                     [
@@ -6261,6 +6473,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
         quote_msg_id=None,
         force_verify_image_resource=None,
         local_images=None,
+        force_active=False,
         flag_log=True
     ):
         return OlivOS.qqGuildv2SDK.event_action.create_markdown_message(
@@ -6273,7 +6486,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
             keyboard=keyboard,
             quote_msg_id=quote_msg_id,
             force_verify_image_resource=force_verify_image_resource,
-            local_images=local_images
+            local_images=local_images,
+            force_active=force_active
         )
 
     def create_markdown_message(
@@ -6288,7 +6502,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
         flag_log=True,
         remote=False,
         force_verify_image_resource=None,
-        local_images=None
+        local_images=None,
+        force_active=False
     ):
         res_data = None
         if remote:
@@ -6305,6 +6520,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
                 quote_msg_id=quote_msg_id,
                 force_verify_image_resource=force_verify_image_resource,
                 local_images=local_images,
+                force_active=force_active,
                 flag_log=flag_log
             )
         return res_data
