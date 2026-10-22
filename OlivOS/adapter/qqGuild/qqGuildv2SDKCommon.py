@@ -4259,7 +4259,9 @@ class event_action_common(object):
                     [
                         (target_event.getBotIDStr(), 'default'),
                         (modelName, 'default'),
-                        ('markdown_image', 'fallback')
+                        # 段类型必须是 diagnoseAPI.segment_type 里注册过的键（default/callback），
+                        # 之前用 'fallback' 会触发 KeyError 打死日志线程。
+                        ('markdown_image', 'callback')
                     ]
                 )
         except Exception:

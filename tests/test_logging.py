@@ -93,6 +93,20 @@ def test_gui_receives_debug_even_when_console_filters_it():
     assert packet.key['data']['data']['str'] == 'debug'
 
 
+def test_unknown_log_segment_type_falls_back_to_default_brackets(capsys):
+    """插件自造的段类型（如 'fallback'）不能让日志线程抛 KeyError。"""
+    logger = OlivOS.diagnoseAPI.logger(logger_queue=queue.Queue(), logger_mode='console')
+    logger.log_output(logger.log_packet(
+        3,
+        'Markdown 图片: 回退到原有图文发送流程',
+        1750000000,
+        [('qqGuildv2SDK', 'default'), ('markdown_image', 'fallback')]
+    ))
+    captured = capsys.readouterr().out
+    assert 'Markdown 图片: 回退到原有图文发送流程' in captured
+    assert '[markdown_image]' in captured
+
+
 def test_log_files_receive_complete_batch(tmp_path):
     (tmp_path / 'logfile').mkdir()
     logger = OlivOS.diagnoseAPI.logger(logger_queue=queue.Queue(), logger_mode=['logfile'])

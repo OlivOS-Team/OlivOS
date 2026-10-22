@@ -485,11 +485,18 @@ class logger(API.Proc_templet):
 
     def __get_log_message(self, log_packet_this):
         log_output_str_1 = ''
+        segment_type_config = self.Proc_config['segment_type']
         for segment_this in log_packet_this['log_segment']:
             (segment_this_mark, segment_this_type) = segment_this
-            log_output_str_1 += self.Proc_config['segment_type'][segment_this_type][0]
+            # 未注册的段类型（如插件自造的 'fallback'）不能打断日志线程：
+            # 回退到 default 的括号样式，同时保留原始标记便于排查。
+            segment_prefix, segment_suffix = segment_type_config.get(
+                segment_this_type,
+                segment_type_config['default']
+            )
+            log_output_str_1 += segment_prefix
             log_output_str_1 += safe_text(segment_this_mark)
-            log_output_str_1 += self.Proc_config['segment_type'][segment_this_type][1] + ' - '
+            log_output_str_1 += segment_suffix + ' - '
         log_output_str_1 += safe_text(log_packet_this['log_message'])
         return log_output_str_1
 
