@@ -4758,13 +4758,13 @@ class event_action_common(object):
         image_sources = {}
         image_segments = []
         has_text_content = False
-        # 引用段（[OP:reply,...]）在 Markdown 正文里没有对应语法，转成 message_reference；
-        # 不转的话整条消息会因为“unsupported media”被迫降级成普通图文。
+        # QQ 不支持带图片的 Markdown 消息作为引用回复：消息带 reply 段（或调用方
+        # 显式给了 quote_msg_id）就整条交回普通图文路径，由旧逻辑带引用发送。
         if quote_msg_id is None:
             quote_msg_id = event_action._get_message_reference_id(message)
+        if quote_msg_id is not None:
+            return None, '带引用的图文消息不走 Markdown'
         for segment in message.data:
-            if isinstance(segment, OlivOS.messageAPI.PARA.reply):
-                continue
             if isinstance(segment, OlivOS.messageAPI.PARA.text):
                 text_content = segment.OP()
                 content_parts.append(('text', text_content))
