@@ -4586,7 +4586,7 @@ class event_action_common(object):
                 }
             image = uploaded[digest]
             replacements[name] = '![%s #%spx #%spx](%s)' % (
-                event_action._escape_markdown_text(name),
+                name,
                 image['width'], image['height'], image['url']
             )
         return replacements, list(uploaded.values()), None
@@ -4609,9 +4609,6 @@ class event_action_common(object):
         if cursor < len(content):
             segments.append(OlivOS.messageAPI.PARA.text(content[cursor:]))
         return OlivOS.messageAPI.Message_templet('olivos_para', segments)
-
-    def _escape_markdown_text(text):
-        return re.sub(r'([\\`*_[\]{}<>#()+.!|~-])', r'\\\1', str(text))
 
     def _replace_markdown_image_markers(content, replacements):
         if not replacements:
@@ -4638,7 +4635,7 @@ class event_action_common(object):
         for segment in message.data:
             if isinstance(segment, OlivOS.messageAPI.PARA.text):
                 text_content = segment.OP()
-                content_parts.append(('text', event_action._escape_markdown_text(text_content)))
+                content_parts.append(('text', text_content))
                 has_text_content = has_text_content or text_content.strip() != ''
             elif isinstance(segment, OlivOS.messageAPI.PARA.at):
                 content_parts.append(('text', markdown_tag.at_para(segment, flag_qq=True)))

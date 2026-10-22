@@ -189,8 +189,36 @@ def test_generated_markers_do_not_replace_matching_literal_text(monkeypatch):
     )
 
     content = send.call_args.args[3]['content']
-    assert content.startswith(r'literal \{\{image\_0\}\}')
+    assert content.startswith('literal {{image_0}} ')
     assert content.endswith('![image #20px #10px](qqbot-media://image/v1/t)')
+
+
+def test_mixed_markdown_keeps_skill_check_brackets(monkeypatch):
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_upload_markdown_images',
+        Mock(return_value=(
+            {'image_0': '![image #20px #10px](qqbot-media://image/v1/t)'},
+            [],
+            None
+        ))
+    )
+    send = Mock(return_value={'active': True, 'data': {'http_status': 200}})
+    monkeypatch.setattr(SDK.event_action, 'create_markdown_message', send)
+    monkeypatch.setattr(SDK.event_action, '_delete_markdown_images', Mock())
+    message = OlivOS.messageAPI.Message_templet('olivos_para', [
+        OlivOS.messageAPI.PARA.text('[Desom]进行技能[50]检定: 1D100=53/50 失败。'),
+        OlivOS.messageAPI.PARA.image('images/a.png')
+    ])
+
+    SDK.event_action._send_markdown_mixed_message(
+        _target_event(), 'qq_group', 'group', message
+    )
+
+    content = send.call_args.args[3]['content']
+    assert content.startswith('[Desom]进行技能[50]检定')
+    assert r'\[' not in content
+    assert '![image #20px #10px](qqbot-media://image/v1/t)' in content
 
 
 def test_remote_markdown_image_rejects_private_network_targets(monkeypatch):
