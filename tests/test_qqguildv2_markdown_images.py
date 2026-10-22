@@ -267,6 +267,55 @@ def test_remote_markdown_image_download_stops_at_size_limit(monkeypatch):
     assert request.call_args.kwargs['allow_redirects'] is False
 
 
+def test_mixed_markdown_moves_reply_segment_to_message_reference(monkeypatch):
+    """BiliShareInfo 这类 [OP:reply,...] + 图 + 文的回复不应被强制降级成普通图文。"""
+    uploaded = [{'image_id': 'id-1', 'url': 'qqbot-media://image/v1/t'}]
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_upload_markdown_images',
+        Mock(return_value=(
+            {'image_0': '![image #20px #10px](qqbot-media://image/v1/t)'},
+            uploaded,
+            None
+        ))
+    )
+    send = Mock(return_value={'active': True, 'data': {'http_status': 200}})
+    monkeypatch.setattr(SDK.event_action, 'create_markdown_message', send)
+    monkeypatch.setattr(SDK.event_action, '_delete_markdown_images', Mock())
+    message = OlivOS.messageAPI.Message_templet('olivos_para', [
+        OlivOS.messageAPI.PARA.reply('ROBOT1.0_quote'),
+        OlivOS.messageAPI.PARA.image('https://i0.hdslb.com/cover.jpg'),
+        OlivOS.messageAPI.PARA.text('BV号：BV184JQ6LEW9')
+    ])
+
+    result, error = SDK.event_action._send_markdown_mixed_message(
+        _target_event(), 'qq_group', 'group', message
+    )
+
+    assert error is None
+    assert result['active'] is True
+    # 引用段转成 message_reference，正文里不再出现 reply 段
+    assert send.call_args.kwargs['quote_msg_id'] == 'ROBOT1.0_quote'
+    assert send.call_args.args[3]['content'] == '![image #20px #10px](qqbot-media://image/v1/t)BV号：BV184JQ6LEW9'
+
+
+def test_mixed_markdown_rejects_real_media_segments_with_type_name(monkeypatch):
+    """视频/语音/文件这类 Markdown 表达不了的段仍然回退，并在错误里点出段类型。"""
+    message = OlivOS.messageAPI.Message_templet('olivos_para', [
+        OlivOS.messageAPI.PARA.text('text'),
+        OlivOS.messageAPI.PARA.video('https://example.com/a.mp4'),
+        OlivOS.messageAPI.PARA.image('images/a.png')
+    ])
+
+    result, error = SDK.event_action._send_markdown_mixed_message(
+        _target_event(), 'qq_group', 'group', message
+    )
+
+    assert result is None
+    assert 'unsupported media' in error
+    assert 'video' in error
+
+
 def test_force_active_mixed_message_does_not_reuse_passive_ids(monkeypatch):
     call = Mock(return_value=({'active': True, 'data': {}}, None))
     monkeypatch.setattr(SDK.event_action, '_send_markdown_mixed_message', call)

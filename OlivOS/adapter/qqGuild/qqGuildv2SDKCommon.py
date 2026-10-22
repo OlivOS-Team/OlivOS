@@ -4757,7 +4757,13 @@ class event_action_common(object):
         image_sources = {}
         image_segments = []
         has_text_content = False
+        # 引用段（[OP:reply,...]）在 Markdown 正文里没有对应语法，转成 message_reference；
+        # 不转的话整条消息会因为“unsupported media”被迫降级成普通图文。
+        if quote_msg_id is None:
+            quote_msg_id = event_action._get_message_reference_id(message)
         for segment in message.data:
+            if isinstance(segment, OlivOS.messageAPI.PARA.reply):
+                continue
             if isinstance(segment, OlivOS.messageAPI.PARA.text):
                 text_content = segment.OP()
                 content_parts.append(('text', text_content))
@@ -4774,7 +4780,9 @@ class event_action_common(object):
                 image_segments.append(name)
                 content_parts.append(('image', name))
             else:
-                return None, 'mixed Markdown message contains unsupported media'
+                return None, 'mixed Markdown message contains unsupported media: %s' % (
+                    type(segment).__name__
+                )
         if not image_segments or not has_text_content:
             return None, 'message is not a text and image mixture'
         replacements, uploaded, error = event_action._upload_markdown_images(
