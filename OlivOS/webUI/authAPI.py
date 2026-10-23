@@ -164,15 +164,84 @@ def interactive_output():
     return bool(sys.stdin and sys.stdout and sys.stdin.isatty() and sys.stdout.isatty())
 
 
+def windows_desktop_available():
+    """只在可见的 Windows 窗口站显示本机密码，不向后台服务弹窗。"""
+    if os.name != 'nt':
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    class UserObjectFlags(ctypes.Structure):
+        _fields_ = [('inherit', wintypes.BOOL), ('reserved', wintypes.BOOL), ('flags', wintypes.DWORD)]
+
+    user32 = ctypes.windll.user32
+    user32.GetProcessWindowStation.restype = wintypes.HANDLE
+    user32.GetUserObjectInformationW.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+    ]
+    flags = UserObjectFlags()
+    required = wintypes.DWORD()
+    station = user32.GetProcessWindowStation()
+    return bool(station and user32.GetUserObjectInformationW(
+        station, 1, ctypes.byref(flags), ctypes.sizeof(flags), ctypes.byref(required),
+    ) and flags.flags & 1)
+
+
+def show_password_dialog(password, migrated=False):
+    """本机一次性窗口；密码可选中或点击复制，不经过日志和网页。"""
+    import tkinter
+    from tkinter import ttk
+
+    window = None
+    try:
+        window = tkinter.Tk()
+        window.title('OlivOS WebUI 密码（仅显示一次）')
+        window.resizable(False, False)
+        panel = ttk.Frame(window, padding=20)
+        panel.grid(sticky='nsew')
+        heading = 'WebUI 旧令牌已迁移，原令牌仍是登录密码。' if migrated else 'WebUI 初始密码已生成。'
+        ttk.Label(panel, text=heading).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
+        ttk.Label(panel, text='当前 WebUI 密码：').grid(row=1, column=0, columnspan=2, sticky='w')
+        value = tkinter.StringVar(window, value=password)
+        entry = ttk.Entry(panel, textvariable=value, state='readonly', width=52)
+        entry.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(4, 12))
+        status = tkinter.StringVar(window, value='请妥善保存；关闭后如忘记，可从本机托盘或终端重置。')
+        ttk.Label(panel, textvariable=status, wraplength=440).grid(
+            row=3, column=0, columnspan=2, sticky='w', pady=(0, 12),
+        )
+
+        def copy_password():
+            try:
+                window.clipboard_clear()
+                window.clipboard_append(password)
+                window.update_idletasks()
+                status.set('密码已复制，请勿粘贴到群聊、日志或其他公开位置。')
+            except tkinter.TclError:
+                status.set('复制失败，请在上方输入框中选中密码并手动复制。')
+
+        ttk.Button(panel, text='复制密码', command=copy_password).grid(row=4, column=0, sticky='w')
+        ttk.Button(panel, text='关闭', command=window.destroy).grid(row=4, column=1, sticky='e')
+        window.protocol('WM_DELETE_WINDOW', window.destroy)
+        window.mainloop()
+        return True
+    except tkinter.TclError:
+        raise OSError('无法显示 WebUI 密码，请从本机重置密码') from None
+    finally:
+        if window is not None:
+            try:
+                window.destroy()
+            except tkinter.TclError:
+                pass
+
+
 def display_password(password, migrated=False):
     # 只显示在本机交互界面，不进入日志队列、文件或重定向的 stdout。
     message = ('WebUI 旧令牌已迁移。' if migrated else 'WebUI 初始密码已生成。') + '\n当前 WebUI 密码：' + password
+    if windows_desktop_available():
+        # 源码和编译版均通过本机弹窗展示，托盘终端只显示普通日志。
+        return show_password_dialog(password, migrated=migrated)
     if interactive_output():
         print(message, flush=True)
-        return True
-    if os.name == 'nt' and (sys.stdout is None or getattr(sys, 'frozen', False)):
-        import ctypes
-        ctypes.windll.user32.MessageBoxW(None, message, 'OlivOS WebUI 密码（仅显示一次）', 0x40)
         return True
     return False
 
@@ -202,8 +271,7 @@ def initialize(root, config):
             legacy.unlink()
             return record
         # 后台实例不能把新生成的密码写进服务日志。
-        can_display = interactive_output() or (os.name == 'nt' and (
-            sys.stdout is None or getattr(sys, 'frozen', False)))
+        can_display = windows_desktop_available() or interactive_output()
         if not can_display:
             raise ValueError('尚未设置 WebUI 密码，请在实例目录执行 --reset-webui-password 后再启用 WebUI')
         password = secrets.token_urlsafe(24)

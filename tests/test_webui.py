@@ -111,7 +111,8 @@ def test_password_persisted_not_regenerated(host):
 
 
 @pytest.mark.parametrize('token', ['1', '123456789'])
-def test_user_token_can_be_short(tmp_path, token):
+def test_user_token_can_be_short(tmp_path, token, monkeypatch):
+    monkeypatch.setattr(serverAPI.authAPI, 'display_password', lambda *args, **kwargs: True)
     token_path = tmp_path / 'conf/webui_token.txt'
     token_path.parent.mkdir(parents=True)
     token_path.write_text(token, encoding='utf-8')
@@ -1172,11 +1173,11 @@ def test_live_websocket_authentication_diagnostics(live_host, monkeypatch, origi
                 assert response.status == status and message in (await response.json())['error']
             entry = json.loads(records[-1][1].removeprefix('WebUI HTTP '))
             assert entry['status'] == status and message in entry['error'] and records[-1][0] == 3
+            rejected_count = len(records)
             protocols = ['olivos', 'token.' + live_host.test_token]
             async with client.ws_connect(url, protocols=protocols, origin=origin) as ws:
                 await ws.receive_json(timeout=2)
-                entry = json.loads(records[-1][1].removeprefix('WebUI HTTP '))
-                assert entry['status'] == 101 and entry['route'] == '/ws/logs'
+                assert len(records) == rejected_count
 
     asyncio.run(scenario())
     assert live_host.test_token not in repr(records) and 'ws-fixture-secret' not in repr(records)

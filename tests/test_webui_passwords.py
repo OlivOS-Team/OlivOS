@@ -96,10 +96,51 @@ def test_initial_password_is_displayed_once_and_never_written_as_plaintext(tmp_p
 
 def test_password_display_does_not_write_redirected_output(monkeypatch, capsys):
     monkeypatch.setattr(authAPI, 'interactive_output', lambda: False)
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: False)
     monkeypatch.setattr(authAPI.sys, 'frozen', False, raising=False)
     assert authAPI.display_password('display-fixture-password', migrated=True) is False
     output = capsys.readouterr()
     assert output.out == output.err == ''
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows local password dialog')
+@pytest.mark.parametrize('interactive', [False, True])
+def test_source_windows_migration_displays_local_dialog_once_without_logging(
+        tmp_path, monkeypatch, capsys, interactive):
+    monkeypatch.setattr(authAPI, 'interactive_output', lambda: interactive)
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: True)
+    monkeypatch.setattr(authAPI.sys, 'frozen', False, raising=False)
+    legacy = tmp_path / 'conf/webui_token.txt'
+    legacy.parent.mkdir()
+    legacy.write_text('dialog-fixture-password', encoding='utf-8')
+    dialogs = []
+    monkeypatch.setattr(authAPI, 'show_password_dialog',
+                        lambda value, migrated=False: dialogs.append((value, migrated)) or True)
+    record = authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
+    assert authAPI.verify('dialog-fixture-password', record)
+    assert dialogs == [('dialog-fixture-password', True)]
+    assert not legacy.exists()
+    assert authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER) == record
+    assert len(dialogs) == 1
+    output = capsys.readouterr()
+    assert output.out == output.err == ''
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows local password dialog')
+def test_dialog_failure_preserves_legacy_password_for_retry(tmp_path, monkeypatch):
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: True)
+
+    def fail_dialog(*args, **kwargs):
+        raise OSError('fixture display failure')
+
+    monkeypatch.setattr(authAPI, 'show_password_dialog', fail_dialog)
+    legacy = tmp_path / 'conf/webui_token.txt'
+    legacy.parent.mkdir()
+    legacy.write_text('dialog-fixture-password', encoding='utf-8')
+    with pytest.raises(OSError):
+        authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
+    assert legacy.exists()
+    assert authAPI.verify('dialog-fixture-password', authAPI.read_record(tmp_path / 'conf/webui_auth.json'))
 
 
 def test_credential_file_has_current_user_only_permissions(tmp_path):
@@ -262,6 +303,7 @@ def test_offline_reset_does_not_guess_paths_when_instance_config_is_corrupt(tmp_
 
 def test_headless_fresh_install_does_not_generate_an_unavailable_password(tmp_path, monkeypatch):
     monkeypatch.setattr(authAPI, 'interactive_output', lambda: False)
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: False)
     monkeypatch.setattr(authAPI.sys, 'stdout', SimpleNamespace(isatty=lambda: False))
     host = serverAPI.server(root_path=tmp_path)
     assert host.error is not None and host.credentials is None

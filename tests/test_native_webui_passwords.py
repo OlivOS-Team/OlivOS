@@ -47,3 +47,49 @@ def test_tray_password_reset_saves_without_original_password(dock, tmp_path, mon
     dock.mainrun()
     assert success.called and dock.UIData['webui_password_reset_active'] is False
     assert authAPI.verify('tray-fixture-password', authAPI.read_record(tmp_path / 'conf/webui_auth.json'))
+
+
+@pytest.fixture(scope='module')
+def password_dialog_owner():
+    import tkinter
+
+    root = tkinter.Tk()
+    root.withdraw()
+    yield root
+    root.destroy()
+
+
+@pytest.mark.native_gui
+@pytest.mark.parametrize('copy_fails', [False, True])
+def test_password_dialog_has_click_to_copy_and_selectable_password(
+        monkeypatch, capsys, copy_fails, password_dialog_owner):
+    import tkinter
+    from tkinter import ttk
+
+    # 使用真实隐藏窗口和按钮；剪贴板接口用替身，避免测试覆盖用户剪贴板。
+    window = tkinter.Toplevel(password_dialog_owner)
+    window.withdraw()
+    monkeypatch.setattr(tkinter, 'Tk', lambda: window)
+    clear = Mock()
+    append = Mock(side_effect=tkinter.TclError('fixture') if copy_fails else None)
+    monkeypatch.setattr(window, 'clipboard_clear', clear)
+    monkeypatch.setattr(window, 'clipboard_append', append)
+
+    def check_window():
+        panel = window.winfo_children()[0]
+        widgets = panel.winfo_children()
+        entry = next(widget for widget in widgets if isinstance(widget, ttk.Entry))
+        assert entry.get() == 'copy-fixture-password' and str(entry['state']) == 'readonly'
+        button = next(widget for widget in widgets if isinstance(widget, ttk.Button) and widget['text'] == '复制密码')
+        button.invoke()
+        clear.assert_called_once_with()
+        append.assert_called_once_with('copy-fixture-password')
+        labels = [window.getvar(widget['textvariable']) for widget in widgets
+                  if isinstance(widget, ttk.Label) and widget['textvariable']]
+        assert any(('复制失败' if copy_fails else '密码已复制') in text for text in labels)
+        window.destroy()
+
+    monkeypatch.setattr(window, 'mainloop', check_window)
+    assert authAPI.show_password_dialog('copy-fixture-password', migrated=True) is True
+    output = capsys.readouterr()
+    assert output.out == output.err == ''

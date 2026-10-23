@@ -151,6 +151,11 @@ class server(OlivOS.API.Proc_templet):
         """来源不限；密码只在登录时验证，API/WS 只接受本次运行签发的凭据。"""
         now = time.monotonic()
         with self.lock:
+            # 旧页面恢复连接会并发发送运行期凭据；失效仅需重新登录，不能累加密码错误。
+            # 请求若同时提交密码/一次性凭证，仍执行下面的正常认证限流。
+            if (password is None and ticket is None and isinstance(token, str)
+                    and token.startswith('webui.') and not self.browser_valid(token)):
+                return 401
             attempts = self.failures.get(address, deque())
             while attempts and now - attempts[0] > 60:
                 attempts.popleft()
@@ -234,12 +239,14 @@ class server(OlivOS.API.Proc_templet):
         raise ValueError('未知的本机管理操作')
 
     def log_access(self, method, route, status, address, started_at, error=None, origin=None, host=None):
+        if status < 400:
+            return
         # 只记录路由模板，不记录请求正文、查询参数、认证头或 Cookie。
         entry = {'method': method, 'route': route, 'status': status, 'remote': address,
                  'duration_ms': round((time.monotonic() - started_at) * 1000, 2)}
         if error:
             entry['error'] = error
-        self.log(3 if status >= 400 else 2, 'WebUI HTTP ' + json.dumps(entry, ensure_ascii=False))
+        self.log(3, 'WebUI HTTP ' + json.dumps(entry, ensure_ascii=False))
 
     def new_session(self):
         with self.lock:

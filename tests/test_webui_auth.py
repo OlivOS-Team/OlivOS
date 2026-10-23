@@ -58,6 +58,36 @@ def test_login_rate_limit_explains_retry_delay(host):
     assert response.headers['Retry-After'] == '60'
 
 
+def test_expired_browser_credentials_do_not_count_as_password_failures(host):
+    client = host.app.test_client()
+    for path in ('/api/status', '/api/login') * 8:
+        response = client.open(path, method='POST' if path == '/api/login' else 'GET',
+                               headers={'X-Auth-Token': 'webui.expired-fixture'})
+        assert response.status_code == 401
+    assert not host.failures
+    assert client.post('/api/login', json={'password': host.test_password}).status_code == 200
+
+
+def test_expired_browser_credentials_cannot_clear_or_bypass_password_rate_limit(host):
+    client = host.app.test_client()
+    for _ in range(10):
+        assert client.post('/api/login', json={'password': 'incorrect-fixture'}).status_code == 401
+    attempts = list(host.failures['127.0.0.1'])
+    assert client.get('/api/status', headers={'X-Auth-Token': 'webui.expired-fixture'}).status_code == 401
+    assert list(host.failures['127.0.0.1']) == attempts
+    assert client.post('/api/login', json={'password': host.test_password}).status_code == 429
+    assert client.post('/api/login', json={'password': 'incorrect-fixture'},
+                       headers={'X-Auth-Token': 'webui.expired-fixture'}).status_code == 429
+
+
+@pytest.mark.parametrize('status', [101, 200, 202, 204, 302, 304])
+def test_successful_http_requests_and_ws_handshakes_are_not_logged(host, monkeypatch, status):
+    records = []
+    monkeypatch.setattr(host, 'log', lambda *args: records.append(args))
+    host.log_access('GET', '/fixture', status, '127.0.0.1', time.monotonic())
+    assert not records
+
+
 @pytest.mark.parametrize('origin', ['https://public.example:20480', 'null', 'https://[invalid'])
 def test_public_client_can_login_without_origin_host_restrictions(host, origin):
     response = host.app.test_client().post(
@@ -84,9 +114,9 @@ def test_http_access_logs_explain_rejection_without_credentials(host):
     assert entry['method'] == 'POST' and entry['route'] == '/api/login' and entry['status'] == 401
     assert entry['remote'] == '127.0.0.1' and entry['duration_ms'] >= 0
     assert '密码不正确' in entry['error']
+    rejected_count = len(records)
     login = client.post('/api/login', headers={'X-Auth-Token': host.test_token}).json
-    assert json.loads(records[-1][1].removeprefix('WebUI HTTP '))['status'] == 200
-    assert records[-1][0] == 2
+    assert len(records) == rejected_count
     client.get('/private-path-fixture-secret?token=another-fixture-secret')
     assert json.loads(records[-1][1].removeprefix('WebUI HTTP '))['route'] == '<unmatched>'
     logged = repr(records)
