@@ -376,6 +376,17 @@ def test_password_record_rejects_short_passwords():
     assert authAPI.verify('short-pass', authAPI.password_record('short-pass'))
 
 
+@pytest.mark.parametrize('password, confirmation, valid', [
+    ('', '', False),
+    ('short', 'short', False),
+    ('valid-fixture-password', 'other-fixture-password', False),
+    ('valid-fixture-password', 'valid-fixture-password', True),
+])
+def test_password_input_requires_length_and_matching_confirmation(password, confirmation, valid):
+    # 校验提示跨平台，不依赖 Tk：输入框只是调用它。
+    assert (authAPI.password_validation_error(password, confirmation) is None) is valid
+
+
 def test_initial_password_display_failure_rolls_back_credentials(tmp_path, monkeypatch):
     monkeypatch.setattr(authAPI, 'interactive_output', lambda: True)
     monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: False)

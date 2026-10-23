@@ -51,16 +51,6 @@ gTerminalDataStep = 8
 gPluginPriorityLimit = 2 ** 31
 
 
-def password_validation_error(password, confirmation):
-    """返回 WebUI 密码输入的校验提示；None 表示可以提交。"""
-    minimum = OlivOS.webUI.authAPI.PASSWORD_MIN_LENGTH
-    if len(password) < minimum:
-        return '密码至少需要 %d 个字符。' % minimum
-    if password != confirmation:
-        return '两次输入的密码不一致。'
-    return None
-
-
 class dock(OlivOS.API.Proc_templet):
     def __init__(
             self,
@@ -1344,7 +1334,7 @@ class dock(OlivOS.API.Proc_templet):
         def submit(event=None):
             password = password_value.get()
             confirmation = confirmation_value.get()
-            error = password_validation_error(password, confirmation)
+            error = OlivOS.webUI.authAPI.password_validation_error(password, confirmation)
             if error is not None:
                 status.set(error)
                 target = password_entry if len(password) < minimum else confirmation_entry

@@ -96,6 +96,15 @@ def credential_lock(path):
         os.close(descriptor)
 
 
+def password_validation_error(password, confirmation):
+    """返回新密码输入的校验提示；None 表示可以提交。"""
+    if len(password) < PASSWORD_MIN_LENGTH:
+        return '密码至少需要 %d 个字符。' % PASSWORD_MIN_LENGTH
+    if password != confirmation:
+        return '两次输入的密码不一致。'
+    return None
+
+
 def password_record(password, enforce_strength=True):
     if not isinstance(password, str) or not password or len(password.encode('utf-8')) > 1024:
         raise ValueError('密码不能为空，且 UTF-8 长度不能超过 1024 字节')
@@ -208,28 +217,88 @@ def windows_desktop_available():
     ) and flags.flags & 1)
 
 
+def password_dialog_icon():
+    """弹窗图标：优先当前工作目录，其次源码目录下的资源目录。"""
+    candidates = [
+        os.path.join('.', 'resource', 'tmp_favoricon.ico'),
+        str(Path(__file__).resolve().parents[2] / 'resource' / 'tmp_favoricon.ico'),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def show_password_dialog(password, migrated=False, on_ready=None):
     """本机一次性窗口；密码可选中或点击复制，不经过日志和网页。"""
     import tkinter
-    from tkinter import ttk
 
+    # 与原生终端共用一套色板，避免系统默认灰色控件与主界面割裂。
+    palette = {
+        'bg': '#00A0EA', 'text': '#FFFFFF', 'hint': '#BBE9FF', 'field': '#FFFFFF', 'ink': '#000000',
+        'primary': '#FFFFFF', 'primary_hover': '#BBE9FF',
+        'secondary': '#40C3FF', 'secondary_hover': '#80D7FF',
+    }
+    dialog_width, dialog_height = 480, 258
     window = None
     try:
         window = tkinter.Tk()
         window.title('OlivOS WebUI 密码（仅显示一次）')
         window.resizable(False, False)
-        panel = ttk.Frame(window, padding=20)
-        panel.grid(sticky='nsew')
-        heading = 'WebUI 旧令牌已迁移，原令牌仍是登录密码。' if migrated else 'WebUI 初始密码已生成。'
-        ttk.Label(panel, text=heading).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
-        ttk.Label(panel, text='当前 WebUI 密码：').grid(row=1, column=0, columnspan=2, sticky='w')
+        window.configure(bg=palette['bg'])
+        window.geometry('%dx%d+%d+%d' % (
+            dialog_width, dialog_height,
+            max(0, (window.winfo_screenwidth() - dialog_width) // 2),
+            max(0, (window.winfo_screenheight() - dialog_height) // 3),
+        ))
+        icon = password_dialog_icon()
+        if icon is not None:
+            try:
+                window.iconbitmap(icon)
+            except tkinter.TclError:
+                pass
+
+        def place_label(text, x, y, size=432, height=18, font=('TkDefaultFont 10'), fg=None, variable=None):
+            node = tkinter.Label(
+                window, text=text, textvariable=variable, bg=palette['bg'],
+                fg=fg or palette['text'], anchor='w', justify='left', font=font,
+            )
+            node.place(x=x, y=y, width=size, height=height)
+            return node
+
+        def place_button(text, command, x, y, size, primary):
+            base = palette['primary'] if primary else palette['secondary']
+            hover = palette['primary_hover'] if primary else palette['secondary_hover']
+            node = tkinter.Button(
+                window, text=text, command=command, bd=0, relief='flat', cursor='hand2',
+                bg=base, fg=palette['bg'] if primary else palette['text'],
+                activebackground=hover, activeforeground=palette['ink'],
+                font=('TkDefaultFont 10'),
+            )
+            node.bind('<Enter>', lambda event: node.configure(bg=hover))
+            node.bind('<Leave>', lambda event: node.configure(bg=base))
+            node.place(x=x, y=y, width=size, height=38)
+            return node
+
+        heading = 'WebUI 旧令牌已迁移' if migrated else 'WebUI 初始密码已生成'
+        subtitle = ('原令牌仍是登录密码，记录后可删除旧文件。' if migrated
+                    else '这是唯一一次显示，关闭后无法再次查看。')
+        place_label(heading, 24, 22, height=26, font=('TkDefaultFont 14 bold'))
+        place_label(subtitle, 24, 52, fg=palette['hint'])
+        place_label('当前 WebUI 密码', 24, 88, fg=palette['hint'])
+
         value = tkinter.StringVar(window, value=password)
-        entry = ttk.Entry(panel, textvariable=value, state='readonly', width=52)
-        entry.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(4, 12))
-        status = tkinter.StringVar(window, value='请妥善保存；关闭后如忘记，可从本机托盘或终端重置。')
-        ttk.Label(panel, textvariable=status, wraplength=440).grid(
-            row=3, column=0, columnspan=2, sticky='w', pady=(0, 12),
+        # 白色底框提供左右留白，输入框本身只读但仍可选中，方便手动复制或核对。
+        field = tkinter.Frame(window, bg=palette['field'], bd=0, highlightthickness=0)
+        field.place(x=24, y=108, width=432, height=44)
+        entry = tkinter.Entry(
+            field, textvariable=value, state='readonly', bd=0, highlightthickness=0,
+            readonlybackground=palette['field'], fg=palette['ink'], font=('TkFixedFont 12'),
         )
+        entry.place(x=12, y=5, width=408, height=34)
+
+        status = tkinter.StringVar(window, value='请妥善保存；关闭后如忘记，可从本机托盘或终端重置。')
+        place_label('', 24, 162, variable=status, fg=palette['hint'])
 
         def copy_password():
             try:
@@ -239,9 +308,12 @@ def show_password_dialog(password, migrated=False, on_ready=None):
                 status.set('密码已复制，请勿粘贴到群聊、日志或其他公开位置。')
             except tkinter.TclError:
                 status.set('复制失败，请在上方输入框中选中密码并手动复制。')
+            entry.selection_range(0, tkinter.END)
+            entry.focus_set()
 
-        ttk.Button(panel, text='复制密码', command=copy_password).grid(row=4, column=0, sticky='w')
-        ttk.Button(panel, text='关闭', command=window.destroy).grid(row=4, column=1, sticky='e')
+        place_button('复制密码', copy_password, 24, 194, 132, True)
+        place_button('关闭', window.destroy, 346, 194, 110, False)
+        window.bind('<Escape>', lambda event: window.destroy())
         window.protocol('WM_DELETE_WINDOW', window.destroy)
         window.update_idletasks()
         if on_ready:

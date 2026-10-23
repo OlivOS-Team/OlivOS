@@ -1,5 +1,6 @@
 """Tray password dialogs use the Tk dispatch queue and the real local credential store."""
 
+import gc
 import os
 import queue
 from unittest.mock import Mock
@@ -8,6 +9,9 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import authAPI
+
+# 本文件的用例都要真实 Tk 窗口和托盘，其他平台既无桌面也无 pystray。
+pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
 
 
 @pytest.fixture
@@ -26,17 +30,6 @@ def test_cancelled_tray_password_preserves_credentials(dock, tmp_path, monkeypat
     dock.showWebUIPasswordReset()
     assert authAPI.read_record(tmp_path / 'conf/webui_auth.json') == initial
     assert dock.UIData['webui_password_reset_active'] is False
-
-
-@pytest.mark.parametrize('password, confirmation, valid', [
-    ('', '', False),
-    ('short', 'short', False),
-    ('valid-fixture-password', 'other-fixture-password', False),
-    ('valid-fixture-password', 'valid-fixture-password', True),
-])
-def test_password_input_requires_length_and_matching_confirmation(password, confirmation, valid):
-    error = OlivOS.nativeWinUIAPI.password_validation_error(password, confirmation)
-    assert (error is None) is valid
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
@@ -70,7 +63,6 @@ def password_dialog_owner():
 def test_password_dialog_has_click_to_copy_and_selectable_password(
         monkeypatch, capsys, copy_fails, password_dialog_owner):
     import tkinter
-    from tkinter import ttk
 
     # 使用真实隐藏窗口和按钮；剪贴板接口用替身，避免测试覆盖用户剪贴板。
     window = tkinter.Toplevel(password_dialog_owner)
@@ -84,18 +76,26 @@ def test_password_dialog_has_click_to_copy_and_selectable_password(
 
     def check_window():
         ready.assert_called_once_with()
-        panel = window.winfo_children()[0]
-        widgets = panel.winfo_children()
-        entry = next(widget for widget in widgets if isinstance(widget, ttk.Entry))
+
+        def descendants(widget):
+            for child in widget.winfo_children():
+                yield child
+                yield from descendants(child)
+
+        widgets = list(descendants(window))
+        entry = next(widget for widget in widgets if isinstance(widget, tkinter.Entry))
         assert entry.get() == 'copy-fixture-password' and str(entry['state']) == 'readonly'
-        button = next(widget for widget in widgets if isinstance(widget, ttk.Button) and widget['text'] == '复制密码')
+        button = next(widget for widget in widgets
+                      if isinstance(widget, tkinter.Button) and widget['text'] == '复制密码')
         button.invoke()
         clear.assert_called_once_with()
         append.assert_called_once_with('copy-fixture-password')
         labels = [window.getvar(widget['textvariable']) for widget in widgets
-                  if isinstance(widget, ttk.Label) and widget['textvariable']]
+                  if isinstance(widget, tkinter.Label) and widget['textvariable']]
         assert any(('复制失败' if copy_fails else '密码已复制') in text for text in labels)
         window.destroy()
+        # Tk 控件环在主线程回收，避免别的线程 GC 时触碰这些对象。
+        gc.collect()
 
     monkeypatch.setattr(window, 'mainloop', check_window)
     assert authAPI.show_password_dialog('copy-fixture-password', migrated=True, on_ready=ready) is True
