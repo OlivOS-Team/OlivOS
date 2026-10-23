@@ -205,8 +205,17 @@ class server(OlivOS.API.Proc_templet):
         self.browser_tokens[self.credential_key(token)] = now + 12 * 3600
         return token
 
-    async def close_authenticated_sockets(self):
-        for socket in list(self.sockets):
+    def renew_browser_token(self, token):
+        """续期同时刷新淘汰顺序，避免长期活跃的凭据被容量挤出缓存。"""
+        key = self.credential_key(token)
+        if key not in self.browser_tokens:
+            return False
+        self.browser_tokens[key] = time.monotonic() + 12 * 3600
+        self.browser_tokens.move_to_end(key)
+        return True
+
+    async def close_authenticated_sockets(self, sockets=None):
+        for socket in list(self.sockets if sockets is None else sockets):
             await socket.close(code=1008, message=b'Login expired')
 
     def reset_password(self, record):
@@ -217,9 +226,18 @@ class server(OlivOS.API.Proc_templet):
             self.sessions.clear()
             self.login_tickets.clear()
             self.failures.clear()
-        if self.loop and self.loop.is_running():
-            # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。
-            asyncio.run_coroutine_threadsafe(self.close_authenticated_sockets(), self.loop).result(timeout=5)
+            # 在锁内快照要撤销的连接：重置后新建的登录不会被误关。
+            retired = list(self.sockets)
+            self.sockets.clear()
+        if retired and self.loop and self.loop.is_running():
+            try:
+                # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。
+                asyncio.run_coroutine_threadsafe(
+                    self.close_authenticated_sockets(retired), self.loop
+                ).result(timeout=5)
+            except (TimeoutError, RuntimeError):
+                # 密码与登录状态已经提交，关连接慢只是收尾不及时，不能报成重置失败。
+                self.log(3, 'WebUI 旧连接关闭超时，密码已更新')
         self.log(2, 'WebUI 密码已由本机更新，原有登录已失效')
 
     def local_action(self, message):
@@ -649,6 +667,10 @@ class server(OlivOS.API.Proc_templet):
             self.log(4, self.error)
             self.ready.set()
             return
+        bind_host = self.config['host']
+        if bind_host not in ('127.0.0.1', 'localhost', '::1') and not bind_host.startswith('127.'):
+            # 没有 TLS 终止时，绑定到非回环地址等于把密码和会话暴露在同网段上。
+            self.log(3, 'WebUI 绑定在非回环地址，登录密码与数据以明文 HTTP 传输，请只在可信网络使用')
         try:
             if os.name == 'nt':
                 # 仅 WebUI 使用 Selector，避开 Proactor 在浏览器刷新断连时的 shutdown 异常。

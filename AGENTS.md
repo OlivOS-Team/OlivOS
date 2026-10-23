@@ -299,6 +299,8 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 - 旧 `token_path` 仅用于迁移；新位置由 `auth_path` 指定。密码只在 `/api/login` 验证，API/WS 使用运行期浏览器凭据，
   不再校验 Origin/Host。托盘/`--reset-webui-password` 通过用户专用本机 IPC 重置，立即撤销所有旧登录。
   不向普通日志输出密码；首次迁移/生成只在本机交互界面显示。无交互界面的新安装须先本机重置。
+  新设置的密码至少 8 个字符（`authAPI.PASSWORD_MIN_LENGTH`）；迁移历史令牌时不校验强度，短令牌仍可登录。
+  认证文件读取前会收紧到当前用户专用权限，无法收紧则拒绝使用。WebUI 无 TLS，绑定非回环地址时启动日志会给明文告警。
 - 运行期路径都是相对当前工作目录：`./conf`、`./plugin/*`、`./data/*`、`./logfile`、`./lib/*`。
   必须在仓库根目录执行 `python main.py`；测试通过 `tests/conftest.py` 自动 chdir 到临时目录，
   不要在测试或代码里写死仓库绝对路径。

@@ -188,6 +188,18 @@ def test_session_recreated_after_eviction(client, host):
     assert host.session_valid(response.json['session'])
 
 
+def test_renewed_browser_token_survives_capacity_eviction(client, host):
+    renewed = host.test_token
+    host.browser_tokens.clear()
+    # 续期前它是最早的一条，续期必须同时更新淘汰顺序。
+    host.browser_tokens[host.credential_key(renewed)] = time.monotonic() + 3600
+    for index in range(127):
+        host.browser_tokens['fixture-%d' % index] = time.monotonic() + 3600
+    assert host.renew_browser_token(renewed)
+    host.new_browser_token()
+    assert host.browser_valid(renewed)
+
+
 def test_plugin_cookie_names_are_isolated_by_port(client, host):
     from test_webui import install_plugin
 

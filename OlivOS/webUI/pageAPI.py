@@ -594,12 +594,13 @@ def register_routes(host):
         with host.lock:
             if g.webui_auth_revision != host.credentials['revision']:
                 return jsonify(error='密码已更新，请重新登录'), 401
+            token = request.headers.get('X-Auth-Token', '')
+            if not host.renew_browser_token(token):
+                return jsonify(error='浏览器登录凭据已失效，请使用 WebUI 密码重新登录'), 401
             if isinstance(session, str) and session in host.sessions:
                 host.sessions[session] = time.monotonic() + 12 * 3600
             else:
                 session = host.new_session()
-            token = request.headers.get('X-Auth-Token', '')
-            host.browser_tokens[host.credential_key(token)] = time.monotonic() + 12 * 3600
             return session_response(session, token)
 
     @app.post('/api/logout')

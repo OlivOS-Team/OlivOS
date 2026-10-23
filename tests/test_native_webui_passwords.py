@@ -9,8 +9,6 @@ import pytest
 import OlivOS
 from OlivOS.webUI import authAPI
 
-pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
-
 
 @pytest.fixture
 def dock(tmp_path):
@@ -19,24 +17,32 @@ def dock(tmp_path):
     return instance
 
 
-@pytest.mark.parametrize('answers', [[None], ['fixture', None], ['fixture', 'different'], ['', '']])
-def test_cancelled_or_invalid_tray_password_preserves_credentials(dock, tmp_path, monkeypatch, answers):
+@pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
+def test_cancelled_tray_password_preserves_credentials(dock, tmp_path, monkeypatch):
     config = {'auth_path': './conf/webui_auth.json'}
     initial = authAPI.password_record('original-fixture-password')
     authAPI.reset_offline(tmp_path, config, initial)
-    values = iter(answers)
-    dialog = Mock(side_effect=lambda *args, **kwargs: next(values))
-    monkeypatch.setattr(OlivOS.nativeWinUIAPI.tkinter.simpledialog, 'askstring', dialog)
-    monkeypatch.setattr(OlivOS.nativeWinUIAPI.tkinter.messagebox, 'showerror', Mock())
+    monkeypatch.setattr(dock, 'askWebUIPassword', lambda: None)
     dock.showWebUIPasswordReset()
     assert authAPI.read_record(tmp_path / 'conf/webui_auth.json') == initial
     assert dock.UIData['webui_password_reset_active'] is False
-    assert all(call.kwargs['show'] == '*' for call in dialog.call_args_list)
 
 
+@pytest.mark.parametrize('password, confirmation, valid', [
+    ('', '', False),
+    ('short', 'short', False),
+    ('valid-fixture-password', 'other-fixture-password', False),
+    ('valid-fixture-password', 'valid-fixture-password', True),
+])
+def test_password_input_requires_length_and_matching_confirmation(password, confirmation, valid):
+    error = OlivOS.nativeWinUIAPI.password_validation_error(password, confirmation)
+    assert (error is None) is valid
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
 def test_tray_password_reset_saves_without_original_password(dock, tmp_path, monkeypatch):
-    monkeypatch.setattr(OlivOS.nativeWinUIAPI.tkinter.simpledialog, 'askstring',
-                        lambda *args, **kwargs: 'tray-fixture-password')
+    monkeypatch.setattr(dock, 'askWebUIPassword',
+                        lambda: ('tray-fixture-password', 'tray-fixture-password'))
     success = Mock()
     monkeypatch.setattr(OlivOS.nativeWinUIAPI.tkinter.messagebox, 'showinfo', success)
     dock.changeWebUIPassword()

@@ -19,12 +19,15 @@ import hmac
 import json
 import os
 import secrets
+import stat
 import sys
 import tempfile
 import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+
+PASSWORD_MIN_LENGTH = 8
 
 
 def private_path(path):
@@ -93,9 +96,12 @@ def credential_lock(path):
         os.close(descriptor)
 
 
-def password_record(password):
+def password_record(password, enforce_strength=True):
     if not isinstance(password, str) or not password or len(password.encode('utf-8')) > 1024:
         raise ValueError('密码不能为空，且 UTF-8 长度不能超过 1024 字节')
+    if enforce_strength and len(password) < PASSWORD_MIN_LENGTH:
+        # 登录限流是每来源每分钟 10 次，过短的密码在这道限流面前等于没有强度。
+        raise ValueError('密码至少需要 %d 个字符' % PASSWORD_MIN_LENGTH)
     salt = secrets.token_bytes(16)
     digest = hashlib.scrypt(password.encode('utf-8'), salt=salt, n=16384, r=8, p=1, dklen=32)
     return {'version': 1, 'algorithm': 'scrypt', 'n': 16384, 'r': 8, 'p': 1,
@@ -128,8 +134,21 @@ def auth_path(root, config):
     return Path(root) / config.get('auth_path', './conf/webui_auth.json')
 
 
+def secure_path(path):
+    """读取前把认证文件权限收回当前用户；无法收紧时拒绝使用该文件。"""
+    if os.name != 'nt':
+        if stat.S_IMODE(os.stat(path).st_mode) & 0o077:
+            os.chmod(path, 0o600)
+            if stat.S_IMODE(os.stat(path).st_mode) & 0o077:
+                raise OSError('WebUI 认证文件权限过宽且无法收紧，请从本机重置密码')
+        return
+    # Windows 上受保护 DACL 是幂等的；继承来的宽松 ACL 会在这一步被覆盖。
+    private_path(path)
+
+
 def read_record(path):
     try:
+        secure_path(path)
         with Path(path).open('r', encoding='utf-8') as source:
             return validate_record(json.loads(source.read(8193)))
     except (ValueError, UnicodeError):
@@ -273,6 +292,14 @@ def display_password(password, migrated=False):
     return False
 
 
+def display_once(password, migrated=False):
+    """展示失败只返回 False，调用方据此决定旧令牌与本次生成的凭据能否删除。"""
+    try:
+        return display_password(password, migrated=migrated)
+    except OSError:
+        return False
+
+
 def initialize(root, config):
     path = auth_path(root, config)
     legacy = Path(root) / config.get('token_path', './conf/webui_token.txt')
@@ -284,18 +311,19 @@ def initialize(root, config):
             # 恢复「新文件已落盘、旧文件尚未删除」之间被中断的迁移；新文件始终是认证真源。
             if legacy.exists():
                 password = legacy.read_text(encoding='utf-8').strip()
-                if verify(password, record):
-                    display_password(password, migrated=True)
+                if verify(password, record) and display_once(password, migrated=True) is not False:
                     legacy.unlink()
             return record
         if legacy.exists():
             password = legacy.read_text(encoding='utf-8').strip()
-            record = password_record(password)
+            # 历史令牌可能很短，迁移必须原样接受，强度只约束新设置的密码。
+            record = password_record(password, enforce_strength=False)
             write_record(path, record)
             if not verify(password, read_record(path)):
                 raise OSError('WebUI 密码迁移校验失败')
-            display_password(password, migrated=True)
-            legacy.unlink()
+            # 迁移后密码与原令牌一致：展示失败时保留旧令牌，它是该密码唯一可读的副本。
+            if display_once(password, migrated=True) is not False:
+                legacy.unlink()
             return record
         # 后台实例不能把新生成的密码写进服务日志。
         can_display = windows_desktop_available() or interactive_output()
@@ -304,7 +332,10 @@ def initialize(root, config):
         password = secrets.token_urlsafe(24)
         record = password_record(password)
         write_record(path, record)
-        display_password(password)
+        if display_once(password) is False:
+            # 没人看到的密码等于不可登录，撤销本次生成，下次启动重新生成。
+            path.unlink(missing_ok=True)
+            raise OSError('无法显示 WebUI 初始密码，已撤销本次生成的密码，请重启或从本机重置密码')
         return record
 
 
@@ -316,7 +347,11 @@ def reset_offline(root, config, record):
     with credential_lock(path):
         write_record(path, record)
         if legacy.exists():
-            legacy.unlink()
+            try:
+                legacy.unlink()
+            except OSError:
+                # 旧令牌此时只是残留文件：认证以新文件为准，删除失败不影响本次重置。
+                pass
 
 
 def set_local_password(root, record):

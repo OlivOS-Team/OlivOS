@@ -137,10 +137,10 @@ def test_dialog_failure_preserves_legacy_password_for_retry(tmp_path, monkeypatc
     legacy = tmp_path / 'conf/webui_token.txt'
     legacy.parent.mkdir()
     legacy.write_text('dialog-fixture-password', encoding='utf-8')
-    with pytest.raises(OSError):
-        authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
+    # 弹窗失败不能拦下启动；旧令牌保留为密码的可读副本，下次启动会再试展示。
+    record = authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
+    assert authAPI.verify('dialog-fixture-password', record)
     assert legacy.exists()
-    assert authAPI.verify('dialog-fixture-password', authAPI.read_record(tmp_path / 'conf/webui_auth.json'))
 
 
 @pytest.mark.parametrize('migrated', [False, True])
@@ -368,6 +368,42 @@ def test_headless_fresh_install_does_not_generate_an_unavailable_password(tmp_pa
     host = serverAPI.server(root_path=tmp_path)
     assert host.error is not None and host.credentials is None
     assert not (tmp_path / 'conf/webui_auth.json').exists()
+
+
+def test_password_record_rejects_short_passwords():
+    with pytest.raises(ValueError):
+        authAPI.password_record('short')
+    assert authAPI.verify('short-pass', authAPI.password_record('short-pass'))
+
+
+def test_initial_password_display_failure_rolls_back_credentials(tmp_path, monkeypatch):
+    monkeypatch.setattr(authAPI, 'interactive_output', lambda: True)
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: False)
+    monkeypatch.setattr(authAPI, 'display_password', lambda value, migrated=False: False)
+    with pytest.raises(OSError):
+        authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
+    # 没人看到的密码不能留在磁盘上，否则之后每次启动都只能靠重置恢复。
+    assert not (tmp_path / 'conf/webui_auth.json').exists()
+
+
+def test_legacy_cleanup_failure_does_not_block_reset(tmp_path):
+    legacy = tmp_path / 'conf/webui_token.txt'
+    legacy.parent.mkdir()
+    legacy.mkdir()  # 目录无法被 unlink 删除，用来模拟旧令牌清理失败
+    record = authAPI.password_record('reset-fixture-password')
+    authAPI.reset_offline(tmp_path, serverAPI.DEFAULT_SERVER, record)
+    assert authAPI.read_record(tmp_path / 'conf/webui_auth.json') == record
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='POSIX file mode')
+def test_auth_file_permissions_are_tightened_before_reading(tmp_path):
+    import stat
+
+    path = tmp_path / 'conf/webui_auth.json'
+    authAPI.write_record(path, authAPI.password_record('permission-fixture-password'))
+    os.chmod(path, 0o644)
+    authAPI.read_record(path)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
 def test_reset_command_hides_input_and_does_not_require_old_password(tmp_path, monkeypatch, capsys):
