@@ -2474,7 +2474,7 @@ class shallow(object):
                 self.root.webui_root
             ):
                 list_new.append(pystray.MenuItem('打开 WebUI', lambda: self.root.openWebUI(), default=True))
-                list_new.append(pystray.MenuItem('修改 WebUI 密码', lambda: self.root.changeWebUIPassword()))
+                list_new.append(pystray.MenuItem('修改密码', lambda: self.root.changeWebUIPassword()))
             for item_this in data:
                 if not type(item_this) is list:
                     pass
