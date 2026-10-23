@@ -16,4 +16,4 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 # OlivOS 跨平台浏览器管理端。
 
-from . import pageAPI, resourceAPI, serverAPI
+from . import authAPI, localAPI, pageAPI, resourceAPI, serverAPI

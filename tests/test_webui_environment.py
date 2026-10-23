@@ -4,6 +4,7 @@ import threading
 import pytest
 
 from OlivOS.webUI import serverAPI
+from webui_test_support import make_host
 
 
 def test_environment_overrides_webui_bind_config(tmp_path, monkeypatch):
@@ -15,7 +16,7 @@ def test_environment_overrides_webui_bind_config(tmp_path, monkeypatch):
         'models': {'OlivOS_webUI': {'server': {'host': 'localhost', 'port': 20480}}},
     }), encoding='utf-8')
     original = config_path.read_bytes()
-    service = serverAPI.server(
+    service = make_host(
         root_path=tmp_path,
         server_conf={'host': '127.0.0.1', 'port': 20480},
     )
@@ -40,7 +41,7 @@ def test_invalid_webui_environment_values_are_ignored(tmp_path, monkeypatch, nam
     monkeypatch.delenv('OLIVOS_WEBUI_HOST', raising=False)
     monkeypatch.delenv('OLIVOS_WEBUI_PORT', raising=False)
     monkeypatch.setenv(name, value)
-    service = serverAPI.server(
+    service = make_host(
         root_path=tmp_path,
         server_conf={'host': '127.0.0.1', 'port': 23456},
     )
@@ -56,7 +57,7 @@ def test_environment_port_zero_uses_actual_listener_in_browser_url(tmp_path, mon
 
     monkeypatch.setenv('OLIVOS_WEBUI_HOST', '127.0.0.1')
     monkeypatch.setenv('OLIVOS_WEBUI_PORT', '0')
-    service = serverAPI.server(root_path=tmp_path)
+    service = make_host(root_path=tmp_path)
     worker = threading.Thread(target=service.run, daemon=True)
     worker.start()
     try:

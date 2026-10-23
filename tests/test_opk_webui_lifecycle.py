@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 from OlivOS import pluginAPI
-from OlivOS.webUI import resourceAPI, serverAPI
+from OlivOS.webUI import resourceAPI
+from webui_test_support import make_host
 
 NAMESPACE = 'OpkWebuiLifecycle'
 ASSETS = {'webui/index.html': b'<html>test</html>', 'webui/assets/app.js': b'window.loaded = true;'}
@@ -26,8 +27,8 @@ def installation(tmp_path, monkeypatch):
     monkeypatch.setattr(pluginAPI, 'plugin_path_tmp', str(tmp_dir) + '/')
     monkeypatch.syspath_prepend(str(app_dir))
     monkeypatch.syspath_prepend(str(tmp_dir))
-    host = serverAPI.server(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
-                            server_conf={'port': 0, 'host': '127.0.0.1'})
+    host = make_host(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
+                     server_conf={'port': 0, 'host': '127.0.0.1'})
     loader = pluginAPI.shallow(control_queue=host.Proc_info.control_queue)
     loader.database = SimpleNamespace(_init_namespace=lambda namespace: None)
     previous = {name: module for name, module in sys.modules.items()
@@ -76,7 +77,7 @@ def mount(host, loader):
         host.consume(host.Proc_info.control_queue.get_nowait())
     client = host.app.test_client()
     assert client.get(f'/plugin/{NAMESPACE}/webui/index.html').status_code == 401
-    assert client.post('/api/login', headers={'X-Auth-Token': host.token}).status_code == 200
+    assert client.post('/api/login', headers={'X-Auth-Token': host.test_token}).status_code == 200
     return client
 
 

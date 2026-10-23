@@ -81,6 +81,8 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 原生插件管理 | `test_native_plugins.py` | 生效顺序展示、用户/默认优先级标签、修改/置顶/置底/恢复默认与热重载 |
 | WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态（含版本号与版本简称）、日志与终端、插件事件、优先级编辑、监听端口和重启反馈 |
 | WebUI 登录 | `test_webui_auth.py` | 凭据生命周期、并发登录、重启、错误提示、短暂断网和跨标签退出 |
+| WebUI 密码与本机管理 | `test_webui_passwords.py` | scrypt 存储、旧令牌迁移及中断恢复、终端重置、本机 IPC 权限、一次性凭证和在线连接撤销 |
+| WebUI 托盘密码 | `test_native_webui_passwords.py` | 隐藏输入、取消/两次不一致不修改、无需旧密码的本机重置 |
 | WebUI 导航 | `test_webui_navigation.py` | 分组、重名、页面保活、消息回包、关闭、刷新恢复、响应布局（含仪表盘版本卡窄屏不溢出）、外部链接、优先级编辑 |
 | WebUI 环境配置 | `test_webui_environment.py` | 监听覆盖、无效输入、端口 0 与实际监听地址 |
 | 插件消息桥 | `test_webui_plugin_template.py` | 宿主菜单事件、浏览器 payload、会话隔离回包，无相邻仓库依赖 |

@@ -3,6 +3,13 @@
 const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
+// 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
+function takeLoginTicket() {
+  const ticket = new URLSearchParams(location.hash.slice(1)).get('login_ticket');
+  if (ticket !== null) history.replaceState(history.state, '', location.pathname + location.search);
+  return ticket;
+}
+const startupTicket = takeLoginTicket();
 
 // 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
 // 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
@@ -163,7 +170,8 @@ async function api(path, options = {}) {
     throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
   if (!response.ok) {
     const authHandled = response.status === 401 || response.status === 403;
-    const message = authHandled ? authMessage ?? '' : data.error || `请求失败 (${response.status})`;
+    const detail = data.error || `请求失败 (${response.status})`;
+    const message = authHandled ? authMessage ?? (path === '/api/login' ? detail : '') : detail;
     if (authHandled) resetLogin(message);
     const error = new Error(message);
     error.status = response.status;
@@ -239,7 +247,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
   return entry;
 }
 
-async function login(ev, token = null) {
+async function login(ev, token = null, ticket = null) {
   ev?.preventDefault();
   const generation = ++state.authGeneration;
   state.sessionRefresh = null;
@@ -247,10 +255,12 @@ async function login(ev, token = null) {
   const submit = $('login-form').querySelector('button[type=submit]');
   submit.disabled = true;
   try {
-    state.token = token ?? $('token').value.trim();
+    state.token = token ?? '';
     const result = await api('/api/login', {
       method: 'POST',
-      authMessage: token === null ? '认证失败' : '',
+      ...(token === null ? { body: ticket === null ? { password: $('token').value } : { ticket } } : {}),
+      // 手动登录显示服务端原因；缓存失效时仍静默返回登录页。
+      ...(token === null ? {} : { authMessage: '' }),
     });
     state.token = result.browser_token;
     cachedToken(state.token);
@@ -2002,6 +2012,10 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted && state.token) login(null, state.token);
 });
+window.addEventListener('hashchange', () => {
+  const ticket = takeLoginTicket();
+  if (ticket !== null) login(null, null, ticket);
+});
 {
   const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
@@ -2024,7 +2038,8 @@ window.addEventListener('pageshow', (ev) => {
     }
   });
   const savedToken = cachedToken();
-  if (savedToken?.startsWith('webui.')) login(null, savedToken);
+  if (startupTicket !== null) login(null, null, startupTicket);
+  else if (savedToken?.startsWith('webui.')) login(null, savedToken);
   // 旧版缓存的是长期 Token，升级后需要手动登录一次才能换成本次运行的凭据。
   else if (savedToken) resetLogin();
   else {

@@ -5,12 +5,12 @@ import queue
 import pytest
 
 import OlivOS
-from OlivOS.webUI import serverAPI
+from webui_test_support import make_host
 
 
 @pytest.fixture
 def bridge(tmp_path):
-    host = serverAPI.server(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue())
+    host = make_host(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue())
     yield host
     host.on_terminate()
 

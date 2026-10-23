@@ -19,7 +19,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import asyncio
 import copy
 import errno
-import hmac
+import hashlib
 import io
 import json
 import os
@@ -30,7 +30,6 @@ import threading
 import time
 from collections import OrderedDict, deque
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
 import psutil
@@ -40,7 +39,7 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import pageAPI, resourceAPI
+from . import authAPI, localAPI, pageAPI, resourceAPI
 
 STATIC_ASSET_NAMES = ('index.html', 'app.js', 'theme.js', 'style.css', 'logo.png')
 BUFFER_LIMIT = 500
@@ -58,6 +57,7 @@ TERMINAL_TYPES = {
 DEFAULT_SERVER = {
     'auto': False, 'type': 'http', 'host': '127.0.0.1', 'port': 20480,
     'token_path': './conf/webui_token.txt', 'static_path': './data/webui/static', 'buffer_limit': BUFFER_LIMIT,
+    'auth_path': './conf/webui_auth.json',
     'plugin_page_cache': PLUGIN_PAGE_CACHE,
 }
 ACTIVE_LISTENERS = {}
@@ -92,7 +92,6 @@ class server(OlivOS.API.Proc_templet):
         self.account_path = self.root / account_path
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
-        self._browser_key = secrets.token_bytes(32)
         self.lock = threading.RLock()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
@@ -116,6 +115,8 @@ class server(OlivOS.API.Proc_templet):
         self.update_available = False
         self.pending = {}
         self.sessions = {}
+        self.browser_tokens = OrderedDict()
+        self.login_tickets = OrderedDict()
         self.failures = OrderedDict()
         self.stop_event = threading.Event()
         self.ready = threading.Event()
@@ -123,16 +124,12 @@ class server(OlivOS.API.Proc_templet):
         self.listen_path = self.root / 'data/webui/listen.json'
         self.loop = None
         self.sockets = set()
-        token_path = self.root / self.config['token_path']
-        token_path.parent.mkdir(parents=True, exist_ok=True)
+        self.local_manager = None
+        self.credentials = None
         try:
-            descriptor = os.open(str(token_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        except FileExistsError:
-            self.token = token_path.read_text(encoding='utf-8').strip()
-        else:
-            self.token = secrets.token_urlsafe(32)
-            with os.fdopen(descriptor, 'w', encoding='utf-8') as token_file:
-                token_file.write(self.token)
+            self.credentials = authAPI.initialize(self.root, self.config)
+        except (OSError, ValueError):
+            self.error = 'WebUI 认证初始化失败，请检查认证文件权限或执行 --reset-webui-password；其他组件继续运行'
         static_override = os.environ.get('OLIVOS_WEBUI_STATIC')
         if static_override:
             self.static_path = Path(static_override).resolve()
@@ -150,17 +147,8 @@ class server(OlivOS.API.Proc_templet):
         self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
         pageAPI.register_routes(self)
 
-    @property
-    def browser_token(self):
-        # 浏览器缓存仅在本次运行有效；原 Token 改变时，缓存也随之失效。
-        return 'webui.' + hmac.new(self._browser_key, self.token.encode(), 'sha256').hexdigest()
-
-    def authenticate(self, token, address, origin=None, host=None):
-        """REST 与 WS 共用认证与限流；不信任客户端提供的转发地址。"""
-        if origin:
-            parsed = urlsplit(origin)
-            if parsed.scheme not in ('http', 'https') or parsed.netloc != host:
-                return 403
+    def authenticate(self, token, address, origin=None, host=None, password=None, ticket=None):
+        """来源不限；密码只在登录时验证，API/WS 只接受本次运行签发的凭据。"""
         now = time.monotonic()
         with self.lock:
             attempts = self.failures.get(address, deque())
@@ -168,10 +156,14 @@ class server(OlivOS.API.Proc_templet):
                 attempts.popleft()
             if len(attempts) >= 10:
                 return 429
-            valid = isinstance(token, str) and bool(token) and (
-                hmac.compare_digest(token.encode(), self.token.encode())
-                or hmac.compare_digest(token.encode(), self.browser_token.encode())
-            )
+            if self.credentials is None:
+                return 401
+            valid = self.browser_valid(token)
+            if password is not None:
+                valid = authAPI.verify(password, self.credentials)
+            elif ticket is not None:
+                key = self.credential_key(ticket)
+                valid = self.login_tickets.pop(key, 0) > now
             if valid:
                 self.failures.pop(address, None)
                 return 200
@@ -181,6 +173,73 @@ class server(OlivOS.API.Proc_templet):
             while len(self.failures) > 1024:
                 self.failures.popitem(last=False)
             return 401
+
+    @staticmethod
+    def authentication_error(status, token=''):
+        if status == 429:
+            return '尝试过多，请一分钟后重试'
+        if not token:
+            return '未提供登录凭据，请输入 WebUI 密码后重试'
+        if token.startswith('webui.'):
+            return '浏览器登录凭据已失效，请使用 WebUI 密码重新登录'
+        return '登录凭据无效，请重新登录'
+
+    @staticmethod
+    def credential_key(value):
+        return hashlib.sha256(value.encode('utf-8')).hexdigest() if isinstance(value, str) else ''
+
+    def browser_valid(self, token):
+        return self.browser_tokens.get(self.credential_key(token), 0) > time.monotonic()
+
+    def new_browser_token(self):
+        now = time.monotonic()
+        self.browser_tokens = OrderedDict((key, expiry) for key, expiry in self.browser_tokens.items() if expiry > now)
+        while len(self.browser_tokens) >= 128:
+            self.browser_tokens.popitem(last=False)
+        token = 'webui.' + secrets.token_urlsafe(32)
+        self.browser_tokens[self.credential_key(token)] = now + 12 * 3600
+        return token
+
+    async def close_authenticated_sockets(self):
+        for socket in list(self.sockets):
+            await socket.close(code=1008, message=b'Login expired')
+
+    def reset_password(self, record):
+        with self.lock:
+            authAPI.reset_offline(self.root, self.config, record)
+            self.credentials = record
+            self.browser_tokens.clear()
+            self.sessions.clear()
+            self.login_tickets.clear()
+            self.failures.clear()
+        if self.loop and self.loop.is_running():
+            # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。
+            asyncio.run_coroutine_threadsafe(self.close_authenticated_sockets(), self.loop).result(timeout=5)
+        self.log(2, 'WebUI 密码已由本机更新，原有登录已失效')
+
+    def local_action(self, message):
+        if message.get('action') == 'reset':
+            self.reset_password(authAPI.validate_record(message.get('record')))
+            return {}
+        if message.get('action') == 'open':
+            with self.lock:
+                now = time.monotonic()
+                self.login_tickets = OrderedDict((key, expiry) for key, expiry in self.login_tickets.items()
+                                                 if expiry > now)
+                while len(self.login_tickets) >= 32:
+                    self.login_tickets.popitem(last=False)
+                ticket = secrets.token_urlsafe(32)
+                self.login_tickets[self.credential_key(ticket)] = now + 60
+                return {'url': listener_url(self.config) + '/#login_ticket=' + ticket}
+        raise ValueError('未知的本机管理操作')
+
+    def log_access(self, method, route, status, address, started_at, error=None, origin=None, host=None):
+        # 只记录路由模板，不记录请求正文、查询参数、认证头或 Cookie。
+        entry = {'method': method, 'route': route, 'status': status, 'remote': address,
+                 'duration_ms': round((time.monotonic() - started_at) * 1000, 2)}
+        if error:
+            entry['error'] = error
+        self.log(3 if status >= 400 else 2, 'WebUI HTTP ' + json.dumps(entry, ensure_ascii=False))
 
     def new_session(self):
         with self.lock:
@@ -396,12 +455,23 @@ class server(OlivOS.API.Proc_templet):
                                               'fliter': 'rx_only'}, 'data': packet})
 
     async def websocket(self, request):
+        started_at = time.monotonic()
+        parts = request.path.strip('/').split('/')
+        route = request.path if parts in (['ws', 'logs'], ['ws', 'events']) else '/ws/<subscription>'
+
+        def reject(message, status):
+            self.log_access(request.method, route, status, request.remote, started_at, message,
+                            request.headers.get('Origin'), request.host)
+            headers = {'Retry-After': '60'} if status == 429 else None
+            return web.json_response({'error': message}, status=status, headers=headers)
+
         protocols = [part.strip() for part in request.headers.get('Sec-WebSocket-Protocol', '').split(',')]
         token = next((part[6:] for part in protocols if part.startswith('token.')), '')
-        status = self.authenticate(token, request.remote, request.headers.get('Origin'), request.host)
+        with self.lock:
+            status = self.authenticate(token, request.remote)
+            revision = self.credentials['revision'] if self.credentials else None
         if status != 200:
-            return web.json_response({'error': '认证失败' if status != 429 else '尝试过多，请稍后重试'}, status=status)
-        parts = request.path.strip('/').split('/')
+            return reject(self.authentication_error(status, token), status)
         session = request.query.get('session')
         level = None
         try:
@@ -409,28 +479,40 @@ class server(OlivOS.API.Proc_templet):
             if cursor < 0:
                 raise ValueError
         except ValueError:
-            return web.json_response({'error': '订阅游标无效'}, status=400)
+            return reject('订阅游标无效', 400)
         if parts == ['ws', 'logs']:
             stream = 'logs'
             try:
                 level = pageAPI.parse_log_levels(request.query.get('level', ''))
             except ValueError:
-                return web.json_response({'error': '日志级别或游标无效'}, status=400)
+                return reject('日志级别或游标无效', 400)
         elif parts == ['ws', 'events'] and self.session_valid(session):
             stream = 'events'
         elif len(parts) == 4 and parts[:2] == ['ws', 'terminal'] and tuple(parts[2:]) in self.terminals:
             stream = '/'.join(parts[2:])
         else:
-            return web.json_response({'error': '订阅不存在'}, status=404)
+            return reject('订阅不存在', 404)
         socket = web.WebSocketResponse(protocols=['olivos'], heartbeat=30, max_msg_size=16384)
         await socket.prepare(request)
-        self.sockets.add(socket)
+        self.log_access(request.method, route, 101, request.remote, started_at)
+        with self.lock:
+            valid = self.browser_valid(token) and revision == self.credentials['revision']
+            if valid:
+                self.sockets.add(socket)
+        if not valid:
+            await socket.close(code=1008, message=b'Login expired')
+            return socket
 
         async def push():
             nonlocal cursor
             # 第一帧为历史，随后每 50ms 批量发送；慢客户端不会积累无界队列。
             first = True
             while not socket.closed:
+                with self.lock:
+                    valid = self.browser_valid(token)
+                if not valid:
+                    await socket.close(code=1008, message=b'Login expired')
+                    break
                 items = self.snapshot(stream, cursor, session, level)
                 if items or first:
                     if items:
@@ -483,12 +565,21 @@ class server(OlivOS.API.Proc_templet):
 
     async def serve(self):
         self.loop = asyncio.get_running_loop()
+        with authAPI.credential_lock(self.root / 'data/webui/manager'):
+            await self._serve_locked()
+
+    async def _serve_locked(self):
         app = web.Application(client_max_size=1024 * 1024)
         app.router.add_route('*', '/{path:.*}', self.http)
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
         listener = None
         try:
+            self.local_manager = localAPI.LocalServer(self.root, self.local_action)
+            self.local_manager.start()
+            # 构造和启动之间，离线重置可能已更新凭据。
+            with self.lock:
+                self.credentials = authAPI.read_record(authAPI.auth_path(self.root, self.config))
             requested_port = int(self.config['port'])
             if not 0 <= requested_port <= 65535:
                 raise ValueError('WebUI 端口必须在 0–65535 之间')
@@ -521,7 +612,7 @@ class server(OlivOS.API.Proc_templet):
                 self.log(2, f"WebUI 监听端口由 {requested_port} 调整为 {self.config['port']}")
             self.ready.set()
             self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；"
-                        f"认证文件：{self.config['token_path']}")
+                        f"认证文件：{self.config['auth_path']}")
             while not self.stop_event.is_set():
                 for _ in range(256):
                     try:
@@ -531,6 +622,9 @@ class server(OlivOS.API.Proc_templet):
                     self.consume(packet)
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
+            if self.local_manager is not None:
+                self.local_manager.close()
+                await asyncio.to_thread(self.local_manager.worker.join, 4)
             if listener is not None and ACTIVE_LISTENERS.get(self.root) == listener:
                 ACTIVE_LISTENERS.pop(self.root, None)
             for socket in list(self.sockets):
@@ -544,6 +638,10 @@ class server(OlivOS.API.Proc_templet):
                 pass
 
     def run(self):
+        if self.error is not None:
+            self.log(4, self.error)
+            self.ready.set()
+            return
         try:
             if os.name == 'nt':
                 # 仅 WebUI 使用 Selector，避开 Proactor 在浏览器刷新断连时的 shutdown 异常。
@@ -571,6 +669,8 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.stop_event.set()
+        if self.local_manager is not None:
+            self.local_manager.close()
 
 
 def forward_packet(packet, proc_dict):
@@ -604,27 +704,54 @@ def listener_valid(active, root):
         return False
 
 
-def browser_url(root_path=None):
-    root = Path(root_path or os.getcwd()).resolve()
+def load_local_config(root, strict=False):
+    root = Path(root)
     config = dict(DEFAULT_SERVER)
     enabled = True
     for path in ('./conf/basic.json', './conf/config.json'):
         try:
-            model = json.loads((root / path).read_text(encoding='utf-8'))['models']['OlivOS_webUI']
+            document = json.loads((root / path).read_text(encoding='utf-8'))
+            model = document.get('models', {}).get('OlivOS_webUI', {})
             config.update(model.get('server', {}))
             enabled = model.get('enable', enabled)
-        except (OSError, ValueError, KeyError):
-            pass
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            if strict:
+                raise ValueError('无法读取实例配置，未重置密码；请检查 conf/basic.json 和 conf/config.json') from None
     apply_environment_config(config)
+    return config, enabled
+
+
+def active_listener(root):
+    root = Path(root).resolve()
     try:
         active = json.loads((root / 'data/webui/listen.json').read_text(encoding='utf-8'))
         if listener_valid(active, root):
-            config.update(host=active['host'], port=active['port'])
+            return active
     except (OSError, ValueError, KeyError, TypeError):
         pass
+
+
+def listener_url(config):
     host = config['host']
-    if host in ('0.0.0.0', '::'):
+    if host == '0.0.0.0':
         host = '127.0.0.1'
-    if ':' in host:
+    elif host == '::':
+        host = '::1'
+    if ':' in host and not host.startswith('['):
         host = f'[{host}]'
-    return f"http://{host}:{config['port']}" if enabled else None
+    return f"http://{host}:{config['port']}"
+
+
+def browser_url(root_path=None):
+    root = Path(root_path or os.getcwd()).resolve()
+    config, enabled = load_local_config(root)
+    active = active_listener(root)
+    if active:
+        config.update(host=active['host'], port=active['port'])
+    return listener_url(config) if enabled else None
+
+
+def local_login_url(root_path=None):
+    return localAPI.request(Path(root_path or os.getcwd()).resolve(), {'action': 'open'})['url']

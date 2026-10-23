@@ -22,6 +22,8 @@ import json
 import pystray
 import tkinter
 import tkinter.messagebox
+import tkinter.simpledialog
+import threading
 import re
 import datetime
 import webbrowser
@@ -204,6 +206,18 @@ class dock(OlivOS.API.Proc_templet):
                         self.updateAccountList(flagInit=True)
                         self.mergeAccountList()
                         self.updateShallowMenuList()
+                    elif 'webui_password_reset' == rx_packet_data.key['data']['action']:
+                        self.showWebUIPasswordReset()
+                    elif 'webui_local_result' == rx_packet_data.key['data']['action']:
+                        result = rx_packet_data.key['data']
+                        if result.get('reset'):
+                            self.UIData['webui_password_reset_active'] = False
+                        if result.get('url'):
+                            webbrowser.open(result['url'])
+                        elif result.get('error'):
+                            tkinter.messagebox.showerror('WebUI', result['error'], parent=self.UIObject['main_tk'])
+                        else:
+                            tkinter.messagebox.showinfo('WebUI', result['message'], parent=self.UIObject['main_tk'])
                     elif 'update_data' == rx_packet_data.key['data']['action']:
                         self.UIData.update(rx_packet_data.key['data']['data'])
                         self.updateShallowMenuList()
@@ -1223,9 +1237,44 @@ class dock(OlivOS.API.Proc_templet):
         self.sendControlEvent('exit_total')
 
     def openWebUI(self):
-        url = OlivOS.webUI.serverAPI.browser_url(self.webui_root)
-        if url:
-            webbrowser.open(url)
+        def open_local():
+            try:
+                result = {'url': OlivOS.webUI.serverAPI.local_login_url(self.webui_root)}
+            except (OSError, ValueError):
+                result = {'error': '无法连接 WebUI 本机管理入口，请确认 WebUI 已启动'}
+            self.sendRxEvent('send', {'data': dict(result, action='webui_local_result')})
+        threading.Thread(target=open_local, daemon=True).start()
+
+    def changeWebUIPassword(self):
+        self.sendRxEvent('send', {'data': {'action': 'webui_password_reset'}})
+
+    def showWebUIPasswordReset(self):
+        if self.UIData.get('webui_password_reset_active'):
+            return
+        self.UIData['webui_password_reset_active'] = True
+        parent = self.UIObject['main_tk']
+        password = tkinter.simpledialog.askstring('修改 WebUI 密码', '请输入新密码：', show='*', parent=parent)
+        if password is None:
+            self.UIData['webui_password_reset_active'] = False
+            return
+        confirmation = tkinter.simpledialog.askstring('修改 WebUI 密码', '请再次输入：', show='*', parent=parent)
+        if confirmation is None:
+            self.UIData['webui_password_reset_active'] = False
+            return
+        if password != confirmation or not password:
+            self.UIData['webui_password_reset_active'] = False
+            tkinter.messagebox.showerror('WebUI', '密码不能为空，且两次输入必须一致', parent=parent)
+            return
+
+        def reset_local():
+            try:
+                record = OlivOS.webUI.authAPI.password_record(password)
+                online = OlivOS.webUI.authAPI.set_local_password(self.webui_root, record)
+                result = {'message': '密码已更新，原有登录已失效。' if online else '密码已更新，下次启动 WebUI 生效。'}
+            except (OSError, ValueError):
+                result = {'error': '密码重置失败，请检查本机管理入口和认证文件权限（密码 UTF-8 长度不能超过 1024 字节）'}
+            self.sendRxEvent('send', {'data': dict(result, action='webui_local_result', reset=True)})
+        threading.Thread(target=reset_local, daemon=True).start()
 
     def sendPluginControlEventFunc(self, pluginNameSpace, eventName):
         def resFunc():
@@ -2425,6 +2474,7 @@ class shallow(object):
                 self.root.webui_root
             ):
                 list_new.append(pystray.MenuItem('打开 WebUI', lambda: self.root.openWebUI(), default=True))
+                list_new.append(pystray.MenuItem('修改 WebUI 密码', lambda: self.root.changeWebUIPassword()))
             for item_this in data:
                 if not type(item_this) is list:
                     pass
