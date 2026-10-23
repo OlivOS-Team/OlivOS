@@ -12,6 +12,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   WebUI 本机密码存储与迁移
 '''
 
+import gc
 import getpass
 import hashlib
 import hmac
@@ -20,6 +21,7 @@ import os
 import secrets
 import sys
 import tempfile
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -187,7 +189,7 @@ def windows_desktop_available():
     ) and flags.flags & 1)
 
 
-def show_password_dialog(password, migrated=False):
+def show_password_dialog(password, migrated=False, on_ready=None):
     """本机一次性窗口；密码可选中或点击复制，不经过日志和网页。"""
     import tkinter
     from tkinter import ttk
@@ -222,6 +224,9 @@ def show_password_dialog(password, migrated=False):
         ttk.Button(panel, text='复制密码', command=copy_password).grid(row=4, column=0, sticky='w')
         ttk.Button(panel, text='关闭', command=window.destroy).grid(row=4, column=1, sticky='e')
         window.protocol('WM_DELETE_WINDOW', window.destroy)
+        window.update_idletasks()
+        if on_ready:
+            on_ready()
         window.mainloop()
         return True
     except tkinter.TclError:
@@ -234,12 +239,34 @@ def show_password_dialog(password, migrated=False):
                 pass
 
 
+def start_password_dialog(password, migrated=False):
+    """窗口在自己的线程创建和关闭；启动流程只等待窗口就绪，不等待用户操作。"""
+    ready = threading.Event()
+    failed = threading.Event()
+
+    def display():
+        try:
+            show_password_dialog(password, migrated=migrated, on_ready=ready.set)
+        except (OSError, RuntimeError):
+            failed.set()
+        finally:
+            # Tk 控件和回调包含循环引用，必须在创建解释器的线程内完成回收。
+            gc.collect()
+            ready.set()
+
+    worker = threading.Thread(target=display, name='WebUI-password-display', daemon=True)
+    worker.start()
+    if not ready.wait(5) or failed.is_set():
+        raise OSError('无法显示 WebUI 密码，请从本机重置密码')
+    return True
+
+
 def display_password(password, migrated=False):
     # 只显示在本机交互界面，不进入日志队列、文件或重定向的 stdout。
     message = ('WebUI 旧令牌已迁移。' if migrated else 'WebUI 初始密码已生成。') + '\n当前 WebUI 密码：' + password
     if windows_desktop_available():
         # 源码和编译版均通过本机弹窗展示，托盘终端只显示普通日志。
-        return show_password_dialog(password, migrated=migrated)
+        return start_password_dialog(password, migrated=migrated)
     if interactive_output():
         print(message, flush=True)
         return True

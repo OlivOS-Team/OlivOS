@@ -115,7 +115,7 @@ def test_source_windows_migration_displays_local_dialog_once_without_logging(
     legacy.write_text('dialog-fixture-password', encoding='utf-8')
     dialogs = []
     monkeypatch.setattr(authAPI, 'show_password_dialog',
-                        lambda value, migrated=False: dialogs.append((value, migrated)) or True)
+                        lambda value, migrated=False, on_ready=None: dialogs.append((value, migrated)) or True)
     record = authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
     assert authAPI.verify('dialog-fixture-password', record)
     assert dialogs == [('dialog-fixture-password', True)]
@@ -141,6 +141,66 @@ def test_dialog_failure_preserves_legacy_password_for_retry(tmp_path, monkeypatc
         authAPI.initialize(tmp_path, serverAPI.DEFAULT_SERVER)
     assert legacy.exists()
     assert authAPI.verify('dialog-fixture-password', authAPI.read_record(tmp_path / 'conf/webui_auth.json'))
+
+
+@pytest.mark.parametrize('migrated', [False, True])
+def test_password_window_can_stay_open_while_webui_and_following_components_start(tmp_path, monkeypatch, migrated):
+    monkeypatch.setattr(authAPI, 'windows_desktop_available', lambda: True)
+    if migrated:
+        legacy = tmp_path / 'conf/webui_token.txt'
+        legacy.parent.mkdir()
+        legacy.write_text('nonblocking-fixture-password', encoding='utf-8')
+    visible = threading.Event()
+    close = threading.Event()
+    closed = threading.Event()
+    following_component = threading.Event()
+    constructed = threading.Event()
+    services = []
+    failures = []
+
+    def keep_dialog_open(password, migrated=False, on_ready=None):
+        visible.set()
+        if on_ready:
+            on_ready()
+        close.wait(10)
+        closed.set()
+        return True
+
+    def boot():
+        try:
+            service = serverAPI.server(root_path=tmp_path, server_conf={'port': 0, 'host': '127.0.0.1'})
+            services.append(service)
+            constructed.set()
+            following_component.set()
+            service.run()
+        except Exception as error:
+            failures.append(type(error).__name__)
+            constructed.set()
+
+    monkeypatch.setattr(authAPI, 'show_password_dialog', keep_dialog_open)
+    worker = threading.Thread(target=boot, daemon=True)
+    worker.start()
+    try:
+        assert visible.wait(2)
+        assert following_component.wait(2), '密码窗口尚未关闭时，启动流程必须继续'
+        assert not failures
+        host = services[0]
+        assert host.ready.wait(5) and host.error is None
+        assert not closed.is_set()
+        assert host.app.test_client().get('/api/health').status_code == 200
+        # 迁移文件锁也必须释放，不能等待用户关闭窗口。
+        with authAPI.credential_lock(authAPI.auth_path(tmp_path, host.config)):
+            assert authAPI.read_record(authAPI.auth_path(tmp_path, host.config)) == host.credentials
+        if migrated:
+            assert not (tmp_path / 'conf/webui_token.txt').exists()
+    finally:
+        close.set()
+        constructed.wait(5)
+        for service in services:
+            service.on_terminate()
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert closed.wait(3)
 
 
 def test_credential_file_has_current_user_only_permissions(tmp_path):

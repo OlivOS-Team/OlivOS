@@ -74,8 +74,10 @@ def test_password_dialog_has_click_to_copy_and_selectable_password(
     append = Mock(side_effect=tkinter.TclError('fixture') if copy_fails else None)
     monkeypatch.setattr(window, 'clipboard_clear', clear)
     monkeypatch.setattr(window, 'clipboard_append', append)
+    ready = Mock()
 
     def check_window():
+        ready.assert_called_once_with()
         panel = window.winfo_children()[0]
         widgets = panel.winfo_children()
         entry = next(widget for widget in widgets if isinstance(widget, ttk.Entry))
@@ -90,6 +92,94 @@ def test_password_dialog_has_click_to_copy_and_selectable_password(
         window.destroy()
 
     monkeypatch.setattr(window, 'mainloop', check_window)
-    assert authAPI.show_password_dialog('copy-fixture-password', migrated=True) is True
+    assert authAPI.show_password_dialog('copy-fixture-password', migrated=True, on_ready=ready) is True
     output = capsys.readouterr()
     assert output.out == output.err == ''
+
+
+@pytest.mark.native_gui
+def test_real_password_window_runs_in_its_own_thread_while_webui_serves(tmp_path):
+    import subprocess
+    import sys
+    import textwrap
+
+    # 独立进程只打开隐藏测试窗口，避免多个 Tk 解释器互相干扰。
+    script = textwrap.dedent('''
+        import threading
+        import time
+        import tkinter
+        from pathlib import Path
+        from OlivOS.webUI import authAPI, serverAPI
+
+        legacy = Path('conf/webui_token.txt')
+        legacy.parent.mkdir()
+        legacy.write_text('threaded-window-fixture', encoding='utf-8')
+        authAPI.windows_desktop_available = lambda: True
+        original_tk = tkinter.Tk
+        original_dialog = authAPI.show_password_dialog
+        services = []
+        observed = threading.Event()
+        closed = threading.Event()
+        failures = []
+        window_threads = []
+
+        def hidden_window():
+            window_threads.append(threading.current_thread().name)
+            window = original_tk()
+            window.withdraw()
+            deadline = time.monotonic() + 5
+
+            def verify_progress():
+                try:
+                    if services and services[0].ready.is_set():
+                        host = services[0]
+                        assert host.error is None
+                        assert host.app.test_client().get('/api/health').status_code == 200
+                        assert not legacy.exists()
+                        observed.set()
+                        window.destroy()
+                    elif time.monotonic() < deadline:
+                        window.after(50, verify_progress)
+                    else:
+                        failures.append('startup blocked')
+                        window.destroy()
+                except Exception as error:
+                    failures.append(type(error).__name__)
+                    window.destroy()
+
+            window.after(50, verify_progress)
+            return window
+
+        def tracked_dialog(*args, **kwargs):
+            try:
+                return original_dialog(*args, **kwargs)
+            finally:
+                closed.set()
+
+        tkinter.Tk = hidden_window
+        authAPI.show_password_dialog = tracked_dialog
+        worker = None
+        try:
+            host = serverAPI.server(root_path=Path.cwd(), server_conf={'port': 0, 'host': '127.0.0.1'})
+            services.append(host)
+            worker = threading.Thread(target=host.run, daemon=True)
+            worker.start()
+            assert observed.wait(7), failures
+            assert closed.wait(3)
+            assert window_threads == ['WebUI-password-display']
+            assert not failures
+        finally:
+            for service in services:
+                service.on_terminate()
+            if worker:
+                worker.join(timeout=5)
+                assert not worker.is_alive()
+            for thread in threading.enumerate():
+                if thread.name == 'WebUI-password-display':
+                    thread.join(timeout=3)
+                    assert not thread.is_alive()
+    ''')
+    result = subprocess.run([sys.executable, '-c', script], cwd=tmp_path, capture_output=True,
+                            text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert 'threaded-window-fixture' not in result.stdout + result.stderr
