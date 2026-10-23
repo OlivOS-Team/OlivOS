@@ -2593,11 +2593,32 @@ class pluginManageUI(object):
             yscrollcommand=self.UIObject['tree_yscroll'].set
         )
 
+        # 侧边栏信息区：命名空间 -> 优先级 -> 介绍，标题高 20、段间距统一 8。
+        self.tree_UI_Label_init(
+            name='root_Label_NAMESPACE_title',
+            title='root_Label_NAMESPACE_title_StringVar',
+            x=525,
+            y=15,
+            width=140,
+            height=20
+        )
+        self.UIData['root_Label_NAMESPACE_title_StringVar'].set('命名空间')
+
+        self.tree_UI_Label_init(
+            name='root_Label_NAMESPACE',
+            title='root_Label_NAMESPACE_StringVar',
+            x=530,
+            y=35,
+            width=140,
+            height=40
+        )
+        self.UIData['root_Label_NAMESPACE_StringVar'].set('未选定插件')
+
         self.tree_UI_Label_init(
             name='root_Label_PRIORITY_title',
             title='root_Label_PRIORITY_title_StringVar',
             x=525,
-            y=15,
+            y=83,
             width=140,
             height=20
         )
@@ -2607,9 +2628,9 @@ class pluginManageUI(object):
             name='root_Label_PRIORITY',
             title='root_Label_PRIORITY_StringVar',
             x=530,
-            y=35,
+            y=103,
             width=140,
-            height=20
+            height=40
         )
         self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
 
@@ -2617,7 +2638,7 @@ class pluginManageUI(object):
             name='root_Label_INFO_title',
             title='root_Label_INFO_title_StringVar',
             x=525,
-            y=65,
+            y=151,
             width=140,
             height=20
         )
@@ -2627,11 +2648,13 @@ class pluginManageUI(object):
             name='root_Label_INFO',
             title='root_Label_INFO_StringVar',
             x=530,
-            y=85,
+            y=171,
             width=140,
-            height=240
+            height=155
         )
         self.UIData['root_Label_INFO_StringVar'].set('未选定插件')
+
+        self.layoutSidebarInfo()
 
         self.tree_UI_Button_init(
             name='root_Button_RESTART',
@@ -2965,9 +2988,13 @@ class pluginManageUI(object):
             # 从映射表获取插件的 namespace
             plugin_namespace_now = self.UIData['item_namespace_map'].get(selected_item, None)
             if not plugin_namespace_now:
+                self.UIData['root_Label_NAMESPACE_StringVar'].set('N/A')
                 self.UIData['root_Label_PRIORITY_StringVar'].set('N/A')
                 self.UIData['root_Label_INFO_StringVar'].set('未找到插件信息')
+                self.layoutSidebarInfo()
                 return
+
+            self.UIData['root_Label_NAMESPACE_StringVar'].set(plugin_namespace_now)
 
             tmp_info_str = '这个插件的作者很懒，没有写介绍。'
             tmp_priority_str = 'N/A'
@@ -2993,6 +3020,35 @@ class pluginManageUI(object):
 
             self.UIData['root_Label_PRIORITY_StringVar'].set(tmp_priority_str)
             self.UIData['root_Label_INFO_StringVar'].set(tmp_info_str)
+            self.layoutSidebarInfo()
+
+    def layoutSidebarInfo(self):
+        """按内容实际高度重排侧栏三段信息，保证每段之间的间距一致。"""
+        sections = (
+            ('root_Label_NAMESPACE_title', 'root_Label_NAMESPACE'),
+            ('root_Label_PRIORITY_title', 'root_Label_PRIORITY'),
+            ('root_Label_INFO_title', 'root_Label_INFO'),
+        )
+        if not all(name in self.UIObject for name, _ in sections):
+            return
+        if not all(value_name in self.UIObject for _, value_name in sections):
+            return
+        gap = 8
+        available_bottom = 326  # 右侧按钮从 y=331 开始，留 5px 余量
+        y = 15
+        for index, (title_name, value_name) in enumerate(sections):
+            title = self.UIObject[title_name]
+            title_height = max(title.winfo_reqheight(), 20)
+            title.place_configure(x=525, y=y, width=140, height=title_height)
+            y += title_height
+            value = self.UIObject[value_name]
+            height = value.winfo_reqheight()
+            if index == len(sections) - 1:
+                height = max(height, available_bottom - y)
+            else:
+                height = max(height, title_height)
+            value.place_configure(x=530, y=y, width=140, height=height)
+            y += height + gap
 
     def clickRecord(self, name, event):
         self.UIData['click_record'][name] = event

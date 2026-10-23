@@ -201,6 +201,49 @@ def test_plugin_navigation_always_shows_namespace_and_uses_page_title_for_single
 
 
 @pytest.mark.browser
+def test_plugin_menu_dialog_shows_namespace_priority_and_info(browser):
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+    browser.driver.execute_script('''
+        const row = [...document.querySelectorAll('#plugin-rows tr')]
+          .find(item => item.cells[0].textContent === '独立插件');
+        row.cells[row.cells.length - 1].querySelector('button').click();
+    ''')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.getElementById("menu-dialog").open'))
+    assert browser.find('#menu-title').text == '独立插件'
+    labels = browser.driver.execute_script(
+        'return [...document.querySelectorAll("#menu-meta dt")].map(item => item.textContent)')
+    assert labels == ['命名空间', '优先级', '介绍']
+    assert browser.find('#menu-namespace').text == 'single'
+    assert browser.find('#menu-priority').text == '1（默认）'
+    assert browser.find('#menu-info').text == '分组导航测试'
+
+
+@pytest.mark.browser
+def test_plugin_menu_priority_refreshes_while_dialog_open(browser):
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+    browser.driver.execute_script('''
+        const row = [...document.querySelectorAll('#plugin-rows tr')]
+          .find(item => item.cells[0].textContent === '独立插件');
+        row.cells[row.cells.length - 1].querySelector('button').click();
+    ''')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.getElementById("menu-dialog").open'))
+    assert browser.find('#menu-priority').text == '1（默认）'
+    # 模拟另一个会话调整优先级：宿主只广播 priority_only，弹窗需要跟着刷新。
+    with browser.host.lock:
+        browser.host.plugin_priority['single'] = {
+            'default': 1, 'user': 50, 'effective': 50, 'source': 'user'}
+        browser.host.publish('events', {'type': 'plugins', 'ready': True, 'priority_only': True})
+    browser.wait.until(
+        lambda _: browser.find('#menu-priority').text == '50（用户 50 / 默认 1）')
+
+
+@pytest.mark.browser
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('retained')
@@ -490,8 +533,10 @@ def test_plugin_priority_editor_updates_order_and_file(browser):
             for namespace in ('multi', 'single')
         }
     browser.click('[data-page="plugins"]')
+    # 登录时已用空优先级渲染过一轮列表，行数条件对旧渲染同样成立；
+    # 必须等点击触发的 loadPlugins 把 20000 拉回 state 后再断言，否则会读到旧渲染。
     browser.wait.until(lambda _: browser.driver.execute_script(
-        'return document.querySelectorAll("#plugin-rows tr").length') == 2)
+        "return state.pluginPriority['single']?.effective === 20000"))
     row = browser.driver.execute_script('''
         return [...document.querySelectorAll('#plugin-rows tr')]
           .find(item => item.cells[0].textContent === '独立插件');

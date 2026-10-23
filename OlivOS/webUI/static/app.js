@@ -49,6 +49,8 @@ const state = {
   pluginPriority: {},
   priorityRevision: '',
   priorityError: '',
+  // 当前菜单弹窗展示的 namespace，用于优先级变更后同步刷新弹窗内容。
+  menuNamespace: '',
   pages: [],
   collapsedPluginGroups: new Set(),
   terminals: [],
@@ -1132,6 +1134,13 @@ function pluginEffectivePriority(namespace, plugin) {
   const info = state.pluginPriority[namespace] || {};
   return Number.isInteger(info.effective) ? info.effective : plugin[6] || 0;
 }
+// 与 GUI 侧边栏同一套文案，避免两个界面读到的优先级说法不一致。
+function pluginPriorityText(namespace, plugin) {
+  const info = state.pluginPriority[namespace] || {};
+  const effective = pluginEffectivePriority(namespace, plugin);
+  if (!Number.isInteger(info.user)) return `${effective}（默认）`;
+  return `${effective}（用户 ${info.user} / 默认 ${info.default ?? effective}）`;
+}
 // 与加载器的 (生效优先级, namespace) 排序保持一致。
 function namespaceCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -1211,6 +1220,24 @@ async function savePluginPriority(namespace, priority) {
   renderPlugins();
   notify(priority === null ? '已恢复默认优先级' : `优先级已更新为 ${priority}，正在热生效`);
 }
+// 优先级可能被其它会话改动，弹窗只会在打开时写一次文案；列表重渲染时同步刷新，
+// 避免已打开的菜单一直显示过期的生效优先级。
+function refreshOpenMenuPriority() {
+  if (!$('menu-dialog').open) {
+    state.menuNamespace = '';
+    return;
+  }
+  const namespace = state.menuNamespace;
+  if (!namespace) return;
+  const plugin = state.plugins[namespace];
+  if (!plugin) {
+    // 插件被卸载后弹窗内容已无意义，直接关掉。
+    state.menuNamespace = '';
+    $('menu-dialog').close();
+    return;
+  }
+  $('menu-priority').textContent = pluginPriorityText(namespace, plugin);
+}
 function renderPlugins() {
   const header = element('tr');
   const columns = [
@@ -1248,10 +1275,15 @@ function renderPlugins() {
     $('plugin-rows').append(row);
   }
   $('toggle-path').textContent = state.showPath ? '隐藏路径' : '显示路径';
+  refreshOpenMenuPriority();
 }
 function pluginMenu(namespace) {
   const plugin = state.plugins[namespace];
+  state.menuNamespace = namespace;
   $('menu-title').textContent = plugin[0];
+  // 插件名可能重复，信息区固定按 命名空间 / 优先级 / 介绍 展示，与 GUI 侧边栏一致。
+  $('menu-namespace').textContent = namespace;
+  $('menu-priority').textContent = pluginPriorityText(namespace, plugin);
   $('menu-info').textContent = plugin[4];
   $('menu-items').replaceChildren();
   for (const item of plugin[3] || [])

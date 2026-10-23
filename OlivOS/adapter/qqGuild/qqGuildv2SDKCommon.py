@@ -17,10 +17,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 import base64
 import copy
 import hashlib
+import io
+import ipaddress
 import json
 import mimetypes
 import os
 import re
+import socket
 import threading
 import time
 import traceback
@@ -32,6 +35,7 @@ from enum import IntEnum
 from urllib import parse
 
 import requests as req
+from PIL import Image
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from requests_toolbelt import MultipartEncoder
 
@@ -79,6 +83,7 @@ sdkAPIRoute = {
     'generate_url_link': '/v2/generate_url_link',
     'menu': '/v2/menu',
     'panels': '/v2/panels',
+    'media_images': '/v2/media-images',
     'getAppAccessToken': '/app/getAppAccessToken'
 }
 
@@ -91,7 +96,8 @@ sdkAPIRouteTemp = {
     'message_id': '-1',
     'member_openid': '-1',
     'strategy_id': '-1',
-    'panel_id': '-1'
+    'panel_id': '-1',
+    'image_id': '-1'
 }
 
 sdkSubSelfInfo = {}
@@ -220,9 +226,33 @@ qqLocalPassiveFallbackErrors = {
     'passive event reply cache is full',
     'passive event reply count exceeded'
 }
+# 40035006：素材接口服务端内部错误（COS 处理、链接生成等失败），官方文档写可稍后重试。
+# 40035003：complete 阶段 md5 与 COS ETag 比对失败，多块对象或 ETag 缺失回退可能触发。
+qqMediaImageRetryErrorCodes = {40035003, 40035006}
+# 素材接口重试按总时长预算而非固定次数：官方只说"可稍后重试"，
+# COS 内部错误通常亚秒恢复，固定 1 次 0.2 秒经常不够；预算兜底防止无限等待。
+qqMediaImageApiRetryBudget = 2.5  # 单阶段（prepare/直传/complete）重试总时长预算（秒）
+qqMediaImageApiRetryBaseDelay = 0.2  # 首次重试间隔（秒），之后指数退避（0.2/0.4/0.8…）
+qqMediaImagePutTimeout = 120.0  # 素材直传 PUT 的请求超时；10MB 大图在慢网下 20 秒全局超时不够
+qqMarkdownImageStageNames = {
+    'prepare': '申请上传',
+    'upload': '直传图片',
+    'complete': '完成上传'
+}
+# 富媒体（分片）上传各阶段的中文名，用于失败日志。
+qqUploadStageNames = {
+    'direct': '直传',
+    'upload_prepare': '预上传',
+    'upload_part': '分片上传',
+    'upload_part_put': '分片直传',
+    'upload_part_finish': '分片确认',
+    'chunk_merge': '分片合并'
+}
 qqEventDedupeCache = {}
 qqEventDedupeLock = threading.Lock()
 qqEventDedupeTTL = 120.0
+# 远程图片下载"钉住 DNS 解析"窗口的互斥锁（见 event_action._fetch_markdown_image_with_addresses）。
+qqMarkdownImageFetchLock = threading.Lock()
 qqEventDedupeMaxSize = 10000
 # 消息内容缓存:收到/发出的消息按 message_id 暂存,供 get_msg 取引用文本。
 # QQ 群/C2C 无"获取指定消息"官方接口,该缓存是取引用文本的唯一来源;频道可回源官方接口。
@@ -4220,6 +4250,601 @@ class event_action_common(object):
                 message_chunks.append((text_buffer, None))
         return message_chunks
 
+    def _log_markdown_image(target_event, message):
+        try:
+            if target_event.log_func is not None:
+                target_event.log_func(
+                    3,
+                    'OlivOS qqGuildv2SDK Markdown 图片: %s' % message,
+                    [
+                        (target_event.getBotIDStr(), 'default'),
+                        (modelName, 'default'),
+                        # 段类型必须是 diagnoseAPI.segment_type 里注册过的键（default/callback），
+                        # 之前用 'fallback' 会触发 KeyError 打死日志线程。
+                        ('markdown_image', 'callback')
+                    ]
+                )
+        except Exception:
+            traceback.print_exc()
+
+    def _resolve_public_image_addresses(url):
+        """
+        解析并校验远程图片域名，返回全部公网 IP（升序）。
+        校验不通过时抛 ValueError，由调用方转成下载失败。
+        """
+        parsed = parse.urlparse(url)
+        if parsed.scheme not in ['http', 'https'] or not parsed.hostname:
+            raise ValueError('图片 URL 必须是带主机名的 HTTP(S) 地址')
+        try:
+            addresses = {
+                item[4][0]
+                for item in socket.getaddrinfo(
+                    parsed.hostname, parsed.port, type=socket.SOCK_STREAM
+                )
+            }
+        except OSError as exc:
+            raise ValueError('图片 URL 域名无法解析') from exc
+        for address in addresses:
+            ip = ipaddress.ip_address(address)
+            if (
+                ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified
+            ):
+                raise ValueError('图片 URL 必须解析到公网地址')
+        return sorted(addresses)
+
+    def _validate_public_image_url(url):
+        event_action._resolve_public_image_addresses(url)
+
+    # 远程图片下载极少并发；用全局锁串行化"钉住 DNS 解析"的窗口，避免影响
+    # 其他线程的解析行为。窗口内只有目标域名被钉到已校验的 IP，其余域名照常解析。
+    def _fetch_markdown_image_with_addresses(url, addresses):
+        hostname = parse.urlparse(url).hostname
+        original_getaddrinfo = socket.getaddrinfo
+
+        def pinned_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            # 参数名必须与标准库一致（urllib3 以 type= 关键字传参），否则会 TypeError。
+            if host == hostname:
+                # 数值 IP 直接给出 sockaddr，不再走系统解析，彻底钉死连接目标；
+                # 端口为 0 时由底层按默认端口处理， family/type/proto 原样透传。
+                pinned = []
+                for address in addresses:
+                    try:
+                        addr_info = ipaddress.ip_address(address)
+                    except ValueError:
+                        continue
+                    sockaddr = (
+                        (str(addr_info), port)
+                        if addr_info.version == 4
+                        else (str(addr_info), port, 0, 0)
+                    )
+                    pinned.append((
+                        socket.AF_INET if addr_info.version == 4 else socket.AF_INET6,
+                        socket.SOCK_STREAM,
+                        6,  # IPPROTO_TCP
+                        '',
+                        sockaddr
+                    ))
+                if pinned:
+                    return pinned
+            return original_getaddrinfo(host, port, family, type, proto, flags)
+
+        with qqMarkdownImageFetchLock:
+            socket.getaddrinfo = pinned_getaddrinfo
+            try:
+                return req.get(
+                    url,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout,
+                    allow_redirects=False,
+                    stream=True
+                )
+            finally:
+                socket.getaddrinfo = original_getaddrinfo
+
+    def _read_markdown_image(target_event, resource):
+        resource = str(resource)
+        parsed = parse.urlparse(resource)
+        if parsed.scheme in ['http', 'https']:
+            try:
+                max_size = 10 * 1024 * 1024
+                request_url = resource
+                response = None
+                for _ in range(3):
+                    # 校验与请求必须基于同一次解析结果，否则 DNS 重绑定可以在
+                    # "解析校验通过 → 实际连接"之间把域名换到内网地址。
+                    addresses = event_action._resolve_public_image_addresses(request_url)
+                    if not addresses:
+                        raise ValueError('图片 URL 必须解析到公网地址')
+                    response = event_action._fetch_markdown_image_with_addresses(
+                        request_url, addresses
+                    )
+                    if response.status_code not in [301, 302, 303, 307, 308]:
+                        break
+                    request_url = parse.urljoin(request_url, response.headers.get('Location', ''))
+                    response.close()
+                if response is None or response.status_code < 200 or response.status_code >= 300:
+                    status = None if response is None else response.status_code
+                    if response is not None:
+                        response.close()
+                    return None, None, '图片下载失败: HTTP %s' % status
+                content_length = response.headers.get('Content-Length')
+                if content_length is not None and int(content_length) > max_size:
+                    response.close()
+                    return None, None, '图片超过 10MB 素材上限'
+                chunks = []
+                total_size = 0
+                for chunk in response.iter_content(64 * 1024):
+                    total_size += len(chunk)
+                    if total_size > max_size:
+                        response.close()
+                        return None, None, '图片超过 10MB 素材上限'
+                    chunks.append(chunk)
+                file_data = b''.join(chunks)
+                file_name = os.path.basename(parse.unquote(parse.urlparse(request_url).path))
+                response.close()
+            except Exception as exc:
+                return None, None, '图片下载失败: %s' % exc
+        else:
+            try:
+                file_data = event_action._read_markdown_resource_data(resource, 10 * 1024 * 1024)
+                file_name = os.path.basename(parse.unquote(parsed.path or resource))
+            except Exception as exc:
+                return None, None, '图片读取失败: %s' % exc
+        if len(file_data) > 10 * 1024 * 1024:
+            return None, None, '图片超过 10MB 素材上限'
+        try:
+            with Image.open(io.BytesIO(file_data)) as image:
+                width, height = image.size
+                image_format = image.format
+            if image_format is None:
+                return None, None, '图片格式不受支持'
+        except Exception as exc:
+            return None, None, '图片解码失败: %s' % exc
+        extension = os.path.splitext(file_name)[1].lower()
+        extension_mime = {
+            '.png': ('PNG', 'image/png'),
+            '.jpg': ('JPEG', 'image/jpeg'),
+            '.jpeg': ('JPEG', 'image/jpeg'),
+            '.gif': ('GIF', 'image/gif'),
+            '.webp': ('WEBP', 'image/webp')
+        }
+        if extension not in extension_mime:
+            extension = {
+                'PNG': '.png', 'JPEG': '.jpg', 'GIF': '.gif', 'WEBP': '.webp'
+            }.get(image_format)
+        if extension not in extension_mime:
+            return None, None, '图片格式必须是 png/jpeg/gif/webp'
+        expected_format, content_type = extension_mime[extension]
+        if image_format != expected_format:
+            return None, None, '图片扩展名与内容格式不一致'
+        if file_name == '' or os.path.splitext(file_name)[1].lower() != extension:
+            file_name = 'image' + extension
+        return {
+            'bytes': file_data,
+            'file_name': file_name,
+            'content_type': content_type,
+            'width': width,
+            'height': height,
+            'alt': os.path.splitext(file_name)[0] or 'image',
+            'md5': hashlib.md5(file_data).hexdigest(),
+            'sha1': hashlib.sha1(file_data).hexdigest(),
+            'sha256': hashlib.sha256(file_data).hexdigest()
+        }, None, None
+
+    def _read_markdown_resource_data(resource, max_size):
+        if resource.startswith('base64://'):
+            encoded = resource[9:]
+            if len(encoded) > max_size * 2:
+                raise ValueError('图片超过 10MB 素材上限')
+            data = base64.b64decode(encoded.encode('utf-8'))
+            if len(data) > max_size:
+                raise ValueError('图片超过 10MB 素材上限')
+            return data
+        if resource.startswith('data:') and ',' in resource:
+            data_meta, data_raw = resource.split(',', 1)
+            if data_meta.endswith(';base64'):
+                if len(data_raw) > max_size * 2:
+                    raise ValueError('图片超过 10MB 素材上限')
+                data = base64.b64decode(data_raw.encode('utf-8'))
+            else:
+                data = parse.unquote_to_bytes(data_raw)
+            if len(data) > max_size:
+                raise ValueError('图片超过 10MB 素材上限')
+            return data
+        parsed = parse.urlparse(resource)
+        if parsed.scheme == 'file':
+            file_path = parse.unquote(parsed.path)
+            if parsed.netloc != '':
+                file_path = '//' + parsed.netloc + file_path
+            if re.match(r'^/[a-zA-Z]:/', file_path):
+                file_path = file_path[1:]
+        else:
+            file_path = resource
+        file_path = OlivOS.contentAPI.resourcePathTransform('images', file_path)
+        chunks = []
+        total_size = 0
+        with open(file_path, 'rb') as file_obj:
+            while True:
+                chunk = file_obj.read(64 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size:
+                    raise ValueError('图片超过 10MB 素材上限')
+                chunks.append(chunk)
+        return b''.join(chunks)
+
+    def _api_response_data(api_obj):
+        raw_obj = init_api_json(api_obj.res)
+        if not isinstance(raw_obj, dict):
+            return None
+        data = raw_obj.get('data', raw_obj)
+        return data if isinstance(data, dict) else None
+
+    def _markdown_image_api_http_ok(api_obj):
+        return (
+            api_obj is not None
+            and api_obj.res_code is not None
+            and 200 <= api_obj.res_code < 300
+        )
+
+    def _should_retry_markdown_image_api(api_obj):
+        if api_obj is None or api_obj.res_code is None:
+            return True
+        if api_obj.res_code >= 500 or api_obj.res_code == 429:
+            return True
+        return event_action._get_api_error_code(
+            init_api_json(api_obj.res)
+        ) in qqMediaImageRetryErrorCodes
+
+    def _retry_markdown_image_api(do_call, is_success, should_retry=None):
+        # 按总时长预算重试（指数退避），而不是固定次数：素材接口的临时故障
+        # （40035006/5xx/429）恢复时间不定，预算兜底避免打穿后直接失败。
+        # should_retry 可按阶段覆盖默认判定（如 complete 的 md5 不符不重试）。
+        api_obj = None
+        extra = None
+        deadline = time.monotonic() + qqMediaImageApiRetryBudget
+        attempt = 0
+        while True:
+            api_obj = do_call()
+            attempt += 1
+            succeeded, extra = is_success(api_obj)
+            if succeeded:
+                return api_obj, extra
+            delay = qqMediaImageApiRetryBaseDelay * (2 ** (attempt - 1))
+            retryable = (
+                event_action._should_retry_markdown_image_api(api_obj)
+                if should_retry is None
+                else should_retry(api_obj)
+            )
+            if (
+                time.monotonic() + delay > deadline
+                or not retryable
+            ):
+                break
+            time.sleep(delay)
+        return api_obj, extra
+
+    def _complete_stage_retryable(api_obj):
+        # 40035003 是 md5 与 COS ETag 不一致：同 md5 重试永远得到同样结果，
+        # 重试无意义，交给外层整段重启换新上传与 ETag；其余可重试错误照常。
+        if api_obj is None or api_obj.res_code is None:
+            return True
+        if api_obj.res_code >= 500 or api_obj.res_code == 429:
+            return True
+        return event_action._get_api_error_code(
+            init_api_json(api_obj.res)
+        ) == 40035006
+
+    def _format_markdown_image_api_failure(stage, api_obj):
+        status = 'n/a' if api_obj is None or api_obj.res_code is None else str(api_obj.res_code)
+        response = '无响应'
+        if api_obj is not None and api_obj.res is not None:
+            response = str(api_obj.res)
+        if len(response) > 1000:
+            response = response[:1000] + '...'
+        raw_obj = init_api_json(None if api_obj is None else api_obj.res)
+        if isinstance(raw_obj, dict):
+            error_code = event_action._get_api_error_code(raw_obj)
+            error_message = raw_obj.get('message', raw_obj.get('msg'))
+            if error_code is not None:
+                response = '%s (error_code=%s)' % (response, error_code)
+            if error_message is not None:
+                response = '%s (message=%s)' % (response, str(error_message)[:500])
+        return '图片%s失败: HTTP %s 响应: %s' % (
+            qqMarkdownImageStageNames.get(stage, stage),
+            status,
+            response
+        )
+
+    def _upload_markdown_image(target_event, image_data):
+        bot_info = get_SDK_bot_info_from_Event(target_event)
+
+        # complete 的 md5 依赖直传阶段的 ETag；一旦 prepare 的 upload_id 被消耗，
+        # 后续阶段失败时只能整段重来（重新 prepare 换新 upload_id），不能只重发单步。
+        def upload_pipeline():
+            def prepare_once():
+                prepare = API.prepareMediaImage(bot_info)
+                prepare.data.file_name = image_data['file_name']
+                prepare.data.file_size = len(image_data['bytes'])
+                prepare.data.content_type = image_data['content_type']
+                prepare.data.md5 = image_data['md5']
+                prepare.data.sha1 = image_data['sha1']
+                prepare.do_api('POST')
+                return prepare
+
+            def prepare_ok(api_obj):
+                data = event_action._api_response_data(api_obj)
+                ok = (
+                    event_action._markdown_image_api_http_ok(api_obj)
+                    and data is not None
+                    and data.get('upload_id')
+                    and data.get('presigned_url')
+                )
+                return ok, data if ok else None
+
+            prepare, prepared = event_action._retry_markdown_image_api(prepare_once, prepare_ok)
+            if prepared is None:
+                return None, None, event_action._format_markdown_image_api_failure('prepare', prepare), prepare
+
+            def upload_once():
+                upload = API.uploadMediaImage(
+                    prepared['presigned_url'],
+                    image_data['content_type'],
+                    image_data['bytes']
+                )
+                upload.do_api('PUT')
+                return upload
+
+            def upload_ok(api_obj):
+                if not event_action._markdown_image_api_http_ok(api_obj):
+                    return False, None
+                try:
+                    etag = api_obj.res_headers.get('ETag')
+                except Exception:
+                    etag = None
+                if etag is None or str(etag).strip().strip('"') == '':
+                    # 文档口径：单文件直传的 ETag 即文件 md5，缺头时回退本地 md5。
+                    etag = image_data.get('md5')
+                if etag is None or str(etag).strip().strip('"') == '':
+                    return False, None
+                return True, str(etag).strip().strip('"').lower()
+
+            upload, etag = event_action._retry_markdown_image_api(
+                upload_once,
+                upload_ok,
+                # 预签名 URL 一经 PUT 就算被使用，COS 侧对已用 URL 重传行为不可靠：
+                # 5xx 时直接失败，交给外层整段重启（重新 prepare 换新 URL）。
+                should_retry=lambda api_obj: False
+            )
+            if etag is None:
+                return None, None, event_action._format_markdown_image_api_failure('upload', upload), upload
+
+            def complete_once():
+                complete = API.completeMediaImage(bot_info)
+                complete.data.upload_id = prepared['upload_id']
+                complete.data.md5 = etag
+                complete.do_api('POST')
+                return complete
+
+            def complete_ok(api_obj):
+                data = event_action._api_response_data(api_obj)
+                ok = (
+                    event_action._markdown_image_api_http_ok(api_obj)
+                    and data is not None
+                    and data.get('url')
+                    and data.get('image_id')
+                )
+                return ok, data if ok else None
+
+            complete, completed = event_action._retry_markdown_image_api(
+                complete_once,
+                complete_ok,
+                should_retry=event_action._complete_stage_retryable
+            )
+            if completed is None:
+                return (
+                    None,
+                    None,
+                    event_action._format_markdown_image_api_failure('complete', complete),
+                    complete
+                )
+            return {
+                'image_id': str(completed['image_id']),
+                'url': str(completed['url'])
+            }, None, None, complete
+
+        # 直传已占用预签名 URL 后再失败（5xx/40035003/40035006），或 complete 不可重试地失败
+        # （如 md5 比对 40035003 用尽预算），upload_id 都已失效，整段重新 prepare 再试一次。
+        # 服务端只校验扩展名与 content_type，实际内容不变，重跑是幂等的。
+        # 永久性错误（配额 40035007、格式 40035001/40035002 等）重跑也无济于事，直接失败。
+        uploaded, _, error, last_api = upload_pipeline()
+        if error is not None and event_action._should_retry_markdown_image_api(last_api):
+            event_action._log_markdown_image(target_event, '%s；重新申请上传后整段重试' % error)
+            uploaded, _, error, _ = upload_pipeline()
+        return uploaded, error
+
+    def _delete_markdown_images(target_event, image_records):
+        bot_info = get_SDK_bot_info_from_Event(target_event)
+        for image in image_records:
+            try:
+                def delete_once(image_id=image['image_id']):
+                    delete = API.deleteMediaImage(bot_info)
+                    delete.metadata.image_id = image_id
+                    delete.do_api('DELETE')
+                    return delete
+
+                delete, _ = event_action._retry_markdown_image_api(
+                    delete_once,
+                    lambda api_obj: (event_action._markdown_image_api_http_ok(api_obj), None)
+                )
+                if not event_action._markdown_image_api_http_ok(delete):
+                    event_action._log_markdown_image(
+                        target_event,
+                        '临时图片清理失败: image_id=%s，重试后仍失败 (HTTP %s)' % (
+                            image['image_id'], None if delete is None else delete.res_code
+                        )
+                    )
+            except Exception as exc:
+                event_action._log_markdown_image(
+                    target_event,
+                    '临时图片清理失败: %s' % exc
+                )
+
+    def _upload_markdown_images(target_event, local_images):
+        uploaded = {}
+        replacements = {}
+        for name, resource in local_images.items():
+            if not isinstance(name, str) or name == '':
+                return None, None, '本地图片名不能为空字符串'
+            image_data, _, error = event_action._read_markdown_image(target_event, resource)
+            if error is not None:
+                return None, list(uploaded.values()), '%s: %s' % (name, error)
+            digest = image_data['sha256']
+            if digest not in uploaded:
+                uploaded_image, error = event_action._upload_markdown_image(target_event, image_data)
+                if error is not None:
+                    return None, list(uploaded.values()), '%s: %s' % (name, error)
+                uploaded[digest] = {
+                    **uploaded_image,
+                    'width': image_data['width'],
+                    'height': image_data['height']
+                }
+            image = uploaded[digest]
+            replacements[name] = '![%s #%spx #%spx](%s)' % (
+                name,
+                image['width'], image['height'], image['url']
+            )
+        return replacements, list(uploaded.values()), None
+
+    def _markdown_image_fallback_message(content, local_images):
+        if not isinstance(content, str) or not isinstance(local_images, dict):
+            return None
+        names = sorted(local_images, key=len, reverse=True)
+        if any(not isinstance(name, str) or name == '' for name in names):
+            return None
+        pattern = re.compile(r'\{\{(' + '|'.join(re.escape(name) for name in names) + r')\}\}')
+        segments = []
+        cursor = 0
+        for match in pattern.finditer(content):
+            if match.start() > cursor:
+                segments.append(OlivOS.messageAPI.PARA.text(content[cursor:match.start()]))
+            name = match.group(1)
+            segments.append(OlivOS.messageAPI.PARA.image(local_images[name]))
+            cursor = match.end()
+        if cursor < len(content):
+            segments.append(OlivOS.messageAPI.PARA.text(content[cursor:]))
+        return OlivOS.messageAPI.Message_templet('olivos_para', segments)
+
+    def _replace_markdown_image_markers(content, replacements):
+        if not replacements:
+            return content
+        pattern = re.compile(
+            r'\{\{(' + '|'.join(re.escape(name) for name in sorted(replacements, key=len, reverse=True)) + r')\}\}'
+        )
+        return pattern.sub(lambda match: replacements[match.group(1)], content)
+
+    def _send_markdown_mixed_message(
+        target_event,
+        chat_type,
+        chat_id,
+        message,
+        reply_msg_id=None,
+        quote_msg_id=None,
+        event_id=None,
+        force_active=False
+    ):
+        content_parts = []
+        image_sources = {}
+        image_segments = []
+        has_text_content = False
+        # QQ 不支持带图片的 Markdown 消息作为引用回复：消息带 reply 段（或调用方
+        # 显式给了 quote_msg_id）就整条交回普通图文路径，由旧逻辑带引用发送。
+        if quote_msg_id is None:
+            quote_msg_id = event_action._get_message_reference_id(message)
+        if quote_msg_id is not None:
+            return None, '带引用的图文消息不走 Markdown'
+        for segment in message.data:
+            if isinstance(segment, OlivOS.messageAPI.PARA.text):
+                text_content = segment.OP()
+                content_parts.append(('text', text_content))
+                has_text_content = has_text_content or text_content.strip() != ''
+            elif isinstance(segment, OlivOS.messageAPI.PARA.at):
+                content_parts.append(('text', markdown_tag.at_para(segment, flag_qq=True)))
+                has_text_content = True
+            elif isinstance(segment, OlivOS.messageAPI.PARA.image):
+                resource = event_action._get_message_resource(segment)
+                if resource is None:
+                    return None, '图片资源为空'
+                name = 'image_%s' % len(image_segments)
+                image_sources[name] = resource
+                image_segments.append(name)
+                content_parts.append(('image', name))
+            else:
+                return None, '混发 Markdown 含不支持的媒体段: %s' % (
+                    type(segment).__name__
+                )
+        if not image_segments or not has_text_content:
+            return None, '消息不是图文混排'
+        replacements, uploaded, error = event_action._upload_markdown_images(
+            target_event,
+            image_sources
+        )
+        if error is not None:
+            event_action._delete_markdown_images(target_event, uploaded or [])
+            return None, error
+        content = ''.join(
+            replacements[value] if part_type == 'image' else value
+            for part_type, value in content_parts
+        )
+        result = event_action.create_markdown_message(
+            target_event,
+            chat_type,
+            chat_id,
+            {'content': content},
+            msg_id=reply_msg_id,
+            event_id=event_id,
+            quote_msg_id=quote_msg_id,
+            force_active=force_active
+        )
+        status = result.get('data', {}).get('http_status')
+        if result.get('active', False):
+            event_action._delete_markdown_images(target_event, uploaded)
+        elif status is None or status >= 500:
+            # 结果不确定时保留素材，避免"其实发出去了又删掉"；
+            # 素材会占用 100 张配额，需人工确认后用查询/删除接口清理。
+            event_action._log_markdown_image(
+                target_event,
+                'Markdown 发送结果不确定 (HTTP %s)，已保留临时图片；'
+                '如确认未发出，请用素材查询/删除接口 (GET /v2/media-images、'
+                'DELETE /v2/media-images/{image_id}/delete) 释放 image_id: %s' % (
+                    'n/a' if status is None else status,
+                    ', '.join(str(image.get('image_id', '?')) for image in (uploaded or [])) or '无'
+                )
+            )
+        else:
+            event_action._delete_markdown_images(target_event, uploaded)
+            event_action._log_markdown_image(
+                target_event,
+                'Markdown 发送被拒绝 (HTTP %s)，回退到原有图文发送流程' % status
+            )
+            fallback_result = event_action.send_qq_msg(
+                target_event,
+                chat_id,
+                message,
+                reply_msg_id=reply_msg_id,
+                flag_direct=chat_type == 'qq_private',
+                quote_msg_id=quote_msg_id,
+                event_id=event_id,
+                force_active=force_active,
+                allow_markdown=False
+            )
+            fallback_result.setdefault('data', {})['markdown_fallback'] = (
+                'Markdown 发送被拒绝 (HTTP %s)' % status
+            )
+            return fallback_result, None
+        return result, None
+
     def create_markdown_message(
         target_event,
         chat_type,
@@ -4229,7 +4854,9 @@ class event_action_common(object):
         event_id=None,
         keyboard=None,
         quote_msg_id=None,
-        force_verify_image_resource=None
+        force_verify_image_resource=None,
+        local_images=None,
+        force_active=False
     ):
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
         res_data['data']['chat_type'] = str(chat_type)
@@ -4238,6 +4865,18 @@ class event_action_common(object):
         if chat_type not in ['qq_group', 'qq_private', 'guild_channel', 'guild_private']:
             res_data['data']['error'] = 'unsupported chat_type'
             return res_data
+        if force_active and (msg_id is not None or event_id is not None):
+            # 互斥校验不限定 local_images：不带本地图时同样生效，
+            # 避免静默丢弃 msg_id/event_id 让调用方误以为被动回复会生效。
+            res_data['data']['error'] = 'force_active cannot be combined with msg_id or event_id'
+            return res_data
+        if local_images is not None:
+            if chat_type not in ['qq_group', 'qq_private']:
+                res_data['data']['error'] = 'local_images only supports qq_group and qq_private'
+                return res_data
+            if type(local_images) is not dict or len(local_images) == 0:
+                res_data['data']['error'] = 'local_images must be a non-empty dict'
+                return res_data
         if chat_id is None or str(chat_id) == '':
             res_data['data']['error'] = 'chat_id is required'
             return res_data
@@ -4255,6 +4894,13 @@ class event_action_common(object):
         )
         if flag_content == flag_template:
             res_data['data']['error'] = 'markdown requires either content or custom_template_id'
+            return res_data
+        keyboard_error = event_action._validate_keyboard_permissions(keyboard, chat_type)
+        if keyboard_error is not None:
+            res_data['data']['error'] = keyboard_error
+            return res_data
+        if msg_id is not None and event_id is not None:
+            res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
             return res_data
         if 'params' in markdown and type(markdown['params']) is not list:
             res_data['data']['error'] = 'markdown params must be a list'
@@ -4287,15 +4933,59 @@ class event_action_common(object):
             )
             return res_data
         markdown = copy.deepcopy(markdown)
+        fallback_markdown_content = markdown.get('content', None)
+        if local_images is not None:
+            markdown_content = markdown.get('content', None)
+            if not isinstance(markdown_content, str):
+                res_data['data']['error'] = 'local_images requires Markdown content'
+                return res_data
+            if any(
+                not isinstance(name, str)
+                or name == ''
+                or '{{%s}}' % name not in markdown_content
+                for name in local_images
+            ):
+                res_data['data']['error'] = 'every local image needs a matching {{name}} marker'
+                return res_data
+            replacements, uploaded, upload_error = event_action._upload_markdown_images(
+                target_event,
+                local_images
+            )
+            if upload_error is not None:
+                event_action._delete_markdown_images(target_event, uploaded or [])
+                event_action._log_markdown_image(
+                    target_event,
+                    '%s；回退到原有图文发送流程' % upload_error
+                )
+                fallback_message = event_action._markdown_image_fallback_message(
+                    markdown_content,
+                    local_images
+                )
+                if fallback_message is None:
+                    res_data['data']['error'] = upload_error
+                    return res_data
+                fallback_result = event_action.send_qq_msg(
+                    target_event,
+                    chat_id,
+                    fallback_message,
+                    reply_msg_id=msg_id,
+                    flag_direct=chat_type == 'qq_private',
+                    quote_msg_id=quote_msg_id,
+                    event_id=event_id,
+                    force_active=force_active,
+                    allow_markdown=False
+                )
+                fallback_result.setdefault('data', {})['markdown_fallback'] = upload_error
+                return fallback_result
+            markdown_content = event_action._replace_markdown_image_markers(
+                markdown_content,
+                replacements
+            )
+            markdown['content'] = markdown_content
+        else:
+            uploaded = []
         if force_verify_image_resource is not None:
             markdown['force_verify_image_resource'] = force_verify_image_resource
-        keyboard_error = event_action._validate_keyboard_permissions(keyboard, chat_type)
-        if keyboard_error is not None:
-            res_data['data']['error'] = keyboard_error
-            return res_data
-        if msg_id is not None and event_id is not None:
-            res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
-            return res_data
         if chat_type in ['guild_channel', 'guild_private']:
             markdown = event_action._normalize_guild_markdown(
                 markdown,
@@ -4303,13 +4993,16 @@ class event_action_common(object):
             )
 
         if chat_type in ['qq_group', 'qq_private']:
-            msg_id, event_id = event_action._resolve_qq_passive_ids(
-                target_event,
-                chat_type,
-                chat_id,
-                msg_id=msg_id,
-                event_id=event_id
-            )
+            if force_active:
+                msg_id, event_id = None, None
+            else:
+                msg_id, event_id = event_action._resolve_qq_passive_ids(
+                    target_event,
+                    chat_type,
+                    chat_id,
+                    msg_id=msg_id,
+                    event_id=event_id
+                )
             allow_active_fallback = (
                 msg_id is not None or event_id is not None
             )
@@ -4346,6 +5039,50 @@ class event_action_common(object):
             allow_active_fallback=allow_active_fallback
         )
 
+        if local_images is not None:
+            result_status = res_data.get('data', {}).get('http_status')
+            if res_data.get('active', False):
+                event_action._delete_markdown_images(target_event, uploaded)
+            elif result_status is None or result_status >= 500:
+                # 结果不确定时保留素材，避免"其实发出去了又删掉"；
+                # 素材会占用 100 张配额，需人工确认后用查询/删除接口清理。
+                event_action._log_markdown_image(
+                    target_event,
+                    'Markdown 发送结果不确定 (HTTP %s)，已保留临时图片；'
+                    '如确认未发出，请用素材查询/删除接口 (GET /v2/media-images、'
+                    'DELETE /v2/media-images/{image_id}/delete) 释放 image_id: %s' % (
+                        'n/a' if result_status is None else result_status,
+                        ', '.join(str(image.get('image_id', '?')) for image in (uploaded or [])) or '无'
+                    )
+                )
+            else:
+                event_action._delete_markdown_images(target_event, uploaded)
+                event_action._log_markdown_image(
+                    target_event,
+                    'Markdown 发送被拒绝 (HTTP %s)，回退到原有图文发送流程'
+                    % result_status
+                )
+                fallback_message = event_action._markdown_image_fallback_message(
+                    fallback_markdown_content,
+                    local_images
+                )
+                if fallback_message is not None:
+                    fallback_result = event_action.send_qq_msg(
+                        target_event,
+                        chat_id,
+                        fallback_message,
+                        reply_msg_id=msg_id,
+                        flag_direct=chat_type == 'qq_private',
+                        quote_msg_id=quote_msg_id,
+                        event_id=event_id,
+                        force_active=force_active,
+                        allow_markdown=False
+                    )
+                    fallback_result.setdefault('data', {})['markdown_fallback'] = (
+                        'Markdown 发送被拒绝 (HTTP %s)' % result_status
+                    )
+                    return fallback_result
+
         if not res_data['active'] and target_event.log_func is not None:
             response_text = str(this_msg.res) if this_msg.res is not None else 'no response'
             if len(response_text) > 1000:
@@ -4355,7 +5092,7 @@ class event_action_common(object):
                 target_event.log_func(
                     3,
                     (
-                        'OlivOS qqGuildv2SDK Markdown message response: '
+                        'OlivOS qqGuildv2SDK Markdown 消息响应: '
                         f'HTTP {response_code} {response_text}'
                     ),
                     [
@@ -5671,8 +6408,8 @@ class event_action_common(object):
         try:
             target_event.log_func(
                 3,
-                'OlivOS qqGuildv2SDK QQ media upload [%s] failed: %s' % (
-                    str(stage),
+                'OlivOS qqGuildv2SDK 富媒体上传 [%s] 失败: %s' % (
+                    qqUploadStageNames.get(str(stage), str(stage)),
                     ' | '.join(detail_parts)
                 ),
                 [
@@ -5882,6 +6619,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
         keyboard=None,
         quote_msg_id=None,
         force_verify_image_resource=None,
+        local_images=None,
+        force_active=False,
         flag_log=True
     ):
         return OlivOS.qqGuildv2SDK.event_action.create_markdown_message(
@@ -5893,7 +6632,9 @@ class inde_interface(OlivOS.API.inde_interface_T):
             event_id=event_id,
             keyboard=keyboard,
             quote_msg_id=quote_msg_id,
-            force_verify_image_resource=force_verify_image_resource
+            force_verify_image_resource=force_verify_image_resource,
+            local_images=local_images,
+            force_active=force_active
         )
 
     def create_markdown_message(
@@ -5907,7 +6648,9 @@ class inde_interface(OlivOS.API.inde_interface_T):
         quote_msg_id=None,
         flag_log=True,
         remote=False,
-        force_verify_image_resource=None
+        force_verify_image_resource=None,
+        local_images=None,
+        force_active=False
     ):
         res_data = None
         if remote:
@@ -5923,6 +6666,8 @@ class inde_interface(OlivOS.API.inde_interface_T):
                 keyboard=keyboard,
                 quote_msg_id=quote_msg_id,
                 force_verify_image_resource=force_verify_image_resource,
+                local_images=local_images,
+                force_active=force_active,
                 flag_log=flag_log
             )
         return res_data
@@ -6740,6 +7485,90 @@ class API_common(object):
                 self.op = None             # add/del
                 self.user_openids = None   # list[str], 仅 c2c
                 self.group_openids = None  # list[str], 仅 group
+
+    # ============ QQ 图片素材管理 ============
+    class prepareMediaImage(api_templet):
+        """POST /v2/media-images/prepare：申请图片直传任务。"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['media_images'] + '/prepare'
+
+        class data_T(object):
+            def __init__(self):
+                self.file_name = None
+                self.file_size = None
+                self.content_type = None
+                self.md5 = None
+                self.sha1 = None
+
+    class completeMediaImage(api_templet):
+        """POST /v2/media-images/complete：完成图片上传。"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = self.data_T()
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['media_images'] + '/complete'
+
+        class data_T(object):
+            def __init__(self):
+                self.upload_id = None
+                self.md5 = None
+
+    class getMediaImages(api_templet):
+        """GET /v2/media-images：分页查询有效图片。"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = None
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['media_images']
+
+    class deleteMediaImage(api_templet):
+        """DELETE /v2/media-images/{image_id}/delete：删除图片素材。"""
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['media_images'] + '/{image_id}/delete'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.image_id = '-1'
+
+    class uploadMediaImage(api_templet):
+        """使用 prepare 返回的预签名 URL 以 PUT 直传图片二进制。"""
+        def __init__(self, upload_url=None, content_type=None, file_data=None):
+            api_templet.__init__(self)
+            self.upload_url = upload_url
+            self.content_type = content_type
+            self.file_data = file_data
+            self.res_headers = None
+
+        def do_api(self, req_type='PUT'):
+            self.res = None
+            self.res_code = None
+            try:
+                response = req.request(
+                    'PUT', self.upload_url,
+                    headers={'Content-Type': self.content_type},
+                    data=self.file_data,
+                    timeout=qqMediaImagePutTimeout
+                )
+                self.res = response.text
+                self.res_code = response.status_code
+                self.res_headers = response.headers
+                return response.text
+            except Exception:
+                return None
 
     # ============ QQ 富媒体上传 ============
     # 名称保留以兼容已有内部引用，实际支持图片、视频、语音和文件。
