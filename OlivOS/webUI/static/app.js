@@ -4,6 +4,17 @@ const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 
+// 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
+function takeLoginTicket() {
+  const ticket = new URLSearchParams(location.hash.slice(1)).get('login_ticket');
+  if (ticket !== null) {
+    const cleanUrl = location.pathname + location.search;
+    history.replaceState(history.state, '', cleanUrl);
+  }
+  return ticket;
+}
+const startupTicket = takeLoginTicket();
+
 // 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
 // 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
 // 刻意不含 allow-same-origin（插件页与宿主 WebUI 同源，给了等于取消沙箱）与
@@ -163,8 +174,17 @@ async function api(path, options = {}) {
     throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
   if (!response.ok) {
     const authHandled = response.status === 401 || response.status === 403;
-    const message = authHandled ? authMessage ?? '' : data.error || `请求失败 (${response.status})`;
-    if (authHandled) resetLogin(message);
+    let message = data.error || `请求失败 (${response.status})`;
+    if (authHandled) {
+      // 登录请求展示具体原因；其他请求认证失效时静默退回登录页。
+      if (path !== '/api/login') {
+        message = '';
+      }
+      if (authMessage !== undefined && authMessage !== null) {
+        message = authMessage;
+      }
+      resetLogin(message);
+    }
     const error = new Error(message);
     error.status = response.status;
     error.authHandled = authHandled;
@@ -239,7 +259,7 @@ function stream(name, path, onBatch, onStatus = () => {}) {
   return entry;
 }
 
-async function login(ev, token = null) {
+async function login(ev, token = null, ticket = null) {
   ev?.preventDefault();
   const generation = ++state.authGeneration;
   state.sessionRefresh = null;
@@ -247,11 +267,19 @@ async function login(ev, token = null) {
   const submit = $('login-form').querySelector('button[type=submit]');
   submit.disabled = true;
   try {
-    state.token = token ?? $('token').value.trim();
-    const result = await api('/api/login', {
-      method: 'POST',
-      authMessage: token === null ? '认证失败' : '',
-    });
+    state.token = token ?? '';
+    const loginOptions = { method: 'POST' };
+    if (token !== null) {
+      // 缓存凭据已放入认证头；失效时静默退回登录页。
+      loginOptions.authMessage = '';
+    } else if (ticket !== null) {
+      // 托盘打开网页时，兑换一次性凭证。
+      loginOptions.body = { ticket };
+    } else {
+      // 手动登录按原样提交密码，保留用户输入的空格。
+      loginOptions.body = { password: $('token').value };
+    }
+    const result = await api('/api/login', loginOptions);
     state.token = result.browser_token;
     cachedToken(state.token);
     state.cachedLogin = cachedToken() === state.token;
@@ -2002,6 +2030,12 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted && state.token) login(null, state.token);
 });
+window.addEventListener('hashchange', () => {
+  const ticket = takeLoginTicket();
+  if (ticket !== null) {
+    login(null, null, ticket);
+  }
+});
 {
   const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
@@ -2024,10 +2058,14 @@ window.addEventListener('pageshow', (ev) => {
     }
   });
   const savedToken = cachedToken();
-  if (savedToken?.startsWith('webui.')) login(null, savedToken);
-  // 旧版缓存的是长期 Token，升级后需要手动登录一次才能换成本次运行的凭据。
-  else if (savedToken) resetLogin();
-  else {
+  if (startupTicket !== null) {
+    login(null, null, startupTicket);
+  } else if (savedToken?.startsWith('webui.')) {
+    login(null, savedToken);
+  } else if (savedToken) {
+    // 旧版缓存的是长期 Token，升级后需要手动登录一次。
+    resetLogin();
+  } else {
     $('loading').hidden = true;
     $('login').hidden = false;
   }

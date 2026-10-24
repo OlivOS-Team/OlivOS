@@ -22,6 +22,7 @@ import json
 import pystray
 import tkinter
 import tkinter.messagebox
+import threading
 import re
 import datetime
 import webbrowser
@@ -204,6 +205,18 @@ class dock(OlivOS.API.Proc_templet):
                         self.updateAccountList(flagInit=True)
                         self.mergeAccountList()
                         self.updateShallowMenuList()
+                    elif 'webui_password_reset' == rx_packet_data.key['data']['action']:
+                        self.showWebUIPasswordReset()
+                    elif 'webui_local_result' == rx_packet_data.key['data']['action']:
+                        result = rx_packet_data.key['data']
+                        if result.get('reset'):
+                            self.UIData['webui_password_reset_active'] = False
+                        if result.get('url'):
+                            webbrowser.open(result['url'])
+                        elif result.get('error'):
+                            tkinter.messagebox.showerror('WebUI', result['error'], parent=self.UIObject['main_tk'])
+                        else:
+                            tkinter.messagebox.showinfo('WebUI', result['message'], parent=self.UIObject['main_tk'])
                     elif 'update_data' == rx_packet_data.key['data']['action']:
                         self.UIData.update(rx_packet_data.key['data']['data'])
                         self.updateShallowMenuList()
@@ -1223,9 +1236,172 @@ class dock(OlivOS.API.Proc_templet):
         self.sendControlEvent('exit_total')
 
     def openWebUI(self):
-        url = OlivOS.webUI.serverAPI.browser_url(self.webui_root)
-        if url:
-            webbrowser.open(url)
+        def open_local():
+            try:
+                result = {'url': OlivOS.webUI.serverAPI.local_login_url(self.webui_root)}
+            except (OSError, ValueError):
+                result = {'error': '无法连接 WebUI 本机管理入口，请确认 WebUI 已启动'}
+            self.sendRxEvent('send', {'data': dict(result, action='webui_local_result')})
+        threading.Thread(target=open_local, daemon=True).start()
+
+    def changeWebUIPassword(self):
+        self.sendRxEvent('send', {'data': {'action': 'webui_password_reset'}})
+
+    def askWebUIPassword(self):
+        """返回 (新密码, 确认密码)，取消或关闭返回 None。"""
+        color = dictColorContext
+        minimum = OlivOS.webUI.authAPI.PASSWORD_MIN_LENGTH
+        parent = self.UIObject['main_tk']
+        dialog = tkinter.Toplevel(parent)
+        dialog.title('修改 WebUI 密码')
+        dialog.resizable(width=False, height=False)
+        width, height = 460, 286
+        dialog.geometry('%dx%d+%d+%d' % (
+            width, height,
+            max(0, (dialog.winfo_screenwidth() - width) // 2),
+            max(0, (dialog.winfo_screenheight() - height) // 3),
+        ))
+        dialog.configure(bg=color['color_001'])
+        dialog.transient(parent)
+        dialog.grab_set()
+        result = {}
+        status = tkinter.StringVar(dialog, value='密码至少需要 %d 个字符。' % minimum)
+
+        def close(value=None):
+            result['value'] = value
+            try:
+                dialog.grab_release()
+            except tkinter.TclError:
+                pass
+            dialog.destroy()
+
+        def dialog_button(text, command, x, width=130):
+            node = tkinter.Button(
+                dialog, text=text, command=command, bd=0,
+                activebackground=color['color_002'], activeforeground=color['color_001'],
+                bg=color['color_003'], fg=color['color_004'], relief='groove'
+            )
+            node.bind('<Enter>', lambda event: node.configure(bg=color['color_006']))
+            node.bind('<Leave>', lambda event: node.configure(bg=color['color_003']))
+            node.place(x=x, y=232, width=width, height=34)
+            return node
+
+        def password_input(row):
+            """密码框与可见性切换按钮；切换只影响显示，不读出也不改动输入值。"""
+            value = tkinter.StringVar(dialog)
+            entry = tkinter.Entry(
+                dialog, textvariable=value, show='*', bd=0,
+                bg=color['color_004'], fg=color['color_005'], insertbackground=color['color_005'],
+                font=('TkDefaultFont 11')
+            )
+            entry.place(x=100, y=row, width=286, height=30)
+            canvas = tkinter.Canvas(dialog, width=30, height=30, bg=color['color_001'],
+                                    highlightthickness=0, cursor='hand2')
+            canvas.place(x=392, y=row, width=30, height=30)
+            state = {'visible': False}
+
+            def draw_eye():
+                visible = state['visible']
+                stroke = color['color_002'] if visible else color['color_004']
+                canvas.delete('all')
+                canvas.create_rectangle(0, 0, 30, 30, outline='', fill=color['color_001'])
+                canvas.create_oval(3, 9, 27, 21, outline=stroke, width=2)
+                canvas.create_oval(11, 12, 19, 18, fill=stroke, outline=stroke)
+                if visible:
+                    # 睁眼加斜杠表示当前为明文，再点一次恢复遮蔽。
+                    canvas.create_line(3, 25, 27, 5, fill=stroke, width=2)
+
+            def toggle(event=None):
+                state['visible'] = not state['visible']
+                entry.configure(show='' if state['visible'] else '*')
+                draw_eye()
+                status.set('密码已显示，注意周围环境。' if state['visible'] else '密码已隐藏。')
+                entry.focus_set()
+
+            canvas.bind('<Button-1>', toggle)
+            draw_eye()
+            return entry, value
+
+        def refresh(event=None):
+            password = password_value.get()
+            if confirmation_value.get() and password != confirmation_value.get():
+                status.set('两次输入的密码不一致。')
+            elif password and len(password) < minimum:
+                status.set('还需要 %d 个字符（至少 %d 个）。' % (minimum - len(password), minimum))
+            else:
+                status.set('密码至少需要 %d 个字符。' % minimum)
+
+        def submit(event=None):
+            password = password_value.get()
+            confirmation = confirmation_value.get()
+            error = OlivOS.webUI.authAPI.password_validation_error(password, confirmation)
+            if error is not None:
+                status.set(error)
+                target = password_entry if len(password) < minimum else confirmation_entry
+                target.focus_set()
+                if target is confirmation_entry:
+                    target.select_range(0, tkinter.END)
+                return
+            close((password, confirmation))
+
+        tkinter.Label(
+            dialog, text='修改 WebUI 密码', bg=color['color_001'], fg=color['color_004'],
+            anchor='w', font=('TkDefaultFont 13 bold')
+        ).place(x=20, y=14, width=420, height=26)
+        tkinter.Label(
+            dialog, text='修改后现有登录立即失效；忘记密码可从托盘或终端重置。',
+            bg=color['color_001'], fg=color['color_002'], justify='left', anchor='w'
+        ).place(x=20, y=44, width=420, height=22)
+        tkinter.Label(
+            dialog, text='新密码', bg=color['color_001'], fg=color['color_004'], anchor='w'
+        ).place(x=20, y=80, width=76, height=30)
+        password_entry, password_value = password_input(80)
+        tkinter.Label(
+            dialog, text='确认密码', bg=color['color_001'], fg=color['color_004'], anchor='w'
+        ).place(x=20, y=126, width=76, height=30)
+        confirmation_entry, confirmation_value = password_input(126)
+        tkinter.Label(
+            dialog, textvariable=status, bg=color['color_001'], fg=color['color_002'],
+            justify='left', anchor='nw', wraplength=420
+        ).place(x=20, y=170, width=420, height=44)
+        dialog_button('确认修改', submit, 95, 130)
+        dialog_button('取消', close, 245, 120)
+        for widget in (password_entry, confirmation_entry):
+            widget.bind('<KeyRelease>', refresh)
+            widget.bind('<Return>', submit)
+        dialog.bind('<Escape>', lambda event: close())
+        dialog.protocol('WM_DELETE_WINDOW', close)
+        try:
+            dialog.iconbitmap('./resource/tmp_favoricon.ico')
+        except tkinter.TclError:
+            # 图标缺失只影响窗口外观，不能因此阻止修改密码。
+            pass
+        password_entry.focus_set()
+        dialog.wait_window()
+        return result.get('value')
+
+    def showWebUIPasswordReset(self):
+        if self.UIData.get('webui_password_reset_active'):
+            return
+        self.UIData['webui_password_reset_active'] = True
+        try:
+            answer = self.askWebUIPassword()
+        except tkinter.TclError:
+            answer = None
+        if not answer:
+            self.UIData['webui_password_reset_active'] = False
+            return
+        password = answer[0]
+
+        def reset_local():
+            try:
+                record = OlivOS.webUI.authAPI.password_record(password)
+                online = OlivOS.webUI.authAPI.set_local_password(self.webui_root, record)
+                result = {'message': '密码已更新，原有登录已失效。' if online else '密码已更新，下次启动 WebUI 生效。'}
+            except (OSError, ValueError) as error:
+                result = {'error': '密码重置失败：%s' % (str(error) or '请检查本机管理入口和认证文件权限')}
+            self.sendRxEvent('send', {'data': dict(result, action='webui_local_result', reset=True)})
+        threading.Thread(target=reset_local, daemon=True).start()
 
     def sendPluginControlEventFunc(self, pluginNameSpace, eventName):
         def resFunc():
@@ -2425,6 +2601,7 @@ class shallow(object):
                 self.root.webui_root
             ):
                 list_new.append(pystray.MenuItem('打开 WebUI', lambda: self.root.openWebUI(), default=True))
+                list_new.append(pystray.MenuItem('修改密码', lambda: self.root.changeWebUIPassword()))
             for item_this in data:
                 if not type(item_this) is list:
                     pass

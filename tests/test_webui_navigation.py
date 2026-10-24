@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 import OlivOS
-from OlivOS.webUI import resourceAPI, serverAPI
+from OlivOS.webUI import resourceAPI
+from webui_test_support import make_host
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -43,8 +44,8 @@ window.addEventListener('message', event => {
 
 @pytest.fixture
 def navigation_host(tmp_path):
-    host = serverAPI.server(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
-                            server_conf={'host': '127.0.0.1', 'port': 0})
+    host = make_host(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
+                     server_conf={'host': '127.0.0.1', 'port': 0})
     for namespace, name, entries in [
         ('multi', '多页面插件', [('首页', 'webui/index.html'), ('配置管理', 'webui/settings/index.html'),
                             ('工具面板', 'webui/tools/index.html')]),
@@ -140,7 +141,7 @@ def browser(navigation_host, tmp_path):
 
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
-        find('#token').send_keys(navigation_host.token)
+        find('#token').send_keys(navigation_host.test_password)
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
         yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select,

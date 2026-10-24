@@ -70,7 +70,7 @@ python script/coverage_summary.py test-results/coverage.json
 ```
 
 CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），任何一个前置阶段失败后面都不会跑。
-`lint.yml` 会额外执行 `python ./script/embed_webui.py` 并 `git diff --exit-code -- OlivOS/webUI/staticData.py`。
+`staticData.py` 是不入 Git 的打包回退生成物；前端源码可直接服务，打包前运行 `script/embed_webui.py`。
 
 ## 3. 仓库结构
 
@@ -90,12 +90,12 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 | `OlivOS/core/{web,L10N,info,inlineData}` | 更新检查与 web 工具、本地化、版本常量、内嵌二进制资源（`inlineData/data.py` 勿手改）。 |
 | `OlivOS/adapter/*` | 具体协议接入：SDK 事件映射、协议 API、连接/会话进程。 |
 | `OlivOS/userModule/UserConfDB.py` | 插件配置数据库（SQLite），按插件 namespace 建表。 |
-| `OlivOS/webUI/*` | 浏览器 UI 后端（Flask + WebSocket + gevent）、页面资源缓存、`staticData.py`（生成物）。 |
+| `OlivOS/webUI/*` | 浏览器 UI 后端（Flask REST + aiohttp HTTP/WebSocket）、页面资源缓存、`staticData.py`（生成物）。 |
 | `OlivOS/nativeGUI/*` | Windows 原生 GUI（Tk 终端、托盘、pywebview）。 |
 | `OlivOS/libBooter/*` | Windows 下启动/管理外部协议程序（NapCat、go-cqhttp 等）。 |
 | `OlivOS/thirdPartyModule/*` | 内置第三方实现（blivedm、mhyVilaProto）；不基于 PyPI 引入的第三方模块统一放这里，flake8 与覆盖率均排除。 |
 | `plugin/{app,conf,data,tmp}` | 插件目录；`app` 放源码或 `.opk`，运行期数据在 `data/<namespace>/`。 |
-| `conf/` | `account.json`、`config.json`（补丁配置）；`basic.json`、`webui_token.txt` 由运行期生成。 |
+| `conf/` | `account.json`、`config.json`（补丁配置）；`basic.json`、`webui_auth.json` 由运行期生成，旧 `webui_token.txt` 首次升级时迁移。 |
 | `script/` | 打包、flake8 检查、WebUI 资源内嵌、覆盖率汇总脚本。 |
 | `tests/` | pytest 功能测试，策略见 `tests/README.md`。 |
 | `hook/` | PyInstaller 运行时 hook。 |
@@ -295,13 +295,18 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
   `model_type` / `server` / `extends` / `debug`）；字段合法性由 `accountMetadataAPI` 约束，
   账号读取/保存走 `accountAPI.Account.load/save`，不要自己解析 JSON 后落盘。
 - WebUI 监听地址可由环境变量覆盖（`OLIVOS_WEBUI_HOST` / `OLIVOS_WEBUI_PORT`，见
-  `webUI/serverAPI.apply_environment_config`）；token 文件默认 `conf/webui_token.txt`。
+  `webUI/serverAPI.apply_environment_config`）；密码记录默认 `conf/webui_auth.json`（scrypt 盐和哈希）。
+- 旧 `token_path` 仅用于迁移；新位置由 `auth_path` 指定。密码只在 `/api/login` 验证，API/WS 使用运行期浏览器凭据，
+  不再校验 Origin/Host。托盘/`--reset-webui-password` 通过用户专用本机 IPC 重置，立即撤销所有旧登录。
+  不向普通日志输出密码；首次迁移/生成只在本机交互界面显示。无交互界面的新安装须先本机重置。
+  新设置的密码至少 8 个字符（`authAPI.PASSWORD_MIN_LENGTH`）；迁移历史令牌时不校验强度，短令牌仍可登录。
+  认证文件读取前会收紧到当前用户专用权限，无法收紧则拒绝使用。WebUI 无 TLS，绑定非回环地址时启动日志会给明文告警。
 - 运行期路径都是相对当前工作目录：`./conf`、`./plugin/*`、`./data/*`、`./logfile`、`./lib/*`。
   必须在仓库根目录执行 `python main.py`；测试通过 `tests/conftest.py` 自动 chdir 到临时目录，
   不要在测试或代码里写死仓库绝对路径。
 - 只 `import OlivOS` 就会创建 `./plugin/app`、`./plugin/tmp`、`./lib/Lib`、`./lib/DLLs`
   等目录（`pluginAPI` 的模块级副作用）。这是既有行为，不要“优化”掉，也不要在仓库外胡乱运行。
-- 不要提交本地运行产物与凭据：`conf/basic.json`、`conf/webui_token.txt`、`conf/*.webui-backup`、
+- 不要提交本地运行产物与凭据：`conf/basic.json`、`conf/webui_token.txt`、`conf/webui_auth.json*`、`conf/*.webui-backup`、
   `logfile/*`、`data/`、`plugin/{app,conf,data,tmp}/*`、`test-results/`、`flake8_output.log`。
 
 ## 9. 版本与兼容性
@@ -390,9 +395,9 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 | adapter / SDK / 事件映射 / 消息 | `python -m pytest tests/test_sdk_events.py tests/test_adapters.py tests/test_messages.py` |
 | 插件加载、调度、插件 WebUI 资源 | `python -m pytest tests/test_plugin_dispatch.py tests/test_opk_webui_lifecycle.py tests/test_webui_plugin_template.py` |
 | 启动、配置合并、账号 | `python -m pytest tests/test_boot_and_metadata.py tests/test_accounts.py tests/test_legacy_config.py` |
-| WebUI | `python -m pytest tests/test_webui.py tests/test_webui_auth.py tests/test_webui_navigation.py tests/test_webui_environment.py`（浏览器用例加 `-m browser` 与环境变量） |
+| WebUI | `python -m pytest tests/test_webui.py tests/test_webui_auth.py tests/test_webui_navigation.py tests/test_webui_environment.py tests/test_webui_passwords.py tests/test_native_webui_passwords.py`（浏览器用例加 `-m browser` 与环境变量） |
 | 日志 / 原生终端 / 原生账号 | `python -m pytest tests/test_logging.py tests/test_native_terminal.py tests/test_native_accounts.py` |
-| `OlivOS/webUI/static/*` | `python script/embed_webui.py` 后提交重新生成的 `OlivOS/webUI/staticData.py`（CI 会校验无 diff） |
+| `OlivOS/webUI/static/*` | `python script/embed_webui.py` 并核对生成资源；`OlivOS/webUI/staticData.py` 保持忽略，不提交 |
 
 注意事项：
 

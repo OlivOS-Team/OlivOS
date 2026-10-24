@@ -51,6 +51,19 @@ if __name__ == '__main__':
     try:
         import OlivOS
 
+        if '--reset-webui-password' in sys.argv[1:]:
+            if sys.argv[1:] != ['--reset-webui-password']:
+                print('用法：在对应实例目录执行 main.py --reset-webui-password', file=sys.stderr)
+                sys.exit(2)
+            try:
+                OlivOS.webUI.authAPI.reset_command()
+            except (OSError, ValueError, EOFError, KeyboardInterrupt) as error:
+                # 交互重置不启动机器人，不生成可能包含输入上下文的异常日志。
+                message = '密码重置已取消。' if isinstance(error, (EOFError, KeyboardInterrupt)) else str(error)
+                print(message, file=sys.stderr)
+                sys.exit(2)
+            sys.exit(0)
+
         if not os.path.exists('./conf'):
             os.makedirs('./conf')
         OlivOS.bootAPI.Entity(
@@ -58,7 +71,7 @@ if __name__ == '__main__':
             patch_conf='./conf/config.json'
         ).start()
     except SystemExit as error:
-        if error.code is not None and error.code != 0:
+        if error.code is not None and error.code != 0 and '--reset-webui-password' not in sys.argv[1:]:
             report_startup_error()
         raise
     except Exception:

@@ -33,6 +33,7 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import pageAPI, serverAPI
+from webui_test_support import make_host
 
 
 def account(account_id=10001):
@@ -50,8 +51,8 @@ def account(account_id=10001):
 @pytest.fixture
 def host(tmp_path):
     bot = account()
-    service = serverAPI.server(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
-                               bot_info_dict={bot.hash: bot})
+    service = make_host(root_path=tmp_path, rx_queue=queue.Queue(), control_queue=queue.Queue(),
+                        bot_info_dict={bot.hash: bot})
     service.account_path.parent.mkdir(parents=True, exist_ok=True)
     OlivOS.accountAPI.Account.save(str(service.account_path), service, service.accounts)
     yield service
@@ -61,7 +62,7 @@ def host(tmp_path):
 @pytest.fixture
 def client(host):
     client = host.app.test_client()
-    client.environ_base['HTTP_X_AUTH_TOKEN'] = host.token
+    client.environ_base['HTTP_X_AUTH_TOKEN'] = host.test_token
     return client
 
 
@@ -77,13 +78,13 @@ def test_auth_and_rate_limit(host):
         assert client.get('/api/status').status_code == 401
     assert client.get('/api/status').status_code == 429
     host.failures.clear()
-    good = {'X-Auth-Token': host.token}
+    good = {'X-Auth-Token': host.test_token}
     assert client.get('/api/status', headers=good).status_code == 200
-    assert client.get('/api/status', headers={**good, 'Origin': 'https://foreign.invalid'}).status_code == 403
+    assert client.get('/api/status', headers={**good, 'Origin': 'https://foreign.invalid'}).status_code == 200
     response = client.get('/api/status', headers=good)
     assert 'Access-Control-Allow-Origin' not in response.headers
     assert response.headers['Cache-Control'] == 'no-store'
-    assert host.token not in response.get_data(as_text=True)
+    assert host.test_token not in response.get_data(as_text=True)
 
 
 @pytest.mark.parametrize('path', [
@@ -102,23 +103,26 @@ def test_account_secrets_require_auth_and_are_not_cached(host, client, path):
     assert response.headers['Cache-Control'] == 'no-store'
 
 
-def test_token_persisted_not_regenerated(host):
-    other = serverAPI.server(root_path=host.root)
-    assert other.token == host.token
-    assert (host.root / 'conf/webui_token.txt').is_file()
+def test_password_persisted_not_regenerated(host):
+    other = make_host(root_path=host.root)
+    assert other.credentials == host.credentials
+    assert other.test_token != host.test_token
+    assert (host.root / 'conf/webui_auth.json').is_file()
 
 
 @pytest.mark.parametrize('token', ['1', '123456789'])
-def test_user_token_can_be_short(tmp_path, token):
+def test_user_token_can_be_short(tmp_path, token, monkeypatch):
+    monkeypatch.setattr(serverAPI.authAPI, 'display_password', lambda *args, **kwargs: True)
     token_path = tmp_path / 'conf/webui_token.txt'
     token_path.parent.mkdir(parents=True)
     token_path.write_text(token, encoding='utf-8')
     service = serverAPI.server(root_path=tmp_path)
     try:
         client = service.app.test_client()
-        assert client.get('/api/status', headers={'X-Auth-Token': token}).status_code == 200
+        assert client.post('/api/login', json={'password': token}).status_code == 200
+        assert client.get('/api/status', headers={'X-Auth-Token': token}).status_code == 401
         assert client.get('/api/status', headers={'X-Auth-Token': 'wrong'}).status_code == 401
-        assert token_path.read_text(encoding='utf-8') == token
+        assert not token_path.exists()
     finally:
         service.on_terminate()
 
@@ -135,6 +139,7 @@ def test_empty_token_does_not_authorize_missing_credentials(tmp_path, token):
         assert client.get('/api/status', headers={'X-Auth-Token': ''}).status_code == 401
         # WebSocket 缺失凭据同样经过此认证入口。
         assert service.authenticate('', '127.0.0.1') == 401
+        assert service.error is not None
         assert token_path.read_text(encoding='utf-8') == token
     finally:
         service.on_terminate()
@@ -146,10 +151,13 @@ def test_legacy_token_is_not_used(tmp_path, legacy_path):
     legacy.parent.mkdir(parents=True)
     old_token = secrets.token_urlsafe(32)
     legacy.write_text(old_token, encoding='utf-8')
-    service = serverAPI.server(root_path=tmp_path)
-    assert service.token != old_token
+    service = make_host(root_path=tmp_path)
+    assert service.test_token != old_token
     assert legacy.read_text(encoding='utf-8') == old_token
-    assert (tmp_path / 'conf/webui_token.txt').read_text(encoding='utf-8') == service.token
+    assert (tmp_path / 'conf/webui_auth.json').is_file()
+    assert not (tmp_path / 'conf/webui_token.txt').exists()
+    # 旧令牌不能作为任何形式的凭据继续使用。
+    assert service.app.test_client().get('/api/status', headers={'X-Auth-Token': old_token}).status_code == 401
     service.on_terminate()
 
 
@@ -161,8 +169,8 @@ def test_logo_is_available_before_login(host):
     logo = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static/logo.png'
     assert response.data == logo.read_bytes()
     html = client.get('/').get_data(as_text=True)
-    assert 'conf/webui_token.txt' in html
-    assert html.count('class="brand-logo"') == 2
+    # 登录页不能泄露凭据文件的位置。
+    assert 'conf/webui_token.txt' not in html and 'conf/webui_auth.json' not in html
 
 
 def test_all_rest_routes(client, host):
@@ -610,7 +618,10 @@ def test_account_reads_are_quiet_and_still_detect_external_changes(client, host,
     latest = client.get('/api/accounts').json
     assert latest['revision'] != initial['revision'] and latest['account'][0]['debug']
     assert not next(iter(host.accounts.values())).debug_mode
-    assert not messages and host.Proc_info.control_queue.empty()
+    # HTTP 访问日志正常记录；读账号不能产生存储层日志或触发配置写入。
+    assert all(message[1].startswith('WebUI HTTP ') for message in messages)
+    assert host.Proc_info.control_queue.empty()
+    messages.clear()
     pageAPI._AccountReadLogger(host).log(3, 'warning')
     assert messages == [(3, 'warning')]
     host.account_path.write_text('broken', encoding='utf-8')
@@ -957,21 +968,24 @@ def test_tray_default_opens_webui(monkeypatch):
         webui_root=str(Path.cwd()),
         UIData={'shallow_menu_list': [['打开终端', lambda: calls.append('terminal')]]},
         openWebUI=lambda: calls.append('webui'),
+        changeWebUIPassword=lambda: calls.append('reset'),
     )
     monkeypatch.setattr(serverAPI, 'browser_url', lambda root: 'http://127.0.0.1:20480')
     tray = OlivOS.nativeWinUIAPI.shallow('test', '', root)
     tray.refreshData()
     menu = tray.UIObject['shallow_menu']
-    assert [item.text for item in menu if item.default] == ['打开 WebUI']
+    # WebUI 入口注入两项：默认项打开 WebUI，第二项修改密码，其后才是主菜单。
+    items = list(menu)
+    assert [item.default for item in items] == [True, False, False]
     menu(None)
     assert calls == ['webui']
-    terminal = next(item for item in menu if item.text == '打开终端')
-    assert not terminal.default
-    terminal(None)
+    items[2](None)
     assert calls == ['webui', 'terminal']
+    items[1](None)
+    assert calls == ['webui', 'terminal', 'reset']
     monkeypatch.setattr(serverAPI, 'browser_url', lambda root: None)
     tray.refreshData()
-    assert [item.text for item in tray.UIObject['shallow_menu']] == ['打开终端']
+    assert len(list(tray.UIObject['shallow_menu'])) == 1
 
 
 @pytest.fixture
@@ -1075,7 +1089,7 @@ def test_webui_disconnects_do_not_break_the_listener(live_host):
             key = base64.b64encode(os.urandom(16)).decode()
             request = (f"GET /ws/logs HTTP/1.1\r\nHost: 127.0.0.1:{host.config['port']}\r\n"
                        'Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\n'
-                       f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Protocol: olivos, token.{host.token}\r\n\r\n')
+                       f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Protocol: olivos, token.{host.test_token}\r\n\r\n')
             connection.sendall(request.encode())
             assert connection.recv(4096).startswith(b'HTTP/1.1 101')
             host.publish('logs', {'text': f'reset-{index}', 'level': 2})
@@ -1097,12 +1111,12 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
         async with aiohttp.ClientSession() as client:
             async with client.get(url + '/api/health') as response:
                 assert response.status == 200 and (await response.json())['status'] == 'OK'
-            async with client.post(url + '/api/login', headers={'X-Auth-Token': host.token}) as response:
+            async with client.post(url + '/api/login', headers={'X-Auth-Token': host.test_token}) as response:
                 assert response.status == 200
             host.publish('events', {'type': 'open_page', 'url': 'https://example.invalid/old'})
-            async with client.post(url + '/api/login', headers={'X-Auth-Token': host.token}) as response:
+            async with client.post(url + '/api/login', headers={'X-Auth-Token': host.test_token}) as response:
                 login_state = await response.json()
-            token = login_state['browser_token'] if browser_login else host.token
+            token = login_state['browser_token'] if browser_login else host.test_token
             events = url + f"/ws/events?session={login_state['session']}&since={login_state['cursor']}"
             async with client.ws_connect(events, protocols=['olivos', 'token.' + token]) as ws:
                 assert (await ws.receive_json(timeout=2))['items'] == []
@@ -1110,9 +1124,9 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
                 assert [item['type'] for item in (await ws.receive_json(timeout=2))['items']] == ['plugins']
             with pytest.raises(aiohttp.WSServerHandshakeError):
                 await client.ws_connect(url + '/ws/logs')
-            with pytest.raises(aiohttp.WSServerHandshakeError):
-                await client.ws_connect(url + '/ws/logs', protocols=['olivos', 'token.' + token],
-                                        origin='https://foreign.invalid')
+            async with client.ws_connect(url + '/ws/logs', protocols=['olivos', 'token.' + token],
+                                         origin='https://foreign.invalid') as ws:
+                assert (await ws.receive_json(timeout=2))['type'] == 'history'
             async with client.ws_connect(url + '/ws/logs', protocols=['olivos', 'token.' + token]) as ws:
                 first = await ws.receive_json(timeout=2)
                 assert first['type'] == 'history' and first['items'][0]['text'] == 'history'
@@ -1142,6 +1156,32 @@ def test_live_http_ws_auth_history_and_stdin(live_host, browser_login):
                 await ws.send_str('not json')
                 assert (await ws.receive_json(timeout=2))['type'] == 'error'
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('origin,status,message', [
+    (None, 401, '未提供登录凭据'),
+    ('https://public.example', 401, '未提供登录凭据'),
+])
+def test_live_websocket_authentication_diagnostics(live_host, monkeypatch, origin, status, message):
+    records = []
+    monkeypatch.setattr(live_host, 'log', lambda *args: records.append(args))
+
+    async def scenario():
+        url = f"http://127.0.0.1:{live_host.config['port']}/ws/logs"
+        async with aiohttp.ClientSession() as client:
+            headers = {'Origin': origin} if origin else {}
+            async with client.get(url + '?session=ws-fixture-secret', headers=headers) as response:
+                assert response.status == status and message in (await response.json())['error']
+            entry = json.loads(records[-1][1].removeprefix('WebUI HTTP '))
+            assert entry['status'] == status and message in entry['error'] and records[-1][0] == 3
+            rejected_count = len(records)
+            protocols = ['olivos', 'token.' + live_host.test_token]
+            async with client.ws_connect(url, protocols=protocols, origin=origin) as ws:
+                await ws.receive_json(timeout=2)
+                assert len(records) == rejected_count
+
+    asyncio.run(scenario())
+    assert live_host.test_token not in repr(records) and 'ws-fixture-secret' not in repr(records)
 
 
 def test_account_update_reconciles_terminal_models(host):

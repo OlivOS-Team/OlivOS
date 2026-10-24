@@ -29,7 +29,7 @@ from collections import deque
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import abort, jsonify, request, send_file, send_from_directory
+from flask import abort, g, jsonify, request, send_file, send_from_directory
 
 import OlivOS
 
@@ -480,14 +480,15 @@ def register_routes(host):
         authority = request.host.lower().encode('utf-8')
         return 'olivos_webui_' + hashlib.sha256(authority).hexdigest()[:16]
 
-    def session_response(session):
-        response = jsonify(session=session, cursor=host.sequence, browser_token=host.browser_token)
+    def session_response(session, browser_token):
+        response = jsonify(session=session, cursor=host.sequence, browser_token=browser_token)
         response.set_cookie(cookie_name(), session, httponly=True, samesite='Strict',
                             secure=request.is_secure, path='/plugin/', max_age=12 * 3600)
         return response
 
     @app.before_request
     def authorize():
+        g.webui_started_at = time.monotonic()
         if request.path == '/api/health':
             return None
         if request.path.startswith('/plugin/'):
@@ -501,10 +502,27 @@ def register_routes(host):
                 return jsonify(error='请先登录 WebUI'), 401
             return None
         if request.path.startswith('/api/'):
-            status = host.authenticate(request.headers.get('X-Auth-Token', ''), request.remote_addr,
-                                       request.headers.get('Origin'), request.host)
+            token = request.headers.get('X-Auth-Token', '')
+            password = ticket = None
+            if request.path == '/api/login' and request.method == 'POST':
+                if request.content_length and not request.is_json:
+                    return jsonify(error='登录请求必须使用 application/json'), 415
+                body = request.get_json(silent=True) if request.is_json else {}
+                if not isinstance(body, dict) or ('password' in body and 'ticket' in body):
+                    return jsonify(error='登录请求格式不正确'), 400
+                password = body.get('password')
+                ticket = body.get('ticket')
+            with host.lock:
+                status = host.authenticate(token, request.remote_addr, password=password, ticket=ticket)
+                g.webui_auth_revision = host.credentials['revision'] if host.credentials else None
             if status != 200:
-                response = jsonify(error='尝试过多，请一分钟后重试' if status == 429 else '认证失败')
+                if ticket is not None and status != 429:
+                    g.webui_auth_error = '一次性登录凭证无效、已使用或已过期，请从托盘重新打开 WebUI'
+                elif password is not None and status != 429:
+                    g.webui_auth_error = 'WebUI 密码不正确，请重新输入；忘记密码可从本机托盘或终端重置'
+                else:
+                    g.webui_auth_error = host.authentication_error(status, token)
+                response = jsonify(error=g.webui_auth_error)
                 if status == 429:
                     response.headers['Retry-After'] = '60'
                 return response, status
@@ -512,6 +530,9 @@ def register_routes(host):
 
     @app.after_request
     def headers(response):
+        host.log_access(request.method, request.url_rule.rule if request.url_rule else '<unmatched>',
+                        response.status_code, request.remote_addr, g.webui_started_at,
+                        getattr(g, 'webui_auth_error', None), request.headers.get('Origin'), request.host)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
@@ -557,8 +578,13 @@ def register_routes(host):
     @app.post('/api/login')
     def login():
         with host.lock:
+            if g.webui_auth_revision != host.credentials['revision']:
+                return jsonify(error='密码已更新，请重新登录'), 401
+            token = request.headers.get('X-Auth-Token', '')
+            if not host.browser_valid(token):
+                token = host.new_browser_token()
             session = host.new_session()
-            return session_response(session)
+            return session_response(session, token)
 
     @app.post('/api/session')
     def renew_session():
@@ -566,17 +592,23 @@ def register_routes(host):
         body = request.get_json(silent=True) or {}
         session = body.get('session') if isinstance(body, dict) else None
         with host.lock:
+            if g.webui_auth_revision != host.credentials['revision']:
+                return jsonify(error='密码已更新，请重新登录'), 401
+            token = request.headers.get('X-Auth-Token', '')
+            if not host.renew_browser_token(token):
+                return jsonify(error='浏览器登录凭据已失效，请使用 WebUI 密码重新登录'), 401
             if isinstance(session, str) and session in host.sessions:
                 host.sessions[session] = time.monotonic() + 12 * 3600
             else:
                 session = host.new_session()
-            return session_response(session)
+            return session_response(session, token)
 
     @app.post('/api/logout')
     def logout():
         body = request.get_json(silent=True) or {}
         with host.lock:
             host.sessions.pop(body.get('session'), None)
+            host.browser_tokens.pop(host.credential_key(request.headers.get('X-Auth-Token', '')), None)
         response = jsonify(ok=True)
         response.delete_cookie(cookie_name(), path='/plugin/')
         return response

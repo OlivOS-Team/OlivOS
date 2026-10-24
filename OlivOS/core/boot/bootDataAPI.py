@@ -182,6 +182,7 @@ default_Conf = {
                 "host": "127.0.0.1",
                 "port": 20480,
                 "token_path": "./conf/webui_token.txt",
+                "auth_path": "./conf/webui_auth.json",
                 "static_path": "./data/webui/static",
                 "buffer_limit": 500,
                 "plugin_page_cache": 10
