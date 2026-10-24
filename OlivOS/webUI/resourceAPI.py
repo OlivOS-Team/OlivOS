@@ -37,15 +37,41 @@ def is_link(path):
 
 
 def safe_path(root, name):
-    """Reject symlinks and Windows junctions, including those inside declared directories."""
+    """Reject links inside the declared directory.
+
+    The root itself may be a link: a plugin directory is routinely junctioned to a
+    development checkout (mklink /J plugin/app/X D:/repo/X), and that root decides
+    which directory is published anyway. Only entries below it must be real.
+    """
     path = Path(root)
-    if is_link(path):
-        raise ValueError('WebUI root must not be a link')
     for part in name.split('/'):
         path = path / part
         if is_link(path):
             raise ValueError('WebUI resources must not be links')
     return path
+
+
+def mounted(path, base, linked_root=False):
+    """Check a published root against its allowed directory without following links.
+
+    `linked_root` permits the last component to be a link, i.e. the plugin directory
+    itself; a plugin subdirectory or a cache generation is always required to be real.
+    """
+    path = os.path.abspath(path)
+    base = os.path.abspath(base)
+    try:
+        relative = os.path.relpath(path, base)
+    except ValueError:
+        return False
+    if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+        return False
+    parts = relative.split(os.sep)
+    current = Path(base)
+    for index, part in enumerate(parts):
+        current = current / part
+        if is_link(current) and not (linked_root and index == len(parts) - 1):
+            return False
+    return True
 
 
 def allows(name, resources):

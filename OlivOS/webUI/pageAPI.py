@@ -784,15 +784,15 @@ def register_routes(host):
             if not directory or not resourceAPI.valid_namespace(namespace):
                 abort(404)
             root = Path(directory)
-            allowed_roots = (host.root / 'plugin/app', host.root / resourceAPI.CACHE_PATH / namespace)
-            if not any(within(root, allowed) for allowed in allowed_roots):
+            # 插件目录本身允许是链接（开发期 junction 到仓库），缓存目录必须全程真实。
+            if not (resourceAPI.mounted(root, host.root / 'plugin/app', linked_root=True)
+                    or resourceAPI.mounted(root, host.root / resourceAPI.CACHE_PATH / namespace)):
                 abort(404)
             resources = host.plugin_webui_paths.get(namespace, [])
             try:
                 name = resourceAPI.relative_path(filename)
                 if not resourceAPI.allows(name, resources):
                     abort(404)
-                resourceAPI.safe_path(host.root, root.relative_to(host.root).as_posix())
                 path = resourceAPI.safe_path(root, name)
                 if not within(path, root) or not path.is_file():
                     abort(404)
