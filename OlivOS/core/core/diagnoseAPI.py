@@ -19,10 +19,12 @@ import datetime
 import json
 import os
 import platform
+import queue
 import re
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import OlivOS
@@ -269,11 +271,29 @@ class logger(API.Proc_templet):
                     packet_this = self.Proc_info.rx_queue.get(block=False)
                 except Exception:
                     continue
-                self.log_output(packet_this, flag_need_refresh)
+                try:
+                    self.log_output(packet_this, flag_need_refresh)
+                except Exception:
+                    # 单条日志出错不能终结日志线程：否则此后所有日志静默消失，只剩「控制台停在某一行」。
+                    self.report_sink_error()
             if flag_need_refresh:
                 self.save_logfile()
                 flag_need_refresh = False
                 self.Proc_data['logfile_count_out'] = self.Proc_config['logfile_count_out']
+
+    def report_sink_error(self):
+        '''日志通道自身出错时的兜底
+
+        此类异常没法再走日志队列，只能写一次 stderr 留痕，
+        并用标记避免同一条故障反复刷屏。
+        '''
+        if self.Proc_data.get('sink_error_reported'):
+            return
+        self.Proc_data['sink_error_reported'] = True
+        try:
+            sys.stderr.write(traceback.format_exc())
+        except Exception:
+            pass
 
     def log(self, log_level, log_message, log_segment=None):
         if log_segment is None:
@@ -290,24 +310,25 @@ class logger(API.Proc_templet):
                 self.log_packet(log_level, safe_text(log_message), time.time(), log_segment_safe),
                 block=False
             )
-        except Exception:
+        except queue.Full:
+            # 队列写满时丢日志是预期行为，不能阻塞生产者
             pass
+        except Exception:
+            # 其余异常说明队列本身有问题，留一次痕迹，别让日志静默消失
+            self.report_sink_error()
 
     def save_logfile(self):
-        if self.Proc_data['data_tmp']['logfile'] != '':
-            file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
-            file_name_unity = logfile_file_unity
-            with open('%s/%s' % (logfile_dir, file_name), 'a+', encoding='utf-8') as logfile_f:
-                try:
+        if self.Proc_data['data_tmp']['logfile'] == '':
+            return
+        file_name = logfile_file % str(time.strftime('%Y-%m-%d', time.localtime()))
+        for file_name_this in (file_name, logfile_file_unity):
+            try:
+                with open('%s/%s' % (logfile_dir, file_name_this), 'a+', encoding='utf-8') as logfile_f:
                     logfile_f.write(self.Proc_data['data_tmp']['logfile'])
-                except Exception:
-                    pass
-            with open('%s/%s' % (logfile_dir, file_name_unity), 'a+', encoding='utf-8') as logfile_f:
-                try:
-                    logfile_f.write(self.Proc_data['data_tmp']['logfile'])
-                except Exception:
-                    pass
-            self.Proc_data['data_tmp']['logfile'] = ''
+            except (OSError, ValueError):
+                # 磁盘满、文件被占用时不能让日志线程跟着退出
+                self.report_sink_error()
+        self.Proc_data['data_tmp']['logfile'] = ''
 
     def log_output_shader_key(self, key=None):
         keylist = key
@@ -443,27 +464,24 @@ class logger(API.Proc_templet):
                 tmp_logger_mode_list = [self.Proc_config['logger_mode']]
             elif type(self.Proc_config['logger_mode']) is list:
                 tmp_logger_mode_list = self.Proc_config['logger_mode']
+            log_output_str = self.__format_log_output(log_packet_this)
+            # 文件通道优先落盘：控制台被 QuickEdit 选区阻塞（conhost 会挂住写入）时，
+            # 日志文件不能跟着一起停写——这正是「日志莫名断流」的成因之一。
+            if 'logfile' in tmp_logger_mode_list:
+                self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
+                if flag_need_refresh:
+                    self.save_logfile()
             for tmp_logger_mode_list_this in tmp_logger_mode_list:
-                if tmp_logger_mode_list_this in [
-                    'console',
-                    'console_color',
-                    'logfile',
-                    'native'
-                ]:
-                    log_output_str = ''
-                    log_output_str += '[' + str(
-                        datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
-                    log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
-                    log_output_str_1 = self.__get_log_message(log_packet_this)
-                    log_output_str += log_output_str_1
+                if tmp_logger_mode_list_this not in ['console', 'console_color']:
+                    continue
+                try:
                     if tmp_logger_mode_list_this == 'console_color':
                         self.log_output_shader(log_output_str, log_packet_this)
-                    elif tmp_logger_mode_list_this == 'console':
+                    else:
                         self.log_output_print(log_output_str)
-                    elif tmp_logger_mode_list_this == 'logfile':
-                        self.Proc_data['data_tmp']['logfile'] += '%s\n' % log_output_str
-                        if flag_need_refresh:
-                            self.save_logfile()
+                except Exception:
+                    # 控制台通道异常（句柄失效、编码问题）不能影响 logfile 与 GUI 通道
+                    self.report_sink_error()
         for mode, target in [('native', 'nativeWinUI'), ('web', 'webUI')]:
             if mode not in self.Proc_config['logger_mode']:
                 continue
@@ -482,6 +500,13 @@ class logger(API.Proc_templet):
                     }
                 }
             )
+
+    def __format_log_output(self, log_packet_this):
+        log_output_str = '[' + str(
+            datetime.datetime.fromtimestamp(int(log_packet_this['log_time']))) + '] - '
+        log_output_str += '[' + self.Proc_config['level_dict'][log_packet_this['log_level']] + ']' + ' - '
+        log_output_str += self.__get_log_message(log_packet_this)
+        return log_output_str
 
     def __get_log_message(self, log_packet_this):
         log_output_str_1 = ''
