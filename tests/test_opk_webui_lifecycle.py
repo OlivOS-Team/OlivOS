@@ -71,6 +71,23 @@ def install(host, relative_path, assets=None, registered=True, broken=False, ent
     return destination
 
 
+def link_directory(target, link, junction=False):
+    """建立目录链接；junction=True 时强制使用等价于 mklink /J 的 Windows junction。"""
+    if junction:
+        if sys.platform != 'win32':
+            pytest.skip('Junctions are unavailable')
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+        return
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        if sys.platform != 'win32':
+            pytest.skip('Creating symlinks is unavailable')
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+
+
 def mount(host, loader):
     loader.sendPluginList(ready=True)
     while not host.Proc_info.control_queue.empty():
@@ -330,13 +347,7 @@ def test_symbolic_links_are_not_copied_or_served(installation):
     outside.mkdir()
     (outside / 'private.txt').write_bytes(b'private')
     link = source / 'webui/linked'
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        if sys.platform != 'win32':
-            pytest.skip('Creating symlinks is unavailable')
-        import _winapi
-        _winapi.CreateJunction(str(outside), str(link))
+    link_directory(outside, link)
     loader.load_plugin_list()
     client = mount(host, loader)
     assert client.get(f'/plugin/{NAMESPACE}/webui/linked/private.txt').status_code == 404
@@ -345,3 +356,28 @@ def test_symbolic_links_are_not_copied_or_served(installation):
     link.rename(cached / 'linked')
     resourceAPI.reset_cache(host.root)
     assert (outside / 'private.txt').read_bytes() == b'private'
+
+
+@pytest.mark.parametrize('junction', [False, True])
+def test_linked_plugin_directory_is_served_but_its_links_are_not(installation, junction):
+    host, loader = installation
+    source = install(host, NAMESPACE)
+    checkout = host.root / 'checkout' / NAMESPACE
+    checkout.parent.mkdir()
+    source.rename(checkout)
+    link_directory(checkout, source, junction)
+    loader.load_plugin_list()
+    assert Path(loader.plugin_models_dict[NAMESPACE]['webui_root']) == source
+    client = mount(host, loader)
+    for name, data in ASSETS.items():
+        with client.get(f'/plugin/{NAMESPACE}/{name}') as response:
+            assert response.status_code == 200
+            assert response.data == data
+    assert client.get(f'/plugin/{NAMESPACE}/app.json').status_code == 404
+    outside = host.root / 'outside'
+    outside.mkdir()
+    (outside / 'private.txt').write_bytes(b'private')
+    link_directory(outside, checkout / 'webui/linked', junction)
+    loader.load_plugin_list()
+    client = mount(host, loader)
+    assert client.get(f'/plugin/{NAMESPACE}/webui/linked/private.txt').status_code == 404
