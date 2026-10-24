@@ -193,7 +193,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     if 'proc_mode' in basic_conf['system']:
                         tmp_proc_mode_raw = basic_conf['system']['proc_mode']
                     if 'proc_mode' in basic_conf_models_this:
-                        tmp_proc_mode_raw = basic_conf['system']['proc_mode']
+                        # 取组件自己声明的 proc_mode；此处曾误取 basic_conf['system']，
+                        # 导致模型级配置被静默忽略，所有组件都退回系统默认值。
+                        tmp_proc_mode_raw = basic_conf_models_this['proc_mode']
                     tmp_proc_mode = tmp_proc_mode_raw
                     if tmp_proc_mode_raw == 'webUI':
                         tmp_proc_mode = 'threading'
