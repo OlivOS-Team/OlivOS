@@ -115,3 +115,21 @@ def test_log_files_receive_complete_batch(tmp_path):
     text = (tmp_path / 'logfile/OlivOS_logfile_unity.log').read_text(encoding='utf-8')
     assert all('row-' + str(index) in text for index in range(10))
     assert len(list((tmp_path / 'logfile').glob('*.log'))) == 2
+
+
+def test_console_sink_failure_still_writes_logfile(tmp_path, monkeypatch):
+    """控制台写失败不能连带停写日志文件（QuickEdit 阻塞、句柄失效的同类回归）。"""
+    (tmp_path / 'logfile').mkdir()
+    logger = OlivOS.diagnoseAPI.logger(
+        logger_queue=queue.Queue(),
+        logger_mode=['console', 'logfile']
+    )
+    logger.Proc_data['logfile_count'] = 1
+
+    def broken_print(_log_output_str):
+        raise OSError('控制台句柄已失效')
+
+    monkeypatch.setattr(logger, 'log_output_print', broken_print)
+    logger.log_output(logger.log_packet(2, '仍应写入文件', 1750000000))
+    text = (tmp_path / 'logfile/OlivOS_logfile_unity.log').read_text(encoding='utf-8')
+    assert '仍应写入文件' in text

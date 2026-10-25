@@ -93,3 +93,18 @@ def test_process_termination_escalates_only_for_unresponsive_process(monkeypatch
     OlivOS.bootAPI.kill_process(process)
     process.terminate.assert_called_once()
     process.kill.assert_called_once()
+
+
+def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
+    """重载真空期（组件已被弹出、尚未重建）内重复的重载请求必须变成空操作。
+
+    直接取 Proc_dict[name] 会抛 KeyError 打穿主控制循环，之后所有重载、优先级更新、
+    插件事件都会投进没人消费的死队列。
+    """
+    proc_this = Mock()
+    proc_this.Proc_info.rx_queue = Mock()
+    assert OlivOS.bootAPI.get_proc_for_restart({}, 'OlivOS_plugin') is None
+    assert OlivOS.bootAPI.get_proc_for_restart({'OlivOS_plugin': proc_this}, 'OlivOS_plugin') is proc_this
+
+    proc_this.Proc_info.rx_queue = None
+    assert OlivOS.bootAPI.get_proc_for_restart({'OlivOS_plugin': proc_this}, 'OlivOS_plugin') is None
