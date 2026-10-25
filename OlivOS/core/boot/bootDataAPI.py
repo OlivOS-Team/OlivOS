@@ -299,6 +299,8 @@ default_Conf = {
             "treading_mode": "full",
             "restart_gate": 10000,
             "enable_auto_restart": True,
+            "restart_at": [],
+            "restart_interval_minutes": 0,
             "debug": False
         },
         "OlivOS_virtual_terminal_link": {

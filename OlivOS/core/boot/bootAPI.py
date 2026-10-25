@@ -263,6 +263,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 treading_mode=basic_conf_models_this['treading_mode'],
                                 restart_gate=basic_conf_models_this['restart_gate'],
                                 enable_auto_restart=basic_conf_models_this['enable_auto_restart'],
+                                restart_at=basic_conf_models_this.get('restart_at', []),
+                                restart_interval_minutes=basic_conf_models_this.get('restart_interval_minutes', 0),
                                 enable_gui=not webui_only
                             )
                             if True or 'auto' == tmp_proc_mode_raw:

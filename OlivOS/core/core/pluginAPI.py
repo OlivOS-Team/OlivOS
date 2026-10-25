@@ -135,10 +135,52 @@ releaseDir('./lib/DLLs')
 sys.path.append('./lib/DLLs')
 
 
+def parse_restart_at(value):
+    """把配置里的定时重载时间点规范成 {'HH:MM'} 集合。
+
+    只接受 24 小时制 'HH:MM' 字符串，非法项一律丢弃；返回值可为空集，
+    表示不启用定时重载。配置写错不应导致组件启动失败。
+    """
+    if type(value) is not list:
+        return set()
+    result = set()
+    for item in value:
+        if type(item) is not str:
+            continue
+        parts = item.strip().split(':')
+        if len(parts) != 2:
+            continue
+        hour_text, minute_text = parts
+        if not (1 <= len(hour_text) <= 2 and len(minute_text) == 2):
+            continue
+        if not (hour_text.isdigit() and minute_text.isdigit()):
+            continue
+        hour, minute = int(hour_text), int(minute_text)
+        if 0 <= hour <= 23 and 0 <= minute <= 59:
+            result.add('%02d:%02d' % (hour, minute))
+    return result
+
+
+def parse_restart_interval(value):
+    """把滚动重载周期（分钟）换算成秒。
+
+    关闭（0/负数）或非法值返回 0；低于 6 分钟视为非法，避免把加载器当节拍器。
+    """
+    if type(value) is bool or type(value) not in (int, float):
+        return 0
+    if value <= 0:
+        return 0
+    seconds = float(value) * 60
+    if seconds < 360:
+        return 0
+    return seconds
+
+
 class shallow(API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
-                 treading_mode='full', restart_gate=10000, enable_auto_restart=False, enable_gui=True):
+                 treading_mode='full', restart_gate=10000, enable_auto_restart=False, enable_gui=True,
+                 restart_at=None, restart_interval_minutes=0):
         API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
@@ -161,6 +203,10 @@ class shallow(API.Proc_templet):
         self.Proc_config['ready_for_restart'] = False
         self.Proc_config['enable_auto_restart'] = enable_auto_restart
         self.Proc_config['step_to_restart'] = restart_gate
+        self.Proc_config['restart_at'] = parse_restart_at(restart_at)
+        self.Proc_config['restart_interval'] = parse_restart_interval(restart_interval_minutes)
+        self.Proc_data['restart_at_last'] = None
+        self.Proc_data['restart_interval_base'] = None
         self.Proc_data['plugin_func_dict'] = plugin_func_dict
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['main_tk'] = None
@@ -259,6 +305,8 @@ class shallow(API.Proc_templet):
         self.run_plugin_func(None, 'init_after')
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS plugin shallow [{0}] is running', [self.Proc_name], modelName))
         self.sendPluginList(ready=True)
+        self.Proc_data['restart_interval_base'] = time.monotonic()
+        self.Proc_data['restart_at_last'] = time.strftime('%Y-%m-%d %H:%M')
         rx_count = 0
         while True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
@@ -269,7 +317,7 @@ class shallow(API.Proc_templet):
                 except Exception:
                     continue
                 if type(rx_packet_data) is API.Control.packet:
-                    if rx_packet_data.action == 'restart_do' and self.Proc_config['enable_auto_restart']:
+                    if rx_packet_data.action == 'restart_do':
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(
@@ -278,7 +326,7 @@ class shallow(API.Proc_templet):
                             'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
                         # 在运行过 save 指令后，将配置数据库关闭
                         self.database.stop()
-                    elif rx_packet_data.action == 'update_hit' and self.Proc_config['enable_auto_restart']:
+                    elif rx_packet_data.action == 'update_hit':
                         self.Proc_config['ready_for_restart'] = True
                         self.run_plugin_func(None, 'save')
                         self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_replace'),
@@ -302,6 +350,8 @@ class shallow(API.Proc_templet):
                     rx_count += 1
                     if rx_count == self.Proc_config['step_to_restart']:
                         self.set_restart()
+                    elif self.Proc_config['restart_at'] or self.Proc_config['restart_interval'] > 0:
+                        self._check_restart_schedule()
 
     def on_control_rx(self, packet):
         if type(packet) is API.Control.packet:
@@ -316,6 +366,39 @@ class shallow(API.Proc_templet):
                         self.set_restart()
                     elif 'plugin_priority_reload' == packet.key['data']['action']:
                         self.apply_plugin_priority()
+
+    def _check_restart_schedule(self):
+        """按「定时点 → 滚动周期」的顺序检查自动重载，命中一次即返回。
+
+        定时点用墙钟判定（错过窗口就不再补），滚动周期用 monotonic 差值判定
+        （迟到必补）。两者都受 enable_auto_restart 总闸约束。
+        """
+        if not self.Proc_config['enable_auto_restart']:
+            return False
+        if self.Proc_config['ready_for_restart']:
+            return False
+        if self.Proc_config['restart_at']:
+            slot = time.strftime('%H:%M')
+            if slot in self.Proc_config['restart_at']:
+                stamp = time.strftime('%Y-%m-%d ') + slot
+                if stamp != self.Proc_data['restart_at_last']:
+                    self.Proc_data['restart_at_last'] = stamp
+                    self.log(2, OlivOS.L10NAPI.getTrans(
+                        'OlivOS plugin shallow [{0}] reached scheduled time [{1}], restarting',
+                        [self.Proc_name, slot], modelName))
+                    self.set_restart()
+                    return True
+        interval = self.Proc_config['restart_interval']
+        if interval > 0 and self.Proc_data['restart_interval_base'] is not None:
+            elapsed = time.monotonic() - self.Proc_data['restart_interval_base']
+            if elapsed >= interval:
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS plugin shallow [{0}] ran {1} min, reached restart interval {2} min, restarting',
+                    [self.Proc_name, int(elapsed // 60), self.Proc_config['restart_interval'] / 60],
+                    modelName))
+                self.set_restart()
+                return True
+        return False
 
     def set_restart(self):
         """重载插件
