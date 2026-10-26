@@ -1307,8 +1307,9 @@ class dock(OlivOS.API.Proc_templet):
                 canvas.create_rectangle(0, 0, 30, 30, outline='', fill=color['color_001'])
                 canvas.create_oval(3, 9, 27, 21, outline=stroke, width=2)
                 canvas.create_oval(11, 12, 19, 18, fill=stroke, outline=stroke)
-                if visible:
-                    # 睁眼加斜杠表示当前为明文，再点一次恢复遮蔽。
+                if not visible:
+                    # 被遮蔽时画斜杠眼；明文可见时画睁眼（与 WebUI 一致：
+                    # 睁眼表示当前明文可见，斜杠眼表示当前被遮蔽）。
                     canvas.create_line(3, 25, 27, 5, fill=stroke, width=2)
 
             def toggle(event=None):
