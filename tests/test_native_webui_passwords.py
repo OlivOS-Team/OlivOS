@@ -52,7 +52,13 @@ def test_tray_password_reset_saves_without_original_password(dock, tmp_path, mon
 def password_dialog_owner():
     import tkinter
 
-    root = tkinter.Tk()
+    try:
+        root = tkinter.Tk()
+    except tkinter.TclError as error:
+        # hostedtoolcache 的 Windows runner 偶发 Tcl 自身损坏（init.tcl 读不出），
+        # 属于环境问题而非代码问题；跳过本模块需要真实 Tk 窗口的用例。
+        pytest.skip(f'tkinter unavailable on this runner: {error}')
+        raise AssertionError('pytest.skip should raise')  # pragma: no cover
     root.withdraw()
     yield root
     root.destroy()
