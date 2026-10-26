@@ -16,7 +16,13 @@ pytestmark = [pytest.mark.native_gui, pytest.mark.skipif(os.name != 'nt', reason
 def tk_root():
     import tkinter
 
-    root = tkinter.Tk()
+    try:
+        root = tkinter.Tk()
+    except tkinter.TclError as error:
+        # 与 test_native_webui_passwords 同源：hostedtoolcache 的 Windows runner
+        # 偶发 Tcl 自身损坏（init.tcl 读不出），属环境问题而非代码问题。
+        pytest.skip(f'tkinter unavailable on this runner: {error}')
+        raise AssertionError('pytest.skip should raise')  # pragma: no cover
     root.withdraw()
     yield root
     root.destroy()
