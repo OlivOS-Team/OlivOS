@@ -44,10 +44,12 @@ class event_action_group(object):
                 'olivos_para',
                 image_message_buffer.copy()
             )
+            # 2026-10-26 起群聊文本/markdown 消息也支持 <qqbot-at-everyone />：
+            # 群聊放行、私聊保持关闭；平台侧要求机器人为该群管理员，且每群每天 1 次。
             message_chunks.extend(event_action._get_message_send_chunks(
                 image_message,
                 [OlivOS.messageAPI.PARA.image],
-                allow_at_all=False
+                allow_at_all=not flag_direct
             ))
             image_message_buffer.clear()
 

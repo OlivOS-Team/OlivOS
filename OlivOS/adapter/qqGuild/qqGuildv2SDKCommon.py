@@ -2598,7 +2598,7 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
 
     if flag_backfill:
         # QQ 群/C2C 修正:平台把 @成员 降级为 <qqbot-at-user id=""/> 或
-        # <qqbot-at-everyone/>(群聊本无 @全体语义)时,content 中拿不到 openid,
+        # <qqbot-at-everyone/>(群聊 @全体，2026-10-26 起平台支持)时,content 中拿不到 openid,
         # 但事件 mentions 数组按出现顺序携带真实 openid,这里按序回填。
         tmp_self_ids = set()
         if self_ids is not None:
