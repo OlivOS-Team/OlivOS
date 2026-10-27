@@ -28,6 +28,7 @@ import socket
 import ssl
 import threading
 import time
+import traceback
 
 import OlivOS
 
@@ -384,6 +385,10 @@ class server(OlivOS.API.Proc_templet):
         # WebUI 位于主进程，监听状态需要在线程和子进程模式下都可见。
         self._webhook_last_ready = multiprocessing.Value('d', 0.0)
         self._webhook_stopped = multiprocessing.Event()
+        # 监听对象要在热停止时显式 stop：StoppableThread.terminate 只是往线程里
+        # 异步抛 SystemExit，线程卡在 epoll_wait 时收不到，端口会一直占着，
+        # 随后重建的新组件 bind 失败——表现就是「热重载不生效、重启进程才正常」。
+        self._webhook_server = None
 
     @property
     def webhook_online(self):
@@ -394,6 +399,13 @@ class server(OlivOS.API.Proc_templet):
     def on_terminate(self):
         self._webhook_stopped.set()
         self._webhook_last_ready.value = 0.0
+        tmp_server = getattr(self, '_webhook_server', None)
+        self._webhook_server = None
+        if tmp_server is not None:
+            try:
+                tmp_server.stop()
+            except Exception:
+                traceback.print_exc()
 
     class config_T(object):
         def __init__(self, debug_mode):
@@ -783,23 +795,23 @@ class server(OlivOS.API.Proc_templet):
                     modelName
                 )
             )
-        self.log(
-            2,
-            OlivOS.L10NAPI.getTrans(
-                'OlivOS qqGuildv2 webhook server [{0}] is running on [{1}]',
-                [
-                    self.Proc_config['Flask_name'],
-                    self._get_listen_url()
-                ],
-                modelName
-            )
-        )
         tmp_watchdog = threading.Thread(
             target=self._run_watchdog,
             args=(),
             daemon=True
         )
         if self.Proc_config['config'].debug_mode:
+            self.log(
+                2,
+                OlivOS.L10NAPI.getTrans(
+                    'OlivOS qqGuildv2 webhook server [{0}] is running on [{1}]',
+                    [
+                        self.Proc_config['Flask_name'],
+                        self._get_listen_url()
+                    ],
+                    modelName
+                )
+            )
             try:
                 tmp_watchdog.start()
                 self.Proc_config['Flask_app'].run(
@@ -844,9 +856,42 @@ class server(OlivOS.API.Proc_templet):
                     self.Proc_config['Flask_app'],
                     **tmp_wsgi_kwargs
                 )
+            self._webhook_server = server
+            tmp_listen_text = '%s:%s' % (
+                str(tmp_listen[0]),
+                str(tmp_listen[1])
+            )
             try:
+                # 绑定失败必须留痕：热重载时旧监听可能还没释放端口，
+                # 这里静默退出过一版，现象就是「重载后 webhook 不工作」。
                 server.start()
-                self._webhook_last_ready.value = time.monotonic()
+            except Exception as error:
+                self.log(
+                    3,
+                    OlivOS.L10NAPI.getTrans(
+                        'OlivOS qqGuildv2 webhook server [{0}] 无法监听 [{1}]: {2}',
+                        [
+                            self.Proc_config['Flask_name'],
+                            tmp_listen_text,
+                            '%s: %s' % (type(error).__name__, str(error))
+                        ],
+                        modelName
+                    )
+                )
+                raise
+            self._webhook_last_ready.value = time.monotonic()
+            self.log(
+                2,
+                OlivOS.L10NAPI.getTrans(
+                    'OlivOS qqGuildv2 webhook server [{0}] is running on [{1}]',
+                    [
+                        self.Proc_config['Flask_name'],
+                        self._get_listen_url()
+                    ],
+                    modelName
+                )
+            )
+            try:
                 tmp_watchdog.start()
                 server.serve_forever()
             finally:
