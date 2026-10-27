@@ -189,7 +189,7 @@ eventLogMetaTable = {
         'message_key': 'event_heartbeat_log'
     },
     'menu': {
-        'level': 2,
+        'level': 1,
         'message_key': 'event_menu_log'
     }
 }
