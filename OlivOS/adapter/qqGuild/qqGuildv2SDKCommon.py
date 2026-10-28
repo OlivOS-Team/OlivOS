@@ -2598,7 +2598,7 @@ def _apply_qq_message_mentions(message_obj, mentions, self_ids=None, flag_backfi
 
     if flag_backfill:
         # QQ 群/C2C 修正:平台把 @成员 降级为 <qqbot-at-user id=""/> 或
-        # <qqbot-at-everyone/>(群聊本无 @全体语义)时,content 中拿不到 openid,
+        # <qqbot-at-everyone/>(群聊 @全体，2026-10-26 起平台支持)时,content 中拿不到 openid,
         # 但事件 mentions 数组按出现顺序携带真实 openid,这里按序回填。
         tmp_self_ids = set()
         if self_ids is not None:
@@ -4341,6 +4341,33 @@ class event_action_common(object):
             finally:
                 socket.getaddrinfo = original_getaddrinfo
 
+    def _get_qq_log_text_preview(content):
+        """把正文压成单行日志正文（换行写成字面量 \\n，内容不截断）。
+
+        callbackLogger 只输出 val_list 里点名的字段，正文不在其中，
+        导致日志只看得到「发了 markdown、message_id 是多少」。这里把正文
+        压成单行，交给 send 时挂回 res_data['data']['content']。
+        """
+        if content is None:
+            return None
+        tmp_raw = str(content)
+        if tmp_raw.strip() == '':
+            return None
+        # 日志一行一条：换行写字面量 \\n，正文一条都不截断。
+        return tmp_raw.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '\\n')
+
+    def _attach_qq_log_content(res_data, content):
+        """把正文摘要挂到返回值上，供 callbackLogger 的 content 字段输出。"""
+        # res_data 是 dict 的子类（universal_result），不能用 type() is dict 判断
+        if not isinstance(res_data, dict) or content is None:
+            return res_data
+        tmp_data = res_data.get('data', None)
+        if not isinstance(tmp_data, dict):
+            tmp_data = {}
+            res_data['data'] = tmp_data
+        tmp_data['content'] = content
+        return res_data
+
     def _read_markdown_image(target_event, resource):
         resource = str(resource)
         parsed = parse.urlparse(resource)
@@ -5026,6 +5053,16 @@ class event_action_common(object):
             this_msg.metadata.guild_id = str(chat_id)
 
         this_msg.data.markdown = markdown
+        tmp_markdown_content = markdown.get('content', None)
+        if type(tmp_markdown_content) is str and tmp_markdown_content != '':
+            tmp_log_content = event_action._get_qq_log_text_preview(tmp_markdown_content)
+        else:
+            tmp_log_content = event_action._get_qq_log_text_preview(
+                'template=%s params=%s' % (
+                    str(markdown.get('custom_template_id', '')),
+                    str(markdown.get('params', []))
+                )
+            )
         this_msg.data.keyboard = keyboard
         if quote_msg_id is not None and str(quote_msg_id) != '':
             this_msg.data.message_reference = {'message_id': str(quote_msg_id)}
@@ -5038,6 +5075,7 @@ class event_action_common(object):
             event_id,
             allow_active_fallback=allow_active_fallback
         )
+        event_action._attach_qq_log_content(res_data, tmp_log_content)
 
         if local_images is not None:
             result_status = res_data.get('data', {}).get('http_status')
@@ -6425,7 +6463,7 @@ class event_action_common(object):
 class inde_interface(OlivOS.API.inde_interface_T):
     @OlivOS.API.Event.callbackLogger(
         'qqGuildv2:send_message',
-        ['chat_type', 'chat_id', 'message_ids']
+        ['chat_type', 'chat_id', 'message_ids', 'content']
     )
     def __send_message(
         target_event,
@@ -6505,7 +6543,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
 
     @OlivOS.API.Event.callbackLogger(
         'qqGuildv2:send_qq_message',
-        ['chat_type', 'chat_id', 'message_ids']
+        ['chat_type', 'chat_id', 'message_ids', 'content']
     )
     def __send_qq_message(
         target_event,
@@ -6607,7 +6645,7 @@ class inde_interface(OlivOS.API.inde_interface_T):
 
     @OlivOS.API.Event.callbackLogger(
         'qqGuildv2:create_markdown_message',
-        ['chat_type', 'chat_id', 'message_id']
+        ['chat_type', 'chat_id', 'message_id', 'content']
     )
     def __create_markdown_message(
         target_event,

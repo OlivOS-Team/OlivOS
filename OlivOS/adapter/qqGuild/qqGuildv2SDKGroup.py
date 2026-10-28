@@ -44,10 +44,12 @@ class event_action_group(object):
                 'olivos_para',
                 image_message_buffer.copy()
             )
+            # 2026-10-26 起群聊文本/markdown 消息也支持 <qqbot-at-everyone />：
+            # 群聊放行、私聊保持关闭；平台侧要求机器人为该群管理员，且每群每天 1 次。
             message_chunks.extend(event_action._get_message_send_chunks(
                 image_message,
                 [OlivOS.messageAPI.PARA.image],
-                allow_at_all=False
+                allow_at_all=not flag_direct
             ))
             image_message_buffer.clear()
 
@@ -137,6 +139,7 @@ class event_action_group(object):
                 msg_id is not None or event_id is not None
             )
         send_results = []
+        sent_texts = []
         if quote_msg_id is None:
             quote_msg_id = event_action._get_message_reference_id(message)
 
@@ -155,6 +158,9 @@ class event_action_group(object):
                 allow_active_fallback=allow_active_fallback
             )
             send_results.append(result)
+            # 日志要显示实际发出去的正文；分片发送时按顺序拼回去。
+            if text_content:
+                sent_texts.append(text_content)
             if result.get('data', {}).get('passive_fallback') is not None:
                 msg_id = None
                 event_id = None
@@ -163,6 +169,13 @@ class event_action_group(object):
                 quote_msg_id = None
             return result
 
+        def merge_results():
+            # 单条结果的 data 不带 content，合并后要重新挂上，日志里才有正文。
+            return event_action._attach_qq_log_content(
+                event_action._merge_send_results(chat_type, chat_id, send_results),
+                event_action._get_qq_log_text_preview('\n'.join(sent_texts))
+            )
+
         for text_content, message_this in event_action._get_qq_message_send_chunks(
             message,
             flag_direct=flag_direct
@@ -170,11 +183,7 @@ class event_action_group(object):
             if message_this is None:
                 result = send_payload(text_content)
                 if not result.get('active', False):
-                    return event_action._merge_send_results(
-                        chat_type,
-                        chat_id,
-                        send_results
-                    )
+                    return merge_results()
                 continue
             if isinstance(message_this, OlivOS.messageAPI.PARA.image):
                 type_path = 'images'
@@ -192,11 +201,7 @@ class event_action_group(object):
             if not bind_content and text_content != '':
                 result = send_payload(text_content)
                 if not result.get('active', False):
-                    return event_action._merge_send_results(
-                        chat_type,
-                        chat_id,
-                        send_results
-                    )
+                    return merge_results()
                 text_content = ''
             resource_url = event_action._get_message_resource(message_this)
             if resource_url is None:
@@ -206,11 +211,7 @@ class event_action_group(object):
                     'send',
                     'message resource is empty'
                 ))
-                return event_action._merge_send_results(
-                    chat_type,
-                    chat_id,
-                    send_results
-                )
+                return merge_results()
             file_name = None
             if (
                 isinstance(message_this, OlivOS.messageAPI.PARA.file)
@@ -232,23 +233,15 @@ class event_action_group(object):
                     'send',
                     'message resource upload failed'
                 ))
-                return event_action._merge_send_results(
-                    chat_type,
-                    chat_id,
-                    send_results
-                )
+                return merge_results()
             result = send_payload(
                 text_content,
                 file_info=file_info,
                 bind_content=bind_content
             )
             if not result.get('active', False):
-                return event_action._merge_send_results(
-                    chat_type,
-                    chat_id,
-                    send_results
-                )
-        return event_action._merge_send_results(chat_type, chat_id, send_results)
+                return merge_results()
+        return merge_results()
 
     def _send_qq_payload(
         target_event,
@@ -270,6 +263,7 @@ class event_action_group(object):
             this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.group_openid = str(chat_id)
         this_msg.data.content = content if file_info is None or bind_content else None
+        tmp_log_content = event_action._get_qq_log_text_preview(this_msg.data.content)
         if file_info is None:
             this_msg.data.msg_type = 0
         else:
@@ -287,6 +281,7 @@ class event_action_group(object):
             event_id,
             allow_active_fallback=allow_active_fallback
         )
+        event_action._attach_qq_log_content(res_data, tmp_log_content)
         fallback_used = res_data.get('data', {}).get('passive_fallback') is not None
         event_action._log_qq_send_result(
             target_event,

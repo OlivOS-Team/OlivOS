@@ -15,7 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 
-OlivOS_Version = '1.0.1'
+OlivOS_Version = '1.0.2'
 OlivOS_SVN = 300
 OlivOS_Version_Slogan = '妖刀村正'
 
