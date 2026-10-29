@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=63.2.0,<71", "wheel"]
+requires = ["setuptools>=63.2.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -85,29 +85,27 @@ pypywin = [
 # 打包工具
 build = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
+    "pyinstaller==6.22.3; python_version >= '3.10'",
     "nuitka==2.8.10",
-    "setuptools>=63.2.0,<71",
+    "setuptools>=63.2.0,<82",
 ]
 
 # pyinstaller打包工具
 pyinstaller = [
     "pyinstaller==5.6.2; python_version == '3.7'",
-    "pyinstaller==6.9.0; python_version >= '3.10' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-    "pyinstaller==6.22.3; python_version >= '3.10' and sys_platform == 'win32' and platform_machine == 'ARM64'",
-    "setuptools>=63.2.0,<71",
+    "pyinstaller==6.22.3; python_version >= '3.10'",
+    "setuptools>=63.2.0,<82",
 ]
 
 # nuitka打包工具
 nuitka = [
     "nuitka==2.8.10",
-    "setuptools>=63.2.0,<71",
+    "setuptools>=63.2.0,<82",
 ]
 
 # pack打包工具
 pack = [
-    "setuptools>=63.2.0,<71",
+    "setuptools>=63.2.0,<82",
 ]
 
 # 插件生态所需依赖

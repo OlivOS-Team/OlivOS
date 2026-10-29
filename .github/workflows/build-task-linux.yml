@@ -75,6 +75,14 @@ jobs:
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
           "${PYTHON}" -m PyInstaller ./OlivOS.spec
+          # 启动冒烟：打包产物在 bootloader / 运行时钩子阶段就崩溃时（如缺 jaraco），构建直接判失败
+          mkdir -p ./smoke && cp ./dist/OlivOS ./smoke/
+          (cd ./smoke && timeout -k 5 30 ./OlivOS > ../smoke.log 2>&1 || true)
+          if grep -q "Failed to execute script 'pyi_rth_" ./smoke.log; then
+            cat ./smoke.log
+            exit 1
+          fi
+          rm -rf ./smoke ./smoke.log
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
           "${PYTHON}" ./script/nuitka_build.py
         fi
