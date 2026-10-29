@@ -308,9 +308,19 @@ class shallow(API.Proc_templet):
         self.Proc_data['restart_interval_base'] = time.monotonic()
         self.Proc_data['restart_at_last'] = time.strftime('%Y-%m-%d %H:%M')
         rx_count = 0
+        idle_check_at = 0.0
         while True:
             if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
                 time.sleep(self.Proc_info.scan_interval)
+                if (
+                    self.Proc_config['enable_auto_restart']
+                    and not self.Proc_config['ready_for_restart']
+                    and (self.Proc_config['restart_at'] or self.Proc_config['restart_interval'] > 0)
+                ):
+                    now = time.monotonic()
+                    if now - idle_check_at >= 1.0:
+                        idle_check_at = now
+                        self._check_restart_schedule()
             else:
                 try:
                     rx_packet_data = self.Proc_info.rx_queue.get(block=False)

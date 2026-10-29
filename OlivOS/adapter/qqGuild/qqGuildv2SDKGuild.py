@@ -145,6 +145,7 @@ class event_action_guild(object):
             this_msg = API.sendMessage(get_SDK_bot_info_from_Event(target_event))
             this_msg.metadata.channel_id = str(chat_id)
         this_msg.data.content = content
+        tmp_log_content = event_action._get_qq_log_text_preview(content)
         this_msg.data.msg_id = None if msg_id is None else str(msg_id)
         if quote_msg_id is not None and str(quote_msg_id) != '':
             this_msg.data.message_reference = {'message_id': str(quote_msg_id)}
@@ -154,12 +155,15 @@ class event_action_guild(object):
             elif image_data.get('file_image', None) is not None:
                 this_msg.data.file_image = image_data['file_image']
         this_msg.do_api()
-        return event_action._make_api_result(
-            target_event,
-            this_msg,
-            chat_type,
-            chat_id,
-            'send'
+        return event_action._attach_qq_log_content(
+            event_action._make_api_result(
+                target_event,
+                this_msg,
+                chat_type,
+                chat_id,
+                'send'
+            ),
+            tmp_log_content
         )
 
     # ============ 频道:频道/子频道 ============

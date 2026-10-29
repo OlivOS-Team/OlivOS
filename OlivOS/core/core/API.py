@@ -1096,12 +1096,14 @@ class Event(object):
                         # 此处缺少接口
                         pass
                     else:
-                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
                 elif flag_type == 'group':
                     if host_id is not None:
-                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_guild_channel_msg(
+                            self, host_id, target_id, tmp_message
+                        )
                     else:
-                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.onebotV11HostServerAPI.gCheckList:
                 if flag_type == 'private':
                     if (
@@ -1111,12 +1113,14 @@ class Event(object):
                         # 此处缺少接口
                         pass
                     else:
-                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
                 elif flag_type == 'group':
                     if host_id is not None:
-                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_guild_channel_msg(
+                            self, host_id, target_id, tmp_message
+                        )
                     else:
-                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.onebotV11LinkServerAPI.gCheckList:
                 if flag_type == 'private':
                     if (
@@ -1126,12 +1130,14 @@ class Event(object):
                         # 此处缺少接口
                         pass
                     else:
-                        OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_private_msg(self, target_id, tmp_message)
                 elif flag_type == 'group':
                     if host_id is not None:
-                        OlivOS.onebotSDK.event_action.send_guild_channel_msg(self, host_id, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_guild_channel_msg(
+                            self, host_id, target_id, tmp_message
+                        )
                     else:
-                        OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
+                        res_data = OlivOS.onebotSDK.event_action.send_group_msg(self, target_id, tmp_message)
             elif self.platform['model'] in OlivOS.qqRedLinkServerAPI.gCheckList:
                 if flag_type == 'private':
                     OlivOS.qqRedSDK.event_action.send_msg(

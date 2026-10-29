@@ -34,6 +34,15 @@ def test_cancelled_tray_password_preserves_credentials(dock, tmp_path, monkeypat
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows tray')
 def test_tray_password_reset_saves_without_original_password(dock, tmp_path, monkeypatch):
+    # localAPI.request() 在子线程里才 import 命名管道要用的 pywin32 模块；CI 的
+    # windows-latest 上「子线程首次 import + GC」会直接把解释器打死
+    # （Windows fatal exception: code 0x80000003），整个 pytest 进程退出。
+    # 这里在主线程先把它们导进来，子线程里就只是一次 sys.modules 命中。
+    import pywintypes  # noqa: F401
+    import win32con  # noqa: F401
+    import win32file  # noqa: F401
+    import win32pipe  # noqa: F401
+
     monkeypatch.setattr(dock, 'askWebUIPassword',
                         lambda: ('tray-fixture-password', 'tray-fixture-password'))
     success = Mock()
@@ -52,7 +61,13 @@ def test_tray_password_reset_saves_without_original_password(dock, tmp_path, mon
 def password_dialog_owner():
     import tkinter
 
-    root = tkinter.Tk()
+    try:
+        root = tkinter.Tk()
+    except tkinter.TclError as error:
+        # hostedtoolcache 的 Windows runner 偶发 Tcl 自身损坏（init.tcl 读不出），
+        # 属于环境问题而非代码问题；跳过本模块需要真实 Tk 窗口的用例。
+        pytest.skip(f'tkinter unavailable on this runner: {error}')
+        raise AssertionError('pytest.skip should raise')  # pragma: no cover
     root.withdraw()
     yield root
     root.destroy()

@@ -84,6 +84,33 @@ def test_onebot_http_api_encodes_access_token_query(monkeypatch):
     assert captured['headers']['Authorization'] == 'Bearer %s' % SYMBOL_TOKEN
 
 
+@pytest.mark.parametrize('body, active, error', [
+    ('{"status": "ok", "retcode": 0, "data": {"message_id": 7}}', True, None),
+    ('{"status": "async", "retcode": 1, "data": null}', True, None),
+    ('{"status": "failed", "retcode": 1200, "wording": "机器人不在该群"}', False, '机器人不在该群'),
+    ({'status': 'failed', 'retcode': 100, 'message': 'user not found'}, False, 'user not found'),
+    ('{"status": "failed", "retcode": 1404}', False, '协议端返回失败（retcode=1404）'),
+    ('not json', False, '协议端无有效响应'),
+    (None, False, '协议端无有效响应'),
+])
+def test_onebot_send_msg_returns_send_result(monkeypatch, body, active, error):
+    def fake_do_api(self, control_queue=None):
+        self.res = None if body is None else self.Result(body)
+        return self.res
+
+    monkeypatch.setattr(OlivOS.onebotSDK.api_templet, 'do_api', fake_do_api)
+    bot = OlivOS.API.bot_info_T(id=1, host='127.0.0.1', port=5700, platform_model='napcat_default')
+    target_event = SimpleNamespace(bot_info=bot, plugin_info={'control_queue': None})
+    for result in [
+        OlivOS.onebotSDK.event_action.send_group_msg(target_event, '7', 'hello'),
+        OlivOS.onebotSDK.event_action.send_private_msg(target_event, '42', 'hello'),
+    ]:
+        assert result['active'] is active
+        assert result['data']['error'] == error
+    if body is not None and 'message_id' in str(body):
+        assert result['data']['message_id'] == '7'
+
+
 def test_milky_and_onebot_forward_urls_encode_access_token():
     bot = OlivOS.API.bot_info_T(id=1, host='127.0.0.1', port=3000, access_token=SYMBOL_TOKEN)
     milky = OlivOS.milkyAutoServerAPI.ServerConf.init_conf_from_post_info(bot.post_info)

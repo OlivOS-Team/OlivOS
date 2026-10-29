@@ -91,6 +91,46 @@ def get_SDK_bot_info_from_Event(target_event):
     return res
 
 
+def get_send_result(api_obj):
+    """把 OneBot 发送接口的回包整理成统一结果，供插件判断发送成功或失败"""
+    res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+    raw_obj = None
+    raw = api_obj.res.body if api_obj.res is not None else None
+    if isinstance(raw, dict):
+        raw_obj = raw
+    elif isinstance(raw, str):
+        try:
+            raw_obj = json.loads(raw)
+        except Exception:
+            raw_obj = None
+    res_data['data'].update({
+        'operation': 'send',
+        'message_id': None,
+        'retcode': None,
+        'error': None,
+        'response': raw_obj
+    })
+    if not isinstance(raw_obj, dict):
+        # 请求异常、超时或回包无法解析时，协议端没有确认收到，按发送失败处理
+        res_data['data']['error'] = '协议端无有效响应'
+        return res_data
+    status = raw_obj.get('status', None)
+    retcode = raw_obj.get('retcode', None)
+    res_data['data']['retcode'] = retcode
+    # OneBot V11：status 为 ok/async（retcode 0/1）表示已受理，failed 表示被协议端拒绝
+    if status in ['ok', 'async'] or (status is None and retcode in [0, 1]):
+        res_data['active'] = True
+        tmp_data = raw_obj.get('data', None)
+        if isinstance(tmp_data, dict) and tmp_data.get('message_id', None) is not None:
+            res_data['data']['message_id'] = str(tmp_data['message_id'])
+    else:
+        error = raw_obj.get('wording', None) or raw_obj.get('message', None) or raw_obj.get('msg', None)
+        if not error:
+            error = '协议端返回失败（retcode=%s）' % str(retcode)
+        res_data['data']['error'] = str(error)
+    return res_data
+
+
 def sendControlEventSend(action, data, control_queue):
     if control_queue is not None:
         control_queue.put(
@@ -856,6 +896,7 @@ class event_action(object):
             msgType = 'para'
         this_msg.data.message = formatMessage(data=message, msgType=msgType)
         this_msg.do_api(control_queue=control_queue)
+        return get_send_result(this_msg)
 
     def send_group_msg(target_event, group_id, message):
         msgType = 'msg'
@@ -869,6 +910,7 @@ class event_action(object):
             msgType = 'para'
         this_msg.data.message = formatMessage(data=message, msgType=msgType)
         this_msg.do_api(control_queue=control_queue)
+        return get_send_result(this_msg)
 
     def delete_msg(target_event, message_id):
         control_queue = target_event.plugin_info['control_queue']
@@ -1324,6 +1366,7 @@ class event_action(object):
         this_msg.data.channel_id = int(channel_id)
         this_msg.data.message = message
         this_msg.do_api(control_queue=control_queue)
+        return get_send_result(this_msg)
 
     def get_guild_member_profile(target_event, guild_id, user_id):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
