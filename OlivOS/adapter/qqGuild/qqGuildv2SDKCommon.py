@@ -215,6 +215,15 @@ qqEventReplyTypes = {
     }
 }
 qqAsyncAcceptedCodes = {304023, 304024}
+# 2026-10-28：群聊/单聊新增图文卡片（msg_type=8）。目前官方只开放 tuwen。
+qqCardMessageTypes = {
+    'tuwen': {
+        'title': (1, 50),
+        'description': (1, 200),
+        'url': 1024,
+        'pic_url': 1024
+    }
+}
 qqPassiveFallbackErrorCodes = {
     # 40034031：msgid 已经过期，清除被动回复凭据后尝试主动发送。
     'msg_id': {304103, 40034005, 40034024, 40034031, 40034128},
@@ -5143,6 +5152,154 @@ class event_action_common(object):
                 traceback.print_exc()
         return res_data
 
+    def _is_https_url(value):
+        if type(value) is not str or value == '':
+            return False
+        parsed = parse.urlparse(value)
+        return parsed.scheme.lower() == 'https' and parsed.netloc != ''
+
+    def _validate_card_message(card):
+        if type(card) is not dict or len(card) == 0:
+            return 'card must be a non-empty dict', None
+        card = copy.deepcopy(card)
+        card_type = card.get('type', None)
+        if card_type is None or card_type == '':
+            card_type = 'tuwen'
+            card['type'] = card_type
+        if type(card_type) is not str:
+            return 'card type must be a string', None
+        if card_type not in qqCardMessageTypes:
+            return 'unsupported card type: %s' % card_type, None
+        content = card.get('content', None)
+        if type(content) is not dict:
+            return 'card content must be a dict', None
+        rules = qqCardMessageTypes[card_type]
+        for field, limit in rules.items():
+            value = content.get(field, None)
+            if type(limit) is tuple:
+                min_len, max_len = limit
+                if type(value) is not str:
+                    return 'card content.%s must be a string' % field, None
+                if len(value) < min_len or len(value) > max_len:
+                    return (
+                        'card content.%s must be %s-%s characters'
+                        % (field, min_len, max_len)
+                    ), None
+                continue
+            if type(value) is not str:
+                return 'card content.%s must be a string' % field, None
+            if len(value) < 1 or len(value) > limit:
+                return (
+                    'card content.%s must be 1-%s characters' % (field, limit)
+                ), None
+            if not event_action._is_https_url(value):
+                return 'card content.%s must be an https URL' % field, None
+        return None, card
+
+    def create_card_message(
+        target_event,
+        chat_type,
+        chat_id,
+        card,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        quote_msg_id=None,
+        force_active=False
+    ):
+        res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        res_data['data']['chat_type'] = str(chat_type)
+        res_data['data']['chat_id'] = None if chat_id is None else str(chat_id)
+
+        if chat_type not in ['qq_group', 'qq_private']:
+            res_data['data']['error'] = (
+                'create_card_message only supports qq_group and qq_private'
+            )
+            return res_data
+        if force_active and (msg_id is not None or event_id is not None):
+            res_data['data']['error'] = (
+                'force_active cannot be combined with msg_id or event_id'
+            )
+            return res_data
+        if chat_id is None or str(chat_id) == '':
+            res_data['data']['error'] = 'chat_id is required'
+            return res_data
+        card_error, card = event_action._validate_card_message(card)
+        if card_error is not None:
+            res_data['data']['error'] = card_error
+            return res_data
+        keyboard_error = event_action._validate_keyboard_permissions(keyboard, chat_type)
+        if keyboard_error is not None:
+            res_data['data']['error'] = keyboard_error
+            return res_data
+        if msg_id is not None and event_id is not None:
+            res_data['data']['error'] = 'msg_id and event_id are mutually exclusive'
+            return res_data
+
+        if force_active:
+            msg_id, event_id = None, None
+        else:
+            msg_id, event_id = event_action._resolve_qq_passive_ids(
+                target_event,
+                chat_type,
+                chat_id,
+                msg_id=msg_id,
+                event_id=event_id
+            )
+        allow_active_fallback = msg_id is not None or event_id is not None
+
+        if chat_type == 'qq_group':
+            this_msg = API.sendQQMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.group_openid = str(chat_id)
+        else:
+            this_msg = API.sendQQDirectMessage(get_SDK_bot_info_from_Event(target_event))
+            this_msg.metadata.openid = str(chat_id)
+        this_msg.data.msg_type = 8
+        this_msg.data.card = card
+        this_msg.data.keyboard = keyboard
+        if quote_msg_id is not None and str(quote_msg_id) != '':
+            this_msg.data.message_reference = {'message_id': str(quote_msg_id)}
+
+        card_content = card.get('content', {})
+        tmp_log_content = event_action._get_qq_log_text_preview(
+            '%s\n%s' % (
+                card_content.get('title', ''),
+                card_content.get('description', '')
+            )
+        )
+        res_data = event_action._send_qq_api(
+            target_event,
+            this_msg,
+            chat_type,
+            chat_id,
+            msg_id,
+            event_id,
+            allow_active_fallback=allow_active_fallback
+        )
+        event_action._attach_qq_log_content(res_data, tmp_log_content)
+
+        if not res_data['active'] and target_event.log_func is not None:
+            response_text = str(this_msg.res) if this_msg.res is not None else 'no response'
+            if len(response_text) > 1000:
+                response_text = response_text[:1000] + '...'
+            response_code = 'n/a' if this_msg.res_code is None else str(this_msg.res_code)
+            try:
+                target_event.log_func(
+                    3,
+                    (
+                        'OlivOS qqGuildv2SDK 图文卡片消息响应: '
+                        f'HTTP {response_code} {response_text}'
+                    ),
+                    [
+                        (target_event.getBotIDStr(), 'default'),
+                        (modelName, 'default'),
+                        ('create_card_message', 'callback')
+                    ]
+                )
+            except Exception:
+                traceback.print_exc()
+        return res_data
+
     def get_login_info(target_event):
         res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
@@ -6705,6 +6862,65 @@ class inde_interface(OlivOS.API.inde_interface_T):
                 quote_msg_id=quote_msg_id,
                 force_verify_image_resource=force_verify_image_resource,
                 local_images=local_images,
+                force_active=force_active,
+                flag_log=flag_log
+            )
+        return res_data
+
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:create_card_message',
+        ['chat_type', 'chat_id', 'message_id', 'content']
+    )
+    def __create_card_message(
+        target_event,
+        chat_type,
+        chat_id,
+        card,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        quote_msg_id=None,
+        force_active=False,
+        flag_log=True
+    ):
+        return OlivOS.qqGuildv2SDK.event_action.create_card_message(
+            target_event=target_event,
+            chat_type=chat_type,
+            chat_id=chat_id,
+            card=card,
+            msg_id=msg_id,
+            event_id=event_id,
+            keyboard=keyboard,
+            quote_msg_id=quote_msg_id,
+            force_active=force_active
+        )
+
+    def create_card_message(
+        self,
+        chat_type,
+        chat_id,
+        card,
+        msg_id=None,
+        event_id=None,
+        keyboard=None,
+        quote_msg_id=None,
+        flag_log=True,
+        remote=False,
+        force_active=False
+    ):
+        res_data = None
+        if remote:
+            pass
+        else:
+            res_data = inde_interface.__create_card_message(
+                self.event,
+                chat_type,
+                chat_id,
+                card,
+                msg_id=msg_id,
+                event_id=event_id,
+                keyboard=keyboard,
+                quote_msg_id=quote_msg_id,
                 force_active=force_active,
                 flag_log=flag_log
             )
