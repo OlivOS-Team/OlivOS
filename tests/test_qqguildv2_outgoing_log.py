@@ -78,7 +78,8 @@ def test_log_val_list_carries_content():
     # 三个发送入口的 callbackLogger 都必须点名 content 字段
     source = inspect.getsource(common.inde_interface)
     for log_name in ['qqGuildv2:send_message', 'qqGuildv2:send_qq_message',
-                     'qqGuildv2:create_markdown_message']:
+                     'qqGuildv2:create_markdown_message',
+                     'qqGuildv2:create_card_message']:
         index = source.index(log_name)
         assert "'content'" in source[index:index + 220], \
             '%s 的 val_list 缺少 content' % log_name

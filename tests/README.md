@@ -69,6 +69,7 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
+| QQ 官方机器人图文卡片 | `test_qqguildv2_card_messages.py` | 群聊/单聊 `msg_type=8` 图文卡片发送、字段校验、indeAPI 入口与被动回复降级 |
 | QQ 官方机器人按钮 | `test_qqguildv2_interactions.py` | 回调按钮投递、群/单聊/频道上下文、原始数据、自动 ACK 与去重、并发/队列上限与过期、异常恢复、被动回复及异常载荷 |
 | QQ 官方机器人分享链接 | `test_qqguildv2_share_links.py` | 请求构造、输入限制与服务端失败响应 |
 | QQ 官方机器人 Markdown 图片 | `test_qqguildv2_media_images.py`, `test_qqguildv2_markdown_images.py` | 素材接口请求、重复图片去重、自动图文转 Markdown、临时素材清理、不确定发送结果与上传失败回退 |

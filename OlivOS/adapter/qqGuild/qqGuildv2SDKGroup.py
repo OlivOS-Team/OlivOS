@@ -1417,6 +1417,7 @@ class API_group(object):
                 self.msg_type = 0       # int
                 self.markdown = None    # object
                 self.keyboard = None    # object
+                self.card = None        # object, msg_type=8
                 self.ark = None         # object
                 self.embed = None       # object
                 self.message_reference = None  # object
