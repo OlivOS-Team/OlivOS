@@ -297,7 +297,9 @@ def browser_auth(host):
     options = webdriver.ChromeOptions()
     if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
         options.add_argument('--no-sandbox')
+    # 认证用例操作桌面侧边栏控件；显式桌面视口避免 Chrome 默认 800px 进入移动抽屉。
     for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
+                     '--window-size=1440,1000',
                      f'--user-data-dir={host.root / "auth-profile"}'):
         options.add_argument(argument)
     if os.environ.get('OLIVOS_CHROME_BINARY'):
