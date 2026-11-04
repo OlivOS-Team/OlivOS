@@ -496,6 +496,48 @@ def test_plugin_navigation_layout_fits_viewport(browser, width, theme):
 
 
 @pytest.mark.browser
+def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
+    driver = browser.driver
+
+    def resize(height):
+        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+            'width': 390, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+        browser.wait.until(lambda _: driver.execute_script(
+            'return Math.abs(window.visualViewport.height - arguments[0]) < 2', height))
+
+    def frame_fits():
+        return driver.execute_script('''
+            const frame = state.frame;
+            if (!frame || frame.hidden) return false;
+            const rect = frame.getBoundingClientRect();
+            const viewport = window.visualViewport;
+            return rect.height > 0 && rect.top >= viewport.offsetTop - 1 &&
+                rect.bottom <= viewport.offsetTop + viewport.height + 1;
+        ''')
+
+    resize(844)
+    identity = browser.select()
+    browser.find('#draft').send_keys('mobile draft')
+    driver.switch_to.default_content()
+    browser.wait.until(lambda _: frame_fits())
+    initial_height = driver.execute_script('return state.frame.getBoundingClientRect().height')
+
+    # 模拟键盘压缩浏览器可视区域，等待真实 resize 事件驱动布局更新。
+    resize(500)
+    browser.wait.until(lambda _: frame_fits() and driver.execute_script(
+        'return state.frame.getBoundingClientRect().height') < initial_height - 200)
+    browser.click('#plugin-mobile-back')
+    browser.wait.until(lambda _: browser.find('#plugins').is_displayed())
+    assert browser.select() == identity
+    assert browser.find('#draft').get_attribute('value') == 'mobile draft'
+
+    driver.switch_to.default_content()
+    browser.click('#plugin-mobile-back')
+    browser.click('[data-page="dashboard"]')
+    browser.wait.until(lambda _: browser.find('#dashboard').is_displayed())
+
+
+@pytest.mark.browser
 @pytest.mark.parametrize('width', [320, 390, 1440])
 def test_dashboard_version_card_keeps_slogan_within_viewport(browser, width):
     driver = browser.driver

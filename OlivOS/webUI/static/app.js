@@ -468,9 +468,22 @@ async function restorePage() {
   }
   await navigate(Object.keys(titles).includes(saved?.page) ? saved.page : 'dashboard');
 }
+function updatePluginViewport() {
+  if (state.page !== 'plugin-page' || !window.visualViewport) return;
+  const viewport = window.visualViewport;
+  const style = $('plugin-page').style;
+  style.setProperty('--plugin-viewport-top', `${viewport.offsetTop}px`);
+  style.setProperty('--plugin-viewport-left', `${viewport.offsetLeft}px`);
+  style.setProperty('--plugin-viewport-width', `${viewport.width}px`);
+  style.setProperty('--plugin-viewport-height', `${viewport.height}px`);
+}
+window.visualViewport?.addEventListener('resize', updatePluginViewport);
+window.visualViewport?.addEventListener('scroll', updatePluginViewport);
+
 async function navigate(page) {
   state.navigationGeneration++;
   state.page = page;
+  if (page === 'plugin-page') updatePluginViewport();
   document.querySelectorAll('.page').forEach((node) => {
     node.hidden = node.id !== page;
   });
@@ -1843,6 +1856,10 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('plugin-pages-close', closePluginPages);
+bind('plugin-mobile-back', () => {
+  navigate('plugins').catch(notifyError);
+  window.scrollTo(0, 0);
+});
 document
   .querySelectorAll('[data-page]')
   .forEach((node) =>
