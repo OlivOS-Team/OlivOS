@@ -1552,13 +1552,19 @@ def logG(log_level, log_message, log_segment=None):
 
 # 启动画面的操作
 def setSplashClose():
-    if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
+    if (
+        '_PYIBoot_SPLASH' in os.environ
+        or '_PYI_SPLASH_IPC' in os.environ
+    ) and importlib.util.find_spec("pyi_splash"):
         import pyi_splash  # type: ignore[import]
         pyi_splash.close()
 
 
 def setSplashText(msg: str):
-    if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
+    if (
+        '_PYIBoot_SPLASH' in os.environ
+        or '_PYI_SPLASH_IPC' in os.environ
+    ) and importlib.util.find_spec("pyi_splash"):
         import pyi_splash  # type: ignore[import]
         pyi_splash.update_text(msg)
 
