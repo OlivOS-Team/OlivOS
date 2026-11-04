@@ -26,6 +26,9 @@ PowerShell 使用 `$env:OLIVOS_WEBUI_BROWSER='1'` 后运行同一 pytest 命令�
 已有浏览器/驱动可通过 `OLIVOS_CHROME_BINARY`、`OLIVOS_CHROMEDRIVER` 指定路径。
 原生 Tk 界面用例只在 Windows 运行，窗口保持隐藏；不启动托盘或真实协议程序。
 
+Windows 打包启动图需额外实测：用带 Splash 的 PyInstaller 程序验证窗口可关闭；源码运行的 pytest
+不能覆盖 bootloader 的启动图和 IPC。新版与旧版打包器应分别验证。
+
 ## 覆盖率
 
 ```sh
