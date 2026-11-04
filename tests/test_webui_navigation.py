@@ -125,7 +125,17 @@ def browser(navigation_host, tmp_path):
         wait.until(lambda _: find(selector).is_displayed() and find(selector).is_enabled())
         find(selector).click()
 
+    def open_sidebar():
+        if not driver.execute_script('return matchMedia("(max-width: 800px)").matches'):
+            return
+        if driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
+            return
+        click('#sidebar-toggle')
+        wait.until(lambda _: driver.execute_script(
+            "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+
     def select(path='webui/index.html', namespace='multi'):
+        open_sidebar()
         click(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
         wait.until(lambda _: driver.execute_script('return !!state.frame && !state.frame.hidden'))
         driver.switch_to.frame(driver.execute_script('return state.frame'))
@@ -145,7 +155,8 @@ def browser(navigation_host, tmp_path):
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
         yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select,
-                              wait_plugin_events=wait_plugin_events, host=navigation_host)
+                              open_sidebar=open_sidebar, wait_plugin_events=wait_plugin_events,
+                              host=navigation_host)
     finally:
         driver.quit()
 
@@ -496,6 +507,133 @@ def test_plugin_navigation_layout_fits_viewport(browser, width, theme):
 
 
 @pytest.mark.browser
+def test_desktop_sidebar_collapses_and_persists(browser):
+    driver = browser.driver
+    width = driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().width")
+    main_width = driver.execute_script(
+        "return document.querySelector('main').getBoundingClientRect().width")
+    browser.click('#sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarCollapsed === 'true'"))
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().width < 100"))
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
+    assert browser.find('#sidebar-toggle').get_attribute('aria-label') == '展开侧边栏'
+    assert driver.execute_script(
+        "return getComputedStyle(document.getElementById('plugin-navigation')).display") == 'none'
+    assert driver.execute_script(
+        "return getComputedStyle(document.querySelector('.sidebar-footer')).display") == 'none'
+    assert driver.execute_script(
+        "return document.querySelector('main').getBoundingClientRect().width") > main_width
+    assert width > 150
+
+    driver.refresh()
+    browser.wait.until(lambda _: browser.find('#shell').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarCollapsed === 'true'"))
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().width < 100")
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
+
+
+@pytest.mark.browser
+def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        'return matchMedia("(max-width: 800px)").matches'))
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
+
+    browser.click('#sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'true'
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'false'
+    assert driver.execute_script('return document.body.classList.contains("sidebar-open")')
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
+    assert driver.execute_script(
+        "return getComputedStyle(document.getElementById('sidebar-backdrop')).visibility") == 'visible'
+    assert driver.execute_script(
+        "return document.elementFromPoint(innerWidth - 10, innerHeight / 2).id") == 'sidebar-backdrop'
+
+    driver.execute_script("document.elementFromPoint(innerWidth - 10, innerHeight / 2).click()")
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+    assert driver.execute_script('return document.body.classList.contains("sidebar-open")') is False
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-toggle'
+
+    browser.click('#sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+    driver.execute_script(
+        "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-toggle'
+
+
+@pytest.mark.browser
+def test_mobile_sidebar_closes_after_navigation(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.open_sidebar()
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-toggle'
+    assert browser.find('[data-page="accounts"]').get_attribute('aria-current') == 'page'
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('width', [320, 390])
+def test_mobile_sidebar_drawer_fits_viewport(browser, width):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.open_sidebar()
+    assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
+    assert driver.execute_script('''
+        const sidebar = document.getElementById('sidebar').getBoundingClientRect();
+        return sidebar.right <= innerWidth && sidebar.width <= innerWidth;
+    ''')
+
+
+@pytest.mark.browser
+def test_sidebar_viewport_switch_clears_mobile_state(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.open_sidebar()
+
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        'return !matchMedia("(max-width: 800px)").matches'))
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+    assert driver.execute_script('return document.body.classList.contains("sidebar-open")') is False
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').hasAttribute('aria-hidden')") is False
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().width") > 150
+
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        'return matchMedia("(max-width: 800px)").matches'))
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
+
+
+@pytest.mark.browser
 def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
     driver = browser.driver
 
@@ -519,6 +657,10 @@ def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('mobile draft')
     driver.switch_to.default_content()
+    assert driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen") == 'false'
+    assert driver.execute_script(
+        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'flex'
     browser.wait.until(lambda _: frame_fits())
     initial_height = driver.execute_script('return state.frame.getBoundingClientRect().height')
 
@@ -533,6 +675,7 @@ def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
 
     driver.switch_to.default_content()
     browser.click('#plugin-mobile-back')
+    browser.open_sidebar()
     browser.click('[data-page="dashboard"]')
     browser.wait.until(lambda _: browser.find('#dashboard').is_displayed())
 
@@ -543,6 +686,7 @@ def test_dashboard_version_card_keeps_slogan_within_viewport(browser, width):
     driver = browser.driver
     driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
         'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.open_sidebar()
     browser.click('[data-page="dashboard"]')
     browser.wait.until(lambda _: driver.execute_script(
         'return document.querySelector(".card-version .version-slogan")?.textContent',

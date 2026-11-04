@@ -3,6 +3,8 @@
 const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
+const sidebarStorageKey = 'olivos.webui.sidebarCollapsed';
+const mobileSidebarQuery = window.matchMedia('(max-width: 800px)');
 
 // 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
 function takeLoginTicket() {
@@ -92,6 +94,8 @@ const state = {
   checkingAuth: false,
   sessionRefresh: null,
   sessionCheckedAt: 0,
+  sidebarCollapsed: false,
+  sidebarOpen: false,
   actions: { reload: null, update: null },
   pluginReload: null,
   pluginListGeneration: 0,
@@ -200,6 +204,73 @@ function bind(id, action, event = 'click') {
       notifyError(error);
     }
   });
+}
+let sidebarReturnFocus = null;
+function sidebarIsMobile() {
+  return mobileSidebarQuery.matches;
+}
+function updateSidebarToggle() {
+  const toggle = $('sidebar-toggle');
+  const sidebar = $('sidebar');
+  const mobile = sidebarIsMobile();
+  const expanded = mobile ? state.sidebarOpen : !state.sidebarCollapsed;
+  const label = mobile
+    ? state.sidebarOpen ? '关闭侧边栏' : '打开侧边栏'
+    : state.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏';
+  toggle.setAttribute('aria-expanded', String(expanded));
+  toggle.setAttribute('aria-label', label);
+  toggle.title = label;
+  if (mobile) sidebar.setAttribute('aria-hidden', String(!state.sidebarOpen));
+  else sidebar.removeAttribute('aria-hidden');
+}
+function setSidebarCollapsed(collapsed, persist = true) {
+  state.sidebarCollapsed = collapsed;
+  $('shell').dataset.sidebarCollapsed = String(collapsed);
+  if (persist) {
+    try {
+      localStorage.setItem(sidebarStorageKey, String(collapsed));
+    } catch {
+      // 禁用存储时只在当前页面保留折叠状态。
+    }
+  }
+  updateSidebarToggle();
+}
+function setSidebarOpen(open, { restoreFocus = true } = {}) {
+  open = sidebarIsMobile() && open;
+  if (state.sidebarOpen === open) {
+    updateSidebarToggle();
+    return;
+  }
+  if (open) sidebarReturnFocus = document.activeElement;
+  state.sidebarOpen = open;
+  $('shell').dataset.sidebarOpen = String(open);
+  document.body.classList.toggle('sidebar-open', open);
+  updateSidebarToggle();
+  if (open) {
+    $('sidebar-close').focus({ preventScroll: true });
+  } else if (restoreFocus && sidebarReturnFocus?.focus) {
+    sidebarReturnFocus.focus({ preventScroll: true });
+  }
+  if (!open) sidebarReturnFocus = null;
+}
+function syncSidebarMode() {
+  if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
+  updateSidebarToggle();
+}
+function initializeSidebar() {
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem(sidebarStorageKey) === 'true';
+  } catch {
+    // 禁用存储时保持默认展开。
+  }
+  setSidebarCollapsed(collapsed, false);
+  setSidebarOpen(false, { restoreFocus: false });
+  if (mobileSidebarQuery.addEventListener) {
+    mobileSidebarQuery.addEventListener('change', syncSidebarMode);
+  } else {
+    mobileSidebarQuery.addListener(syncSidebarMode);
+  }
 }
 function closeStream(name) {
   const entry = state.streams.get(name);
@@ -334,6 +405,7 @@ async function logout() {
 function resetLogin(message = '') {
   state.authGeneration++;
   state.navigationGeneration++;
+  setSidebarOpen(false, { restoreFocus: false });
   cachedToken('');
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
@@ -482,6 +554,7 @@ window.visualViewport?.addEventListener('scroll', updatePluginViewport);
 
 async function navigate(page) {
   state.navigationGeneration++;
+  if (state.sidebarOpen) setSidebarOpen(false);
   state.page = page;
   if (page === 'plugin-page') updatePluginViewport();
   document.querySelectorAll('.page').forEach((node) => {
@@ -489,7 +562,12 @@ async function navigate(page) {
   });
   document
     .querySelectorAll('[data-page]')
-    .forEach((node) => node.classList.toggle('active', node.dataset.page === page));
+    .forEach((node) => {
+      const active = node.dataset.page === page;
+      node.classList.toggle('active', active);
+      if (active) node.setAttribute('aria-current', 'page');
+      else node.removeAttribute('aria-current');
+    });
   $('page-title').textContent = titles[page] || '插件页面';
   if (page !== 'plugin-page') hideFrames();
   if (page !== 'logs') closeStream('logs');
@@ -1856,6 +1934,21 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('plugin-pages-close', closePluginPages);
+bind('sidebar-toggle', () => {
+  if (sidebarIsMobile()) setSidebarOpen(!state.sidebarOpen);
+  else setSidebarCollapsed(!state.sidebarCollapsed);
+});
+bind('sidebar-close', () => setSidebarOpen(false));
+bind('sidebar-backdrop', () => setSidebarOpen(false));
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape' || !state.sidebarOpen) return;
+  ev.preventDefault();
+  setSidebarOpen(false);
+});
+document.addEventListener('click', (ev) => {
+  if (!state.sidebarOpen || !ev.target.closest('#plugin-links .plugin-link-external')) return;
+  setSidebarOpen(false, { restoreFocus: false });
+});
 bind('plugin-mobile-back', () => {
   navigate('plugins').catch(notifyError);
   window.scrollTo(0, 0);
@@ -2054,6 +2147,7 @@ window.addEventListener('hashchange', () => {
   }
 });
 {
+  initializeSidebar();
   const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
   function setCollapsed(collapsed) {
