@@ -542,7 +542,6 @@ def register_routes(host):
             response.headers['Content-Security-Policy'] = (
                 PLUGIN_SANDBOX +
                 "default-src 'self' data: blob:; "
-                "img-src 'self' data: blob: https:; "
                 "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                 "connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
                 "form-action 'none'"
