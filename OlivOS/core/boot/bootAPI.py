@@ -1557,8 +1557,7 @@ def setSplashClose():
         or '_PYI_SPLASH_IPC' in os.environ
     ) and importlib.util.find_spec("pyi_splash"):
         import pyi_splash  # type: ignore[import]
-        if pyi_splash.is_alive():
-            pyi_splash.close()
+        pyi_splash.close()
 
 
 def setSplashText(msg: str):
@@ -1567,8 +1566,7 @@ def setSplashText(msg: str):
         or '_PYI_SPLASH_IPC' in os.environ
     ) and importlib.util.find_spec("pyi_splash"):
         import pyi_splash  # type: ignore[import]
-        if pyi_splash.is_alive():
-            pyi_splash.update_text(msg)
+        pyi_splash.update_text(msg)
 
 
 def preLoadPrint(msg: str):
