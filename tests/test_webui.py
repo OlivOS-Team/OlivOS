@@ -72,7 +72,11 @@ def send(host, data):
 
 def test_auth_and_rate_limit(host):
     client = host.app.test_client()
-    assert client.get('/api/health').json == {'status': 'OK'}
+    assert client.get('/api/health').json == {
+        'status': 'OK',
+        'version': OlivOS.infoAPI.OlivOS_Version_Short,
+        'version_slogan': OlivOS.infoAPI.OlivOS_Version_Slogan,
+    }
     assert client.get('/').status_code == 200
     for _ in range(10):
         assert client.get('/api/status').status_code == 401
@@ -1024,7 +1028,10 @@ def test_busy_port_advances_and_tray_uses_actual_port(host, monkeypatch):
             assert Path.cwd() != host.root
             assert serverAPI.browser_url(host.root) == f"http://127.0.0.1:{host.config['port']}"
             with urllib.request.urlopen(serverAPI.browser_url(host.root) + '/api/health', timeout=3) as response:
-                assert json.load(response) == {'status': 'OK'}
+                health = json.load(response)
+                assert health['status'] == 'OK'
+                assert health['version'] == OlivOS.infoAPI.OlivOS_Version_Short
+                assert health['version_slogan'] == OlivOS.infoAPI.OlivOS_Version_Slogan
             result = subprocess.run([
                 sys.executable, '-c',
                 'import sys; from OlivOS.webUI.serverAPI import browser_url; print(browser_url(sys.argv[1]))',

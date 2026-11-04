@@ -574,7 +574,9 @@ def register_routes(host):
 
     @app.get('/api/health')
     def health():
-        return jsonify(status='OK')
+        # 登录页需要在认证前展示版本，因此公开接口只增量暴露静态版本信息。
+        return jsonify(status='OK', version=OlivOS.infoAPI.OlivOS_Version_Short,
+                       version_slogan=OlivOS.infoAPI.OlivOS_Version_Slogan)
 
     @app.post('/api/login')
     def login():

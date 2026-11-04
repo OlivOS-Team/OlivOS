@@ -89,6 +89,8 @@ const state = {
   seenEvents: new Set(),
   qrURL: null,
   timer: null,
+  uptimeTimer: null,
+  uptimeSnapshot: null,
   authGeneration: 0,
   cachedLogin: false,
   checkingAuth: false,
@@ -196,6 +198,29 @@ async function api(path, options = {}) {
   }
   return data;
 }
+// 版本信息在登录前也需要可见；health 是唯一无需认证的 API。
+async function loadPublicVersion() {
+  const version = $('login-version');
+  if (!version) return;
+  try {
+    const response = await fetch('/api/health', { headers: { Accept: 'application/json' } });
+    if (!response.ok) return;
+    const data = await response.json();
+    const number = typeof data.version === 'string' ? data.version.trim() : '';
+    const slogan = typeof data.version_slogan === 'string' ? data.version_slogan.trim() : '';
+    if (!number) return;
+    version.querySelector('[data-version-number]').textContent = number;
+    const sloganElement = version.querySelector('[data-version-slogan]');
+    const separator = version.querySelector('[data-version-separator]');
+    sloganElement.textContent = slogan;
+    sloganElement.hidden = !slogan;
+    separator.hidden = !slogan;
+    version.title = slogan ? number + ' · ' + slogan : number;
+    version.hidden = false;
+  } catch {
+    // 版本信息只用于展示，接口不可用时保持隐藏，不影响登录。
+  }
+}
 function bind(id, action, event = 'click') {
   $(id).addEventListener(event, async (ev) => {
     try {
@@ -237,6 +262,7 @@ function setSidebarCollapsed(collapsed, persist = true) {
 }
 function setSidebarOpen(open, { restoreFocus = true } = {}) {
   open = sidebarIsMobile() && open;
+  if (!open) closeSelectMenu();
   if (state.sidebarOpen === open) {
     updateSidebarToggle();
     return;
@@ -378,10 +404,14 @@ async function login(ev, token = null, ticket = null) {
       }
       checkCachedLogin();
     }, 10000);
+    clearInterval(state.uptimeTimer);
+    state.uptimeTimer = setInterval(updateUptime, 1000);
   } catch (error) {
     if (error.authHandled || error.authObsolete) return;
     for (const name of [...state.streams.keys()]) closeStream(name);
     clearInterval(state.timer);
+    clearInterval(state.uptimeTimer);
+    state.uptimeSnapshot = null;
     state.token = '';
     state.session = '';
     $('shell').hidden = true;
@@ -410,6 +440,8 @@ function resetLogin(message = '') {
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
+  clearInterval(state.uptimeTimer);
+  state.uptimeSnapshot = null;
   state.token = '';
   state.session = '';
   state.sessionRefresh = null;
@@ -553,6 +585,7 @@ window.visualViewport?.addEventListener('resize', updatePluginViewport);
 window.visualViewport?.addEventListener('scroll', updatePluginViewport);
 
 async function navigate(page) {
+  closeSelectMenu();
   state.navigationGeneration++;
   if (state.sidebarOpen) setSidebarOpen(false);
   state.page = page;
@@ -597,6 +630,13 @@ function uptimeText(seconds) {
   const minutes = Math.floor(seconds / 60) % 60;
   return `运行时长：${days} 天 ${hours} 时 ${minutes} 分 ${seconds % 60} 秒`;
 }
+// 服务端心跳是间断的，页面以最近一次 uptime 为锚点按本地单调时钟推进；
+// 下一次心跳到达时再校准，页面被浏览器节流后恢复也不会丢失经过的时间。
+function updateUptime() {
+  if (state.page !== 'dashboard' || !state.uptimeSnapshot) return;
+  const elapsed = Math.floor((performance.now() - state.uptimeSnapshot.receivedAt) / 1000);
+  $('runtime').textContent = uptimeText(state.uptimeSnapshot.seconds + elapsed);
+}
 async function refreshStatus() {
   const status = await api('/api/status');
   if (Number.isInteger(status.plugin_page_cache)) {
@@ -615,7 +655,8 @@ async function refreshStatus() {
     card.append(element('span', label), element('strong', value));
     cards.append(card);
   }
-  $('runtime').textContent = uptimeText(status.uptime);
+  state.uptimeSnapshot = { seconds: Number(status.uptime) || 0, receivedAt: performance.now() };
+  updateUptime();
   $('online-note').textContent = status.unknown
     ? `${status.unknown} 个启用账号尚无可用的连接状态：`
     : '';
@@ -759,6 +800,353 @@ function setAt(object, path, value) {
   for (const part of parts) target = target[part] ||= {};
   target[key] = value;
 }
+const selectMenuMaxHeight = 320;
+const selectMenuGap = 4;
+const selectMenuViewportGap = 8;
+const selectMenuState = {
+  select: null,
+  menu: null,
+  items: [],
+  activeIndex: -1,
+  typeahead: '',
+  lastTypeaheadAt: 0,
+  sequence: 0,
+};
+
+function selectMenuLabel(select) {
+  const aria = select.getAttribute('aria-label');
+  if (aria) return aria;
+  const label = select.labels && select.labels[0];
+  if (!label) return '选项';
+  const text = Array.from(label.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent)
+    .join(' ')
+    .trim();
+  return text || '选项';
+}
+
+function selectMenuHost(select) {
+  return select.closest('dialog[open]') || document.body;
+}
+
+function enhanceSelect(select) {
+  if (!select || select.multiple || select.dataset.customSelectReady === '1') return;
+  if (select.closest('.select-shell')) return;
+  select.dataset.customSelectReady = '1';
+  const shell = element('span', null, { class: 'select-shell' });
+  const chevron = element('span', null, { class: 'select-chevron', 'aria-hidden': 'true' });
+  select.parentNode.insertBefore(shell, select);
+  shell.append(select, chevron);
+  select.setAttribute('aria-haspopup', 'listbox');
+  select.setAttribute('aria-expanded', 'false');
+  select.addEventListener('pointerdown', (event) => {
+    if (select.disabled) return;
+    event.preventDefault();
+    select.focus({ preventScroll: true });
+    if (selectMenuState.select === select) closeSelectMenu();
+    else openSelectMenu(select);
+  });
+  select.addEventListener('keydown', handleSelectKeydown);
+  const label = select.labels && select.labels[0];
+  if (label) {
+    label.addEventListener('click', (event) => {
+      if (event.target === select || select.disabled) return;
+      event.preventDefault();
+      select.focus({ preventScroll: true });
+      if (selectMenuState.select === select) closeSelectMenu();
+      else openSelectMenu(select);
+    });
+  }
+}
+
+function enhanceSelects(root = document) {
+  root.querySelectorAll('select:not([multiple])').forEach(enhanceSelect);
+}
+
+function appendSelectMenuItem(menu, items, option, index, groupDisabled) {
+  const disabled = groupDisabled || option.disabled;
+  const item = element('div', null, {
+    id: `${menu.id}-option-${index}`,
+    class: 'select-menu-option',
+    role: 'option',
+    'aria-selected': String(option.selected),
+    'aria-disabled': String(disabled),
+  });
+  item.append(element('span', option.textContent.trim() || option.value || '（空白选项）', {
+    class: 'select-menu-option-label',
+  }));
+  menu.append(item);
+  const entry = { option, element: item, disabled };
+  const itemIndex = items.length;
+  items.push(entry);
+  if (disabled) return;
+  item.addEventListener('pointermove', () => {
+    if (selectMenuState.activeIndex !== itemIndex) setSelectActiveIndex(itemIndex);
+  });
+  item.addEventListener('click', () => chooseSelectMenuItem(entry));
+}
+
+function openSelectMenu(select) {
+  if (!select || select.disabled) return;
+  closeSelectMenu();
+  select.focus({ preventScroll: true });
+  const menu = element('div', null, {
+    id: `customSelectMenu${++selectMenuState.sequence}`,
+    class: 'select-menu',
+    role: 'listbox',
+    'aria-label': selectMenuLabel(select),
+  });
+  const items = [];
+  let optionIndex = 0;
+  Array.from(select.children).forEach((child) => {
+    if (child.tagName === 'OPTGROUP') {
+      menu.append(element('div', child.label || '', {
+        class: 'select-menu-group',
+        role: 'presentation',
+      }));
+      Array.from(child.children).forEach((option) => {
+        if (option.tagName !== 'OPTION') return;
+        appendSelectMenuItem(menu, items, option, optionIndex, child.disabled);
+        optionIndex += 1;
+      });
+      return;
+    }
+    if (child.tagName === 'OPTION') {
+      appendSelectMenuItem(menu, items, child, optionIndex, false);
+      optionIndex += 1;
+    }
+  });
+  menu.addEventListener('pointerdown', (event) => event.preventDefault());
+  menu.style.visibility = 'hidden';
+  selectMenuHost(select).append(menu);
+  selectMenuState.select = select;
+  selectMenuState.menu = menu;
+  selectMenuState.items = items;
+  selectMenuState.activeIndex = -1;
+  select.classList.add('select-menu-open');
+  select.setAttribute('aria-expanded', 'true');
+  select.setAttribute('aria-controls', menu.id);
+  const selectedIndex = items.findIndex((item) => item.option.selected && !item.disabled);
+  setSelectActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabledSelectItem());
+  positionSelectMenu();
+  menu.style.visibility = '';
+  document.addEventListener('pointerdown', handleSelectOutsidePointerDown, true);
+  document.addEventListener('focusin', handleSelectFocusChange, true);
+  window.addEventListener('resize', positionSelectMenu);
+  window.addEventListener('scroll', handleSelectViewportScroll, true);
+  window.addEventListener('blur', handleSelectWindowBlur);
+}
+
+function setSelectActiveIndex(index) {
+  if (!selectMenuState.menu || index < 0 || index >= selectMenuState.items.length) return;
+  const item = selectMenuState.items[index];
+  if (!item || item.disabled) return;
+  selectMenuState.activeIndex = index;
+  selectMenuState.items.forEach((entry, entryIndex) => {
+    entry.element.dataset.active = String(entryIndex === index);
+  });
+  selectMenuState.select.setAttribute('aria-activedescendant', item.element.id);
+  const menu = selectMenuState.menu;
+  const itemTop = item.element.offsetTop;
+  const itemBottom = itemTop + item.element.offsetHeight;
+  if (itemTop < menu.scrollTop) menu.scrollTop = itemTop;
+  else if (itemBottom > menu.scrollTop + menu.clientHeight) {
+    menu.scrollTop = itemBottom - menu.clientHeight;
+  }
+}
+
+function moveSelectActive(delta) {
+  const items = selectMenuState.items;
+  if (!items.length) return;
+  let index = selectMenuState.activeIndex;
+  for (let count = 0; count < items.length; count += 1) {
+    index = (index + delta + items.length) % items.length;
+    if (!items[index].disabled) {
+      setSelectActiveIndex(index);
+      return;
+    }
+  }
+}
+
+function firstEnabledSelectItem() {
+  return selectMenuState.items.findIndex((item) => !item.disabled);
+}
+
+function lastEnabledSelectItem() {
+  for (let index = selectMenuState.items.length - 1; index >= 0; index -= 1) {
+    if (!selectMenuState.items[index].disabled) return index;
+  }
+  return -1;
+}
+
+function chooseSelectMenuItem(item) {
+  const select = selectMenuState.select;
+  if (!select || !item || item.disabled) return;
+  const changed = select.selectedIndex !== item.option.index;
+  select.selectedIndex = item.option.index;
+  closeSelectMenu(true);
+  if (changed) select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function handleSelectKeydown(event) {
+  const select = event.currentTarget;
+  if (select.disabled || event.isComposing) return;
+  const open = selectMenuState.select === select;
+  if (!open) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openSelectMenu(select);
+      moveSelectActive(event.key === 'ArrowDown' ? 1 : -1);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openSelectMenu(select);
+    }
+    return;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeSelectMenu(true);
+  } else if (event.key === 'Tab') {
+    closeSelectMenu();
+  } else if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    const item = selectMenuState.items[selectMenuState.activeIndex];
+    if (item && !item.disabled) chooseSelectMenuItem(item);
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    moveSelectActive(1);
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveSelectActive(-1);
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    setSelectActiveIndex(firstEnabledSelectItem());
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    setSelectActiveIndex(lastEnabledSelectItem());
+  } else if (event.key === 'PageDown') {
+    event.preventDefault();
+    moveSelectActive(5);
+  } else if (event.key === 'PageUp') {
+    event.preventDefault();
+    moveSelectActive(-5);
+  } else if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    typeaheadSelectItem(event.key);
+  }
+}
+
+function typeaheadSelectItem(character) {
+  const now = Date.now();
+  if (now - selectMenuState.lastTypeaheadAt > 700) selectMenuState.typeahead = '';
+  selectMenuState.lastTypeaheadAt = now;
+  selectMenuState.typeahead += character.toLocaleLowerCase();
+  const query = selectMenuState.typeahead;
+  const items = selectMenuState.items;
+  const start = selectMenuState.activeIndex >= 0
+    ? (selectMenuState.activeIndex + 1) % items.length
+    : 0;
+  for (let offset = 0; offset < items.length; offset += 1) {
+    const index = (start + offset) % items.length;
+    const item = items[index];
+    if (!item.disabled && item.option.textContent.trim().toLocaleLowerCase().startsWith(query)) {
+      setSelectActiveIndex(index);
+      return;
+    }
+  }
+}
+
+function positionSelectMenu() {
+  const select = selectMenuState.select;
+  const menu = selectMenuState.menu;
+  if (!select || !menu || !document.contains(select)) {
+    closeSelectMenu();
+    return;
+  }
+  const rect = select.getBoundingClientRect();
+  if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+    closeSelectMenu();
+    return;
+  }
+  const maxWidth = Math.max(0, window.innerWidth - selectMenuViewportGap * 2);
+  const width = Math.min(Math.max(rect.width, 168), maxWidth);
+  const left = Math.min(
+    Math.max(rect.left, selectMenuViewportGap),
+    Math.max(selectMenuViewportGap, window.innerWidth - width - selectMenuViewportGap),
+  );
+  menu.style.width = `${Math.round(width)}px`;
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.maxHeight = `${Math.min(selectMenuMaxHeight, Math.max(80, window.innerHeight - 16))}px`;
+  menu.style.top = '0px';
+  const naturalHeight = menu.scrollHeight;
+  const availableBelow = window.innerHeight - rect.bottom - selectMenuGap - selectMenuViewportGap;
+  const availableAbove = rect.top - selectMenuGap - selectMenuViewportGap;
+  const height = Math.min(naturalHeight, selectMenuMaxHeight);
+  const opensAbove = availableBelow < height && availableAbove > availableBelow;
+  const finalHeight = Math.max(0, Math.min(height, opensAbove ? availableAbove : availableBelow));
+  menu.style.maxHeight = `${Math.min(selectMenuMaxHeight, finalHeight)}px`;
+  const top = opensAbove ? rect.top - selectMenuGap - finalHeight : rect.bottom + selectMenuGap;
+  menu.style.top = `${Math.round(Math.max(selectMenuViewportGap, top))}px`;
+  menu.classList.toggle('opens-above', opensAbove);
+  // 边框盒会带来 2px 差值，只有内容确实溢出时才启用滚动。
+  menu.classList.toggle('is-scrollable', menu.scrollHeight > menu.clientHeight + 2);
+}
+
+function handleSelectOutsidePointerDown(event) {
+  const select = selectMenuState.select;
+  const menu = selectMenuState.menu;
+  if (!select || !menu) return;
+  if (event.target === select || select.contains(event.target) || menu.contains(event.target)) return;
+  closeSelectMenu();
+}
+
+function handleSelectViewportScroll(event) {
+  if (event.target === selectMenuState.menu) return;
+  positionSelectMenu();
+}
+
+function handleSelectFocusChange(event) {
+  const select = selectMenuState.select;
+  const menu = selectMenuState.menu;
+  if (!select || !menu) return;
+  if (event.target !== select && !menu.contains(event.target)) closeSelectMenu();
+}
+
+function handleSelectWindowBlur() {
+  closeSelectMenu();
+}
+
+function closeSelectMenu(focusSelect = false) {
+  const select = selectMenuState.select;
+  if (select) {
+    select.classList.remove('select-menu-open');
+    select.setAttribute('aria-expanded', 'false');
+    select.removeAttribute('aria-controls');
+    select.removeAttribute('aria-activedescendant');
+  }
+  if (selectMenuState.menu?.parentNode) selectMenuState.menu.remove();
+  selectMenuState.select = null;
+  selectMenuState.menu = null;
+  selectMenuState.items = [];
+  selectMenuState.activeIndex = -1;
+  selectMenuState.typeahead = '';
+  selectMenuState.lastTypeaheadAt = 0;
+  document.removeEventListener('pointerdown', handleSelectOutsidePointerDown, true);
+  document.removeEventListener('focusin', handleSelectFocusChange, true);
+  window.removeEventListener('resize', positionSelectMenu);
+  window.removeEventListener('scroll', handleSelectViewportScroll, true);
+  window.removeEventListener('blur', handleSelectWindowBlur);
+  if (focusSelect && select && !select.disabled) select.focus({ preventScroll: true });
+}
+
+function initializeSelectMenus() {
+  enhanceSelects(document);
+  document.querySelectorAll('dialog').forEach((dialog) => {
+    dialog.addEventListener('close', () => closeSelectMenu());
+  });
+}
+
 function options(select, values, selected) {
   select.replaceChildren();
   for (const value of values) select.append(element('option', value, { value }));
@@ -2136,6 +2524,7 @@ window.addEventListener('beforeunload', (ev) => {
 window.addEventListener('pagehide', () => {
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
+  clearInterval(state.uptimeTimer);
 });
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted && state.token) login(null, state.token);
@@ -2148,6 +2537,8 @@ window.addEventListener('hashchange', () => {
 });
 {
   initializeSidebar();
+  initializeSelectMenus();
+  loadPublicVersion();
   const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
   function setCollapsed(collapsed) {

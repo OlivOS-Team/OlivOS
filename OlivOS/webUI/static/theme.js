@@ -13,16 +13,39 @@
     // Theme switching still works when browser storage is unavailable.
   }
 
+  function effectiveTheme() {
+    return mode === 'system' ? (systemTheme.matches ? 'dark' : 'light') : mode;
+  }
+
   function applyTheme() {
-    document.documentElement.dataset.theme =
-      mode === 'system' ? (systemTheme.matches ? 'dark' : 'light') : mode;
-    document.querySelectorAll('[data-theme-select]').forEach((select) => {
-      select.value = mode;
+    const theme = effectiveTheme();
+    const dark = theme === 'dark';
+    const label = dark ? '深色模式' : '浅色模式';
+    const target = dark ? '浅色' : '深色';
+    document.documentElement.dataset.theme = theme;
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(dark));
+      button.setAttribute('aria-label', `切换到${target}模式`);
+      button.title = `切换到${target}模式`;
+      const text = button.querySelector('[data-theme-label]');
+      if (text) text.textContent = label;
     });
   }
 
+  function toggleTheme() {
+    mode = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    applyTheme();
+    try {
+      localStorage.setItem(storageKey, mode);
+    } catch {
+      // Keep the chosen theme for this page even if persistence is blocked.
+    }
+  }
+
   applyTheme();
-  systemTheme.addEventListener('change', applyTheme);
+  systemTheme.addEventListener('change', () => {
+    if (mode === 'system') applyTheme();
+  });
   window.addEventListener('storage', (event) => {
     if (event.key !== storageKey && event.key !== null) return;
     mode = modes.includes(event.newValue) ? event.newValue : 'system';
@@ -31,16 +54,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
-    document.querySelectorAll('[data-theme-select]').forEach((select) => {
-      select.addEventListener('change', () => {
-        mode = modes.includes(select.value) ? select.value : 'system';
-        applyTheme();
-        try {
-          localStorage.setItem(storageKey, mode);
-        } catch {
-          // Keep the chosen theme for this page even if persistence is blocked.
-        }
-      });
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      button.addEventListener('click', toggleTheme);
     });
   });
 })();

@@ -38,14 +38,30 @@
         </label>
         <button type="submit" class="primary">登录</button>
         <p id="login-error" role="alert"></p>
-        <label class="theme-control">
-          <span>外观</span>
-          <select data-theme-select aria-label="外观">
-            <option value="system">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
-          </select>
-        </label>
+        <div class="theme-control login-theme-control">
+          <span id="login-version" class="login-version" hidden>
+            <span class="login-version-number" data-version-number></span>
+            <span class="login-version-separator" data-version-separator aria-hidden="true">·</span>
+            <span class="login-version-slogan" data-version-slogan></span>
+          </span>
+          <button
+            class="theme-toggle theme-toggle-icon-only"
+            type="button"
+            data-theme-toggle
+            aria-pressed="false"
+            aria-label="切换到深色模式"
+            title="切换到深色模式"
+          >
+            <svg class="theme-toggle-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+            </svg>
+            <svg class="theme-toggle-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z"></path>
+            </svg>
+            <span class="visually-hidden" data-theme-label>浅色模式</span>
+          </button>
+        </div>
       </form>
     </section>
     <div id="shell" data-sidebar-collapsed="false" data-sidebar-open="false" hidden>
@@ -127,15 +143,30 @@
           </div>
         </nav>
         <div class="sidebar-footer">
-          <label class="theme-control">
-            <span>外观</span>
-            <select data-theme-select aria-label="外观">
-              <option value="system">跟随系统</option>
-              <option value="light">浅色</option>
-              <option value="dark">深色</option>
-            </select>
-          </label>
-          <button id="logout">退出登录</button>
+          <button
+            class="theme-toggle sidebar-action"
+            type="button"
+            data-theme-toggle
+            aria-pressed="false"
+            aria-label="切换到深色模式"
+            title="切换到深色模式"
+          >
+            <svg class="theme-toggle-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+            </svg>
+            <svg class="theme-toggle-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z"></path>
+            </svg>
+            <span class="sidebar-action-label" data-theme-label>浅色模式</span>
+          </button>
+          <button id="logout" class="sidebar-action" type="button" aria-label="退出登录" title="退出登录">
+            <svg class="sidebar-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <path d="m16 17 5-5-5-5M21 12H9"></path>
+            </svg>
+            <span class="sidebar-action-label">退出登录</span>
+          </button>
         </div>
       </aside>
       <div id="sidebar-backdrop" aria-hidden="true"></div>

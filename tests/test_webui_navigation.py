@@ -133,9 +133,13 @@ def browser(navigation_host, tmp_path):
         click('#sidebar-toggle')
         wait.until(lambda _: driver.execute_script(
             "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+        wait.until(lambda _: driver.execute_script(
+            "return document.getElementById('sidebar').getBoundingClientRect().left >= -1"))
 
     def select(path='webui/index.html', namespace='multi'):
         open_sidebar()
+        entry = find(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
+        driver.execute_script('arguments[0].scrollIntoView({block: "center"})', entry)
         click(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
         wait.until(lambda _: driver.execute_script('return !!state.frame && !state.frame.hidden'))
         driver.switch_to.frame(driver.execute_script('return state.frame'))
@@ -507,6 +511,352 @@ def test_plugin_navigation_layout_fits_viewport(browser, width, theme):
 
 
 @pytest.mark.browser
+def test_theme_toggle_switches_both_buttons_and_persists(browser):
+    from selenium.webdriver.common.by import By
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-color-scheme', 'value': 'light'}]})
+    driver.execute_script("localStorage.removeItem('olivos.webui.theme')")
+    driver.refresh()
+    browser.wait.until(lambda _: browser.find('#shell').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'light')
+
+    def button_states():
+        return driver.execute_script('''
+            return [...document.querySelectorAll('[data-theme-toggle]')].map(button => ({
+              pressed: button.getAttribute('aria-pressed'),
+              label: button.querySelector('[data-theme-label]').textContent,
+              action: button.getAttribute('aria-label'),
+            }));
+        ''')
+
+    assert len(driver.find_elements(By.CSS_SELECTOR, '[data-theme-toggle]')) == 2
+    assert button_states() == [
+        {'pressed': 'false', 'label': '浅色模式', 'action': '切换到深色模式'},
+        {'pressed': 'false', 'label': '浅色模式', 'action': '切换到深色模式'},
+    ]
+    browser.click('#sidebar [data-theme-toggle]')
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'dark')
+    assert driver.execute_script("return localStorage.getItem('olivos.webui.theme')") == 'dark'
+    assert button_states() == [
+        {'pressed': 'true', 'label': '深色模式', 'action': '切换到浅色模式'},
+        {'pressed': 'true', 'label': '深色模式', 'action': '切换到浅色模式'},
+    ]
+
+    driver.refresh()
+    browser.wait.until(lambda _: browser.find('#shell').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'dark')
+    assert button_states()[0]['label'] == '深色模式'
+    browser.click('#sidebar [data-theme-toggle]')
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'light')
+    assert driver.execute_script("return localStorage.getItem('olivos.webui.theme')") == 'light'
+
+
+@pytest.mark.browser
+def test_theme_toggle_follows_system_until_first_click(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-color-scheme', 'value': 'dark'}]})
+    driver.execute_script("localStorage.removeItem('olivos.webui.theme')")
+    driver.refresh()
+    browser.wait.until(lambda _: browser.find('#shell').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'dark')
+    assert browser.find('#sidebar [data-theme-toggle]').get_attribute('aria-label') == '切换到浅色模式'
+    assert browser.find('#sidebar [data-theme-label]').text == '深色模式'
+
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-color-scheme', 'value': 'light'}]})
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') == 'light')
+    assert browser.find('#sidebar [data-theme-toggle]').get_attribute('aria-label') == '切换到深色模式'
+    assert driver.execute_script("return localStorage.getItem('olivos.webui.theme')") is None
+
+
+@pytest.mark.browser
+def test_theme_and_logout_actions_share_layout_and_icons(browser):
+    result = browser.driver.execute_script('''
+        const theme = document.querySelector('#sidebar [data-theme-toggle]');
+        const logout = document.getElementById('logout');
+        const login = document.querySelector('#login [data-theme-toggle]');
+        const loginLabel = login.querySelector('[data-theme-label]');
+        const themeRect = theme.getBoundingClientRect();
+        const logoutRect = logout.getBoundingClientRect();
+        return {
+          aligned: Math.abs(themeRect.left - logoutRect.left) < 0.5 &&
+            Math.abs(themeRect.right - logoutRect.right) < 0.5 &&
+            Math.abs(themeRect.width - logoutRect.width) < 0.5,
+          stacked: logoutRect.top >= themeRect.bottom,
+          sameHeight: Math.abs(themeRect.height - logoutRect.height) < 0.5,
+          themeIcon: !!theme.querySelector('svg.theme-toggle-icon'),
+          logoutIcon: !!logout.querySelector('svg.sidebar-action-icon'),
+          loginIconOnly: login.classList.contains('theme-toggle-icon-only') &&
+            getComputedStyle(loginLabel).position === 'absolute' &&
+            parseFloat(getComputedStyle(loginLabel).width) <= 1,
+          loginHasVisibleLabel: !!document.querySelector(
+            '#login .theme-control > span:not([data-theme-label]):not(.login-version)'),
+        };
+    ''')
+    assert result == {
+        'aligned': True, 'stacked': True, 'sameHeight': True, 'themeIcon': True,
+        'logoutIcon': True, 'loginIconOnly': True, 'loginHasVisibleLabel': False,
+    }
+
+
+@pytest.mark.browser
+def test_custom_log_select_supports_pointer_and_keyboard(browser):
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    driver = browser.driver
+    browser.click('[data-page="logs"]')
+    browser.wait.until(lambda _: browser.find('#logs').is_displayed())
+    select = browser.find('#log-message-mode')
+    assert select.get_attribute('aria-haspopup') == 'listbox'
+
+    select.click()
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    assert driver.execute_script(
+        'return [...document.querySelectorAll(".select-menu-option")].map(item => item.textContent)'
+    ) == ['OP', 'CQ']
+    geometry = driver.execute_script("""
+        const menu = document.querySelector('.select-menu');
+        const style = getComputedStyle(menu);
+        return {
+          scrollableClass: menu.classList.contains('is-scrollable'),
+          overflowY: style.overflowY,
+        };
+    """)
+    assert geometry == {'scrollableClass': False, 'overflowY': 'hidden'}
+    driver.find_elements(By.CSS_SELECTOR, '.select-menu-option')[1].click()
+    browser.wait.until(lambda _: select.get_attribute('value') == 'cq')
+    browser.wait.until(lambda _: driver.execute_script('return state.logMessageMode') == 'cq')
+    assert driver.execute_script('return document.activeElement.id') == 'log-message-mode'
+    assert not driver.find_elements(By.CSS_SELECTOR, '.select-menu')
+
+    select.send_keys(Keys.ENTER)
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    assert select.get_attribute('aria-expanded') == 'true'
+    select.send_keys(Keys.ESCAPE)
+    browser.wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '.select-menu'))
+    assert select.get_attribute('aria-expanded') == 'false'
+    assert driver.execute_script('return document.activeElement.id') == 'log-message-mode'
+
+    select.send_keys(Keys.ARROW_UP)
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    select.send_keys(Keys.ENTER)
+    browser.wait.until(lambda _: select.get_attribute('value') == 'op')
+    browser.wait.until(lambda _: driver.execute_script('return state.logMessageMode') == 'op')
+
+    browser.find('label[for="log-message-mode"]').click()
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    select.send_keys(Keys.TAB)
+    browser.wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '.select-menu'))
+
+
+@pytest.mark.browser
+def test_custom_select_scrolls_only_when_options_overflow(browser):
+    from selenium.webdriver.common.by import By
+    driver = browser.driver
+    browser.click('[data-page="logs"]')
+    browser.wait.until(lambda _: browser.find('#logs').is_displayed())
+    driver.execute_script("""
+        const select = document.getElementById('log-message-mode');
+        for (let index = 0; index < 20; index += 1) {
+          select.append(new Option(`选项 ${index}`, `option-${index}`));
+        }
+    """)
+    browser.find('#log-message-mode').click()
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.querySelector('.select-menu').classList.contains('is-scrollable')"))
+    assert driver.execute_script("""
+        const menu = document.querySelector('.select-menu');
+        return {
+          overflowY: getComputedStyle(menu).overflowY,
+          hasOverflow: menu.scrollHeight > menu.clientHeight + 2,
+        };
+    """) == {'overflowY': 'auto', 'hasOverflow': True}
+    driver.find_elements(By.CSS_SELECTOR, '.select-menu-option')[0].click()
+
+
+@pytest.mark.browser
+def test_log_level_summary_uses_custom_chevron(browser):
+    driver = browser.driver
+    browser.click('[data-page="logs"]')
+    browser.wait.until(lambda _: browser.find('#logs').is_displayed())
+
+    def chevron():
+        return driver.execute_script("""
+            const logStyle = getComputedStyle(
+              document.querySelector('#log-filter > summary'), '::before');
+            const selectStyle = getComputedStyle(
+              document.querySelector('#log-message-mode + .select-chevron'), '::before');
+            return {
+              content: logStyle.content,
+              width: logStyle.width,
+              height: logStyle.height,
+              borderRightWidth: logStyle.borderRightWidth,
+              borderBottomWidth: logStyle.borderBottomWidth,
+              transform: logStyle.transform,
+              selectWidth: selectStyle.width,
+              selectHeight: selectStyle.height,
+              selectBorderRightWidth: selectStyle.borderRightWidth,
+              selectBorderBottomWidth: selectStyle.borderBottomWidth,
+              selectTransform: selectStyle.transform,
+            };
+        """)
+
+    closed = chevron()
+    assert closed['content'] == '""'
+    assert closed['width'] == closed['selectWidth']
+    assert closed['height'] == closed['selectHeight']
+    assert closed['borderRightWidth'] == closed['selectBorderRightWidth']
+    assert closed['borderBottomWidth'] == closed['selectBorderBottomWidth']
+    assert closed['transform'] == closed['selectTransform']
+    assert closed['transform'] != 'none'
+
+    browser.click('#log-level')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('log-filter').open"))
+    browser.wait.until(lambda _: chevron()['transform'] != closed['transform'])
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('width', [320, 1440])
+def test_login_page_shows_version_beside_theme_toggle(browser, width):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    driver.execute_script('resetLogin()')
+    browser.wait.until(lambda _: browser.find('#login').is_displayed())
+    browser.wait.until(lambda _: browser.find('#login-version').is_displayed())
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.querySelector('[data-version-number]').textContent"
+    ) == OlivOS.infoAPI.OlivOS_Version_Short)
+    layout = driver.execute_script("""
+        const row = document.querySelector('.login-theme-control');
+        const version = document.getElementById('login-version');
+        const slogan = version.querySelector('[data-version-slogan]');
+        const theme = row.querySelector('[data-theme-toggle]');
+        const rowRect = row.getBoundingClientRect();
+        const versionRect = version.getBoundingClientRect();
+        const themeRect = theme.getBoundingClientRect();
+        return {
+          slogan: slogan.textContent,
+          versionLeft: Math.abs(versionRect.left - rowRect.left) < 1,
+          themeRight: Math.abs(themeRect.right - rowRect.right) < 1,
+          insideRow: versionRect.top >= rowRect.top - 1 && versionRect.bottom <= rowRect.bottom + 1,
+          noOverflow: document.documentElement.scrollWidth <= innerWidth,
+        };
+    """)
+    assert layout == {
+        'slogan': OlivOS.infoAPI.OlivOS_Version_Slogan,
+        'versionLeft': True,
+        'themeRight': True,
+        'insideRow': True,
+        'noOverflow': True,
+    }
+
+
+@pytest.mark.browser
+def test_account_dialog_custom_select_is_not_covered_by_modal(browser):
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    driver = browser.driver
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
+    browser.click('#add-account')
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.getElementById("account-dialog").open'))
+    select = browser.find('#account-sdk')
+    select.click()
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    geometry = driver.execute_script('''
+        const menu = document.querySelector('.select-menu');
+        const dialog = document.getElementById('account-dialog');
+        const rect = menu.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 12);
+        return {
+          inDialog: menu.closest('dialog') === dialog,
+          inViewport: rect.left >= 0 && rect.top >= 0 &&
+            rect.right <= innerWidth && rect.bottom <= innerHeight,
+          hitMenu: !!hit?.closest('.select-menu'),
+        };
+    ''')
+    assert geometry == {'inDialog': True, 'inViewport': True, 'hitMenu': True}
+
+    driver.execute_script('''
+        document.getElementById('account-sdk').append(new Option('动态 SDK', 'dynamic-sdk'));
+    ''')
+    select.send_keys(Keys.ESCAPE)
+    browser.wait.until(lambda _: not driver.find_elements(By.CSS_SELECTOR, '.select-menu'))
+    select.click()
+    browser.wait.until(lambda _: browser.find('.select-menu').is_displayed())
+    labels = driver.execute_script(
+        'return [...document.querySelectorAll(".select-menu-option")].map(item => item.textContent)')
+    assert '动态 SDK' in labels
+    driver.execute_script('''
+        const select = document.getElementById('account-sdk');
+        select.querySelector('option[value="dynamic-sdk"]')?.remove();
+        closeSelectMenu();
+    ''')
+
+
+@pytest.mark.browser
+def test_mobile_custom_select_menu_opens_above_and_fits_viewport(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 320, 'height': 568, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        'return matchMedia("(max-width: 800px)").matches'))
+    driver.execute_script('''
+        const select = document.createElement('select');
+        select.id = 'edge-select';
+        for (let index = 0; index < 12; index += 1) {
+          select.append(new Option(`选项 ${index}`, `v${index}`));
+        }
+        Object.assign(select.style, {
+          position: 'fixed', left: '8px', bottom: '8px', width: '190px', zIndex: '100',
+        });
+        document.body.append(select);
+        enhanceSelects(document);
+        select.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerType: 'mouse',
+        }));
+    ''')
+    browser.wait.until(lambda _: driver.execute_script(
+        'return !!document.querySelector(".select-menu.opens-above")'))
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.querySelector(".select-menu").getAnimations()'
+        '.every(item => item.playState === "finished")'))
+    geometry = driver.execute_script('''
+        const menu = document.querySelector('.select-menu');
+        const select = document.getElementById('edge-select');
+        const menuRect = menu.getBoundingClientRect();
+        const selectRect = select.getBoundingClientRect();
+        return {
+          inViewport: menuRect.left >= 8 && menuRect.top >= 8 &&
+            menuRect.right <= innerWidth - 8 && menuRect.bottom <= innerHeight - 8,
+          aboveSelect: menuRect.bottom <= selectRect.top - 4,
+          touchHeight: selectRect.height >= 44 &&
+            document.getElementById('sidebar-toggle').getBoundingClientRect().height >= 44,
+          fitsPage: document.documentElement.scrollWidth <= innerWidth,
+        };
+    ''')
+    assert geometry == {
+        'inViewport': True, 'aboveSelect': True, 'touchHeight': True, 'fitsPage': True,
+    }
+    driver.execute_script('''
+        closeSelectMenu();
+        document.getElementById('edge-select').remove();
+    ''')
+
+
+@pytest.mark.browser
 def test_desktop_sidebar_collapses_and_persists(browser):
     driver = browser.driver
     width = driver.execute_script(
@@ -523,7 +873,27 @@ def test_desktop_sidebar_collapses_and_persists(browser):
     assert driver.execute_script(
         "return getComputedStyle(document.getElementById('plugin-navigation')).display") == 'none'
     assert driver.execute_script(
-        "return getComputedStyle(document.querySelector('.sidebar-footer')).display") == 'none'
+        "return getComputedStyle(document.querySelector('.sidebar-footer')).display") == 'flex'
+    theme_toggle = browser.find('#sidebar [data-theme-toggle]')
+    logout = browser.find('#logout')
+    assert theme_toggle.is_displayed() and theme_toggle.is_enabled()
+    assert logout.is_displayed() and logout.is_enabled()
+    initial_theme = driver.execute_script('return document.documentElement.dataset.theme')
+    theme_toggle.click()
+    browser.wait.until(lambda _: driver.execute_script(
+        'return document.documentElement.dataset.theme') != initial_theme)
+    assert driver.execute_script('''
+        const buttons = [...document.querySelectorAll('#sidebar .sidebar-footer > .sidebar-action')];
+        return buttons.length === 2 && buttons.every(button => {
+          const rect = button.getBoundingClientRect();
+          return rect.width === 44 && rect.height === 44 &&
+            [...button.querySelectorAll('svg')].some(icon => icon.getBoundingClientRect().width > 0);
+        });
+    ''')
+    assert driver.execute_script('''
+        return [...document.querySelectorAll('#sidebar .sidebar-action-label')]
+          .every(label => getComputedStyle(label).display === 'none');
+    ''')
     assert driver.execute_script(
         "return document.querySelector('main').getBoundingClientRect().width") > main_width
     assert width > 150
@@ -700,6 +1070,29 @@ def test_dashboard_version_card_keeps_slogan_within_viewport(browser, width):
         return [card.scrollWidth <= card.clientWidth + 1,
                 document.documentElement.scrollWidth <= innerWidth];
     """) == [True, True]
+
+
+@pytest.mark.browser
+def test_dashboard_uptime_advances_between_status_refreshes(browser):
+    driver = browser.driver
+    browser.open_sidebar()
+    browser.click('[data-page="dashboard"]')
+    browser.wait.until(lambda _: driver.execute_script("""
+        return state.page === 'dashboard' && !!state.uptimeSnapshot &&
+          document.getElementById('runtime').textContent.startsWith('运行时长：');
+    """))
+    initial = driver.execute_script("""
+        return {
+          text: document.getElementById('runtime').textContent,
+          seconds: state.uptimeSnapshot.seconds,
+        };
+    """)
+
+    # 状态轮询间隔是 10 秒；这里要求锚点不变时文本也能在本地计时器驱动下推进。
+    browser.wait.until(lambda _: driver.execute_script("""
+        return document.getElementById('runtime').textContent !== arguments[0] &&
+          state.uptimeSnapshot.seconds === arguments[1];
+    """, initial['text'], initial['seconds']))
 
 
 @pytest.mark.browser

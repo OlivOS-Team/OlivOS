@@ -3,6 +3,7 @@ import threading
 
 import pytest
 
+import OlivOS
 from OlivOS.webUI import serverAPI
 from webui_test_support import make_host
 
@@ -66,7 +67,10 @@ def test_environment_port_zero_uses_actual_listener_in_browser_url(tmp_path, mon
         url = serverAPI.browser_url(tmp_path)
         assert url == f"http://127.0.0.1:{service.config['port']}"
         with urllib.request.urlopen(url + '/api/health', timeout=3) as response:
-            assert json.load(response) == {'status': 'OK'}
+            health = json.load(response)
+            assert health['status'] == 'OK'
+            assert health['version'] == OlivOS.infoAPI.OlivOS_Version_Short
+            assert health['version_slogan'] == OlivOS.infoAPI.OlivOS_Version_Slogan
     finally:
         service.on_terminate()
         worker.join(timeout=5)
