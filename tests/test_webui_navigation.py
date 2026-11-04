@@ -126,11 +126,16 @@ def browser(navigation_host, tmp_path):
         find(selector).click()
 
     def open_sidebar():
-        if not driver.execute_script('return matchMedia("(max-width: 800px)").matches'):
+        if not driver.execute_script(
+                'return matchMedia("(max-width: 800px), (orientation: portrait)").matches'):
             return
         if driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
             return
-        click('#sidebar-toggle')
+        toggle = driver.execute_script('''
+            return document.getElementById('plugin-page').hidden
+                ? '#sidebar-toggle' : '#plugin-sidebar-toggle';
+        ''')
+        click(toggle)
         wait.until(lambda _: driver.execute_script(
             "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
         wait.until(lambda _: driver.execute_script(
@@ -261,11 +266,17 @@ def test_plugin_menu_priority_refreshes_while_dialog_open(browser):
 
 @pytest.mark.browser
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
+    driver = browser.driver
     identity = browser.select()
     browser.find('#draft').send_keys('retained')
-    browser.driver.switch_to.default_content()
+    driver.switch_to.default_content()
+    page_title = driver.execute_script('return state.frame.title')
+    assert driver.execute_script(
+        "return document.getElementById('plugin-page-title').textContent") == page_title
+    assert driver.execute_script(
+        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'none'
     browser.select('webui/settings/index.html')
-    browser.driver.switch_to.default_content()
+    driver.switch_to.default_content()
     assert browser.select() == identity
     assert browser.find('#draft').get_attribute('value') == 'retained'
 
@@ -1004,7 +1015,7 @@ def test_sidebar_viewport_switch_clears_mobile_state(browser):
 
 
 @pytest.mark.browser
-def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
+def test_mobile_plugin_viewport_and_sidebar_header_preserve_page(browser):
     driver = browser.driver
 
     def resize(height):
@@ -1027,10 +1038,17 @@ def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
     identity = browser.select()
     browser.find('#draft').send_keys('mobile draft')
     driver.switch_to.default_content()
+    page_title = driver.execute_script('return state.frame.title')
+    driver.execute_script('window.__pluginFrame = state.frame')
     assert driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen") == 'false'
     assert driver.execute_script(
         "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'flex'
+    assert driver.execute_script(
+        "return !document.getElementById('plugin-mobile-back')")
+    assert browser.find('#plugin-page-title').text == page_title
+    assert driver.execute_script(
+        "return document.getElementById('plugin-sidebar-toggle').getBoundingClientRect().height >= 44")
     browser.wait.until(lambda _: frame_fits())
     initial_height = driver.execute_script('return state.frame.getBoundingClientRect().height')
 
@@ -1038,16 +1056,61 @@ def test_mobile_plugin_viewport_resizes_and_return_preserves_page(browser):
     resize(500)
     browser.wait.until(lambda _: frame_fits() and driver.execute_script(
         'return state.frame.getBoundingClientRect().height') < initial_height - 200)
-    browser.click('#plugin-mobile-back')
+    browser.click('#plugin-sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+    assert browser.find('#plugin-sidebar-toggle').get_attribute('aria-expanded') == 'true'
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
+    assert driver.execute_script('''
+        const sidebar = document.getElementById('sidebar');
+        const plugin = document.getElementById('plugin-page');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        return getComputedStyle(sidebar).visibility === 'visible' &&
+            Number(getComputedStyle(sidebar).zIndex) > Number(getComputedStyle(plugin).zIndex) &&
+            getComputedStyle(backdrop).visibility === 'visible';
+    ''')
+    driver.execute_script(
+        "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+    assert driver.execute_script('return document.activeElement.id') == 'plugin-sidebar-toggle'
+    assert driver.execute_script('return window.__pluginFrame === state.frame')
+    driver.switch_to.frame(driver.execute_script('return state.frame'))
+    assert driver.execute_script('return window.pageIdentity') == identity
+    assert browser.find('#draft').get_attribute('value') == 'mobile draft'
+    driver.switch_to.default_content()
+
+    browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: browser.find('#plugins').is_displayed())
     assert browser.select() == identity
     assert browser.find('#draft').get_attribute('value') == 'mobile draft'
-
     driver.switch_to.default_content()
-    browser.click('#plugin-mobile-back')
+    assert driver.execute_script('return window.__pluginFrame === state.frame')
+
     browser.open_sidebar()
     browser.click('[data-page="dashboard"]')
     browser.wait.until(lambda _: browser.find('#dashboard').is_displayed())
+
+
+@pytest.mark.browser
+def test_portrait_tablet_plugin_header_opens_sidebar(browser):
+    driver = browser.driver
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': 900, 'height': 1200, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        "return matchMedia('(orientation: portrait)').matches"))
+    browser.select()
+    driver.switch_to.default_content()
+    assert driver.execute_script(
+        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'flex'
+    browser.click('#plugin-sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().left >= -1"))
+    assert driver.execute_script(
+        "return document.getElementById('plugin-sidebar-toggle').getAttribute('aria-expanded')") == 'true'
 
 
 @pytest.mark.browser

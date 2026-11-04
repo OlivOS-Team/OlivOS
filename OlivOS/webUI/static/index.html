@@ -177,6 +177,7 @@
               id="sidebar-toggle"
               class="sidebar-toggle"
               type="button"
+              data-sidebar-toggle
               aria-controls="sidebar"
               aria-expanded="true"
               aria-label="收起侧边栏"
@@ -335,7 +336,21 @@
         </section>
         <section id="plugin-page" class="page" hidden>
           <div id="plugin-mobile-toolbar">
-            <button id="plugin-mobile-back" type="button">返回导航</button>
+            <button
+              id="plugin-sidebar-toggle"
+              class="sidebar-toggle"
+              type="button"
+              data-sidebar-toggle
+              aria-controls="sidebar"
+              aria-expanded="false"
+              aria-label="打开侧边栏"
+              title="打开侧边栏"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 7h16M4 12h16M4 17h16"></path>
+              </svg>
+            </button>
+            <h1 id="plugin-page-title">插件页面</h1>
           </div>
           <div id="plugin-frame-container"></div>
         </section>

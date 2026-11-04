@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id);
 const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 const sidebarStorageKey = 'olivos.webui.sidebarCollapsed';
-const mobileSidebarQuery = window.matchMedia('(max-width: 800px)');
+const mobileSidebarQuery = window.matchMedia('(max-width: 800px), (orientation: portrait)');
 
 // 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
 function takeLoginTicket() {
@@ -234,17 +234,22 @@ let sidebarReturnFocus = null;
 function sidebarIsMobile() {
   return mobileSidebarQuery.matches;
 }
+function toggleSidebar() {
+  if (sidebarIsMobile()) setSidebarOpen(!state.sidebarOpen);
+  else setSidebarCollapsed(!state.sidebarCollapsed);
+}
 function updateSidebarToggle() {
-  const toggle = $('sidebar-toggle');
   const sidebar = $('sidebar');
   const mobile = sidebarIsMobile();
   const expanded = mobile ? state.sidebarOpen : !state.sidebarCollapsed;
   const label = mobile
     ? state.sidebarOpen ? '关闭侧边栏' : '打开侧边栏'
     : state.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏';
-  toggle.setAttribute('aria-expanded', String(expanded));
-  toggle.setAttribute('aria-label', label);
-  toggle.title = label;
+  document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+  });
   if (mobile) sidebar.setAttribute('aria-hidden', String(!state.sidebarOpen));
   else sidebar.removeAttribute('aria-hidden');
 }
@@ -584,6 +589,11 @@ function updatePluginViewport() {
 window.visualViewport?.addEventListener('resize', updatePluginViewport);
 window.visualViewport?.addEventListener('scroll', updatePluginViewport);
 
+function setPageTitle(title) {
+  $('page-title').textContent = title;
+  const pluginTitle = $('plugin-page-title');
+  if (pluginTitle) pluginTitle.textContent = title;
+}
 async function navigate(page) {
   closeSelectMenu();
   state.navigationGeneration++;
@@ -601,7 +611,7 @@ async function navigate(page) {
       if (active) node.setAttribute('aria-current', 'page');
       else node.removeAttribute('aria-current');
     });
-  $('page-title').textContent = titles[page] || '插件页面';
+  setPageTitle(titles[page] || '插件页面');
   if (page !== 'plugin-page') hideFrames();
   if (page !== 'logs') closeStream('logs');
   if (page !== 'terminals') closeStream('terminal');
@@ -1605,7 +1615,7 @@ function suspendPluginPages() {
   state.pluginListGeneration++;
   if (state.frames.size) destroyFrames();
   $('menu-dialog').close();
-  if (state.page === 'plugin-page') $('page-title').textContent = '插件页面';
+  if (state.page === 'plugin-page') setPageTitle('插件页面');
   state.plugins = {};
   state.pages = [];
   renderPlugins();
@@ -2127,7 +2137,7 @@ async function openPluginPage(page) {
     if (group.querySelector('.plugin-group-toggle')) setPluginGroupExpanded(group, true);
   }
   trimFrames();
-  $('page-title').textContent = page.title;
+  setPageTitle(page.title);
   rememberPage();
 }
 async function openExternalPage(page) {
@@ -2142,7 +2152,7 @@ async function openExternalPage(page) {
   });
   $('plugin-frame-container').append(state.externalFrame);
   rememberPage();
-  $('page-title').textContent = title;
+  setPageTitle(title);
 }
 window.addEventListener('message', async (ev) => {
   if (ev.origin !== 'null') return;
@@ -2322,10 +2332,8 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('plugin-pages-close', closePluginPages);
-bind('sidebar-toggle', () => {
-  if (sidebarIsMobile()) setSidebarOpen(!state.sidebarOpen);
-  else setSidebarCollapsed(!state.sidebarCollapsed);
-});
+bind('sidebar-toggle', toggleSidebar);
+bind('plugin-sidebar-toggle', toggleSidebar);
 bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
 document.addEventListener('keydown', (ev) => {
@@ -2336,10 +2344,6 @@ document.addEventListener('keydown', (ev) => {
 document.addEventListener('click', (ev) => {
   if (!state.sidebarOpen || !ev.target.closest('#plugin-links .plugin-link-external')) return;
   setSidebarOpen(false, { restoreFocus: false });
-});
-bind('plugin-mobile-back', () => {
-  navigate('plugins').catch(notifyError);
-  window.scrollTo(0, 0);
 });
 document
   .querySelectorAll('[data-page]')
