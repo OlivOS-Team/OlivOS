@@ -131,11 +131,7 @@ def browser(navigation_host, tmp_path):
             return
         if driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
             return
-        toggle = driver.execute_script('''
-            return document.getElementById('plugin-page').hidden
-                ? '#sidebar-toggle' : '#plugin-sidebar-toggle';
-        ''')
-        click(toggle)
+        click('#sidebar-toggle')
         wait.until(lambda _: driver.execute_script(
             "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
         wait.until(lambda _: driver.execute_script(
@@ -168,6 +164,27 @@ def browser(navigation_host, tmp_path):
                               host=navigation_host)
     finally:
         driver.quit()
+
+
+def set_viewport(browser, width, height):
+    """切换视口，并等侧边栏完成移动端/桌面端模式同步。
+
+    matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
+    aria-hidden 要等监听器跑完才更新；只等 matchMedia 就断言会读到上一档视口的旧值。
+    """
+    driver = browser.driver
+    mobile = width <= 800
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        '''
+        const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
+        const sidebar = document.getElementById('sidebar');
+        const synced = mobile
+            ? sidebar.getAttribute('aria-hidden') === 'true'
+            : !sidebar.hasAttribute('aria-hidden');
+        return mobile === arguments[0] && synced;
+        ''', mobile))
 
 
 @pytest.mark.browser
@@ -272,9 +289,7 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     driver.switch_to.default_content()
     page_title = driver.execute_script('return state.frame.title')
     assert driver.execute_script(
-        "return document.getElementById('plugin-page-title').textContent") == page_title
-    assert driver.execute_script(
-        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'none'
+        "return document.getElementById('page-title').textContent") == page_title
     browser.select('webui/settings/index.html')
     driver.switch_to.default_content()
     assert browser.select() == identity
@@ -486,6 +501,25 @@ def test_close_all_reports_plugin_and_page_counts(browser):
     browser.click('#plugin-pages-close')
     browser.wait.until(lambda _: browser.driver.execute_script('return state.frames.size') == 0)
     assert browser.find('#notice-message').text == '已关闭全部插件页面（2 个插件，共 2 个页面）。'
+
+
+@pytest.mark.browser
+def test_notice_centers_message_vertically_and_keeps_it_left_aligned(browser):
+    driver = browser.driver
+    driver.execute_script("notify('已关闭插件页面：QQ 官方机器人控制台')")
+    browser.wait.until(lambda _: browser.find('#notice').is_displayed())
+    # 关闭按钮比单行文字高：文字上下留白要相等，横向仍从左侧起排。
+    assert driver.execute_script("""
+        const notice = document.getElementById('notice');
+        const box = notice.getBoundingClientRect();
+        const message = document.getElementById('notice-message').getBoundingClientRect();
+        const style = getComputedStyle(notice);
+        const leftInset = parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth);
+        const top = message.top - box.top;
+        const bottom = box.bottom - message.bottom;
+        return Math.abs(top - bottom) <= 1 && Math.abs(message.left - box.left - leftInset) <= 1;
+    """)
+    driver.execute_script('hideNotice()')
 
 
 @pytest.mark.browser
@@ -897,14 +931,27 @@ def test_desktop_sidebar_collapses_and_persists(browser):
         const buttons = [...document.querySelectorAll('#sidebar .sidebar-footer > .sidebar-action')];
         return buttons.length === 2 && buttons.every(button => {
           const rect = button.getBoundingClientRect();
-          return rect.width === 44 && rect.height === 44 &&
+          return rect.width >= 44 && rect.height === 44 &&
             [...button.querySelectorAll('svg')].some(icon => icon.getBoundingClientRect().width > 0);
         });
     ''')
-    assert driver.execute_script('''
-        return [...document.querySelectorAll('#sidebar .sidebar-action-label')]
-          .every(label => getComputedStyle(label).display === 'none');
+    # 标签不能退回 display: none，而是收敛成 0 宽并透明，才能跟着折叠动画一起淡出。
+    labels = driver.execute_script('''
+        return [...document.querySelectorAll('#sidebar .sidebar-action-label')].map(label => {
+          const style = getComputedStyle(label);
+          return {
+            text: label.textContent.trim(),
+            display: style.display,
+            opacity: Number(style.opacity),
+            width: label.getBoundingClientRect().width,
+          };
+        });
     ''')
+    assert labels
+    for label in labels:
+        assert label['display'] != 'none', labels
+        assert label['opacity'] < 0.05, labels
+        assert label['width'] < 1, labels
     assert driver.execute_script(
         "return document.querySelector('main').getBoundingClientRect().width") > main_width
     assert width > 150
@@ -919,12 +966,40 @@ def test_desktop_sidebar_collapses_and_persists(browser):
 
 
 @pytest.mark.browser
+def test_desktop_sidebar_collapse_transitions_instead_of_jumping(browser):
+    driver = browser.driver
+    # 该用例专门验证过渡效果，固定成「允许动画」，避免系统开了减少动态效果时必然失败。
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-reduced-motion', 'value': 'no-preference'}]})
+    expanded = driver.execute_script(
+        "return document.getElementById('sidebar').getBoundingClientRect().width")
+    assert expanded > 150
+    samples = driver.execute_async_script("""
+        const done = arguments[0];
+        const aside = document.getElementById('sidebar');
+        const widths = [];
+        const start = performance.now();
+        document.getElementById('sidebar-toggle').click();
+        function step() {
+          widths.push(aside.getBoundingClientRect().width);
+          if (performance.now() - start < 400) requestAnimationFrame(step);
+          else done(widths);
+        }
+        requestAnimationFrame(step);
+    """)
+    # 有过渡时能逐帧采到中间宽度；直接跳变则第一帧就是收起后的宽度。
+    assert any(expanded - 5 > width > 70 for width in samples), samples
+    assert samples[-1] < 100
+
+    browser.click('#sidebar-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarCollapsed === 'false'"))
+
+
+@pytest.mark.browser
 def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
     assert driver.execute_script(
         "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
@@ -989,14 +1064,10 @@ def test_mobile_sidebar_drawer_fits_viewport(browser, width):
 @pytest.mark.browser
 def test_sidebar_viewport_switch_clears_mobile_state(browser):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    set_viewport(browser, 390, 844)
     browser.open_sidebar()
 
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return !matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 1440, 900)
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
     assert driver.execute_script('return document.body.classList.contains("sidebar-open")') is False
@@ -1005,112 +1076,39 @@ def test_sidebar_viewport_switch_clears_mobile_state(browser):
     assert driver.execute_script(
         "return document.getElementById('sidebar').getBoundingClientRect().width") > 150
 
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
     assert driver.execute_script(
         "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
 
 
 @pytest.mark.browser
-def test_mobile_plugin_viewport_and_sidebar_header_preserve_page(browser):
+def test_mobile_plugin_page_keeps_regular_layout_and_sidebar_drawer(browser):
     driver = browser.driver
+    set_viewport(browser, 390, 844)
 
-    def resize(height):
-        driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-            'width': 390, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
-        browser.wait.until(lambda _: driver.execute_script(
-            'return Math.abs(window.visualViewport.height - arguments[0]) < 2', height))
-
-    def frame_fits():
-        return driver.execute_script('''
-            const frame = state.frame;
-            if (!frame || frame.hidden) return false;
-            const rect = frame.getBoundingClientRect();
-            const viewport = window.visualViewport;
-            return rect.height > 0 && rect.top >= viewport.offsetTop - 1 &&
-                rect.bottom <= viewport.offsetTop + viewport.height + 1;
-        ''')
-
-    resize(844)
     identity = browser.select()
     browser.find('#draft').send_keys('mobile draft')
     driver.switch_to.default_content()
-    page_title = driver.execute_script('return state.frame.title')
-    driver.execute_script('window.__pluginFrame = state.frame')
-    assert driver.execute_script(
-        "return document.getElementById('shell').dataset.sidebarOpen") == 'false'
-    assert driver.execute_script(
-        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'flex'
-    assert driver.execute_script(
-        "return !document.getElementById('plugin-mobile-back')")
-    assert browser.find('#plugin-page-title').text == page_title
-    assert driver.execute_script(
-        "return document.getElementById('plugin-sidebar-toggle').getBoundingClientRect().height >= 44")
-    browser.wait.until(lambda _: frame_fits())
-    initial_height = driver.execute_script('return state.frame.getBoundingClientRect().height')
 
-    # 模拟键盘压缩浏览器可视区域，等待真实 resize 事件驱动布局更新。
-    resize(500)
-    browser.wait.until(lambda _: frame_fits() and driver.execute_script(
-        'return state.frame.getBoundingClientRect().height') < initial_height - 200)
-    browser.click('#plugin-sidebar-toggle')
-    browser.wait.until(lambda _: driver.execute_script(
-        "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
-    assert browser.find('#plugin-sidebar-toggle').get_attribute('aria-expanded') == 'true'
-    assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
-    assert driver.execute_script('''
-        const sidebar = document.getElementById('sidebar');
-        const plugin = document.getElementById('plugin-page');
-        const backdrop = document.getElementById('sidebar-backdrop');
-        return getComputedStyle(sidebar).visibility === 'visible' &&
-            Number(getComputedStyle(sidebar).zIndex) > Number(getComputedStyle(plugin).zIndex) &&
-            getComputedStyle(backdrop).visibility === 'visible';
-    ''')
-    driver.execute_script(
-        "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
-    browser.wait.until(lambda _: driver.execute_script(
-        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
-    assert driver.execute_script('return document.activeElement.id') == 'plugin-sidebar-toggle'
-    assert driver.execute_script('return window.__pluginFrame === state.frame')
-    driver.switch_to.frame(driver.execute_script('return state.frame'))
-    assert driver.execute_script('return window.pageIdentity') == identity
-    assert browser.find('#draft').get_attribute('value') == 'mobile draft'
-    driver.switch_to.default_content()
-
-    browser.open_sidebar()
-    browser.click('[data-page="plugins"]')
-    browser.wait.until(lambda _: browser.find('#plugins').is_displayed())
-    assert browser.select() == identity
-    assert browser.find('#draft').get_attribute('value') == 'mobile draft'
-    driver.switch_to.default_content()
-    assert driver.execute_script('return window.__pluginFrame === state.frame')
-
-    browser.open_sidebar()
-    browser.click('[data-page="dashboard"]')
-    browser.wait.until(lambda _: browser.find('#dashboard').is_displayed())
-
-
-@pytest.mark.browser
-def test_portrait_tablet_plugin_header_opens_sidebar(browser):
-    driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 900, 'height': 1200, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        "return matchMedia('(orientation: portrait)').matches"))
-    browser.select()
-    driver.switch_to.default_content()
+    # 插件页不再独占可视区域：没有移动端工具栏，也不做全屏覆盖。
+    assert driver.execute_script("return !document.getElementById('plugin-mobile-toolbar')")
     assert driver.execute_script(
-        "return getComputedStyle(document.getElementById('plugin-mobile-toolbar')).display") == 'flex'
-    browser.click('#plugin-sidebar-toggle')
+        "return getComputedStyle(document.getElementById('plugin-page')).position") == 'static'
+    assert driver.execute_script('return state.frame.getBoundingClientRect().height > 200')
+
+    # 顶栏的侧边栏按钮在插件页上同样能唤出抽屉。
+    browser.click('#sidebar-toggle')
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('sidebar').getBoundingClientRect().left >= -1"))
-    assert driver.execute_script(
-        "return document.getElementById('plugin-sidebar-toggle').getAttribute('aria-expanded')") == 'true'
+    assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
+
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.find('#plugins').is_displayed())
+    assert browser.select() == identity
+    assert browser.find('#draft').get_attribute('value') == 'mobile draft'
 
 
 @pytest.mark.browser
@@ -1144,18 +1142,32 @@ def test_dashboard_uptime_advances_between_status_refreshes(browser):
         return state.page === 'dashboard' && !!state.uptimeSnapshot &&
           document.getElementById('runtime').textContent.startsWith('运行时长：');
     """))
-    initial = driver.execute_script("""
-        return {
-          text: document.getElementById('runtime').textContent,
-          seconds: state.uptimeSnapshot.seconds,
-        };
+    # 状态心跳每 10 秒一次：只要在两次心跳之间看到文本推进，就说明本地计时器在走。
+    # 机器慢时等待窗口里可能正好收到新心跳，此时用新锚点重新开始观察，避免偶发超时。
+    driver.set_script_timeout(30)
+    assert driver.execute_async_script("""
+        const done = arguments[arguments.length - 1];
+        const runtime = document.getElementById('runtime');
+        const deadline = performance.now() + 15000;
+        let anchor = state.uptimeSnapshot.receivedAt;
+        let text = runtime.textContent;
+        function step() {
+          const current = runtime.textContent;
+          if (state.uptimeSnapshot.receivedAt !== anchor) {
+            anchor = state.uptimeSnapshot.receivedAt;
+            text = current;
+          } else if (current !== text) {
+            done(true);
+            return;
+          }
+          if (performance.now() > deadline) {
+            done(false);
+            return;
+          }
+          setTimeout(step, 100);
+        }
+        step();
     """)
-
-    # 状态轮询间隔是 10 秒；这里要求锚点不变时文本也能在本地计时器驱动下推进。
-    browser.wait.until(lambda _: driver.execute_script("""
-        return document.getElementById('runtime').textContent !== arguments[0] &&
-          state.uptimeSnapshot.seconds === arguments[1];
-    """, initial['text'], initial['seconds']))
 
 
 @pytest.mark.browser
