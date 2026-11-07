@@ -1497,9 +1497,6 @@ dialog::backdrop {
   height: auto;
   background: white;
 }
-#plugin-mobile-toolbar {
-  display: none;
-}
 #plugin-frame-container iframe {
   width: 100%;
   height: calc(100dvh - 140px);
@@ -1516,39 +1513,6 @@ dialog::backdrop {
   }
   #plugin-links {
     max-height: 40dvh;
-  }
-}
-@media (max-width: 800px), (orientation: portrait) {
-  #plugin-page:not([hidden]) {
-    position: fixed;
-    z-index: 10;
-    top: var(--plugin-viewport-top, 0px);
-    left: var(--plugin-viewport-left, 0px);
-    width: var(--plugin-viewport-width, 100%);
-    height: var(--plugin-viewport-height, 100dvh);
-    display: flex;
-    flex-direction: column;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background: var(--panel);
-  }
-  #plugin-mobile-toolbar {
-    display: flex;
-    flex: none;
-    padding: 8px;
-    border-bottom: 1px solid var(--line);
-  }
-  #plugin-frame-container {
-    flex: 1;
-    min-height: 0;
-  }
-  #plugin-frame-container iframe {
-    display: block;
-    height: 100%;
-    border: 0;
-    border-radius: 0;
-  }
-  #plugin-frame-container iframe[hidden] {
-    display: none;
   }
 }
 @media (max-width: 800px) {

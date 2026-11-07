@@ -572,24 +572,11 @@ async function restorePage() {
   }
   await navigate(Object.keys(titles).includes(saved?.page) ? saved.page : 'dashboard');
 }
-function updatePluginViewport() {
-  if (state.page !== 'plugin-page' || !window.visualViewport) return;
-  const viewport = window.visualViewport;
-  const style = $('plugin-page').style;
-  style.setProperty('--plugin-viewport-top', `${viewport.offsetTop}px`);
-  style.setProperty('--plugin-viewport-left', `${viewport.offsetLeft}px`);
-  style.setProperty('--plugin-viewport-width', `${viewport.width}px`);
-  style.setProperty('--plugin-viewport-height', `${viewport.height}px`);
-}
-window.visualViewport?.addEventListener('resize', updatePluginViewport);
-window.visualViewport?.addEventListener('scroll', updatePluginViewport);
-
 async function navigate(page) {
   closeSelectMenu();
   state.navigationGeneration++;
   if (state.sidebarOpen) setSidebarOpen(false);
   state.page = page;
-  if (page === 'plugin-page') updatePluginViewport();
   document.querySelectorAll('.page').forEach((node) => {
     node.hidden = node.id !== page;
   });
@@ -2336,10 +2323,6 @@ document.addEventListener('keydown', (ev) => {
 document.addEventListener('click', (ev) => {
   if (!state.sidebarOpen || !ev.target.closest('#plugin-links .plugin-link-external')) return;
   setSidebarOpen(false, { restoreFocus: false });
-});
-bind('plugin-mobile-back', () => {
-  navigate('plugins').catch(notifyError);
-  window.scrollTo(0, 0);
 });
 document
   .querySelectorAll('[data-page]')
