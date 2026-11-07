@@ -166,6 +166,27 @@ def browser(navigation_host, tmp_path):
         driver.quit()
 
 
+def set_viewport(browser, width, height):
+    """切换视口，并等侧边栏完成移动端/桌面端模式同步。
+
+    matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
+    aria-hidden 要等监听器跑完才更新；只等 matchMedia 就断言会读到上一档视口的旧值。
+    """
+    driver = browser.driver
+    mobile = width <= 800
+    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+    browser.wait.until(lambda _: driver.execute_script(
+        '''
+        const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
+        const sidebar = document.getElementById('sidebar');
+        const synced = mobile
+            ? sidebar.getAttribute('aria-hidden') === 'true'
+            : !sidebar.hasAttribute('aria-hidden');
+        return mobile === arguments[0] && synced;
+        ''', mobile))
+
+
 @pytest.mark.browser
 @pytest.mark.parametrize('field', ['password', 'server.access_token', 'appsecret', 'token', 'cookie', 'key'])
 def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser, field):
@@ -978,10 +999,7 @@ def test_desktop_sidebar_collapse_transitions_instead_of_jumping(browser):
 @pytest.mark.browser
 def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
     assert driver.execute_script(
         "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
@@ -1046,14 +1064,10 @@ def test_mobile_sidebar_drawer_fits_viewport(browser, width):
 @pytest.mark.browser
 def test_sidebar_viewport_switch_clears_mobile_state(browser):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    set_viewport(browser, 390, 844)
     browser.open_sidebar()
 
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return !matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 1440, 900)
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
     assert driver.execute_script('return document.body.classList.contains("sidebar-open")') is False
@@ -1062,10 +1076,7 @@ def test_sidebar_viewport_switch_clears_mobile_state(browser):
     assert driver.execute_script(
         "return document.getElementById('sidebar').getBoundingClientRect().width") > 150
 
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
     assert driver.execute_script(
         "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
@@ -1074,10 +1085,7 @@ def test_sidebar_viewport_switch_clears_mobile_state(browser):
 @pytest.mark.browser
 def test_mobile_plugin_page_keeps_regular_layout_and_sidebar_drawer(browser):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': 390, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
-    browser.wait.until(lambda _: driver.execute_script(
-        'return matchMedia("(max-width: 800px)").matches'))
+    set_viewport(browser, 390, 844)
 
     identity = browser.select()
     browser.find('#draft').send_keys('mobile draft')
