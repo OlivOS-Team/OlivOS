@@ -897,12 +897,21 @@ nav h2 {
   .brand,
   #navigation button,
   .sidebar-footer > .sidebar-action {
-    transition: padding 180ms ease, gap 180ms ease;
+    /* 只补 padding / gap，同时保留按钮原有的配色反馈过渡，
+       否则 hover、active 的背景与边框会变成瞬时切换。 */
+    transition:
+      padding 180ms ease,
+      gap 180ms ease,
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      box-shadow 120ms ease;
   }
   .brand-text,
   .nav-label,
   .sidebar-action-label {
     max-width: 220px;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     transition: max-width 180ms ease, opacity 140ms ease;

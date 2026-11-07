@@ -914,14 +914,23 @@ def test_desktop_sidebar_collapses_and_persists(browser):
             [...button.querySelectorAll('svg')].some(icon => icon.getBoundingClientRect().width > 0);
         });
     ''')
-    # 标签不再 display: none，收敛成 0 宽并透明，才能跟着折叠动画一起淡出。
-    assert driver.execute_script('''
-        return [...document.querySelectorAll('#sidebar .sidebar-action-label')]
-          .every(label => {
-            const style = getComputedStyle(label);
-            return style.opacity === '0' && label.getBoundingClientRect().width === 0;
-          });
+    # 标签不能退回 display: none，而是收敛成 0 宽并透明，才能跟着折叠动画一起淡出。
+    labels = driver.execute_script('''
+        return [...document.querySelectorAll('#sidebar .sidebar-action-label')].map(label => {
+          const style = getComputedStyle(label);
+          return {
+            text: label.textContent.trim(),
+            display: style.display,
+            opacity: Number(style.opacity),
+            width: label.getBoundingClientRect().width,
+          };
+        });
     ''')
+    assert labels
+    for label in labels:
+        assert label['display'] != 'none', labels
+        assert label['opacity'] < 0.05, labels
+        assert label['width'] < 1, labels
     assert driver.execute_script(
         "return document.querySelector('main').getBoundingClientRect().width") > main_width
     assert width > 150
@@ -938,6 +947,9 @@ def test_desktop_sidebar_collapses_and_persists(browser):
 @pytest.mark.browser
 def test_desktop_sidebar_collapse_transitions_instead_of_jumping(browser):
     driver = browser.driver
+    # 该用例专门验证过渡效果，固定成「允许动画」，避免系统开了减少动态效果时必然失败。
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-reduced-motion', 'value': 'no-preference'}]})
     expanded = driver.execute_script(
         "return document.getElementById('sidebar').getBoundingClientRect().width")
     assert expanded > 150
