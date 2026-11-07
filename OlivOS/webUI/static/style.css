@@ -891,6 +891,22 @@ nav h2 {
   display: none;
 }
 @media (min-width: 801px) {
+  /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
+     收起后不会出现「内容先消失、面板再跳一下」的观感。 */
+  aside,
+  .brand,
+  #navigation button,
+  .sidebar-footer > .sidebar-action {
+    transition: padding 180ms ease, gap 180ms ease;
+  }
+  .brand-text,
+  .nav-label,
+  .sidebar-action-label {
+    max-width: 220px;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 180ms ease, opacity 140ms ease;
+  }
   #shell[data-sidebar-collapsed='true'] {
     grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
   }
@@ -904,8 +920,15 @@ nav h2 {
     width: 100%;
     justify-content: center;
   }
+  #shell[data-sidebar-collapsed='true'] .brand {
+    gap: 0;
+  }
   #shell[data-sidebar-collapsed='true'] .brand-text,
   #shell[data-sidebar-collapsed='true'] .nav-label,
+  #shell[data-sidebar-collapsed='true'] .sidebar-action-label {
+    max-width: 0;
+    opacity: 0;
+  }
   #shell[data-sidebar-collapsed='true'] #plugin-navigation {
     display: none;
   }
@@ -914,25 +937,26 @@ nav h2 {
     align-items: center;
     gap: 8px;
   }
+  /* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
+     宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
   #shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
-    width: 44px;
+    width: 100%;
     min-width: 44px;
     height: 44px;
     min-height: 44px;
     padding: 0;
+    gap: 0;
     justify-content: center;
-  }
-  #shell[data-sidebar-collapsed='true'] .sidebar-action-label {
-    display: none;
   }
   #shell[data-sidebar-collapsed='true'] #navigation {
     width: 100%;
     align-items: center;
   }
   #shell[data-sidebar-collapsed='true'] #navigation button {
-    width: 44px;
+    width: 100%;
     min-height: 44px;
     padding: 0;
+    gap: 0;
     justify-content: center;
   }
 }
@@ -996,7 +1020,8 @@ header h1 {
 }
 #notice {
   display: flex;
-  align-items: flex-start;
+  /* 关闭按钮比单行文字高，靠 flex-start 会把文字顶到上沿；改为居中，短提示也居中显示。 */
+  align-items: center;
   gap: 12px;
   border: 1px solid var(--control-border);
   background: var(--control-bg-hover);
@@ -1413,6 +1438,10 @@ dialog::backdrop {
   summary::before,
   #shell,
   aside,
+  .brand,
+  .brand-text,
+  .nav-label,
+  .sidebar-action-label,
   #sidebar-backdrop {
     animation: none;
     transition: none;
@@ -1515,7 +1544,7 @@ dialog::backdrop {
     max-height: 40dvh;
   }
 }
-@media (max-width: 800px) {
+@media (max-width: 800px), (orientation: portrait) {
   body.sidebar-open {
     overflow: hidden;
   }
@@ -1551,7 +1580,7 @@ dialog::backdrop {
   }
   aside {
     position: fixed;
-    z-index: 9;
+    z-index: 12;
     top: 0;
     bottom: 0;
     left: 0;
@@ -1587,7 +1616,7 @@ dialog::backdrop {
   #sidebar-backdrop {
     display: block;
     position: fixed;
-    z-index: 8;
+    z-index: 11;
     inset: 0;
     background: #0006;
     opacity: 0;
