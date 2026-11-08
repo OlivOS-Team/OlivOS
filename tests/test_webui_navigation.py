@@ -602,6 +602,58 @@ def test_theme_toggle_switches_both_buttons_and_persists(browser):
 
 
 @pytest.mark.browser
+def test_pwa_manifest_and_service_worker_cache_only_app_shell(browser):
+    driver = browser.driver
+    assert driver.execute_script('return window.isSecureContext') is True
+    manifest = driver.execute_async_script('''
+        const done = arguments[0];
+        const link = document.querySelector('link[rel="manifest"]');
+        if (!link) return done({error: 'missing manifest link'});
+        fetch(link.href).then(response => response.json()).then(done)
+          .catch(error => done({error: String(error)}));
+    ''')
+    assert manifest.get('error') is None
+    assert manifest['start_url'] == '/'
+    assert manifest['scope'] == '/'
+    assert manifest['display'] == 'standalone'
+
+    worker = driver.execute_async_script('''
+        const done = arguments[0];
+        navigator.serviceWorker.ready.then(async registration => {
+          const cacheNames = await caches.keys();
+          const cacheName = cacheNames.find(name => name.startsWith('olivos-webui-'));
+          if (!cacheName) return done({error: 'missing cache', cacheNames});
+          const cache = await caches.open(cacheName);
+          const requests = await cache.keys();
+          done({
+            scope: registration.scope,
+            cacheNames,
+            paths: requests.map(request => new URL(request.url).pathname).sort(),
+          });
+        }).catch(error => done({error: String(error)}));
+    ''')
+    assert worker.get('error') is None
+    assert worker['scope'] == driver.execute_script('return location.origin + `/`')
+    for path in ('/', '/manifest.webmanifest', '/static/static-files.json',
+                 '/static/app.js', '/static/theme.js',
+                 '/static/style.css', '/static/icon-192.png', '/static/icon-512.png',
+                 '/static/icon-maskable-512.png', '/static/apple-touch-icon.png'):
+        assert path in worker['paths']
+    assert not any(path.startswith(('/api/', '/ws/', '/plugin/')) for path in worker['paths'])
+    browser.wait.until(lambda _: driver.execute_script('return !!navigator.serviceWorker.controller'))
+    driver.execute_cdp_cmd('Network.enable', {})
+    offline = {'offline': True, 'latency': 0, 'downloadThroughput': 0, 'uploadThroughput': 0}
+    online = {'offline': False, 'latency': 0, 'downloadThroughput': -1, 'uploadThroughput': -1}
+    driver.execute_cdp_cmd('Network.emulateNetworkConditions', offline)
+    try:
+        driver.get(driver.current_url)
+        browser.wait.until(lambda _: driver.execute_script('return document.readyState') == 'complete')
+        assert driver.title == 'OlivOS · WebUI'
+    finally:
+        driver.execute_cdp_cmd('Network.emulateNetworkConditions', online)
+
+
+@pytest.mark.browser
 def test_theme_toggle_follows_system_until_first_click(browser):
     driver = browser.driver
     driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {

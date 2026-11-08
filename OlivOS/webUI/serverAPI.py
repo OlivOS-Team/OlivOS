@@ -39,9 +39,7 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import authAPI, localAPI, pageAPI, resourceAPI
-
-STATIC_ASSET_NAMES = ('index.html', 'app.js', 'theme.js', 'style.css', 'logo.png')
+from . import assetAPI, authAPI, localAPI, pageAPI, resourceAPI
 BUFFER_LIMIT = 500
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
 PLUGIN_PAGE_CACHE = 10
@@ -133,16 +131,28 @@ class server(OlivOS.API.Proc_templet):
         static_override = os.environ.get('OLIVOS_WEBUI_STATIC')
         if static_override:
             self.static_path = Path(static_override).resolve()
-            if not all((self.static_path / name).is_file() for name in STATIC_ASSET_NAMES):
-                raise ValueError('OLIVOS_WEBUI_STATIC 中缺少前端资源')
+            try:
+                self.static_assets = assetAPI.load(self.static_path)
+            except ValueError as exc:
+                raise ValueError('OLIVOS_WEBUI_STATIC 中缺少前端资源清单') from exc
         else:
             bundled_static = Path(__file__).resolve().parent / 'static'
-            if all((bundled_static / name).is_file() for name in STATIC_ASSET_NAMES):
+            try:
+                bundled_assets = assetAPI.load(bundled_static)
+            except ValueError:
+                bundled_assets = None
+            if bundled_assets is not None and not assetAPI.missing(bundled_static, bundled_assets):
                 # 源码形态直接服务仓库前端资源，避免吃到过期的嵌入 blob。
                 self.static_path = bundled_static
+                self.static_assets = bundled_assets
             else:
                 from . import staticData
                 self.static_path = staticData.releaseBase64Data(self.root / self.config['static_path'])
+                self.static_assets = assetAPI.load(self.static_path)
+        incomplete = assetAPI.missing(self.static_path, self.static_assets)
+        if incomplete:
+            prefix = 'OLIVOS_WEBUI_STATIC 中缺少前端资源' if static_override else 'WebUI 前端资源不完整'
+            raise ValueError(prefix + '：' + ', '.join(incomplete))
         self.app = Flask(__name__, static_folder=None)
         self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
         pageAPI.register_routes(self)

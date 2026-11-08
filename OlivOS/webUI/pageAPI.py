@@ -564,11 +564,21 @@ def register_routes(host):
 
     @app.get('/')
     def index():
-        return send_from_directory(str(host.static_path), 'index.html')
+        return send_from_directory(str(host.static_path), host.static_assets['entry'])
+
+    def root_asset(name):
+        config = host.static_assets['root'][name]
+        response = send_from_directory(str(host.static_path), name, mimetype=config['mimetype'])
+        response.headers.update(config.get('headers', {}))
+        return response
+
+    for asset_index, name in enumerate(host.static_assets['root']):
+        app.add_url_rule('/' + name, endpoint='root_asset_' + str(asset_index),
+                         view_func=root_asset, defaults={'name': name})
 
     @app.get('/static/<name>')
     def assets(name):
-        if name not in ('app.js', 'theme.js', 'style.css', 'logo.png'):
+        if name not in host.static_assets['static']:
             abort(404)
         return send_from_directory(str(host.static_path), name)
 

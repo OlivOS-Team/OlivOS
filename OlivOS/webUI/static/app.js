@@ -17,6 +17,13 @@ function takeLoginTicket() {
 }
 const startupTicket = takeLoginTicket();
 
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch(() => {
+    // 安装/离线能力不可用时不影响 WebUI 在线使用。
+  });
+}
+
 // 插件页沙箱能力，必须与 pageAPI.py 的 PLUGIN_SANDBOX 保持一致 —— CSP 头的 sandbox
 // 指令与 iframe 的 sandbox 属性是两套独立机制，浏览器取更严格的那个，漏一处就失效。
 // 刻意不含 allow-same-origin（插件页与宿主 WebUI 同源，给了等于取消沙箱）与
@@ -2527,6 +2534,8 @@ window.addEventListener('hashchange', () => {
   initializeSidebar();
   initializeSelectMenus();
   loadPublicVersion();
+  if (document.readyState === 'complete') registerServiceWorker();
+  else window.addEventListener('load', registerServiceWorker, { once: true });
   const toggle = $('plugin-navigation-toggle');
   const storageKey = 'olivos.webui.pluginsCollapsed';
   function setCollapsed(collapsed) {

@@ -1,0 +1,26 @@
+{
+  "entry": "index.html",
+  "root": {
+    "manifest.webmanifest": {
+      "mimetype": "application/manifest+json"
+    },
+    "service-worker.js": {
+      "mimetype": "application/javascript",
+      "headers": {
+        "Service-Worker-Allowed": "/"
+      },
+      "precache": false
+    }
+  },
+  "static": [
+    "static-files.json",
+    "app.js",
+    "theme.js",
+    "style.css",
+    "logo.png",
+    "icon-192.png",
+    "icon-512.png",
+    "icon-maskable-512.png",
+    "apple-touch-icon.png"
+  ]
+}

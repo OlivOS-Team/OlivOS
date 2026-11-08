@@ -18,10 +18,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 # 供盘上无 static 目录的部署形态（pip/打包）回退；源码运行直接服务 OlivOS/webUI/static。
 
 import base64
+import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI'
 target = root / 'staticData.py'
+metadata = json.loads((root / 'static/static-files.json').read_text(encoding='utf-8'))
+names = (metadata['entry'], *metadata['root'], *metadata['static'])
 
 HEADER = '''# -*- encoding: utf-8 -*-
 r\'\'\'
@@ -61,7 +64,7 @@ def releaseBase64Data(directory):
 '''
 
 lines = ['FILES = {']
-for name in ('index.html', 'app.js', 'theme.js', 'style.css', 'logo.png'):
+for name in names:
     source = root / 'static' / name
     # 文本统一为 LF，避免 Git 的自动换行转换导致不同平台生成不同资源。
     data = source.read_bytes() if source.suffix == '.png' else source.read_text(encoding='utf-8').encode('utf-8')

@@ -24,6 +24,7 @@ import os
 import queue
 import secrets
 import socket
+import struct
 import threading
 import time
 from pathlib import Path
@@ -32,7 +33,7 @@ import aiohttp
 import pytest
 
 import OlivOS
-from OlivOS.webUI import pageAPI, serverAPI
+from OlivOS.webUI import assetAPI, pageAPI, serverAPI
 from webui_test_support import make_host
 
 
@@ -175,6 +176,67 @@ def test_logo_is_available_before_login(host):
     html = client.get('/').get_data(as_text=True)
     # 登录页不能泄露凭据文件的位置。
     assert 'conf/webui_token.txt' not in html and 'conf/webui_auth.json' not in html
+
+
+def test_pwa_assets_are_public_and_manifest_is_valid(host):
+    client = host.app.test_client()
+    response = client.get('/manifest.webmanifest')
+    assert response.status_code == 200
+    assert response.mimetype == 'application/manifest+json'
+    assert response.headers['Cache-Control'] == 'no-store'
+    manifest = json.loads(response.get_data(as_text=True))
+    assert manifest['id'] == '/'
+    assert manifest['start_url'] == '/'
+    assert manifest['scope'] == '/'
+    assert manifest['display'] == 'standalone'
+    assert manifest['lang'] == 'zh-CN'
+    assert {icon['purpose'] for icon in manifest['icons']} == {'any', 'maskable'}
+    for icon in manifest['icons']:
+        icon_response = client.get(icon['src'])
+        assert icon_response.status_code == 200
+        assert icon_response.mimetype == 'image/png'
+
+    static_files = client.get('/static/static-files.json')
+    assert static_files.status_code == 200
+    assert static_files.mimetype == 'application/json'
+    document = json.loads(static_files.get_data(as_text=True))
+    assert document['entry'] == 'index.html'
+    assert 'static-files.json' in document['static']
+
+    worker = client.get('/service-worker.js')
+    assert worker.status_code == 200
+    assert worker.mimetype == 'application/javascript'
+    assert worker.headers['Service-Worker-Allowed'] == '/'
+    assert worker.headers['Cache-Control'] == 'no-store'
+    script = worker.get_data(as_text=True)
+    assert '/static/static-files.json' in script
+    for path in ('/api/', '/ws/', '/plugin/'):
+        assert path in script
+
+
+def test_index_declares_pwa_metadata(host):
+    html = host.app.test_client().get('/').get_data(as_text=True)
+    for fragment in (
+        '<link rel="manifest" href="/manifest.webmanifest" />',
+        '<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />',
+        '<meta name="apple-mobile-web-app-capable" content="yes" />',
+        '<meta name="apple-mobile-web-app-title" content="OlivOS" />',
+        '<meta name="theme-color" content="#f5f6f8"',
+        '<meta name="theme-color" content="#191b1f"',
+    ):
+        assert fragment in html
+
+
+@pytest.mark.parametrize('name,size', [
+    ('icon-192.png', 192),
+    ('icon-512.png', 512),
+    ('icon-maskable-512.png', 512),
+    ('apple-touch-icon.png', 180),
+])
+def test_pwa_icon_dimensions(name, size):
+    data = (Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static' / name).read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n'
+    assert struct.unpack('>II', data[16:24]) == (size, size)
 
 
 def test_all_rest_routes(client, host):
@@ -951,7 +1013,8 @@ def test_plugin_priority_corrupted_file_blocks_edits(client, host):
 
 def test_packaging_and_shallow_config():
     static_root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI/static'
-    for name in serverAPI.STATIC_ASSET_NAMES:
+    assets = assetAPI.load(static_root)
+    for name in assets['files']:
         assert (static_root / name).is_file()
     user_config = {'system': {}, 'models': {}}
     assert 'OlivOS_webUI' not in user_config.get('models', {})
