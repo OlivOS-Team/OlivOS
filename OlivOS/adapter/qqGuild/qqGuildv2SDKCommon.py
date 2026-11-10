@@ -235,6 +235,16 @@ qqLocalPassiveFallbackErrors = {
     'passive event reply cache is full',
     'passive event reply count exceeded'
 }
+
+# 2026-11-09：平台发送侧开始按分片灰度收紧消息长度上限，官方限值内的消息也会被
+# 40054007（消息长度超限）/ 40054018（消息过长或异常）拒掉，社区反馈同一内容重试常能通过。
+# 这类错误代表「确定没有发出去」，重试一次不会造成重复；超时、无状态码、5xx、429
+# 都可能其实已经发出去了，一律不重试。
+qqSendRetryErrorCodes = {40054007, 40054018, 50055001, 50055006}
+qqSendLengthErrorCodes = {40054007, 40054018}
+qqSendRetryDelay = 0.3  # 重试间隔（秒），给分片切换留一点时间
+qqSendLengthFallbackMaxBytes = 900  # 长度降级拆分后单条的目标字节上限
+qqSendLengthFallbackMaxParts = 4  # 单条消息最多拆成几段
 # 40035006：素材接口服务端内部错误（COS 处理、链接生成等失败），官方文档写可稍后重试。
 # 40035003：complete 阶段 md5 与 COS ETag 比对失败，多块对象或 ETag 缺失回退可能触发。
 qqMediaImageRetryErrorCodes = {40035003, 40035006}
@@ -4026,6 +4036,350 @@ class event_action_common(object):
         }
         return active_result
 
+    def _qq_send_error_code(result):
+        return result.get('data', {}).get('error_code', None)
+
+    def _should_retry_qq_send(result):
+        """只对平台明确「没有发出去」的失败重试；结果不确定的一律不重试。"""
+        if result.get('active', False):
+            return False
+        if result.get('data', {}).get('passive_fallback', None) is not None:
+            return False
+        http_status = result.get('data', {}).get('http_status', None)
+        # 超时（没有状态码）、5xx、429 都可能其实已经发出去了，重发就是重复刷屏。
+        if (
+            type(http_status) is not int
+            or http_status < 400
+            or http_status >= 500
+            or http_status == 429
+        ):
+            return False
+        return event_action._qq_send_error_code(result) in qqSendRetryErrorCodes
+
+    def _log_qq_send_retry(target_event, chat_type, chat_id, text, level=3):
+        if getattr(target_event, 'log_func', None) is None:
+            return
+        try:
+            target_event.log_func(
+                level,
+                'OlivOS qqGuildv2SDK %s：%s' % (
+                    '私聊' if chat_type == 'qq_private' else '群聊',
+                    text
+                ),
+                [
+                    (target_event.getBotIDStr(), 'default'),
+                    ('qqGuildv2SDK', 'default'),
+                    ('send_retry', 'callback')
+                ]
+            )
+        except Exception:
+            traceback.print_exc()
+
+    def _reserve_qq_passive_slot(target_event, api_obj, chat_type, chat_id, msg_id, event_id):
+        """重试与拆段每发一条都要占用一次被动回复额度；额度用尽时返回本地错误结果。
+
+        msg_id 与 event_id 两条被动回复通道都要占用额度：msg_id 走 msg_seq 计数，
+        event_id 走 use_eventid 计数，漏掉任何一条都会让后面的分段被平台拒掉。
+        """
+        if chat_type not in ['qq_group', 'qq_private']:
+            return None
+        if msg_id is None and event_id is None:
+            return None
+        return event_action._prepare_qq_passive_message(
+            target_event,
+            api_obj,
+            chat_type,
+            chat_id,
+            msg_id,
+            event_id
+        )
+
+    def _retry_qq_send(target_event, api_obj, chat_type, chat_id, msg_id, event_id, result):
+        """发送失败且平台明确没发出时重试一次；返回重试后的结果。"""
+        if not event_action._should_retry_qq_send(result):
+            return result
+        first_code = event_action._qq_send_error_code(result)
+        # 重试要占新的被动回复额度，否则平台会按同一条回复去重。
+        reserve_error = event_action._reserve_qq_passive_slot(
+            target_event,
+            api_obj,
+            chat_type,
+            chat_id,
+            msg_id,
+            event_id
+        )
+        if reserve_error is not None:
+            event_action._log_qq_send_retry(
+                target_event,
+                chat_type,
+                chat_id,
+                '消息发送失败 (错误码 %s)，被动回复额度不足，未重试' % first_code
+            )
+            return result
+        time.sleep(qqSendRetryDelay)
+        api_obj.do_api()
+        retried = event_action._make_api_result(
+            target_event,
+            api_obj,
+            chat_type,
+            chat_id,
+            'send'
+        )
+        retried['data']['send_retry'] = {
+            'attempted': True,
+            'first_error_code': first_code,
+            'first_result': copy.deepcopy(result)
+        }
+        if retried.get('active', False):
+            event_action._log_qq_send_retry(
+                target_event,
+                chat_type,
+                chat_id,
+                '消息发送失败 (错误码 %s)，重试一次后成功' % first_code,
+                level=2
+            )
+        return retried
+
+    def _qq_markdown_to_plain_text(content):
+        """把 markdown 卡片降级成普通文本：去图片、去链接语法与表格分隔行。"""
+        lines = []
+        for raw_line in str(content).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
+            line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', raw_line)
+            line = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', line)
+            line = re.sub(r'^\s{0,3}#{1,6}\s*', '', line)
+            line = line.replace('**', '').replace('__', '').replace('`', '')
+            if '|' in line:
+                if re.fullmatch(r'\s*\|?[\s:|-]+\|?\s*', line):
+                    continue
+                line = re.sub(r'\s*\|\s*', ' ', line).strip()
+            if line.startswith('> '):
+                line = line[2:]
+            lines.append(line.rstrip())
+        text = '\n'.join(lines)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
+
+    def _qq_text_tokens(text):
+        """把文本切成最小不可分单元：内联标签整体保留，其余按字符。"""
+        tokens = []
+        index = 0
+        length = len(text)
+        while index < length:
+            if text[index] == '<':
+                close = text.find('>', index)
+                # QQ 的内联标签（<qqbot-at-user .../> 等）不允许从中间切开。
+                if close != -1 and close - index <= 200:
+                    tokens.append(text[index:close + 1])
+                    index = close + 1
+                    continue
+            tokens.append(text[index])
+            index += 1
+        return tokens
+
+    def _split_qq_text_by_bytes(
+        text,
+        max_bytes=qqSendLengthFallbackMaxBytes,
+        max_parts=qqSendLengthFallbackMaxParts
+    ):
+        """按 UTF-8 字节切段：单段不超过 max_bytes，最多 max_parts 段。
+
+        超出的内容不硬塞进最后一段（那样反而会被平台整段拒掉），由调用方按
+        丢弃字节数如实记录。内联标签作为整体参与切分，不会被切断。
+        """
+        if len(text.encode('utf-8')) <= max_bytes:
+            return [text]
+        parts = []
+        current = []
+        size = 0
+        for token in event_action._qq_text_tokens(text):
+            token_size = len(token.encode('utf-8'))
+            if size > 0 and size + token_size > max_bytes:
+                parts.append(''.join(current))
+                current = []
+                size = 0
+                if len(parts) >= max_parts:
+                    return parts
+            current.append(token)
+            size += token_size
+        if len(current) > 0:
+            if len(parts) < max_parts:
+                parts.append(''.join(current))
+        return parts
+
+    def _qq_send_max_fallback_parts(chat_type, msg_id, event_id):
+        """拆段数按剩余被动回复额度封顶。"""
+        if msg_id is None and event_id is None:
+            return qqSendLengthFallbackMaxParts
+        # 群聊一个凭据只允许 5 次、私聊 4 次回复，首发与重试已经用掉两次。
+        return 2 if chat_type == 'qq_private' else 3
+
+    def _fallback_qq_length_send(
+        target_event,
+        api_obj,
+        chat_type,
+        chat_id,
+        msg_id,
+        event_id,
+        result
+    ):
+        """长度类错误重试仍失败时的降级：markdown 转纯文本，再按字节拆段重发。
+
+        只处理群聊/单聊的文本与 markdown；带本地图片的 markdown 不在这里降级，
+        交给图文回退保留图片。带键盘按钮的 markdown 会降级但丢掉按钮——按钮没了
+        仍然比整条回复发不出去好，丢弃情况记在 keyboard_dropped 里。
+        """
+        if chat_type not in ['qq_group', 'qq_private']:
+            return result
+        if result.get('active', False):
+            return result
+        if event_action._qq_send_error_code(result) not in qqSendLengthErrorCodes:
+            return result
+        msg_type = getattr(api_obj.data, 'msg_type', None)
+        if msg_type == 2:
+            markdown = getattr(api_obj.data, 'markdown', None)
+            content = ''
+            if isinstance(markdown, dict):
+                content = markdown.get('content', '') or ''
+            text = event_action._qq_markdown_to_plain_text(content)
+            if text == '':
+                return result
+            keyboard_dropped = getattr(api_obj.data, 'keyboard', None) is not None
+            # 纯文本 markdown 没有图文回退分支，被拒就是静默丢回复；
+            # 这里降级成普通消息，宁可排版难看、按钮丢掉，也不能什么都不发。
+            api_obj.data.msg_type = 0
+            api_obj.data.markdown = None
+            api_obj.data.keyboard = None
+            api_obj.data.content = text
+            degrade_reason = 'markdown_to_text'
+        elif msg_type == 0:
+            content = getattr(api_obj.data, 'content', None)
+            if not isinstance(content, str) or content == '':
+                return result
+            text = content
+            degrade_reason = 'split_text'
+            keyboard_dropped = False
+        else:
+            return result
+        max_parts = event_action._qq_send_max_fallback_parts(chat_type, msg_id, event_id)
+        parts = event_action._split_qq_text_by_bytes(text, max_parts=max_parts)
+        if len(parts) == 0:
+            return result
+        total_bytes = len(text.encode('utf-8'))
+        sent_bytes = sum(len(part.encode('utf-8')) for part in parts)
+        dropped_bytes = total_bytes - sent_bytes
+        passive_mode = msg_id is not None or event_id is not None
+        active_mode = False
+        active_parts = 0
+        results = []
+        for part in parts:
+            api_obj.data.content = part
+            if passive_mode:
+                # 每一段（包括第一段）都要拿新的 msg_seq / 新的 event 计数，
+                # 复用上一次失败的凭据会被平台按去重拒掉。
+                reserve_error = event_action._reserve_qq_passive_slot(
+                    target_event,
+                    api_obj,
+                    chat_type,
+                    chat_id,
+                    msg_id,
+                    event_id
+                )
+                if reserve_error is not None:
+                    # 被动回复额度用尽：这一段和它后面的全部改发主动消息。
+                    # 复用既有的主动回退（清被动凭据 + 关掉本会话被动回复 + 记录原因），
+                    # 不另写一套「清字段再发」。
+                    active_result = event_action._retry_qq_message_as_active(
+                        target_event,
+                        api_obj,
+                        chat_type,
+                        chat_id,
+                        msg_id,
+                        event_id,
+                        reserve_error,
+                        'length_fallback_quota_exhausted'
+                    )
+                    active_result['data']['send_length_fallback'] = {
+                        'reason': degrade_reason,
+                        'part': len(results) + 1,
+                        'parts': len(parts),
+                        'bytes': len(part.encode('utf-8')),
+                        'active': True
+                    }
+                    results.append(active_result)
+                    active_parts += 1
+                    passive_mode = False
+                    active_mode = True
+                    if not active_result.get('active', False):
+                        break
+                    continue
+            api_obj.do_api()
+            part_result = event_action._make_api_result(
+                target_event,
+                api_obj,
+                chat_type,
+                chat_id,
+                'send'
+            )
+            part_result['data']['send_length_fallback'] = {
+                'reason': degrade_reason,
+                'part': len(results) + 1,
+                'parts': len(parts),
+                'bytes': len(part.encode('utf-8')),
+                'active': active_mode
+            }
+            results.append(part_result)
+            if active_mode:
+                active_parts += 1
+            if not part_result.get('active', False):
+                break
+        if len(results) == 0:
+            return result
+        fallback_result = event_action._merge_send_results(chat_type, chat_id, results)
+        failed = [
+            item for item in results
+            if not item.get('active', False)
+        ]
+        if len(failed) > 0:
+            # 降级本身是明确失败时要把状态码带上去，否则带图 markdown 的调用方
+            # 会把「确定没发出」当成「结果不确定」，一直留着已上传的临时素材。
+            fallback_result['data']['http_status'] = failed[0].get('data', {}).get(
+                'http_status',
+                None
+            )
+        elif fallback_result.get('active', False):
+            fallback_result['data']['http_status'] = 200
+        fallback_result['data']['send_length_fallback'] = {
+            'reason': degrade_reason,
+            'parts': len(parts),
+            'sent_parts': len(results),
+            'active_parts': active_parts,
+            'keyboard_dropped': keyboard_dropped,
+            'dropped_bytes': dropped_bytes,
+            'first_result': {
+                'http_status': result.get('data', {}).get('http_status', None),
+                'error_code': result.get('data', {}).get('error_code', None)
+            }
+        }
+        detail = '成功' if fallback_result.get('active', False) else '仍有失败'
+        if active_parts > 0:
+            detail += '，其中 %d 段因被动额度用尽改发主动消息' % active_parts
+        if keyboard_dropped:
+            detail += '，键盘按钮已丢弃'
+        if dropped_bytes > 0:
+            detail += '，超出可发送上限 %d 字节未发出' % dropped_bytes
+        event_action._log_qq_send_retry(
+            target_event,
+            chat_type,
+            chat_id,
+            '消息长度超限，重试仍失败，已%s重发 %d 段（%s）' % (
+                '转纯文本' if degrade_reason == 'markdown_to_text' else '分段',
+                len(parts),
+                detail
+            ),
+            level=2 if fallback_result.get('active', False) else 3
+        )
+        return fallback_result
+
     def _send_qq_api(
         target_event,
         api_obj,
@@ -4033,7 +4387,8 @@ class event_action_common(object):
         chat_id,
         msg_id,
         event_id,
-        allow_active_fallback=False
+        allow_active_fallback=False,
+        allow_length_fallback=True
     ):
         message_reference = getattr(api_obj.data, 'message_reference', None)
         if chat_type in ['qq_group', 'qq_private'] and isinstance(message_reference, dict):
@@ -4068,7 +4423,7 @@ class event_action_common(object):
                 allow_active_fallback
                 and local_error in qqLocalPassiveFallbackErrors
             ):
-                return event_action._retry_qq_message_as_active(
+                active_result = event_action._retry_qq_message_as_active(
                     target_event,
                     api_obj,
                     chat_type,
@@ -4078,6 +4433,27 @@ class event_action_common(object):
                     passive_error,
                     'local_passive_reply_count_exceeded'
                 )
+                # 主动发送同样可能撞上长度限制或服务端抖动，这里一并兜住。
+                active_result = event_action._retry_qq_send(
+                    target_event,
+                    api_obj,
+                    chat_type,
+                    chat_id,
+                    None,
+                    None,
+                    active_result
+                )
+                if allow_length_fallback:
+                    active_result = event_action._fallback_qq_length_send(
+                        target_event,
+                        api_obj,
+                        chat_type,
+                        chat_id,
+                        None,
+                        None,
+                        active_result
+                    )
+                return active_result
             return passive_error
 
         api_obj.do_api()
@@ -4088,6 +4464,16 @@ class event_action_common(object):
             chat_id,
             'send'
         )
+        # 平台明确没发出去的失败重试一次；不确定的（超时/5xx/429）保持原样。
+        passive_result = event_action._retry_qq_send(
+            target_event,
+            api_obj,
+            chat_type,
+            chat_id,
+            msg_id,
+            event_id,
+            passive_result
+        )
         if (
             allow_active_fallback
             and event_action._should_fallback_qq_passive(
@@ -4096,7 +4482,7 @@ class event_action_common(object):
                 event_id
             )
         ):
-            return event_action._retry_qq_message_as_active(
+            active_result = event_action._retry_qq_message_as_active(
                 target_event,
                 api_obj,
                 chat_type,
@@ -4106,7 +4492,39 @@ class event_action_common(object):
                 passive_result,
                 'platform_rejected_passive_reply'
             )
-        return passive_result
+            # 改发主动消息之后同样跑一遍重试与长度降级。
+            active_result = event_action._retry_qq_send(
+                target_event,
+                api_obj,
+                chat_type,
+                chat_id,
+                None,
+                None,
+                active_result
+            )
+            if allow_length_fallback:
+                active_result = event_action._fallback_qq_length_send(
+                    target_event,
+                    api_obj,
+                    chat_type,
+                    chat_id,
+                    None,
+                    None,
+                    active_result
+                )
+            return active_result
+        # 长度类错误重试仍失败时降级发送，避免整条回复静默消失。
+        if not allow_length_fallback:
+            return passive_result
+        return event_action._fallback_qq_length_send(
+            target_event,
+            api_obj,
+            chat_type,
+            chat_id,
+            msg_id,
+            event_id,
+            passive_result
+        )
 
     def _merge_send_results(chat_type, chat_id, results):
         if len(results) == 0:
@@ -5082,7 +5500,10 @@ class event_action_common(object):
             chat_id,
             msg_id,
             event_id,
-            allow_active_fallback=allow_active_fallback
+            allow_active_fallback=allow_active_fallback,
+            # 带本地图片时不要在长度降级里把 markdown 转成纯文本（那会丢图），
+            # 交给下面的图文回退流程处理。
+            allow_length_fallback=local_images is None
         )
         event_action._attach_qq_log_content(res_data, tmp_log_content)
 
