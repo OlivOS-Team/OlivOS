@@ -340,6 +340,17 @@ def log_tail(path, limit, level):
     return list(output)
 
 
+def _record_activity(host, online, known, last_seen_map):
+    now = time.monotonic()
+    for bot_hash, last_seen in last_seen_map.items():
+        bot = host.accounts.get(bot_hash)
+        if bot is None or not bot.enable:
+            continue
+        known.add(bot_hash)
+        if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
+            online.add(bot_hash)
+
+
 def runtime_status(host):
     online = set()
     known = set()
@@ -355,14 +366,7 @@ def runtime_status(host):
                     online.add(bot.hash)
             continue
         if hasattr(proc, 'account_activity'):
-            now = time.monotonic()
-            for bot_hash, last_seen in proc.account_activity().items():
-                bot = host.accounts.get(bot_hash)
-                if bot is None or not bot.enable:
-                    continue
-                known.add(bot_hash)
-                if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
-                    online.add(bot_hash)
+            _record_activity(host, online, known, proc.account_activity())
             continue
         bot_info = getattr(proc, 'bot_info', None)
         if bot_info is None:
@@ -402,6 +406,9 @@ def runtime_status(host):
                 known.add(bot.hash)
                 if ('virtual_terminal', bot.hash) in host.terminals:
                     online.add(bot.hash)
+    http_post = getattr(OlivOS.flaskServerAPI, 'http_post_activity', None)
+    if callable(http_post):
+        _record_activity(host, online, known, http_post())
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
     unknown = enabled - known

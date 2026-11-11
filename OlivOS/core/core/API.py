@@ -107,11 +107,12 @@ class accountActivity(object):
                 self._index[bot_hash] = len(self._index)
         self._seen = multiprocessing.Array('d', max(len(self._index), 1))
 
-    def mark(self, bot_hash):
+    def mark(self, bot_hash, when=None):
         slot = self._index.get(bot_hash)
         if slot is None:
             return False
-        self._seen[slot] = time.monotonic()
+        # when=0 表示明确离线，供心跳 status.online=false 使用。
+        self._seen[slot] = time.monotonic() if when is None else when
         return True
 
     def snapshot(self):

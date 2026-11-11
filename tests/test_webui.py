@@ -489,6 +489,76 @@ def test_onebot_http_post_reports_heartbeat_status(client, host):
     assert status['unknown'] == 0 and status['unknown_accounts'] == []
 
 
+def _onebot_post_service(host, bot, other=None):
+    accounts = {bot.hash: bot}
+    if other is not None:
+        accounts[other.hash] = other
+    host.accounts = accounts
+    service = OlivOS.flaskServerAPI.server(
+        'test-onebot-post', 'test-onebot-post', ['GET', 'POST'], '127.0.0.1', 0,
+        tx_queue=queue.Queue(), bot_info_dict=accounts,
+    )
+    service.app()
+    service.set_config()
+    return service
+
+
+def test_onebot_http_post_napcat_model_uses_default_report_path(client, host):
+    # 实现端普遍 POST 到 /qq/onebot/default，账号模型却是 napcat_default。
+    bot = OlivOS.API.bot_info_T(
+        id=3520767439, platform_sdk='onebot', platform_platform='qq',
+        platform_model='napcat_default', server_type='post', host='127.0.0.1', port=9873,
+    )
+    service = _onebot_post_service(host, bot)
+    host.runtime['test-onebot-post'] = service
+    flask_client = service.Proc_config['Flask_app'].test_client()
+    heartbeat = {
+        'time': int(time.time()), 'self_id': bot.id, 'post_type': 'meta_event',
+        'meta_event_type': 'heartbeat', 'status': {'online': True, 'good': True}, 'interval': 5000,
+    }
+    assert flask_client.post('/OlivOSMsgApi/qq/onebot/default', json=heartbeat).status_code == 200
+    status = client.get('/api/status').json
+    assert status['account_connections'][bot.hash] == 'online'
+
+
+def test_onebot_http_post_activity_visible_without_runtime_entry(client, host):
+    # WebUI 在 init 列表里早于 flask 启动；不能只靠 host.runtime 里有没有 flask 对象。
+    bot = OlivOS.API.bot_info_T(
+        id=3520767439, platform_sdk='onebot', platform_platform='qq',
+        platform_model='napcat_default', server_type='post', host='127.0.0.1', port=9873,
+    )
+    service = _onebot_post_service(host, bot)
+    flask_client = service.Proc_config['Flask_app'].test_client()
+    heartbeat = {
+        'time': int(time.time()), 'self_id': bot.id, 'post_type': 'meta_event',
+        'meta_event_type': 'heartbeat', 'status': {'online': True, 'good': True}, 'interval': 5000,
+    }
+    assert flask_client.post('/OlivOSMsgApi/qq/onebot/default', json=heartbeat).status_code == 200
+    status = client.get('/api/status').json
+    assert status['account_connections'][bot.hash] == 'online'
+
+
+def test_onebot_http_post_heartbeat_can_report_offline(client, host):
+    bot = OlivOS.API.bot_info_T(
+        id=3520767439, platform_sdk='onebot', platform_platform='qq',
+        platform_model='napcat_default', server_type='post', host='127.0.0.1', port=9873,
+    )
+    service = _onebot_post_service(host, bot)
+    host.runtime['test-onebot-post'] = service
+    flask_client = service.Proc_config['Flask_app'].test_client()
+    online_hb = {
+        'time': int(time.time()), 'self_id': bot.id, 'post_type': 'meta_event',
+        'meta_event_type': 'heartbeat', 'status': {'online': True, 'good': True}, 'interval': 5000,
+    }
+    offline_hb = dict(online_hb, status={'online': False, 'good': False})
+    assert flask_client.post('/OlivOSMsgApi/qq/onebot/default', json=online_hb).status_code == 200
+    assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
+    assert flask_client.post('/OlivOSMsgApi/qq/onebot/default', json=offline_hb).status_code == 200
+    status = client.get('/api/status').json
+    assert status['account_connections'][bot.hash] == 'offline'
+    assert status['unknown'] == 0
+
+
 def test_webhook_accounts_use_shared_listener_status(client, host, tmp_path, monkeypatch):
     from unittest.mock import Mock
 

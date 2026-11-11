@@ -23,6 +23,17 @@ import OlivOS
 
 modelName = 'flaskServerAPI'
 
+# WebUI 在 init 列表里早于 flask 启动；用模块级登记，避免只靠 host.runtime 才能读到上报。
+_http_post_servers = []
+
+
+def http_post_activity():
+    merged = {}
+    for server in list(_http_post_servers):
+        merged.update(server.account_activity())
+    return merged
+
+
 gCheckList = [
     'default',
     'para_default',
@@ -83,19 +94,40 @@ class server(OlivOS.API.Proc_templet):
             if isinstance(bot, OlivOS.API.bot_info_T)
             and bot.platform['sdk'] == 'onebot' and bot.post_info.type == 'post'
         }
+        self._post_accounts = post_accounts
         self.activity = OlivOS.API.accountActivity(post_accounts)
+        if self not in _http_post_servers:
+            _http_post_servers.append(self)
 
     def mark_post_seen(self, sdk_event):
         """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
         if not sdk_event.active:
             return
         self_id = str(sdk_event.base_info.get('self_id', ''))
-        platform = sdk_event.platform
-        self.activity.mark(OlivOS.API.getBotHash(
+        if not self_id:
+            return
+        platform = sdk_event.platform or {}
+        hashed = OlivOS.API.getBotHash(
             bot_id=self_id,
             platform_sdk=platform.get('sdk'),
             platform_platform=platform.get('platform'),
-        ))
+            platform_model=platform.get('model'),
+        )
+        payload = getattr(sdk_event, 'json', None) or {}
+        status = payload.get('status') if isinstance(payload, dict) else None
+        when = None
+        if (isinstance(payload, dict)
+                and payload.get('post_type') == 'meta_event'
+                and payload.get('meta_event_type') == 'heartbeat'
+                and isinstance(status, dict)
+                and status.get('online') is False):
+            when = 0
+        if self.activity.mark(hashed, when):
+            return
+        for bot_hash, bot in self._post_accounts.items():
+            if str(bot.id) == self_id:
+                self.activity.mark(bot_hash, when)
+                return
 
     def account_activity(self):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
