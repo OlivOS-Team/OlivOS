@@ -111,9 +111,23 @@ class accountActivity(object):
         slot = self._index.get(bot_hash)
         if slot is None:
             return False
-        # when=0 表示明确离线，供心跳 status.online=false 使用。
         self._seen[slot] = time.monotonic() if when is None else when
         return True
+
+    def mark_offline(self, bot_hash, when=None):
+        """记录一次明确的离线事件（如心跳 status.online=false）。
+
+        0 表示本次运行还没收到过任何上报，不能拿来当离线；这里存入负的时间戳，
+        既与「无上报」区分开，又保留事件先后，方便多处活动表按时序合并。
+        """
+        return self.mark(bot_hash, -(time.monotonic() if when is None else when))
+
+    def clear(self, bot_hash=None):
+        """清掉活动记录，回到「本次运行未收到上报」的初始状态。"""
+        targets = self._index.items() if bot_hash is None else [(bot_hash, self._index.get(bot_hash))]
+        for _, slot in targets:
+            if slot is not None:
+                self._seen[slot] = 0
 
     def snapshot(self):
         return {bot_hash: self._seen[slot] for bot_hash, slot in self._index.items()}

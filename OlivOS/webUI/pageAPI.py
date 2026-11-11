@@ -341,6 +341,7 @@ def log_tail(path, limit, level):
 
 
 def _record_activity(host, online, known, last_seen_map):
+    # 时间戳 0 = 本次运行未收到上报；负值 = 明确离线（如心跳 status.online=false）。
     now = time.monotonic()
     for bot_hash, last_seen in last_seen_map.items():
         bot = host.accounts.get(bot_hash)

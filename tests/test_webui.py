@@ -489,6 +489,93 @@ def test_onebot_http_post_reports_heartbeat_status(client, host):
     assert status['unknown'] == 0 and status['unknown_accounts'] == []
 
 
+def test_account_activity_distinguishes_explicit_offline_from_no_report(monkeypatch):
+    # 0 表示「本次运行没收到过上报」；明确离线要用可区分的事件，不能和它撞车。
+    from unittest.mock import Mock
+    bot = account()
+    tracker = OlivOS.API.accountActivity(bot)
+    monkeypatch.setattr(OlivOS.API.time, 'monotonic', Mock(return_value=100.0))
+    assert tracker.snapshot() == {bot.hash: 0.0}
+    assert tracker.mark_offline(bot.hash) is True
+    assert tracker.mark_offline('missing-hash') is False
+    seen = tracker.snapshot()[bot.hash]
+    assert seen < 0
+    # 之后收到在线活动，重新算在线。
+    monkeypatch.setattr(OlivOS.API.time, 'monotonic', Mock(return_value=200.0))
+    assert tracker.mark(bot.hash) is True
+    assert tracker.snapshot()[bot.hash] == 200.0
+
+
+def test_http_post_activity_merge_prefers_more_recent_explicit_offline(host):
+    # 同一账号被多个 HTTP 服务跟踪时，按事件先后合并，明确离线不能被旧的在线时间盖掉。
+    bot = OlivOS.API.bot_info_T(
+        id=10070, platform_sdk='onebot', platform_platform='qq',
+        platform_model='default', server_type='post', host='127.0.0.1', port=5700,
+    )
+    host.accounts = {bot.hash: bot}
+    OlivOS.flaskServerAPI._http_post_servers.clear()
+    services = [
+        OlivOS.flaskServerAPI.server(
+            'merge-first', 'merge-first', ['GET', 'POST'], '127.0.0.1', 0,
+            tx_queue=queue.Queue(), bot_info_dict=host.accounts,
+        ),
+        OlivOS.flaskServerAPI.server(
+            'merge-second', 'merge-second', ['GET', 'POST'], '127.0.0.1', 0,
+            tx_queue=queue.Queue(), bot_info_dict=host.accounts,
+        ),
+    ]
+    try:
+        services[0].activity.mark(bot.hash, 100.0)
+        merged = OlivOS.flaskServerAPI.http_post_activity()
+        assert merged[bot.hash] == 100.0
+        services[1].activity.mark_offline(bot.hash, 200.0)
+        merged = OlivOS.flaskServerAPI.http_post_activity()
+        assert merged[bot.hash] < 0
+    finally:
+        OlivOS.flaskServerAPI._http_post_servers.clear()
+
+
+def test_onebot_http_post_service_deregisters_on_parent_terminate(client, host):
+    # processing 模式下子进程被 terminate 不会回调父进程侧对象，停止后不能再报在线的旧活动。
+    bot = OlivOS.API.bot_info_T(
+        id=10071, platform_sdk='onebot', platform_platform='qq',
+        platform_model='default', server_type='post', host='127.0.0.1', port=5700,
+    )
+    service = _onebot_post_service(host, bot)
+    flask_client = service.Proc_config['Flask_app'].test_client()
+    heartbeat = {
+        'time': int(time.time()), 'self_id': bot.id, 'post_type': 'meta_event',
+        'meta_event_type': 'heartbeat', 'status': {'online': True, 'good': True}, 'interval': 5000,
+    }
+    assert flask_client.post('/OlivOSMsgApi/qq/onebot/default', json=heartbeat).status_code == 200
+    assert OlivOS.flaskServerAPI.http_post_activity()[bot.hash] > 0
+    # WebUI 仍在 host.runtime 里持有这个对象时，也必须回到离线。
+    host.runtime['test-onebot-post'] = service
+    assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
+    service.on_parent_terminate()
+    assert OlivOS.flaskServerAPI.http_post_activity() == {}
+    status = client.get('/api/status').json
+    assert status['account_connections'][bot.hash] == 'offline'
+    assert status['unknown'] == 0
+
+
+def test_detach_proc_registration_calls_hook_and_tolerates_plain_proc():
+    from OlivOS.core.boot import bootAPI as boot_module
+
+    calls = []
+
+    class WithHook:
+        def on_parent_terminate(self):
+            calls.append('hook')
+
+    class WithoutHook:
+        pass
+
+    boot_module.detach_proc_registration(WithHook())
+    boot_module.detach_proc_registration(WithoutHook())
+    assert calls == ['hook']
+
+
 def _onebot_post_service(host, bot, other=None):
     OlivOS.flaskServerAPI._http_post_servers.clear()
     accounts = {bot.hash: bot}

@@ -28,11 +28,16 @@ _http_post_servers = []
 
 
 def http_post_activity():
+    """合并各 HTTP 上报服务的活动表。
+
+    时间戳存的是绝对时刻，负值表示明确离线。按事件先后（时间戳绝对值）取胜，
+    这样后到的明确离线不会被另一份较旧的在线记录盖掉。
+    """
     merged = {}
     for server in list(_http_post_servers):
         for bot_hash, last_seen in server.account_activity().items():
             prev = merged.get(bot_hash)
-            if prev is None or last_seen > prev:
+            if prev is None or abs(last_seen) > abs(prev):
                 merged[bot_hash] = last_seen
     return merged
 
@@ -121,29 +126,45 @@ class server(OlivOS.API.Proc_templet):
         )
         payload = getattr(sdk_event, 'json', None) or {}
         status = payload.get('status') if isinstance(payload, dict) else None
-        when = None
-        if (isinstance(payload, dict)
-                and payload.get('post_type') == 'meta_event'
-                and payload.get('meta_event_type') == 'heartbeat'
-                and isinstance(status, dict)
-                and status.get('online') is False):
-            when = 0
-        if self.activity.mark(hashed, when):
+        offline = (
+            isinstance(payload, dict)
+            and payload.get('post_type') == 'meta_event'
+            and payload.get('meta_event_type') == 'heartbeat'
+            and isinstance(status, dict)
+            and status.get('online') is False
+        )
+        if self._mark_activity(hashed, offline):
             return
         for bot_hash, bot in self._post_accounts.items():
             if (str(bot.id) == self_id
                     and bot.platform.get('sdk') == platform.get('sdk')
                     and bot.platform.get('platform') == platform.get('platform')):
-                self.activity.mark(bot_hash, when)
+                self._mark_activity(bot_hash, offline)
                 return
+
+    def _mark_activity(self, bot_hash, offline):
+        if offline:
+            return self.activity.mark_offline(bot_hash)
+        return self.activity.mark(bot_hash)
 
     def account_activity(self):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
         return self.activity.snapshot()
 
     def on_terminate(self):
-        if self in _http_post_servers:
-            _http_post_servers.remove(self)
+        self.deregister()
+
+    def on_parent_terminate(self):
+        """父进程侧在终止本组件前调用。
+
+        processing 模式下的子进程被 terminate() 不会回调本对象，登记会一直留着，
+        仪表盘就会在停服后继续把账号显示成在线，直到活动窗口过期。
+        """
+        self.deregister()
+
+    def deregister(self):
+        _http_post_servers[:] = [server for server in _http_post_servers if server is not self]
+        self.activity.clear()
 
     class config_T(object):
         def __init__(self, debug_mode):
