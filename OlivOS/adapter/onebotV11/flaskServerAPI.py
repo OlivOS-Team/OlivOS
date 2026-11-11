@@ -30,7 +30,10 @@ _http_post_servers = []
 def http_post_activity():
     merged = {}
     for server in list(_http_post_servers):
-        merged.update(server.account_activity())
+        for bot_hash, last_seen in server.account_activity().items():
+            prev = merged.get(bot_hash)
+            if prev is None or last_seen > prev:
+                merged[bot_hash] = last_seen
     return merged
 
 
@@ -96,8 +99,11 @@ class server(OlivOS.API.Proc_templet):
         }
         self._post_accounts = post_accounts
         self.activity = OlivOS.API.accountActivity(post_accounts)
-        if self not in _http_post_servers:
-            _http_post_servers.append(self)
+        _http_post_servers[:] = [
+            server for server in _http_post_servers
+            if server is not self and getattr(server, 'Proc_name', None) != self.Proc_name
+        ]
+        _http_post_servers.append(self)
 
     def mark_post_seen(self, sdk_event):
         """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
@@ -125,13 +131,19 @@ class server(OlivOS.API.Proc_templet):
         if self.activity.mark(hashed, when):
             return
         for bot_hash, bot in self._post_accounts.items():
-            if str(bot.id) == self_id:
+            if (str(bot.id) == self_id
+                    and bot.platform.get('sdk') == platform.get('sdk')
+                    and bot.platform.get('platform') == platform.get('platform')):
                 self.activity.mark(bot_hash, when)
                 return
 
     def account_activity(self):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
         return self.activity.snapshot()
+
+    def on_terminate(self):
+        if self in _http_post_servers:
+            _http_post_servers.remove(self)
 
     class config_T(object):
         def __init__(self, debug_mode):

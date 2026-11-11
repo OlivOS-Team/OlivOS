@@ -490,6 +490,7 @@ def test_onebot_http_post_reports_heartbeat_status(client, host):
 
 
 def _onebot_post_service(host, bot, other=None):
+    OlivOS.flaskServerAPI._http_post_servers.clear()
     accounts = {bot.hash: bot}
     if other is not None:
         accounts[other.hash] = other
