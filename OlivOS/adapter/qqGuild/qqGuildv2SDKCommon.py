@@ -4782,6 +4782,9 @@ class event_action_common(object):
         tmp_raw = str(content)
         if tmp_raw.strip() == '':
             return None
+        # 空行占位（U+200B）是给卡片撑行距用的渲染辅助，日志里去掉，
+        # 正文里该有的换行仍以字面量 \\n 保留，排查时看得到空行位置。
+        tmp_raw = tmp_raw.replace(markdown_tag.qqMarkdownBlankLine, '')
         # 日志一行一条：换行写字面量 \\n，正文一条都不截断。
         return tmp_raw.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '\\n')
 

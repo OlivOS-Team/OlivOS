@@ -122,3 +122,75 @@ def test_plain_text_fallback_drops_placeholder():
     content = 'A' + NL + ZWSP + NL + 'B'
 
     assert SDK.event_action._qq_markdown_to_plain_text(content) == 'A' + NL + NL + 'B'
+
+
+def _joined_text(message):
+    return ''.join(
+        segment.data['text']
+        for segment in message.data
+        if isinstance(segment, OlivOS.messageAPI.PARA.text)
+    )
+
+
+def test_rejected_mixed_markdown_fallback_has_no_placeholder(monkeypatch):
+    """图文混发被平台拒掉时回退发原消息，原消息里不能带占位字符。"""
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_upload_markdown_images',
+        Mock(return_value=(
+            {'image_0': '![image #20px #10px](qqbot-media://image/v1/t)'},
+            [],
+            None
+        ))
+    )
+    monkeypatch.setattr(SDK.event_action, '_delete_markdown_images', Mock())
+    monkeypatch.setattr(
+        SDK.event_action,
+        'create_markdown_message',
+        Mock(return_value={'active': False, 'data': {'http_status': 400}})
+    )
+    fallback = Mock(return_value={'active': True, 'data': {}})
+    monkeypatch.setattr(SDK.event_action, 'send_qq_msg', fallback)
+    message = OlivOS.messageAPI.Message_templet('olivos_para', [
+        OlivOS.messageAPI.PARA.text('第一段' + NL * 2 + '第二段'),
+        OlivOS.messageAPI.PARA.image('images/a.png')
+    ])
+
+    SDK.event_action._send_markdown_mixed_message(
+        _target_event(), 'qq_group', 'group', message
+    )
+
+    assert fallback.called
+    assert ZWSP not in _joined_text(fallback.call_args.args[2])
+
+
+def test_upload_failure_fallback_has_no_placeholder(monkeypatch):
+    """图片素材上传失败时回退发原始 markdown 正文，同样不能带占位。"""
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_upload_markdown_images',
+        Mock(return_value=(None, [], 'cover: 图片超过 10MB 素材上限'))
+    )
+    monkeypatch.setattr(SDK.event_action, '_delete_markdown_images', Mock())
+    fallback = Mock(return_value={'active': True, 'data': {}})
+    monkeypatch.setattr(SDK.event_action, 'send_qq_msg', fallback)
+
+    SDK.event_action.create_markdown_message(
+        _target_event(),
+        'qq_group',
+        'group',
+        {'content': '标题' + NL * 2 + '正文{{cover}}'},
+        local_images={'cover': 'cover.png'}
+    )
+
+    assert fallback.called
+    assert ZWSP not in _joined_text(fallback.call_args.args[2])
+
+
+def test_log_preview_strips_placeholder():
+    """日志里不显示零宽字符，换行仍以字面量 \n 呈现。"""
+    preview = SDK.event_action._get_qq_log_text_preview('A' + NL + ZWSP + NL + 'B')
+
+    assert ZWSP not in preview
+    assert preview == 'A' + chr(92) + 'n' + chr(92) + 'n' + 'B'
+
