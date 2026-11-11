@@ -193,4 +193,3 @@ def test_log_preview_strips_placeholder():
 
     assert ZWSP not in preview
     assert preview == 'A' + chr(92) + 'n' + chr(92) + 'n' + 'B'
-
