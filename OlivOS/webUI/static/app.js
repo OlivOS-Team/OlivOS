@@ -62,6 +62,7 @@ const state = {
   navigationGeneration: 0,
   accounts: [],
   savedAccounts: [],
+  accountConnections: {},
   revision: '',
   schema: null,
   plugins: {},
@@ -609,7 +610,10 @@ async function navigate(page) {
   if (page !== 'terminals') closeStream('terminal');
   if (page !== 'plugin-page') rememberPage();
   if (page === 'dashboard') await refreshStatus();
-  if (page === 'accounts' && !state.dirty) await loadAccounts();
+  if (page === 'accounts') {
+    if (!state.dirty) await loadAccounts();
+    await refreshStatus();
+  }
   if (page === 'plugins') await loadPlugins();
   if (page === 'logs') await openLogs();
   if (page === 'terminals') {
@@ -675,6 +679,8 @@ async function refreshStatus() {
   $('update-status').textContent = status.update_available
     ? '发现可用更新。'
     : '当前未收到新版本通知。';
+  state.accountConnections = status.account_connections || {};
+  if (state.page === 'accounts') renderAccounts();
 }
 
 function dirty() {
@@ -714,8 +720,12 @@ function renderAccounts() {
     const cell = element('td');
     cell.append(enabled);
     row.append(cell);
+    const connection = state.accountConnections[account.hash];
+    const accountText = account.enable && connection === 'offline'
+      ? `${account.id} (离线)`
+      : String(account.id);
     row.append(
-      element('td', account.id),
+      element('td', accountText),
       element('td', account.platform_type),
       element('td', `${account.sdk_type} / ${account.model_type}`),
     );
