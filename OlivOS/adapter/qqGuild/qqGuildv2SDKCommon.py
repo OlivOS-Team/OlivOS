@@ -4144,7 +4144,9 @@ class event_action_common(object):
         """把 markdown 卡片降级成普通文本：去图片、去链接语法与表格分隔行。"""
         lines = []
         for raw_line in str(content).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
-            line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', raw_line)
+            # 空行占位（U+200B）只是给 Markdown 卡片撑行距用的，转纯文本时要去掉。
+            line = raw_line.replace(markdown_tag.qqMarkdownBlankLine, '')
+            line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', line)
             line = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', line)
             line = re.sub(r'^\s{0,3}#{1,6}\s*', '', line)
             line = line.replace('**', '').replace('__', '').replace('`', '')
@@ -5251,6 +5253,9 @@ class event_action_common(object):
             replacements[value] if part_type == 'image' else value
             for part_type, value in content_parts
         )
+        # QQ 的 Markdown 卡片会吞掉空行，拼好的正文统一补零宽占位，
+        # 否则插件排好的段落会在群里挤成一坨。
+        content = markdown_tag.normalize_blank_lines(content)
         result = event_action.create_markdown_message(
             target_event,
             chat_type,
@@ -5445,6 +5450,14 @@ class event_action_common(object):
                 markdown,
                 allow_at_all=chat_type == 'guild_channel'
             )
+        elif chat_type in ['qq_group', 'qq_private']:
+            # 同一个坑在插件直接调 markdown 接口时也要堵上：QQ 群聊/单聊的
+            # Markdown 卡片吞空行，正文里的空行补零宽占位才留得住段落间隔。
+            markdown = copy.deepcopy(markdown)
+            if isinstance(markdown.get('content', None), str):
+                markdown['content'] = markdown_tag.normalize_blank_lines(
+                    markdown['content']
+                )
 
         if chat_type in ['qq_group', 'qq_private']:
             if force_active:
@@ -7666,6 +7679,51 @@ class markdown_tag:
         r'<qqbot-at-user\s+id=(["\'])([^"\']+)\1\s*/>'
     )
     qqAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
+
+    # QQ 的 Markdown 卡片会把空行压掉：正文里连续两个换行只渲染成一次换行，
+    # 段落之间想留一行空白必须用零宽空格占位。官方文档「换多行」示例也是
+    # 这么写的（第一行与第二行之间靠 \u200B 撑开）。这里统一用 U+200B。
+    qqMarkdownBlankLine = '\u200b'
+
+    @staticmethod
+    def normalize_blank_lines(text):
+        """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
+
+        只在代码块之外动手——代码块里的空行是内容的一部分，塞进不可见
+        字符会改变插件要发的东西。已经是占位行（U+200B）的行不会被当成
+        空行，因此函数幂等，重复调用不会把空行越撑越多；正文末尾的空行
+        也保持原样，不补占位。
+        """
+        source = str(text).replace('\r\n', '\n').replace('\r', '\n')
+        lines = source.split('\n')
+        last_content_index = -1
+        for index, line in enumerate(lines):
+            if line.strip() != '':
+                last_content_index = index
+        result = []
+        in_fence = False
+        fence_marker = None
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith('```') or stripped.startswith('~~~'):
+                marker = stripped[:3]
+                if not in_fence:
+                    in_fence = True
+                    fence_marker = marker
+                elif marker == fence_marker:
+                    in_fence = False
+                    fence_marker = None
+                result.append(line)
+                continue
+            if in_fence:
+                result.append(line)
+                continue
+            # 后面还有正文才需要占位；尾部空行补了只会在结尾多一行不可见字符。
+            if stripped == '' and index < last_content_index:
+                result.append(markdown_tag.qqMarkdownBlankLine)
+                continue
+            result.append(line)
+        return '\n'.join(result)
 
     def at_para(message_para, allow_at_all=True, flag_qq=True):
         if not isinstance(message_para, OlivOS.messageAPI.PARA.at):
