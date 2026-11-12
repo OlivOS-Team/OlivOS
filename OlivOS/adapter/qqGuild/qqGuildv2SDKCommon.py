@@ -7689,13 +7689,61 @@ class markdown_tag:
     qqMarkdownBlankLine = '\u200b'
 
     @staticmethod
+    def is_block_line(line):
+        """判断一行是不是 Markdown 块级元素（引用、标题、围栏、表格、列表、分割线）。
+
+        块级元素自带上下间距，而且内部允许「空行后继续缩进内容」——在它后面
+        补占位行会打断块的边界，所以这类行相邻的空行不能动。
+        """
+        text = str(line).strip()
+        if text == '':
+            return False
+        if text[0] in '>#|':
+            return True
+        if text.startswith('```') or text.startswith('~~~'):
+            return True
+        if len(text) >= 3 and set(text) <= set('-*_'):
+            return True
+        if text[0] in '-+*' and text[1:2].isspace():
+            return True
+        index = 0
+        while index < len(text) and index < 10 and text[index].isdigit():
+            index += 1
+        if 1 <= index <= 9 and text[index:index + 1] in ('.', ')'):
+            if text[index + 1:index + 2].isspace():
+                return True
+        return False
+
+    @staticmethod
+    def blank_line_needs_placeholder(lines, index):
+        """只有「普通段落之间」的空行才补占位。
+
+        空行前后任一侧是块级元素就不补：块级元素自己带间距，补了也不会更空；
+        反过来，块级元素前面的空行一旦换成非空行，手机端会把它当成块内的
+        lazy continuation（实测：引用块会把后面整段正文吞进引用框）。
+        """
+        previous = ''
+        for cursor in range(index - 1, -1, -1):
+            if str(lines[cursor]).strip() != '':
+                previous = lines[cursor]
+                break
+        following = ''
+        for cursor in range(index + 1, len(lines)):
+            if str(lines[cursor]).strip() != '':
+                following = lines[cursor]
+                break
+        if markdown_tag.is_block_line(previous) or markdown_tag.is_block_line(following):
+            return False
+        return True
+
+    @staticmethod
     def normalize_blank_lines(text):
         """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
 
-        只在代码块之外动手——代码块里的空行是内容的一部分，塞进不可见
-        字符会改变插件要发的东西。已经是占位行（U+200B）的行不会被当成
-        空行，因此函数幂等，重复调用不会把空行越撑越多；正文末尾的空行
-        也保持原样，不补占位。
+        只在代码块之外、且空行两侧都是普通文本时动手——块级元素（引用、
+        列表、表格、围栏）自带间距，插占位反而会把后续内容吞进块里。
+        已经是占位行（U+200B）的行不会被当成空行，因此函数幂等；正文末尾
+        的空行也保持原样，不补占位。
         """
         source = str(text).replace('\r\n', '\n').replace('\r', '\n')
         lines = source.split('\n')
@@ -7723,7 +7771,10 @@ class markdown_tag:
                 continue
             # 后面还有正文才需要占位；尾部空行补了只会在结尾多一行不可见字符。
             if stripped == '' and index < last_content_index:
-                result.append(markdown_tag.qqMarkdownBlankLine)
+                if markdown_tag.blank_line_needs_placeholder(lines, index):
+                    result.append(markdown_tag.qqMarkdownBlankLine)
+                else:
+                    result.append(line)
                 continue
             result.append(line)
         return '\n'.join(result)
