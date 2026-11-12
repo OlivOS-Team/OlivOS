@@ -118,6 +118,43 @@ def test_create_markdown_message_pads_blank_lines(monkeypatch):
     assert sent.data.markdown['content'] == '标题' + NL + ZWSP + NL + '正文'
 
 
+def test_blank_line_after_quote_is_untouched():
+    """引用块后面的空行不能换占位，否则手机端会把正文吞进引用框。"""
+    text = '> kp_Desom hp12/12 san0/99 dex65' + NL * 2 + '收到！已激活！'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text
+
+
+def test_blank_line_before_quote_is_untouched():
+    text = '普通段落' + NL * 2 + '> 引用一行'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text
+
+
+def test_blank_line_after_list_and_fence_is_untouched():
+    listed = '- 第一项' + NL * 2 + '正文'
+    fenced = '```' + NL + 'code' + NL + '```' + NL * 2 + '正文'
+
+    assert common.markdown_tag.normalize_blank_lines(listed) == listed
+    assert common.markdown_tag.normalize_blank_lines(fenced) == fenced
+
+
+def test_blank_line_after_table_and_rule_is_untouched():
+    table = '| a | b |' + NL + '| - | - |' + NL * 2 + '正文'
+    rule = '正文' + NL + '---' + NL * 2 + '下一段'
+
+    assert common.markdown_tag.normalize_blank_lines(table) == table
+    assert common.markdown_tag.normalize_blank_lines(rule) == rule
+
+
+def test_blank_line_between_plain_paragraphs_still_padded():
+    text = '普通一段' + NL * 2 + '普通二段'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == (
+        '普通一段' + NL + ZWSP + NL + '普通二段'
+    )
+
+
 def test_plain_text_fallback_drops_placeholder():
     content = 'A' + NL + ZWSP + NL + 'B'
 
