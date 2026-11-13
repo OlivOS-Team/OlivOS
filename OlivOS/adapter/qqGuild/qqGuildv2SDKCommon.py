@@ -7698,7 +7698,14 @@ class markdown_tag:
         text = str(line).strip()
         if text == '':
             return False
-        if text[0] in '>#|':
+        if text[0] == '>':
+            return True
+        if text[0] == '#':
+            # ATX 标题必须 `#` 后跟空白（或整行只有一个 `#`）。QQ 群里
+            # 常见的 `#话题` 不是标题，它旁边的空行仍要靠占位撑开，
+            # 否则按标题放过会被 QQ 吞掉，两段挤在一起。
+            return len(text) == 1 or text[1].isspace()
+        if text[0] == '|':
             return True
         if text.startswith('```') or text.startswith('~~~'):
             return True
@@ -7715,12 +7722,25 @@ class markdown_tag:
         return False
 
     @staticmethod
+    def is_table_line(line):
+        """判断一行是不是 Markdown 表格行（表头行 / 数据行 / 分隔行）。
+
+        口径与 is_block_line 里判表格的一致：去掉行首空白后以 `|` 开头。
+        """
+        return str(line).strip().startswith('|')
+
+    @staticmethod
     def blank_line_needs_placeholder(lines, index):
         """只有「普通段落之间」的空行才补占位。
 
         空行前后任一侧是块级元素就不补：块级元素自己带间距，补了也不会更空；
         反过来，块级元素前面的空行一旦换成非空行，手机端会把它当成块内的
         lazy continuation（实测：引用块会把后面整段正文吞进引用框）。
+
+        表格是唯一例外：GFM 里表格的边界完全靠空行界定，空行被 QQ 吞掉时
+        两张相邻的表会连成一张（后一张的 `| --- |` 直接变成数据行），表格
+        后面的正文也会被吸进表格当成新行。表格不像引用块那样吃 lazy
+        continuation，补一行占位是安全的，所以表格两侧的空行一律要占位。
         """
         previous = ''
         for cursor in range(index - 1, -1, -1):
@@ -7732,6 +7752,8 @@ class markdown_tag:
             if str(lines[cursor]).strip() != '':
                 following = lines[cursor]
                 break
+        if markdown_tag.is_table_line(previous) or markdown_tag.is_table_line(following):
+            return True
         if markdown_tag.is_block_line(previous) or markdown_tag.is_block_line(following):
             return False
         return True
