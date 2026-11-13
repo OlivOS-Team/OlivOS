@@ -4144,8 +4144,12 @@ class event_action_common(object):
         """把 markdown 卡片降级成普通文本：去图片、去链接语法与表格分隔行。"""
         lines = []
         for raw_line in str(content).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
-            # 空行占位（U+200B）只是给 Markdown 卡片撑行距用的，转纯文本时要去掉。
-            line = raw_line.replace(markdown_tag.qqMarkdownBlankLine, '')
+            # 只清整行的占位（U+200B）：那一行是给卡片撑行距用的，转纯文本时
+            # 还原成空行。调用方自己写在正文里的零宽字符要原样留着。
+            if raw_line.strip() == markdown_tag.qqMarkdownBlankLine:
+                line = ''
+            else:
+                line = raw_line
             line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', line)
             line = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', line)
             line = re.sub(r'^\s{0,3}#{1,6}\s*', '', line)
@@ -4782,9 +4786,12 @@ class event_action_common(object):
         tmp_raw = str(content)
         if tmp_raw.strip() == '':
             return None
-        # 空行占位（U+200B）是给卡片撑行距用的渲染辅助，日志里去掉，
-        # 正文里该有的换行仍以字面量 \\n 保留，排查时看得到空行位置。
-        tmp_raw = tmp_raw.replace(markdown_tag.qqMarkdownBlankLine, '')
+        # 空行占位（U+200B）是给卡片撑行距用的渲染辅助，日志里还原成空行；
+        # 调用方自己写的零宽字符不属于占位，原样保留，排查时才对得上原文。
+        tmp_raw = '\n'.join(
+            '' if line.strip() == markdown_tag.qqMarkdownBlankLine else line
+            for line in tmp_raw.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+        )
         # 日志一行一条：换行写字面量 \\n，正文一条都不截断。
         return tmp_raw.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '\\n')
 
@@ -7689,6 +7696,30 @@ class markdown_tag:
     qqMarkdownBlankLine = '\u200b'
 
     @staticmethod
+    def fence_prefix(text):
+        """返回 (围栏字符, 长度)；不是围栏行返回 None。"""
+        stripped = str(text).strip()
+        if not stripped or stripped[0] not in '`~':
+            return None
+        char = stripped[0]
+        count = len(stripped) - len(stripped.lstrip(char))
+        if count < 3:
+            return None
+        return char, count
+
+    @staticmethod
+    def is_fence_close(line, fence_char, fence_len):
+        """判断是否是围栏的收尾行。
+
+        按 CommonMark 口径：字符必须与开头一致、长度不短于开头，且围栏后面
+        只能有空白。` ```python ` 这种带信息的行不会误闭合代码块。
+        """
+        fence = markdown_tag.fence_prefix(line)
+        if fence is None or fence[0] != fence_char or fence[1] < fence_len:
+            return False
+        return str(line).strip().lstrip(fence_char).strip() == ''
+
+    @staticmethod
     def is_block_line(line):
         """判断一行是不是 Markdown 块级元素（引用、标题、围栏、表格、列表、分割线）。
 
@@ -7701,15 +7732,20 @@ class markdown_tag:
         if text[0] == '>':
             return True
         if text[0] == '#':
-            # ATX 标题必须 `#` 后跟空白（或整行只有一个 `#`）。QQ 群里
-            # 常见的 `#话题` 不是标题，它旁边的空行仍要靠占位撑开，
-            # 否则按标题放过会被 QQ 吞掉，两段挤在一起。
-            return len(text) == 1 or text[1].isspace()
+            # ATX 标题：1~6 个 # 后跟空白，或整行只有这些 #（空标题）。
+            # QQ 群里常见的 `#话题` 两种都不是，旁边的空行仍要补占位。
+            index = 0
+            while index < len(text) and index < 6 and text[index] == '#':
+                index += 1
+            if index == len(text):
+                return True
+            return text[index].isspace()
         if text[0] == '|':
             return True
-        if text.startswith('```') or text.startswith('~~~'):
+        if markdown_tag.fence_prefix(text) is not None:
             return True
-        if len(text) >= 3 and set(text) <= set('-*_'):
+        if len(text) >= 3 and len(set(text)) == 1 and text[0] in '-*_':
+            # 分割线要求整行是同一个字符，`-*-` 这类混排只是普通文本。
             return True
         if text[0] in '-+*' and text[1:2].isspace():
             return True
@@ -7722,16 +7758,91 @@ class markdown_tag:
         return False
 
     @staticmethod
+    def is_table_separator(line):
+        """判断一行是不是 GFM 表格的分隔行（允许没有外层竖线）。
+
+        `| --- | --- |`、`--- | ---`、`:-: | -` 都算；纯粹的 `---` 是分割线，
+        不含竖线所以不算。
+        """
+        text = str(line).strip()
+        if '|' not in text:
+            return False
+        cells = text.strip('|').split('|')
+        if not cells:
+            return False
+        for cell in cells:
+            if re.fullmatch(r':?-+:?', cell.strip()) is None:
+                return False
+        return True
+
+    @staticmethod
     def is_table_line(line):
         """判断一行是不是 Markdown 表格行（表头行 / 数据行 / 分隔行）。
 
-        口径与 is_block_line 里判表格的一致：去掉行首空白后以 `|` 开头。
+        只认以 `|` 开头的行；没有外层竖线的写法由 markdown_table_flags()
+        按「分隔行 + 相邻含竖线的行」补齐，避免把普通文本里带竖线的句子
+        当成表格。
         """
         return str(line).strip().startswith('|')
 
     @staticmethod
-    def blank_line_needs_placeholder(lines, index):
-        """只有「普通段落之间」的空行才补占位。
+    def markdown_table_flags(lines):
+        """标出每一行是否属于 Markdown 表格（含没有外层竖线的写法）。"""
+        texts = [str(line).strip() for line in lines]
+        flags = [False] * len(texts)
+        separators = [markdown_tag.is_table_separator(text) for text in texts]
+        for index, text in enumerate(texts):
+            if text.startswith('|') or separators[index]:
+                flags[index] = True
+        for index, is_separator in enumerate(separators):
+            if not is_separator:
+                continue
+            # 分隔行上一行是表头、下一行是第一条数据行，两处都含竖线
+            if index > 0 and '|' in texts[index - 1]:
+                flags[index - 1] = True
+            if index + 1 < len(texts) and '|' in texts[index + 1]:
+                flags[index + 1] = True
+        for index in range(1, len(texts)):
+            if flags[index - 1] and texts[index] != '' and '|' in texts[index]:
+                flags[index] = True
+        for index in range(len(texts) - 2, -1, -1):
+            if flags[index + 1] and texts[index] != '' and '|' in texts[index]:
+                flags[index] = True
+        return flags
+
+    @staticmethod
+    def _neighbor_indexes(lines):
+        """线性扫一遍，返回每个位置左右最近的非空行下标（没有则 -1）。"""
+        prev_indexes = [-1] * len(lines)
+        last = -1
+        for index, line in enumerate(lines):
+            prev_indexes[index] = last
+            if str(line).strip() != '':
+                last = index
+        next_indexes = [-1] * len(lines)
+        last = -1
+        for index in range(len(lines) - 1, -1, -1):
+            next_indexes[index] = last
+            if str(lines[index]).strip() != '':
+                last = index
+        return prev_indexes, next_indexes
+
+    @staticmethod
+    def _decide_placeholder(lines, previous_index, following_index, table_flags):
+        """空行是否要补占位（邻居下标由调用方一次算好，避免逐行回溯）。"""
+        if previous_index >= 0 and table_flags[previous_index]:
+            return True
+        if following_index >= 0 and table_flags[following_index]:
+            return True
+        if previous_index >= 0 and markdown_tag.is_block_line(lines[previous_index]):
+            return False
+        if following_index >= 0 and markdown_tag.is_block_line(lines[following_index]):
+            return False
+        return True
+
+    @staticmethod
+    def blank_line_needs_placeholder(lines, index, table_flags=None):
+        """单个空行是否需要补占位（外部调用入口，内部走预计算版本）。
 
         空行前后任一侧是块级元素就不补：块级元素自己带间距，补了也不会更空；
         反过来，块级元素前面的空行一旦换成非空行，手机端会把它当成块内的
@@ -7742,30 +7853,29 @@ class markdown_tag:
         后面的正文也会被吸进表格当成新行。表格不像引用块那样吃 lazy
         continuation，补一行占位是安全的，所以表格两侧的空行一律要占位。
         """
-        previous = ''
-        for cursor in range(index - 1, -1, -1):
-            if str(lines[cursor]).strip() != '':
-                previous = lines[cursor]
-                break
-        following = ''
-        for cursor in range(index + 1, len(lines)):
-            if str(lines[cursor]).strip() != '':
-                following = lines[cursor]
-                break
-        if markdown_tag.is_table_line(previous) or markdown_tag.is_table_line(following):
-            return True
-        if markdown_tag.is_block_line(previous) or markdown_tag.is_block_line(following):
-            return False
-        return True
+        if table_flags is None:
+            table_flags = markdown_tag.markdown_table_flags(lines)
+        previous_index = index - 1
+        while previous_index >= 0 and str(lines[previous_index]).strip() == '':
+            previous_index -= 1
+        following_index = index + 1
+        while following_index < len(lines) and str(lines[following_index]).strip() == '':
+            following_index += 1
+        if following_index >= len(lines):
+            following_index = -1
+        return markdown_tag._decide_placeholder(
+            lines, previous_index, following_index, table_flags
+        )
 
     @staticmethod
     def normalize_blank_lines(text):
         """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
 
-        只在代码块之外、且空行两侧都是普通文本时动手——块级元素（引用、
-        列表、表格、围栏）自带间距，插占位反而会把后续内容吞进块里。
-        已经是占位行（U+200B）的行不会被当成空行，因此函数幂等；正文末尾
-        的空行也保持原样，不补占位。
+        只在代码围栏之外动手：围栏内的空行是代码的一部分，塞进不可见字符
+        等于改了插件要发的内容。块级元素（引用、列表、围栏、分割线）相邻的
+        空行保持原样，因为手机端会把占位行当成块内的 lazy continuation；
+        表格是例外（见 blank_line_needs_placeholder）。已经是占位行（U+200B）
+        的行不算空行，因此函数幂等；正文末尾的空行也不补。
         """
         source = str(text).replace('\r\n', '\n').replace('\r', '\n')
         lines = source.split('\n')
@@ -7773,27 +7883,32 @@ class markdown_tag:
         for index, line in enumerate(lines):
             if line.strip() != '':
                 last_content_index = index
+        prev_indexes, next_indexes = markdown_tag._neighbor_indexes(lines)
+        table_flags = markdown_tag.markdown_table_flags(lines)
         result = []
         in_fence = False
-        fence_marker = None
+        fence_char = ''
+        fence_len = 0
         for index, line in enumerate(lines):
-            stripped = line.strip()
-            if stripped.startswith('```') or stripped.startswith('~~~'):
-                marker = stripped[:3]
-                if not in_fence:
-                    in_fence = True
-                    fence_marker = marker
-                elif marker == fence_marker:
+            if in_fence:
+                if markdown_tag.is_fence_close(line, fence_char, fence_len):
                     in_fence = False
-                    fence_marker = None
                 result.append(line)
                 continue
-            if in_fence:
+            fence = markdown_tag.fence_prefix(line)
+            if fence is not None:
+                in_fence = True
+                fence_char, fence_len = fence
                 result.append(line)
                 continue
             # 后面还有正文才需要占位；尾部空行补了只会在结尾多一行不可见字符。
-            if stripped == '' and index < last_content_index:
-                if markdown_tag.blank_line_needs_placeholder(lines, index):
+            if line.strip() == '' and index < last_content_index:
+                if markdown_tag._decide_placeholder(
+                    lines,
+                    prev_indexes[index],
+                    next_indexes[index],
+                    table_flags
+                ):
                     result.append(markdown_tag.qqMarkdownBlankLine)
                 else:
                     result.append(line)
