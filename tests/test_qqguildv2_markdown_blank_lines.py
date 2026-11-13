@@ -139,12 +139,56 @@ def test_blank_line_after_list_and_fence_is_untouched():
     assert common.markdown_tag.normalize_blank_lines(fenced) == fenced
 
 
-def test_blank_line_after_table_and_rule_is_untouched():
-    table = '| a | b |' + NL + '| - | - |' + NL * 2 + '正文'
+def test_blank_line_between_two_tables_is_padded():
+    """表格靠空行定边界：空行被 QQ 吞掉，两张表会连成一张。
+
+    实测现象：后一张表的 `| --- |` 变成前一张表的数据行，
+    表格后面的正文也会被吸进表格当行。
+    """
+    text = (
+        '| a | b |' + NL + '| - | - |' + NL + '| 1 | 2 |' + NL * 2
+        + '| c | d |' + NL + '| - | - |' + NL + '| 3 | 4 |'
+    )
+    expected = (
+        '| a | b |' + NL + '| - | - |' + NL + '| 1 | 2 |' + NL + ZWSP + NL
+        + '| c | d |' + NL + '| - | - |' + NL + '| 3 | 4 |'
+    )
+
+    assert common.markdown_tag.normalize_blank_lines(text) == expected
+
+
+def test_blank_line_between_table_and_text_is_padded():
+    """表格和正文之间的空行同样要占位，否则正文会变成表格新行。"""
+    after = '| a | b |' + NL + '| - | - |' + NL * 2 + 'D1'
+    before = 'D0' + NL * 2 + '| a | b |' + NL + '| - | - |'
+
+    assert common.markdown_tag.normalize_blank_lines(after) == (
+        '| a | b |' + NL + '| - | - |' + NL + ZWSP + NL + 'D1'
+    )
+    assert common.markdown_tag.normalize_blank_lines(before) == (
+        'D0' + NL + ZWSP + NL + '| a | b |' + NL + '| - | - |'
+    )
+
+
+def test_blank_line_after_rule_is_untouched():
     rule = '正文' + NL + '---' + NL * 2 + '下一段'
 
-    assert common.markdown_tag.normalize_blank_lines(table) == table
     assert common.markdown_tag.normalize_blank_lines(rule) == rule
+
+
+def test_blank_line_after_heading_is_untouched():
+    text = '# 标题' + NL * 2 + '正文'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text
+
+
+def test_hash_topic_line_is_not_heading():
+    """`#话题` 不是 ATX 标题，它旁边的空行照样要占位。"""
+    text = '正文' + NL * 2 + '#今日话题'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == (
+        '正文' + NL + ZWSP + NL + '#今日话题'
+    )
 
 
 def test_blank_line_between_plain_paragraphs_still_padded():
