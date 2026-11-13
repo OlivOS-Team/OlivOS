@@ -56,8 +56,7 @@ def test_parse_qq_join_request_flag_roundtrip():
     assert group_sdk._parse_qq_join_request_flag([]) is None
 
 
-def test_set_group_add_request_applies_to_qq_group_join_approval(monkeypatch):
-    # 审批走官方 POST /v2/groups/{group_openid}/approval_join_request/{member_openid}
+def _approval_calls(monkeypatch):
     calls = []
 
     def fake_approve(target_event, group_openid, member_openid, op, join_request_id=None, reject_reason=None):
@@ -69,26 +68,42 @@ def test_set_group_add_request_applies_to_qq_group_join_approval(monkeypatch):
 
     monkeypatch.setattr(common.event_action, 'approve_qq_group_join_request', staticmethod(fake_approve))
     monkeypatch.setattr(group_sdk, 'event_action', common.event_action)
+    return calls
 
+
+def test_set_group_add_request_approves_qq_group_join_request(monkeypatch):
+    # 审批走官方 POST /v2/groups/{group_openid}/approval_join_request/{member_openid}
+    calls = _approval_calls(monkeypatch)
     flag = group_sdk._make_qq_join_request_flag('G-1', 'M-1', 'REQ-1')
+
     assert group_sdk.event_action_group.set_group_add_request(None, flag, 'add', True) == 'ok'
     assert calls[-1] == {
         'group_openid': 'G-1', 'member_openid': 'M-1',
         'op': 'approve', 'join_request_id': 'REQ-1', 'reject_reason': None,
     }
 
+
+def test_set_group_add_request_declines_with_reason(monkeypatch):
+    calls = _approval_calls(monkeypatch)
+    flag = group_sdk._make_qq_join_request_flag('G-1', 'M-1', 'REQ-1')
+
     assert group_sdk.event_action_group.set_group_add_request(None, flag, 'add', False, '不认识') == 'ok'
     assert calls[-1]['op'] == 'decline'
     assert calls[-1]['reject_reason'] == '不认识'
 
 
-def test_set_group_add_request_rejects_bad_flag_and_sub_type(monkeypatch):
+def test_set_group_add_request_rejects_bad_flag(monkeypatch):
     monkeypatch.setattr(group_sdk, 'event_action', common.event_action)
+
     bad_flag = group_sdk.event_action_group.set_group_add_request(None, 'not-json', 'add', True)
     assert bad_flag['active'] is False
     assert 'invalid QQ group join request flag' in str(bad_flag)
 
+
+def test_set_group_add_request_rejects_unsupported_sub_type(monkeypatch):
+    monkeypatch.setattr(group_sdk, 'event_action', common.event_action)
     flag = group_sdk._make_qq_join_request_flag('G-1', 'M-1', 'REQ-1')
+
     bad_type = group_sdk.event_action_group.set_group_add_request(None, flag, 'kick', True)
     assert bad_type['active'] is False
     assert 'unsupported group request sub_type' in str(bad_type)

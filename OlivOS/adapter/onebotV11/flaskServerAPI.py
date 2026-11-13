@@ -14,6 +14,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import time
+
 from gevent import pywsgi
 from flask import Flask
 from flask import current_app
@@ -25,6 +27,9 @@ modelName = 'flaskServerAPI'
 
 # WebUI 在 init 列表里早于 flask 启动；用模块级登记，避免只靠 host.runtime 才能读到上报。
 _http_post_servers = []
+# 服务停掉后保留一份「明确离线」记录：账号不在 host.runtime 里时，WebUI 才
+# 不会把它显示成「未知」。
+_retired_activity = {}
 
 
 def http_post_activity():
@@ -33,7 +38,7 @@ def http_post_activity():
     时间戳存的是绝对时刻，负值表示明确离线。按事件先后（时间戳绝对值）取胜，
     这样后到的明确离线不会被另一份较旧的在线记录盖掉。
     """
-    merged = {}
+    merged = dict(_retired_activity)
     for server in list(_http_post_servers):
         for bot_hash, last_seen in server.account_activity().items():
             prev = merged.get(bot_hash)
@@ -104,6 +109,8 @@ class server(OlivOS.API.Proc_templet):
         }
         self._post_accounts = post_accounts
         self.activity = OlivOS.API.accountActivity(post_accounts)
+        for bot_hash in post_accounts:
+            _retired_activity.pop(bot_hash, None)
         _http_post_servers[:] = [
             server for server in _http_post_servers
             if server is not self and getattr(server, 'Proc_name', None) != self.Proc_name
@@ -164,6 +171,12 @@ class server(OlivOS.API.Proc_templet):
 
     def deregister(self):
         _http_post_servers[:] = [server for server in _http_post_servers if server is not self]
+        # 停服后这些账号不会再有上报：留一条「明确离线」记录，WebUI 显示离线
+        # 而不是「未知」（活动表清成 0 就回到「本次运行未收到上报」）。
+        retired_at = -time.monotonic()
+        for bot_hash, last_seen in self.activity.snapshot().items():
+            if last_seen > 0:
+                _retired_activity[bot_hash] = retired_at
         self.activity.clear()
 
     class config_T(object):

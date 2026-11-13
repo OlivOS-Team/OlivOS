@@ -339,3 +339,67 @@ def test_upload_failure_fallback_has_no_placeholder(monkeypatch):
 
     assert fallback.called
     assert ZWSP not in _joined_text(fallback.call_args.args[2])
+
+
+# ---------------------------------------------------------------- 围栏与缩进代码
+
+def test_four_space_indented_fence_is_code_content():
+    """缩进 4 空格的围栏行属于缩进代码内容，不能当围栏开合。"""
+    text = (
+        '正文' + NL * 2
+        + '    ```' + NL + '    code' + NL + '    ```' + NL * 2
+        + '结尾'
+    )
+    expected = (
+        '正文' + NL + ZWSP + NL
+        + '    ```' + NL + '    code' + NL + '    ```' + NL + ZWSP + NL
+        + '结尾'
+    )
+
+    assert common.markdown_tag.normalize_blank_lines(text) == expected
+
+
+def test_backtick_in_info_string_is_not_fence_opener():
+    """反引号围栏的信息串不能含反引号，这种行不是围栏开头。"""
+    text = '```a`b' + NL * 2 + '正文'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == (
+        '```a`b' + NL + ZWSP + NL + '正文'
+    )
+
+
+def test_indented_code_block_blank_lines_are_preserved():
+    """缩进代码块内部的空行属于代码内容，不能塞占位。"""
+    text = (
+        '正文' + NL * 2
+        + '    line1' + NL * 2 + '    line2'
+    )
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text.replace(
+        '正文' + NL * 2, '正文' + NL + ZWSP + NL
+    )
+
+
+# ---------------------------------------------------------------- 表格与分割线
+
+def test_pipe_prose_without_separator_is_not_table():
+    """以 | 开头但没有分隔行的普通文本，不算表格，旁边的空行照常按普通段落处理。"""
+    text = '| 这不是表格' + NL * 2 + '普通段落'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == (
+        '| 这不是表格' + NL + ZWSP + NL + '普通段落'
+    )
+
+
+def test_pipe_prose_before_quote_keeps_block_rule():
+    """以 | 开头的普通文本后面接引用块：仍按「块级元素旁不补」处理。"""
+    text = '| 这不是表格' + NL * 2 + '> 引用一行'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text
+
+
+def test_spaced_thematic_break_is_untouched():
+    """`- - -` 是合法分割线，旁边的空行保持原样。"""
+    text = '正文' + NL + '- - -' + NL * 2 + '下一段'
+
+    assert common.markdown_tag.normalize_blank_lines(text) == text

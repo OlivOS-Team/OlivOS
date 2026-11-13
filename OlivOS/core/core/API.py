@@ -111,7 +111,13 @@ class accountActivity(object):
         slot = self._index.get(bot_hash)
         if slot is None:
             return False
-        self._seen[slot] = time.monotonic() if when is None else when
+        value = time.monotonic() if when is None else when
+        current = self._seen[slot]
+        # 只接受比现有记录更新的时刻（按绝对值比较；负值代表明确离线）：
+        # 迟到的旧心跳不能把较新的在线/离线状态顶掉。
+        if current != 0 and abs(value) < abs(current):
+            return True
+        self._seen[slot] = value
         return True
 
     def mark_offline(self, bot_hash, when=None):

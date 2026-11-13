@@ -7696,14 +7696,36 @@ class markdown_tag:
     qqMarkdownBlankLine = '\u200b'
 
     @staticmethod
-    def fence_prefix(text):
-        """返回 (围栏字符, 长度)；不是围栏行返回 None。"""
-        stripped = str(text).strip()
+    def fence_prefix(text, allow_indent=3):
+        """返回 (围栏字符, 长度)；不是围栏行返回 None。
+
+        缩进超过 3 个空格的围栏形状按 CommonMark 属于缩进代码块的内容，
+        不算围栏开头/收尾，否则缩进代码里的 ``` 会把后续正文吞进代码块。
+        """
+        raw = str(text)
+        indent = len(raw) - len(raw.lstrip(' \t'))
+        if indent > allow_indent:
+            return None
+        stripped = raw.strip()
         if not stripped or stripped[0] not in '`~':
             return None
         char = stripped[0]
         count = len(stripped) - len(stripped.lstrip(char))
         if count < 3:
+            return None
+        return char, count
+
+    @staticmethod
+    def is_fence_open(line):
+        """判断是否是围栏开头，返回 (字符, 长度) 或 None。
+
+        反引号围栏的信息串里不能再出现反引号（```a`b），这种行只是普通文本。
+        """
+        fence = markdown_tag.fence_prefix(line)
+        if fence is None:
+            return None
+        char, count = fence
+        if char == '`' and '`' in str(line).strip()[count:]:
             return None
         return char, count
 
@@ -7718,6 +7740,14 @@ class markdown_tag:
         if fence is None or fence[0] != fence_char or fence[1] < fence_len:
             return False
         return str(line).strip().lstrip(fence_char).strip() == ''
+
+    @staticmethod
+    def is_indented_code_line(line):
+        """缩进 4 个空格以上的非空行（缩进代码块的内容行）。"""
+        raw = str(line)
+        if raw.strip() == '':
+            return False
+        return len(raw) - len(raw.lstrip(' \t')) >= 4
 
     @staticmethod
     def is_block_line(line):
@@ -7740,12 +7770,16 @@ class markdown_tag:
             if index == len(text):
                 return True
             return text[index].isspace()
-        if text[0] == '|':
+        # 表格行不在这里判：由 markdown_table_flags() 按「有没有分隔行」决定，
+        # 否则「| 开头的普通文本」会被误当成表格、白吃一条占位规则。
+        # 传原始行而不是 strip 过的：缩进 4 空格的围栏形状属于缩进代码块，
+        # 不能当围栏（is_fence_open 自己会判缩进）。
+        if markdown_tag.is_fence_open(line) is not None:
             return True
-        if markdown_tag.fence_prefix(text) is not None:
-            return True
-        if len(text) >= 3 and len(set(text)) == 1 and text[0] in '-*_':
-            # 分割线要求整行是同一个字符，`-*-` 这类混排只是普通文本。
+        compact = text.replace(' ', '').replace('\t', '')
+        if len(compact) >= 3 and len(set(compact)) == 1 and compact[0] in '-*_':
+            # 分割线允许标记之间带空格（`- - -`），但要求整行同一字符，
+            # `-*-` 这类混排只是普通文本。
             return True
         if text[0] in '-+*' and text[1:2].isspace():
             return True
@@ -7787,27 +7821,26 @@ class markdown_tag:
 
     @staticmethod
     def markdown_table_flags(lines):
-        """标出每一行是否属于 Markdown 表格（含没有外层竖线的写法）。"""
+        """标出每一行是否属于 Markdown 表格。
+
+        以分隔行为锚点向上下扩展（连续的非空、含竖线行），因此：
+        没有分隔行的「以 | 开头的普通文本」不会被当成表格；
+        没有外层竖线的 GFM 写法（`a | b`）同样能识别出来。
+        """
         texts = [str(line).strip() for line in lines]
         flags = [False] * len(texts)
-        separators = [markdown_tag.is_table_separator(text) for text in texts]
         for index, text in enumerate(texts):
-            if text.startswith('|') or separators[index]:
-                flags[index] = True
-        for index, is_separator in enumerate(separators):
-            if not is_separator:
+            if not markdown_tag.is_table_separator(text):
                 continue
-            # 分隔行上一行是表头、下一行是第一条数据行，两处都含竖线
-            if index > 0 and '|' in texts[index - 1]:
-                flags[index - 1] = True
-            if index + 1 < len(texts) and '|' in texts[index + 1]:
-                flags[index + 1] = True
-        for index in range(1, len(texts)):
-            if flags[index - 1] and texts[index] != '' and '|' in texts[index]:
-                flags[index] = True
-        for index in range(len(texts) - 2, -1, -1):
-            if flags[index + 1] and texts[index] != '' and '|' in texts[index]:
-                flags[index] = True
+            flags[index] = True
+            cursor = index - 1
+            while cursor >= 0 and texts[cursor] != '' and '|' in texts[cursor]:
+                flags[cursor] = True
+                cursor -= 1
+            cursor = index + 1
+            while cursor < len(texts) and texts[cursor] != '' and '|' in texts[cursor]:
+                flags[cursor] = True
+                cursor += 1
         return flags
 
     @staticmethod
@@ -7830,6 +7863,11 @@ class markdown_tag:
     @staticmethod
     def _decide_placeholder(lines, previous_index, following_index, table_flags):
         """空行是否要补占位（邻居下标由调用方一次算好，避免逐行回溯）。"""
+        if (previous_index >= 0 and following_index >= 0
+                and markdown_tag.is_indented_code_line(lines[previous_index])
+                and markdown_tag.is_indented_code_line(lines[following_index])):
+            # 缩进代码块内部的空行属于代码内容，塞 U+200B 会改掉代码。
+            return False
         if previous_index >= 0 and table_flags[previous_index]:
             return True
         if following_index >= 0 and table_flags[following_index]:
@@ -7871,11 +7909,11 @@ class markdown_tag:
     def normalize_blank_lines(text):
         """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
 
-        只在代码围栏之外动手：围栏内的空行是代码的一部分，塞进不可见字符
-        等于改了插件要发的内容。块级元素（引用、列表、围栏、分割线）相邻的
-        空行保持原样，因为手机端会把占位行当成块内的 lazy continuation；
-        表格是例外（见 blank_line_needs_placeholder）。已经是占位行（U+200B）
-        的行不算空行，因此函数幂等；正文末尾的空行也不补。
+        只在代码之外动手：围栏代码块与缩进代码块里的空行是代码的一部分，
+        塞进不可见字符等于改了插件要发的内容。块级元素（引用、列表、围栏、
+        分割线）相邻的空行保持原样，因为手机端会把占位行当成块内的 lazy
+        continuation；表格是例外（见 blank_line_needs_placeholder）。
+        已经是占位行（U+200B）的行不算空行，因此函数幂等；正文末尾的空行也不补。
         """
         source = str(text).replace('\r\n', '\n').replace('\r', '\n')
         lines = source.split('\n')
@@ -7895,7 +7933,7 @@ class markdown_tag:
                     in_fence = False
                 result.append(line)
                 continue
-            fence = markdown_tag.fence_prefix(line)
+            fence = markdown_tag.is_fence_open(line)
             if fence is not None:
                 in_fence = True
                 fence_char, fence_len = fence

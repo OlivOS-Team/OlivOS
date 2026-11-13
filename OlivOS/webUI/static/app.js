@@ -414,6 +414,8 @@ async function login(ev, token = null, ticket = null) {
       } else {
         checkAuthentication();
         if (state.page === 'logs') loadLogDisplay().catch(notifyError);
+        // 账号页要跟着连接状态变，不能只在进入页面那一刻刷一次。
+        if (state.page === 'accounts') refreshStatus().then(() => ensureSession()).catch(notifyError);
       }
       checkCachedLogin();
     }, 10000);
@@ -643,8 +645,12 @@ function updateUptime() {
   const elapsed = Math.floor((performance.now() - state.uptimeSnapshot.receivedAt) / 1000);
   $('runtime').textContent = uptimeText(state.uptimeSnapshot.seconds + elapsed);
 }
+let statusRequestId = 0;
 async function refreshStatus() {
+  const requestId = ++statusRequestId;
   const status = await api('/api/status');
+  // 请求可能重叠：先发的后到会覆盖更新的状态，晚到的旧响应直接丢弃。
+  if (requestId !== statusRequestId) return;
   if (Number.isInteger(status.plugin_page_cache)) {
     state.frameCacheLimit = Math.max(1, status.plugin_page_cache);
     trimFrames();

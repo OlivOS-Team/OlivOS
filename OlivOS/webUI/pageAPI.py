@@ -355,6 +355,7 @@ def _record_activity(host, online, known, last_seen_map):
 def runtime_status(host):
     online = set()
     known = set()
+    activity_maps = []
     for proc in list(host.runtime.values()):
         if getattr(proc, 'Proc_type', None) == 'qqGuildv2_webhook':
             for bot in proc.Proc_data.get('bot_info_dict', {}).values():
@@ -367,7 +368,7 @@ def runtime_status(host):
                     online.add(bot.hash)
             continue
         if hasattr(proc, 'account_activity'):
-            _record_activity(host, online, known, proc.account_activity())
+            activity_maps.append(proc.account_activity())
             continue
         bot_info = getattr(proc, 'bot_info', None)
         if bot_info is None:
@@ -409,7 +410,16 @@ def runtime_status(host):
                     online.add(bot.hash)
     http_post = getattr(OlivOS.flaskServerAPI, 'http_post_activity', None)
     if callable(http_post):
-        _record_activity(host, online, known, http_post())
+        activity_maps.append(http_post())
+    # 多份活动表先按事件时刻合并再统一判定在线：online 集合只增不减，
+    # 先处理到的旧在线记录会把后到的明确离线盖掉。
+    merged_activity = {}
+    for activity_map in activity_maps:
+        for bot_hash, last_seen in activity_map.items():
+            previous = merged_activity.get(bot_hash)
+            if previous is None or abs(last_seen) > abs(previous):
+                merged_activity[bot_hash] = last_seen
+    _record_activity(host, online, known, merged_activity)
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
     unknown = enabled - known

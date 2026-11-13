@@ -553,7 +553,63 @@ def test_onebot_http_post_service_deregisters_on_parent_terminate(client, host):
     host.runtime['test-onebot-post'] = service
     assert client.get('/api/status').json['account_connections'][bot.hash] == 'online'
     service.on_parent_terminate()
-    assert OlivOS.flaskServerAPI.http_post_activity() == {}
+    # 停服后保留一条「明确离线」记录：账号在 WebUI 里显示离线，而不是变回未知。
+    assert OlivOS.flaskServerAPI.http_post_activity()[bot.hash] < 0
+    status = client.get('/api/status').json
+    assert status['account_connections'][bot.hash] == 'offline'
+    assert status['unknown'] == 0
+    # 同一个账号重新起了服务，离线记录要让位给新的活动表。
+    _onebot_post_service(host, bot)
+    assert bot.hash not in OlivOS.flaskServerAPI._retired_activity
+
+
+def test_account_activity_ignores_stale_event():
+    """迟到的旧事件不能覆盖更新的在线/离线记录。"""
+    bot = OlivOS.API.bot_info_T(
+        id=10074, platform_sdk='onebot', platform_platform='qq',
+        platform_model='default', server_type='post', host='127.0.0.1', port=5701,
+    )
+    activity = OlivOS.API.accountActivity({bot.hash: bot})
+
+    activity.mark(bot.hash, 100.0)
+    activity.mark(bot.hash, 90.0)
+    assert activity.snapshot()[bot.hash] == 100.0
+
+    activity.mark_offline(bot.hash, 95.0)
+    assert activity.snapshot()[bot.hash] == 100.0
+
+    activity.mark_offline(bot.hash, 110.0)
+    assert activity.snapshot()[bot.hash] == -110.0
+
+
+def test_runtime_status_prefers_newer_offline_record(client, host):
+    """多份活动表里，后到的明确离线要压过更早的在线记录。"""
+    bot = OlivOS.API.bot_info_T(
+        id=10075, platform_sdk='onebot', platform_platform='qq',
+        platform_model='default', server_type='post', host='127.0.0.1', port=5702,
+    )
+    bot.enable = True
+    host.accounts = {bot.hash: bot}
+    now = time.monotonic()
+
+    class OlderOnline:
+        Proc_type = 'flaskServerAPI'
+
+        @staticmethod
+        def account_activity():
+            return {bot.hash: now - 5}
+
+    class NewerOffline:
+        Proc_type = 'flaskServerAPI'
+
+        @staticmethod
+        def account_activity():
+            return {bot.hash: -(now - 1)}
+
+    host.runtime.clear()
+    host.runtime['older-online'] = OlderOnline()
+    host.runtime['newer-offline'] = NewerOffline()
+
     status = client.get('/api/status').json
     assert status['account_connections'][bot.hash] == 'offline'
     assert status['unknown'] == 0
