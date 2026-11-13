@@ -7,6 +7,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 \____/ /_____/___/  _____/  \____/ /____/
 
 @File      :   tests/test_qqguildv2_join_request.py
+@Author    :   Desom-fu
+@Contact   :   desom233@outlook.com
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
 @Desc      :   群入群申请：列表拉取 / 审批 / 私有函数跨模块可见性
