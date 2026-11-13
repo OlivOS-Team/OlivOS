@@ -79,7 +79,7 @@ def sdk_case(request, monkeypatch):
     if name == 'qqGuildv2SDK':
         monkeypatch.setattr(qq_common, 'sdkSelfInfo', {bot.hash: {'id': '10001', 'username': 'bot'}})
         for field in ('qqEventDedupeCache', 'sdkUserInfo', 'sdkSubSelfInfo', 'sdkRxMessageInfo',
-                      'sdkMsgIdxInfo', 'sdkGroupMemberCacheInfo'):
+                      'sdkMsgIdxInfo'):
             monkeypatch.setattr(qq_common, field, {})
         monkeypatch.setattr(qq_common, '_get_qq_group_self_open_id', lambda *args: '10001')
 

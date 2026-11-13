@@ -739,7 +739,8 @@ class event_action_group(object):
                 'cached': True,
                 'bot': record.get('bot', None),
                 'union_openid': record.get('union_openid', None),
-                'updated_at': record.get('updated_at', 0)
+                'updated_at': record.get('updated_at', 0),
+                'stale': record.get('stale', False)
             }
             res_data['data'].append(member)
         return res_data

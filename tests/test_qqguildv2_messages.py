@@ -41,8 +41,7 @@ def bot(monkeypatch, tmp_path):
     monkeypatch.setattr(common, 'sdkSelfInfo', {bot.hash: {'id': 'bot', 'username': 'bot'}})
     for name in [
         'qqEventDedupeCache', 'sdkUserInfo', 'sdkSubSelfInfo',
-        'sdkRxMessageInfo', 'sdkForwardMessageInfo', 'sdkMsgIdxInfo',
-        'sdkGroupMemberCacheInfo'
+        'sdkRxMessageInfo', 'sdkForwardMessageInfo', 'sdkMsgIdxInfo'
     ]:
         monkeypatch.setattr(common, name, {})
     monkeypatch.setattr(common, '_get_qq_group_self_open_id', lambda *args: 'bot')
