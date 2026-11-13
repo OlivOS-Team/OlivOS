@@ -278,6 +278,15 @@ class shallow(API.Proc_templet):
 
     def run(self):
         OlivOS.pluginAPI.gProc = self
+        if any(bot.platform.get('sdk') == 'qqGuildv2_link'
+               for bot in self.Proc_data['bot_info_dict'].values()):
+            try:
+                from OlivOS.adapter.qqGuild import qqGuildv2Store
+                qqGuildv2Store.open_db()
+                threading.Thread(target=OlivOS.qqGuildv2SDK.init_qq_bot_self,
+                                 args=(self.Proc_data['bot_info_dict'],), daemon=True).start()
+            except Exception:
+                self.log(4, 'QQ 群成员缓存初始化失败: %s' % traceback.format_exc())
         self.Proc_data['webui_load_started'] = time.time()
         self.sendPluginList()
         releaseDir('./plugin')

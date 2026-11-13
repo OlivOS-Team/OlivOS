@@ -69,11 +69,15 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
-| QQ 官方机器人发送重试 | `test_qqguildv2_send_retry.py` | 按错误码分档重试（长度/服务端异常重试一次，超时/5xx/429 不重试）、重试与拆段占用被动回复额度、长度降级为纯文本并按字节拆段、内联标签不被切断 |
+| QQ 官方机器人发送重试 | `test_qqguildv2_send_retry.py` | 按错误码分档重试（长度/服务端异常最多重试三次，超时/5xx/429 不重试）、重试与拆段占用被动回复额度、长度降级为纯文本并按字节拆段、内联标签不被切断 |
+| QQ 官方机器人群缓存 | `test_qqguildv2_store.py`, `test_qqguildv2_group_cache.py` | JSON 迁移幂等、跳过非法文件及无有效文件时保留目录、SQLite 淘汰、接口权限禁用及群级退避 |
+| QQ 官方机器人自身 openid | `test_qqguildv2_self_openid.py` | 文件命中零请求、种子群切换、权限禁用与事件字段兼容 |
 | QQ 官方机器人图文卡片 | `test_qqguildv2_card_messages.py` | 群聊/单聊 `msg_type=8` 图文卡片发送、字段校验、indeAPI 入口与被动回复降级 |
 | QQ 官方机器人按钮 | `test_qqguildv2_interactions.py` | 回调按钮投递、群/单聊/频道上下文、原始数据、自动 ACK 与去重、并发/队列上限与过期、异常恢复、被动回复及异常载荷 |
 | QQ 官方机器人分享链接 | `test_qqguildv2_share_links.py` | 请求构造、输入限制与服务端失败响应 |
 | QQ 官方机器人 Markdown 图片 | `test_qqguildv2_media_images.py`, `test_qqguildv2_markdown_images.py` | 素材接口请求、重复图片去重、自动图文转 Markdown、临时素材清理、不确定发送结果与上传失败回退 |
+| QQ 官方机器人 Markdown 排版 | `test_qqguildv2_markdown_blank_lines.py` | 空行补 U+200B 占位（引用/列表/围栏/分割线/标题不补，表格两侧补）、围栏闭合口径、无外层竖线的表格、幂等、日志预览与三条回退路径不残留占位 |
+| QQ 官方机器人入群申请 | `test_qqguildv2_join_request.py` | 入群申请标志解析与构造、审批接口参数校验、星号导入下私有工具函数的可见性 |
 | 协议启动器 | `test_protocol_booters.py` | Windows 启动器日志路由、NapCat 配置生成，不运行外部程序 |
 | 数据存储 | `test_user_database.py`, `test_legacy_config.py` | SQLite 持久化/隔离/并发/序列化，以及旧用户/群配置接口 |
 | 启动与辅助功能 | `test_boot_and_metadata.py` | 配置合并、启动顺序、元数据、本地化、资源定位、更新请求与进程终止边界 |

@@ -26,9 +26,17 @@ SDK = common
 LENGTH_BODY = '{"message":"消息发送失败, 长度超长","code":40054007,"err_code":40054007}'
 LONG_BODY = '{"message":"消息发送失败, 消息过长或异常","code":40054018,"err_code":40054018}'
 SERVER_BODY = '{"message":"消息发送异常，请稍后重试","code":50055001,"err_code":50055001}'
+SERVER_OTHER_BODY = '{"message":"消息发送异常","code":50055006,"err_code":50055006}'
 BANNED_BODY = '{"message":"机器人被禁言","code":40054002,"err_code":40054002}'
 DUP_BODY = '{"message":"消息被去重","code":40054005,"err_code":40054005}'
 OK_BODY = '{"id":"MSGID","timestamp":"2026-11-09T23:00:00+08:00"}'
+
+
+@pytest.fixture(autouse=True)
+def retry_delays(monkeypatch):
+    delays = []
+    monkeypatch.setattr(SDK.time, 'sleep', delays.append)
+    return delays
 
 
 def make_event():
@@ -100,23 +108,66 @@ def run_send(
     )
 
 
-def test_length_error_retries_once_and_succeeds():
+@pytest.mark.parametrize('body, error_code', [
+    (LENGTH_BODY, 40054007),
+    (LONG_BODY, 40054018),
+    (SERVER_BODY, 50055001),
+    (SERVER_OTHER_BODY, 50055006),
+])
+def test_retryable_error_stops_at_success(body, error_code, retry_delays):
     event = make_event()
-    api = FakeAPI([(400, LENGTH_BODY), (200, OK_BODY)], content='短消息')
-    result = run_send(event, api)
-    assert len(api.calls) == 2
+    api = FakeAPI([(400, body)] * 3 + [(200, OK_BODY)], content='短消息')
+    result = run_send(event, api, allow_length_fallback=False)
+    assert len(api.calls) == 4
+    assert retry_delays == [0.3, 0.6, 1.2]
     assert result['active'] is True
     assert result['data']['send_retry']['attempted'] is True
-    assert result['data']['send_retry']['first_error_code'] == 40054007
-    assert any('重试一次后成功' in message for _, message in event.logs)
+    assert result['data']['send_retry']['first_error_code'] == error_code
 
 
-def test_server_error_code_retries_once():
+@pytest.mark.parametrize('body', [LENGTH_BODY, LONG_BODY, SERVER_BODY, SERVER_OTHER_BODY])
+def test_retryable_error_stops_after_three_retries(body, retry_delays):
     event = make_event()
-    api = FakeAPI([(400, SERVER_BODY), (200, OK_BODY)], content='短消息')
+    api = FakeAPI([(400, body)] * 4, content='短消息')
+    result = run_send(event, api, allow_length_fallback=False)
+    assert len(api.calls) == 4
+    assert retry_delays == [0.3, 0.6, 1.2]
+    assert result['active'] is False
+
+
+@pytest.mark.parametrize('failures', [1, 2])
+def test_retry_stops_immediately_after_early_success(failures, retry_delays):
+    event = make_event()
+    api = FakeAPI([(400, SERVER_BODY)] * failures + [(200, OK_BODY)], content='短消息')
     result = run_send(event, api)
-    assert len(api.calls) == 2
+    assert len(api.calls) == failures + 1
+    assert retry_delays == [0.3, 0.6][:failures]
     assert result['active'] is True
+
+
+@pytest.mark.parametrize('status, body', [
+    (429, SERVER_BODY),
+    (500, SERVER_BODY),
+    (None, ''),
+    (400, DUP_BODY),
+])
+def test_retry_stops_when_later_result_is_ambiguous_or_duplicate(status, body, retry_delays):
+    event = make_event()
+    api = FakeAPI([(400, SERVER_BODY), (status, body)], content='短消息')
+    result = run_send(event, api, allow_length_fallback=False)
+    assert len(api.calls) == 2
+    assert retry_delays == [0.3]
+    assert result['active'] is False
+
+
+@pytest.mark.parametrize('status', [429, 500, 503, None])
+def test_ambiguous_status_never_retries_even_with_retryable_code(status, retry_delays):
+    event = make_event()
+    api = FakeAPI([(status, SERVER_BODY)], content='短消息')
+    result = run_send(event, api, allow_length_fallback=False)
+    assert len(api.calls) == 1
+    assert retry_delays == []
+    assert result['active'] is False
 
 
 def test_ambiguous_failure_is_never_retried():
@@ -154,14 +205,15 @@ def test_duplicate_error_is_not_retried_and_stays_failed():
     assert result['active'] is False
 
 
-def test_retry_uses_new_msg_seq_for_passive_reply():
+def test_retry_uses_new_msg_seq_for_passive_reply(retry_delays):
     event = make_event()
-    api = FakeAPI([(400, LENGTH_BODY), (200, OK_BODY)], content='短消息')
+    api = FakeAPI([(400, LENGTH_BODY)] * 3 + [(200, OK_BODY)], content='短消息')
     result = run_send(event, api, chat_id='CHATSEQ', msg_id='MSG-ID-SEQ')
-    assert len(api.calls) == 2
-    assert api.calls[0]['msg_seq'] is not None
-    assert api.calls[1]['msg_seq'] is not None
-    assert api.calls[1]['msg_seq'] != api.calls[0]['msg_seq']
+    assert len(api.calls) == 4
+    sequences = [call['msg_seq'] for call in api.calls]
+    assert all(seq is not None for seq in sequences)
+    assert len(set(sequences)) == 4
+    assert retry_delays == [0.3, 0.6, 1.2]
     assert result['active'] is True
 
 
@@ -169,13 +221,13 @@ def test_length_failure_falls_back_to_split_text():
     event = make_event()
     text = '测' * 2000  # 6000 字节，远超单条 900 字节上限
     api = FakeAPI(
-        [(400, LENGTH_BODY), (400, LENGTH_BODY)] + [(200, OK_BODY)] * 4,
+        [(400, LENGTH_BODY)] * 4 + [(200, OK_BODY)] * 4,
         content=text,
     )
     result = run_send(event, api)
-    # 1 次首发 + 1 次重试 + 最多 4 段降级
-    assert len(api.calls) == 6
-    sent_parts = [call['content'] for call in api.calls[2:]]
+    # 1 次首发 + 3 次重试 + 最多 4 段降级
+    assert len(api.calls) == 8
+    sent_parts = [call['content'] for call in api.calls[4:]]
     # 每段都不超过上限，避免再被平台整段拒掉
     assert all(len(part.encode('utf-8')) <= 900 for part in sent_parts)
     assert text.startswith(''.join(sent_parts))
@@ -196,14 +248,15 @@ def test_markdown_length_failure_falls_back_to_plain_text():
         '| HP | 12 |\n'
     )
     api = FakeAPI(
-        [(400, LENGTH_BODY), (400, LONG_BODY), (200, OK_BODY)],
+        [(400, LENGTH_BODY), (400, LONG_BODY), (400, LENGTH_BODY), (400, LONG_BODY), (200, OK_BODY)],
         msg_type=2,
         markdown={'content': markdown},
     )
     result = run_send(event, api)
     assert result['active'] is True
-    assert api.calls[2]['msg_type'] == 0
-    plain = api.calls[2]['content']
+    assert len(api.calls) == 5
+    assert api.calls[4]['msg_type'] == 0
+    plain = api.calls[4]['content']
     assert '# 状态卡' not in plain
     assert '**' not in plain
     assert '![' not in plain
@@ -216,28 +269,28 @@ def test_markdown_length_failure_falls_back_to_plain_text():
 def test_markdown_with_local_images_skips_length_fallback():
     event = make_event()
     api = FakeAPI(
-        [(400, LENGTH_BODY), (400, LENGTH_BODY)],
+        [(400, LENGTH_BODY)] * 4,
         msg_type=2,
         markdown={'content': '# 带图卡片\n![图](qqbot-media://image/v1/xxx)'},
     )
     # 带本地图片时由图文回退处理，这里不能把 markdown 转成纯文本（那会丢图）
     result = run_send(event, api, allow_length_fallback=False)
-    assert len(api.calls) == 2
+    assert len(api.calls) == 4
     assert result['active'] is False
 
 
 def test_markdown_with_keyboard_degrades_and_drops_keyboard():
     event = make_event()
     api = FakeAPI(
-        [(400, LENGTH_BODY), (400, LENGTH_BODY), (200, OK_BODY)],
+        [(400, LENGTH_BODY)] * 4 + [(200, OK_BODY)],
         msg_type=2,
         markdown={'content': '# 带按钮卡片'},
         keyboard={'content': {'rows': []}},
     )
     result = run_send(event, api)
     # 按钮丢了也比整条回复发不出去好；降级后必须清掉 keyboard，否则会带残值发送
-    assert len(api.calls) == 3
-    assert api.calls[2]['msg_type'] == 0
+    assert len(api.calls) == 5
+    assert api.calls[4]['msg_type'] == 0
     assert api.data.keyboard is None
     assert result['active'] is True
     assert result['data']['send_length_fallback']['keyboard_dropped'] is True
@@ -248,26 +301,29 @@ def test_markdown_with_keyboard_degrades_and_drops_keyboard():
     ('qq_private', 2),
 ])
 def test_passive_fallback_caps_parts_by_reply_quota(chat_type, max_parts):
-    # 群聊一个 msg_id 只允许 5 次回复、私聊 4 次：首发 + 重试之后只剩 3 / 2 段，
-    # 拆多了会被平台直接拒掉，等于白丢内容。
+    # 首发和三次重试占用四次额度；剩余段须在被动额度用尽后切换主动发送。
     event = make_event()
     text = '测' * 2000
-    responses = [(400, LENGTH_BODY), (400, LENGTH_BODY)]
+    responses = [(400, LENGTH_BODY)] * 4
     responses += [(200, OK_BODY)] * max_parts
     api = FakeAPI(responses, content=text)
     result = run_send(event, api, chat_type=chat_type, chat_id='CHATCAP', msg_id='MSG-ID-CAP')
-    assert len(api.calls) == 2 + max_parts
-    sent_parts = [call['content'] for call in api.calls[2:]]
+    assert len(api.calls) == 4 + max_parts
+    sent_parts = [call['content'] for call in api.calls[4:]]
     assert all(len(part.encode('utf-8')) <= 900 for part in sent_parts)
     assert result['data']['send_length_fallback']['parts'] == max_parts
     assert result['data']['send_length_fallback']['dropped_bytes'] > 0
+    passive_parts = 1 if chat_type == 'qq_group' else 0
+    assert all(call['msg_seq'] is not None for call in api.calls[4:4 + passive_parts])
+    assert all(call['msg_seq'] is None for call in api.calls[4 + passive_parts:])
+    assert result['data']['send_length_fallback']['active_parts'] == max_parts - passive_parts
 
 
 def test_event_id_reply_reserves_quota_for_retry_and_parts():
     # event_id 通道（没有 msg_id）同样要按次占用额度，否则分段会被平台拒掉。
     event = make_event()
     api = FakeAPI(
-        [(400, LENGTH_BODY), (400, LENGTH_BODY), (200, OK_BODY), (200, OK_BODY)],
+        [(400, LENGTH_BODY)] * 4 + [(200, OK_BODY)] * 2,
         content='测' * 400,
     )
     result = run_send(
@@ -278,8 +334,9 @@ def test_event_id_reply_reserves_quota_for_retry_and_parts():
         msg_id=None,
         event_id='EVENT-ID-1',
     )
-    # 私聊 event_id 只允许 4 次：首发 + 重试 + 2 段，正好用满
-    assert len(api.calls) == 4
+    # 私聊 event_id 的四次额度被首发及三次重试用满，拆段改发主动消息。
+    assert len(api.calls) == 6
+    assert result['data']['send_length_fallback']['active_parts'] == 2
     assert result['active'] is True
 
 
@@ -308,8 +365,7 @@ def test_short_text_is_not_split():
 
 
 def test_length_fallback_switches_to_active_when_quota_exhausted():
-    # 同一个 msg_id 之前已经回过消息、被动额度只剩 2 次时，首发 + 重试用满额度，
-    # 后面的分段要自动改发主动消息，而不是把剩下的内容丢掉。
+    # 被动额度只剩 2 次：首发和第一次重试用满，不能继续被动重试；拆段改发主动消息。
     event = make_event()
     msg_id = 'MSG-ID-TAIL'
     chat_id = 'CHATTAIL'

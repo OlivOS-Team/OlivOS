@@ -15,6 +15,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 from .qqGuildv2SDKCommon import *
+# 星号导入不会带出下划线开头的名字，这些私有工具函数必须显式导入，
+# 否则群入群申请、成员列表等路径会在运行期抛 NameError。
+from .qqGuildv2SDKCommon import (
+    _do_qq_group_api_request,
+    _get_qq_group_member_cache_members,
+    _get_qq_join_request_comment,
+    _make_qq_join_request_flag,
+    _parse_qq_join_request_flag,
+    _parse_qq_message_timestamp,
+    _qq_group_fetch_member_pages,
+    _qq_group_member_cache_remove_member,
+    _register_qq_group_for_calibration,
+)
 
 event_action = None
 API = None
@@ -726,7 +739,8 @@ class event_action_group(object):
                 'cached': True,
                 'bot': record.get('bot', None),
                 'union_openid': record.get('union_openid', None),
-                'updated_at': record.get('updated_at', 0)
+                'updated_at': record.get('updated_at', 0),
+                'stale': record.get('stale', False)
             }
             res_data['data'].append(member)
         return res_data

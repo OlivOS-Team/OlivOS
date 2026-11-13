@@ -14,6 +14,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import time
+
 from gevent import pywsgi
 from flask import Flask
 from flask import current_app
@@ -22,6 +24,28 @@ from flask import request
 import OlivOS
 
 modelName = 'flaskServerAPI'
+
+# WebUI 在 init 列表里早于 flask 启动；用模块级登记，避免只靠 host.runtime 才能读到上报。
+_http_post_servers = []
+# 服务停掉后保留一份「明确离线」记录：账号不在 host.runtime 里时，WebUI 才
+# 不会把它显示成「未知」。
+_retired_activity = {}
+
+
+def http_post_activity():
+    """合并各 HTTP 上报服务的活动表。
+
+    时间戳存的是绝对时刻，负值表示明确离线。按事件先后（时间戳绝对值）取胜，
+    这样后到的明确离线不会被另一份较旧的在线记录盖掉。
+    """
+    merged = dict(_retired_activity)
+    for server in list(_http_post_servers):
+        for bot_hash, last_seen in server.account_activity().items():
+            prev = merged.get(bot_hash)
+            if prev is None or abs(last_seen) > abs(prev):
+                merged[bot_hash] = last_seen
+    return merged
+
 
 gCheckList = [
     'default',
@@ -83,23 +107,77 @@ class server(OlivOS.API.Proc_templet):
             if isinstance(bot, OlivOS.API.bot_info_T)
             and bot.platform['sdk'] == 'onebot' and bot.post_info.type == 'post'
         }
+        self._post_accounts = post_accounts
         self.activity = OlivOS.API.accountActivity(post_accounts)
+        for bot_hash in post_accounts:
+            _retired_activity.pop(bot_hash, None)
+        _http_post_servers[:] = [
+            server for server in _http_post_servers
+            if server is not self and getattr(server, 'Proc_name', None) != self.Proc_name
+        ]
+        _http_post_servers.append(self)
 
     def mark_post_seen(self, sdk_event):
         """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
         if not sdk_event.active:
             return
         self_id = str(sdk_event.base_info.get('self_id', ''))
-        platform = sdk_event.platform
-        self.activity.mark(OlivOS.API.getBotHash(
+        if not self_id:
+            return
+        platform = sdk_event.platform or {}
+        hashed = OlivOS.API.getBotHash(
             bot_id=self_id,
             platform_sdk=platform.get('sdk'),
             platform_platform=platform.get('platform'),
-        ))
+            platform_model=platform.get('model'),
+        )
+        payload = getattr(sdk_event, 'json', None) or {}
+        status = payload.get('status') if isinstance(payload, dict) else None
+        offline = (
+            isinstance(payload, dict)
+            and payload.get('post_type') == 'meta_event'
+            and payload.get('meta_event_type') == 'heartbeat'
+            and isinstance(status, dict)
+            and status.get('online') is False
+        )
+        if self._mark_activity(hashed, offline):
+            return
+        for bot_hash, bot in self._post_accounts.items():
+            if (str(bot.id) == self_id
+                    and bot.platform.get('sdk') == platform.get('sdk')
+                    and bot.platform.get('platform') == platform.get('platform')):
+                self._mark_activity(bot_hash, offline)
+                return
+
+    def _mark_activity(self, bot_hash, offline):
+        if offline:
+            return self.activity.mark_offline(bot_hash)
+        return self.activity.mark(bot_hash)
 
     def account_activity(self):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
         return self.activity.snapshot()
+
+    def on_terminate(self):
+        self.deregister()
+
+    def on_parent_terminate(self):
+        """父进程侧在终止本组件前调用。
+
+        processing 模式下的子进程被 terminate() 不会回调本对象，登记会一直留着，
+        仪表盘就会在停服后继续把账号显示成在线，直到活动窗口过期。
+        """
+        self.deregister()
+
+    def deregister(self):
+        _http_post_servers[:] = [server for server in _http_post_servers if server is not self]
+        # 停服后这些账号不会再有上报：留一条「明确离线」记录，WebUI 显示离线
+        # 而不是「未知」（活动表清成 0 就回到「本次运行未收到上报」）。
+        retired_at = -time.monotonic()
+        for bot_hash, last_seen in self.activity.snapshot().items():
+            if last_seen > 0:
+                _retired_activity[bot_hash] = retired_at
+        self.activity.clear()
 
     class config_T(object):
         def __init__(self, debug_mode):

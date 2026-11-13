@@ -1101,6 +1101,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     else:
                         Proc_type_this = proc_this.Proc_type
                         time.sleep(proc_this.Proc_info.dead_interval)
+                        detach_proc_registration(proc_this)
                         proc_proc_this.terminate()
                         proc_proc_this.join()
                         Proc_dict.pop(rx_packet_data.key, None)
@@ -1331,6 +1332,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 tmp_Proc_name in Proc_dict
                                 and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type
                             ):
+                                detach_proc_registration(Proc_dict[tmp_Proc_name])
                                 Proc_Proc_dict[tmp_Proc_name].terminate()
                                 Proc_Proc_dict[tmp_Proc_name].join()
                                 list_stop.append(tmp_Proc_name)
@@ -1348,6 +1350,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                     tmp_Proc_name = rx_packet_data.key
                     try:
                         if tmp_Proc_name in Proc_Proc_dict:
+                            if tmp_Proc_name in Proc_dict:
+                                detach_proc_registration(Proc_dict[tmp_Proc_name])
                             Proc_Proc_dict[tmp_Proc_name].terminate()
                             Proc_Proc_dict[tmp_Proc_name].join()
                             logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
@@ -1516,6 +1520,20 @@ def kill_process_children(p):
 
 
 # 重载链路的组件查找
+def detach_proc_registration(proc):
+    """组件被终止前，让它在父进程侧摘掉自己的对外登记。
+
+    processing 模式下 terminate() 只杀子进程，不会回调父进程里的对象方法，
+    于是 WebUI 还能读到停在最后一刻的活动记录。有专门钩子的组件在这里调用。
+    """
+    hook = getattr(proc, 'on_parent_terminate', None)
+    if callable(hook):
+        try:
+            hook()
+        except Exception:
+            traceback.print_exc()
+
+
 def get_proc_for_restart(Proc_dict, proc_name):
     '''取出可接收重载指令的组件，重载真空期内返回 None
 

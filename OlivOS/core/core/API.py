@@ -107,12 +107,33 @@ class accountActivity(object):
                 self._index[bot_hash] = len(self._index)
         self._seen = multiprocessing.Array('d', max(len(self._index), 1))
 
-    def mark(self, bot_hash):
+    def mark(self, bot_hash, when=None):
         slot = self._index.get(bot_hash)
         if slot is None:
             return False
-        self._seen[slot] = time.monotonic()
+        value = time.monotonic() if when is None else when
+        current = self._seen[slot]
+        # 只接受比现有记录更新的时刻（按绝对值比较；负值代表明确离线）：
+        # 迟到的旧心跳不能把较新的在线/离线状态顶掉。
+        if current != 0 and abs(value) < abs(current):
+            return True
+        self._seen[slot] = value
         return True
+
+    def mark_offline(self, bot_hash, when=None):
+        """记录一次明确的离线事件（如心跳 status.online=false）。
+
+        0 表示本次运行还没收到过任何上报，不能拿来当离线；这里存入负的时间戳，
+        既与「无上报」区分开，又保留事件先后，方便多处活动表按时序合并。
+        """
+        return self.mark(bot_hash, -(time.monotonic() if when is None else when))
+
+    def clear(self, bot_hash=None):
+        """清掉活动记录，回到「本次运行未收到上报」的初始状态。"""
+        targets = self._index.items() if bot_hash is None else [(bot_hash, self._index.get(bot_hash))]
+        for _, slot in targets:
+            if slot is not None:
+                self._seen[slot] = 0
 
     def snapshot(self):
         return {bot_hash: self._seen[slot] for bot_hash, slot in self._index.items()}

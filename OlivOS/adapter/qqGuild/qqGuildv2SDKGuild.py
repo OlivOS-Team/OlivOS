@@ -15,6 +15,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 from .qqGuildv2SDKCommon import *
+# 星号导入不带下划线开头的名字，频道本地图片走 multipart 时要显式导入。
+from .qqGuildv2SDKCommon import _send_channel_multipart
 
 event_action = None
 API = None

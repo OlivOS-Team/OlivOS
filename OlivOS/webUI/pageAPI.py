@@ -340,9 +340,22 @@ def log_tail(path, limit, level):
     return list(output)
 
 
+def _record_activity(host, online, known, last_seen_map):
+    # 时间戳 0 = 本次运行未收到上报；负值 = 明确离线（如心跳 status.online=false）。
+    now = time.monotonic()
+    for bot_hash, last_seen in last_seen_map.items():
+        bot = host.accounts.get(bot_hash)
+        if bot is None or not bot.enable:
+            continue
+        known.add(bot_hash)
+        if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
+            online.add(bot_hash)
+
+
 def runtime_status(host):
     online = set()
     known = set()
+    activity_maps = []
     for proc in list(host.runtime.values()):
         if getattr(proc, 'Proc_type', None) == 'qqGuildv2_webhook':
             for bot in proc.Proc_data.get('bot_info_dict', {}).values():
@@ -355,14 +368,7 @@ def runtime_status(host):
                     online.add(bot.hash)
             continue
         if hasattr(proc, 'account_activity'):
-            now = time.monotonic()
-            for bot_hash, last_seen in proc.account_activity().items():
-                bot = host.accounts.get(bot_hash)
-                if bot is None or not bot.enable:
-                    continue
-                known.add(bot_hash)
-                if last_seen > 0 and now - last_seen <= ACTIVITY_ONLINE_WINDOW:
-                    online.add(bot_hash)
+            activity_maps.append(proc.account_activity())
             continue
         bot_info = getattr(proc, 'bot_info', None)
         if bot_info is None:
@@ -402,6 +408,18 @@ def runtime_status(host):
                 known.add(bot.hash)
                 if ('virtual_terminal', bot.hash) in host.terminals:
                     online.add(bot.hash)
+    http_post = getattr(OlivOS.flaskServerAPI, 'http_post_activity', None)
+    if callable(http_post):
+        activity_maps.append(http_post())
+    # 多份活动表先按事件时刻合并再统一判定在线：online 集合只增不减，
+    # 先处理到的旧在线记录会把后到的明确离线盖掉。
+    merged_activity = {}
+    for activity_map in activity_maps:
+        for bot_hash, last_seen in activity_map.items():
+            previous = merged_activity.get(bot_hash)
+            if previous is None or abs(last_seen) > abs(previous):
+                merged_activity[bot_hash] = last_seen
+    _record_activity(host, online, known, merged_activity)
     accounts = host.accounts
     enabled = {key for key, bot in accounts.items() if bot.enable}
     unknown = enabled - known

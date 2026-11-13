@@ -47,6 +47,7 @@ def bot(request, monkeypatch):
     monkeypatch.setattr(common, 'sdkSelfInfo', {bot.hash: {'id': 'bot', 'username': 'bot'}})
     for name in ['qqEventDedupeCache', 'sdkSubSelfInfo', 'sdkUnhandledEventInfo', 'sdkEventidinfo']:
         monkeypatch.setattr(common, name, {})
+    monkeypatch.setattr(common, '_get_qq_group_self_open_id', lambda *args: None)
     monkeypatch.setattr(common.req, 'request', Mock(side_effect=AssertionError('Unexpected network call')))
     monkeypatch.setattr(common, '_interaction_ack_pool', common._InteractionAckPool())
     return bot
