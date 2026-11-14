@@ -4064,12 +4064,7 @@ class event_action_common(object):
         """把 markdown 卡片降级成普通文本：去图片、去链接语法与表格分隔行。"""
         lines = []
         for raw_line in str(content).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
-            # 只清整行的占位（U+200B）：那一行是给卡片撑行距用的，转纯文本时
-            # 还原成空行。调用方自己写在正文里的零宽字符要原样留着。
-            if raw_line.strip() == markdown_tag.qqMarkdownBlankLine:
-                line = ''
-            else:
-                line = raw_line
+            line = raw_line
             line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', line)
             line = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', line)
             line = re.sub(r'^\s{0,3}#{1,6}\s*', '', line)
@@ -4706,12 +4701,6 @@ class event_action_common(object):
         tmp_raw = str(content)
         if tmp_raw.strip() == '':
             return None
-        # 空行占位（U+200B）是给卡片撑行距用的渲染辅助，日志里还原成空行；
-        # 调用方自己写的零宽字符不属于占位，原样保留，排查时才对得上原文。
-        tmp_raw = '\n'.join(
-            '' if line.strip() == markdown_tag.qqMarkdownBlankLine else line
-            for line in tmp_raw.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-        )
         # 日志一行一条：换行写字面量 \\n，正文一条都不截断。
         return tmp_raw.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '\\n')
 
@@ -5183,9 +5172,6 @@ class event_action_common(object):
             replacements[value] if part_type == 'image' else value
             for part_type, value in content_parts
         )
-        # QQ 的 Markdown 卡片会吞掉空行，拼好的正文统一补零宽占位，
-        # 否则插件排好的段落会在群里挤成一坨。
-        content = markdown_tag.normalize_blank_lines(content)
         result = event_action.create_markdown_message(
             target_event,
             chat_type,
@@ -5380,14 +5366,6 @@ class event_action_common(object):
                 markdown,
                 allow_at_all=chat_type == 'guild_channel'
             )
-        elif chat_type in ['qq_group', 'qq_private']:
-            # 同一个坑在插件直接调 markdown 接口时也要堵上：QQ 群聊/单聊的
-            # Markdown 卡片吞空行，正文里的空行补零宽占位才留得住段落间隔。
-            markdown = copy.deepcopy(markdown)
-            if isinstance(markdown.get('content', None), str):
-                markdown['content'] = markdown_tag.normalize_blank_lines(
-                    markdown['content']
-                )
 
         if chat_type in ['qq_group', 'qq_private']:
             if force_active:
@@ -7609,270 +7587,6 @@ class markdown_tag:
         r'<qqbot-at-user\s+id=(["\'])([^"\']+)\1\s*/>'
     )
     qqAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
-
-    # QQ 的 Markdown 卡片会把空行压掉：正文里连续两个换行只渲染成一次换行，
-    # 段落之间想留一行空白必须用零宽空格占位。官方文档「换多行」示例也是
-    # 这么写的（第一行与第二行之间靠 \u200B 撑开）。这里统一用 U+200B。
-    qqMarkdownBlankLine = '\u200b'
-
-    @staticmethod
-    def fence_prefix(text, allow_indent=3):
-        """返回 (围栏字符, 长度)；不是围栏行返回 None。
-
-        缩进超过 3 个空格的围栏形状按 CommonMark 属于缩进代码块的内容，
-        不算围栏开头/收尾，否则缩进代码里的 ``` 会把后续正文吞进代码块。
-        """
-        raw = str(text)
-        indent = len(raw) - len(raw.lstrip(' \t'))
-        if indent > allow_indent:
-            return None
-        stripped = raw.strip()
-        if not stripped or stripped[0] not in '`~':
-            return None
-        char = stripped[0]
-        count = len(stripped) - len(stripped.lstrip(char))
-        if count < 3:
-            return None
-        return char, count
-
-    @staticmethod
-    def is_fence_open(line):
-        """判断是否是围栏开头，返回 (字符, 长度) 或 None。
-
-        反引号围栏的信息串里不能再出现反引号（```a`b），这种行只是普通文本。
-        """
-        fence = markdown_tag.fence_prefix(line)
-        if fence is None:
-            return None
-        char, count = fence
-        if char == '`' and '`' in str(line).strip()[count:]:
-            return None
-        return char, count
-
-    @staticmethod
-    def is_fence_close(line, fence_char, fence_len):
-        """判断是否是围栏的收尾行。
-
-        按 CommonMark 口径：字符必须与开头一致、长度不短于开头，且围栏后面
-        只能有空白。` ```python ` 这种带信息的行不会误闭合代码块。
-        """
-        fence = markdown_tag.fence_prefix(line)
-        if fence is None or fence[0] != fence_char or fence[1] < fence_len:
-            return False
-        return str(line).strip().lstrip(fence_char).strip() == ''
-
-    @staticmethod
-    def is_indented_code_line(line):
-        """缩进 4 个空格以上的非空行（缩进代码块的内容行）。"""
-        raw = str(line)
-        if raw.strip() == '':
-            return False
-        return len(raw) - len(raw.lstrip(' \t')) >= 4
-
-    @staticmethod
-    def is_block_line(line):
-        """判断一行是不是 Markdown 块级元素（引用、标题、围栏、表格、列表、分割线）。
-
-        块级元素自带上下间距，而且内部允许「空行后继续缩进内容」——在它后面
-        补占位行会打断块的边界，所以这类行相邻的空行不能动。
-        """
-        text = str(line).strip()
-        if text == '':
-            return False
-        if text[0] == '>':
-            return True
-        if text[0] == '#':
-            # ATX 标题：1~6 个 # 后跟空白，或整行只有这些 #（空标题）。
-            # QQ 群里常见的 `#话题` 两种都不是，旁边的空行仍要补占位。
-            index = 0
-            while index < len(text) and index < 6 and text[index] == '#':
-                index += 1
-            if index == len(text):
-                return True
-            return text[index].isspace()
-        # 表格行不在这里判：由 markdown_table_flags() 按「有没有分隔行」决定，
-        # 否则「| 开头的普通文本」会被误当成表格、白吃一条占位规则。
-        # 传原始行而不是 strip 过的：缩进 4 空格的围栏形状属于缩进代码块，
-        # 不能当围栏（is_fence_open 自己会判缩进）。
-        if markdown_tag.is_fence_open(line) is not None:
-            return True
-        compact = text.replace(' ', '').replace('\t', '')
-        if len(compact) >= 3 and len(set(compact)) == 1 and compact[0] in '-*_':
-            # 分割线允许标记之间带空格（`- - -`），但要求整行同一字符，
-            # `-*-` 这类混排只是普通文本。
-            return True
-        if text[0] in '-+*' and text[1:2].isspace():
-            return True
-        index = 0
-        while index < len(text) and index < 10 and text[index].isdigit():
-            index += 1
-        if 1 <= index <= 9 and text[index:index + 1] in ('.', ')'):
-            if text[index + 1:index + 2].isspace():
-                return True
-        return False
-
-    @staticmethod
-    def is_table_separator(line):
-        """判断一行是不是 GFM 表格的分隔行（允许没有外层竖线）。
-
-        `| --- | --- |`、`--- | ---`、`:-: | -` 都算；纯粹的 `---` 是分割线，
-        不含竖线所以不算。
-        """
-        text = str(line).strip()
-        if '|' not in text:
-            return False
-        cells = text.strip('|').split('|')
-        if not cells:
-            return False
-        for cell in cells:
-            if re.fullmatch(r':?-+:?', cell.strip()) is None:
-                return False
-        return True
-
-    @staticmethod
-    def is_table_line(line):
-        """判断一行是不是 Markdown 表格行（表头行 / 数据行 / 分隔行）。
-
-        只认以 `|` 开头的行；没有外层竖线的写法由 markdown_table_flags()
-        按「分隔行 + 相邻含竖线的行」补齐，避免把普通文本里带竖线的句子
-        当成表格。
-        """
-        return str(line).strip().startswith('|')
-
-    @staticmethod
-    def markdown_table_flags(lines):
-        """标出每一行是否属于 Markdown 表格。
-
-        以分隔行为锚点向上下扩展（连续的非空、含竖线行），因此：
-        没有分隔行的「以 | 开头的普通文本」不会被当成表格；
-        没有外层竖线的 GFM 写法（`a | b`）同样能识别出来。
-        """
-        texts = [str(line).strip() for line in lines]
-        flags = [False] * len(texts)
-        for index, text in enumerate(texts):
-            if not markdown_tag.is_table_separator(text):
-                continue
-            flags[index] = True
-            cursor = index - 1
-            while cursor >= 0 and texts[cursor] != '' and '|' in texts[cursor]:
-                flags[cursor] = True
-                cursor -= 1
-            cursor = index + 1
-            while cursor < len(texts) and texts[cursor] != '' and '|' in texts[cursor]:
-                flags[cursor] = True
-                cursor += 1
-        return flags
-
-    @staticmethod
-    def _neighbor_indexes(lines):
-        """线性扫一遍，返回每个位置左右最近的非空行下标（没有则 -1）。"""
-        prev_indexes = [-1] * len(lines)
-        last = -1
-        for index, line in enumerate(lines):
-            prev_indexes[index] = last
-            if str(line).strip() != '':
-                last = index
-        next_indexes = [-1] * len(lines)
-        last = -1
-        for index in range(len(lines) - 1, -1, -1):
-            next_indexes[index] = last
-            if str(lines[index]).strip() != '':
-                last = index
-        return prev_indexes, next_indexes
-
-    @staticmethod
-    def _decide_placeholder(lines, previous_index, following_index, table_flags):
-        """空行是否要补占位（邻居下标由调用方一次算好，避免逐行回溯）。"""
-        if (previous_index >= 0 and following_index >= 0
-                and markdown_tag.is_indented_code_line(lines[previous_index])
-                and markdown_tag.is_indented_code_line(lines[following_index])):
-            # 缩进代码块内部的空行属于代码内容，塞 U+200B 会改掉代码。
-            return False
-        if previous_index >= 0 and table_flags[previous_index]:
-            return True
-        if following_index >= 0 and table_flags[following_index]:
-            return True
-        if previous_index >= 0 and markdown_tag.is_block_line(lines[previous_index]):
-            return False
-        if following_index >= 0 and markdown_tag.is_block_line(lines[following_index]):
-            return False
-        return True
-
-    @staticmethod
-    def blank_line_needs_placeholder(lines, index, table_flags=None):
-        """单个空行是否需要补占位（外部调用入口，内部走预计算版本）。
-
-        空行前后任一侧是块级元素就不补：块级元素自己带间距，补了也不会更空；
-        反过来，块级元素前面的空行一旦换成非空行，手机端会把它当成块内的
-        lazy continuation（实测：引用块会把后面整段正文吞进引用框）。
-
-        表格是唯一例外：GFM 里表格的边界完全靠空行界定，空行被 QQ 吞掉时
-        两张相邻的表会连成一张（后一张的 `| --- |` 直接变成数据行），表格
-        后面的正文也会被吸进表格当成新行。表格不像引用块那样吃 lazy
-        continuation，补一行占位是安全的，所以表格两侧的空行一律要占位。
-        """
-        if table_flags is None:
-            table_flags = markdown_tag.markdown_table_flags(lines)
-        previous_index = index - 1
-        while previous_index >= 0 and str(lines[previous_index]).strip() == '':
-            previous_index -= 1
-        following_index = index + 1
-        while following_index < len(lines) and str(lines[following_index]).strip() == '':
-            following_index += 1
-        if following_index >= len(lines):
-            following_index = -1
-        return markdown_tag._decide_placeholder(
-            lines, previous_index, following_index, table_flags
-        )
-
-    @staticmethod
-    def normalize_blank_lines(text):
-        """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
-
-        只在代码之外动手：围栏代码块与缩进代码块里的空行是代码的一部分，
-        塞进不可见字符等于改了插件要发的内容。块级元素（引用、列表、围栏、
-        分割线）相邻的空行保持原样，因为手机端会把占位行当成块内的 lazy
-        continuation；表格是例外（见 blank_line_needs_placeholder）。
-        已经是占位行（U+200B）的行不算空行，因此函数幂等；正文末尾的空行也不补。
-        """
-        source = str(text).replace('\r\n', '\n').replace('\r', '\n')
-        lines = source.split('\n')
-        last_content_index = -1
-        for index, line in enumerate(lines):
-            if line.strip() != '':
-                last_content_index = index
-        prev_indexes, next_indexes = markdown_tag._neighbor_indexes(lines)
-        table_flags = markdown_tag.markdown_table_flags(lines)
-        result = []
-        in_fence = False
-        fence_char = ''
-        fence_len = 0
-        for index, line in enumerate(lines):
-            if in_fence:
-                if markdown_tag.is_fence_close(line, fence_char, fence_len):
-                    in_fence = False
-                result.append(line)
-                continue
-            fence = markdown_tag.is_fence_open(line)
-            if fence is not None:
-                in_fence = True
-                fence_char, fence_len = fence
-                result.append(line)
-                continue
-            # 后面还有正文才需要占位；尾部空行补了只会在结尾多一行不可见字符。
-            if line.strip() == '' and index < last_content_index:
-                if markdown_tag._decide_placeholder(
-                    lines,
-                    prev_indexes[index],
-                    next_indexes[index],
-                    table_flags
-                ):
-                    result.append(markdown_tag.qqMarkdownBlankLine)
-                else:
-                    result.append(line)
-                continue
-            result.append(line)
-        return '\n'.join(result)
 
     def at_para(message_para, allow_at_all=True, flag_qq=True):
         if not isinstance(message_para, OlivOS.messageAPI.PARA.at):
