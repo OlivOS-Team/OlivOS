@@ -139,6 +139,8 @@ def test_minor_mode_code_is_treated_as_miss_without_cache(monkeypatch):
     # 不编数据、不进缓存。此用例直接用模块真实实现,不走 fixture 里的假实现。
     monkeypatch.setattr(common, 'sdkUserInfo', {})
     monkeypatch.setattr(common, 'sdkQQUserInfoMinorLogged', {})
+    # 钉在开机不久：缺记录若被当成 0，这里会把第一次提示吞掉。
+    monkeypatch.setattr(common.time, 'monotonic', lambda: 100.0)
     monkeypatch.setattr(common, 'sdkQQUserInfoRateHistory', __import__('collections').deque())
     bot = OlivOS.API.bot_info_T(
         id='190001',
@@ -172,6 +174,9 @@ def test_minor_mode_code_is_treated_as_miss_without_cache(monkeypatch):
     assert common._get_qq_user_info(bot.hash, 'u_minor') is None
     # 未成年人模式只提示一次,不刷日志
     assert 'u_minor' in common.sdkQQUserInfoMinorLogged
+    common.time.monotonic = lambda: 200.0
+    common._log_qq_user_info_minor_mode('u_minor')
+    assert common.sdkQQUserInfoMinorLogged['u_minor'] == 100.0
 
 
 def test_missing_username_falls_back_to_stable_placeholder(user_api):

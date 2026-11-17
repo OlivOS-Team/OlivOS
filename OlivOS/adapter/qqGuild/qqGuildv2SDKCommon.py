@@ -3763,8 +3763,9 @@ def _log_qq_user_info_minor_mode(openid):
     now = time.monotonic()
     key = str(openid)
     with sdkQQUserInfoMinorLogLock:
-        last = sdkQQUserInfoMinorLogged.get(key, 0.0)
-        if now - last < 86400:
+        # 缺记录不能当 0：monotonic 从开机算起，新机器前 24 小时会被误判成「刚记过」。
+        last = sdkQQUserInfoMinorLogged.get(key)
+        if last is not None and now - last < 86400:
             return
         sdkQQUserInfoMinorLogged[key] = now
     proc = getattr(OlivOS.pluginAPI, 'gProc', None)
