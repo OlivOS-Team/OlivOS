@@ -134,6 +134,65 @@ def test_11253_mark_skips_later_group_calls(user_api):
     assert basic_calls == ['m3']
 
 
+def test_minor_mode_code_is_treated_as_miss_without_cache(monkeypatch):
+    # 40011033:账号处于未成年人模式,平台不返回用户资料。按 miss 处理,
+    # 不编数据、不进缓存。此用例直接用模块真实实现,不走 fixture 里的假实现。
+    monkeypatch.setattr(common, 'sdkUserInfo', {})
+    monkeypatch.setattr(common, 'sdkQQUserInfoMinorLogged', {})
+    monkeypatch.setattr(common, 'sdkQQUserInfoRateHistory', __import__('collections').deque())
+    bot = OlivOS.API.bot_info_T(
+        id='190001',
+        platform_sdk='qqGuildv2_link',
+        platform_platform='qqGuild',
+        platform_model='public'
+    )
+    event = SimpleNamespace(bot_info=bot)
+    calls = []
+
+    class FakeAPI:
+        @staticmethod
+        def getQQUserInfo(bot_info):
+            calls.append(1)
+
+            class Obj:
+                res = '{"err_code": 40011033, "message": "用户处于未成年人模式，暂不支持该操作"}'
+                res_code = 400
+
+                class metadata:
+                    openid = '-1'
+
+                def do_api(self, req_type='GET'):
+                    return self.res
+
+            return Obj()
+
+    monkeypatch.setattr(common, 'API', FakeAPI)
+    assert common._fetch_qq_user_basic_info(event, 'u_minor') is None
+    assert calls == [1]
+    assert common._get_qq_user_info(bot.hash, 'u_minor') is None
+    # 未成年人模式只提示一次,不刷日志
+    assert 'u_minor' in common.sdkQQUserInfoMinorLogged
+
+
+def test_missing_username_falls_back_to_stable_placeholder(user_api):
+    # 平台没下发 username 时,插件侧的 sender['name'] 不能是空串或占位词「用户」。
+    _, bot, _, _ = user_api
+    openid = 'CF621F136B7B19AD1EDFC8A00D0728B2'
+    event = SimpleNamespace(data=SimpleNamespace(sender={}), bot_info=bot)
+    common._apply_incoming_sender(event, openid, '用户', 'member')
+    assert event.data.sender['name'] == event.data.sender['nickname']
+    assert event.data.sender['name'] not in ('', '用户', 'Nobody')
+    assert event.data.sender['name'] == 'QQ用户0728B2'
+    # 同一 openid 多次调用得到同一个名字
+    again = SimpleNamespace(data=SimpleNamespace(sender={}), bot_info=bot)
+    common._apply_incoming_sender(again, openid, None, 'member')
+    assert again.data.sender['name'] == event.data.sender['name']
+    # 真正的昵称到了就用真的
+    real = SimpleNamespace(data=SimpleNamespace(sender={}), bot_info=bot)
+    common._apply_incoming_sender(real, 'u9', '真昵称', 'member')
+    assert real.data.sender['name'] == '真昵称'
+
+
 def test_group_card_comes_from_member_nickname(user_api):
     event, bot, _, basic_calls = user_api
     common._register_qq_user_info(

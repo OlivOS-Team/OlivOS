@@ -332,6 +332,10 @@ sdkQQUserInfoRateLock = threading.Lock()
 qqUserInfoRateLimit = 10
 qqUserInfoRateWindow = 60.0
 qqUserInfoNoFriendCode = 40184001
+# 未成年人模式:该账号在未成年人模式下不提供用户资料,按 miss 处理,不进缓存也不重试。
+qqUserInfoMinorModeCodes = {40011033}
+sdkQQUserInfoMinorLogged = {}
+sdkQQUserInfoMinorLogLock = threading.Lock()
 # 11253 按接口在本进程永久禁用；其他权限/频控错误按群退避。
 sdkQQGroupApiDenied = set()
 sdkQQGroupApiBackoff = {}
@@ -2877,10 +2881,26 @@ def _apply_incoming_message_payload(target_event, message_obj, event_data):
     target_event.data.font = None
 
 
+def _qq_user_fallback_name(user_id):
+    # 平台没下发 username 时,下游插件(如 OlivaDiceCore 的 tUserName)会拿到空名字。
+    # 这里按 openid 生成一个稳定的占位名,保证插件侧永远拿到非空用户名。
+    # 占位名只用于展示,不写进用户缓存,真正昵称一到就会被覆盖。
+    text = '' if user_id is None else str(user_id).strip()
+    if text == '':
+        return 'QQ用户'
+    tail = ''.join(char for char in text if char.isalnum())[-6:]
+    if tail == '':
+        return 'QQ用户'
+    return 'QQ用户%s' % tail
+
+
 def _apply_incoming_sender(target_event, user_id, nickname, role='member', card=None):
     # nickname/name 只放全局昵称（QQ 用户名）。群名片单独放 card，
     # 避免插件把群名片当成用户全局名（如 OlivaDiceCore 的 tUserName 读 sender['name']）。
     user_id_text = str(user_id)
+    # 缺 username 时补稳定占位名,别让插件拿到空用户名或占位词「用户」。
+    if not _qq_nickname_usable(nickname):
+        nickname = _qq_user_fallback_name(user_id_text)
     target_event.data.sender['user_id'] = user_id_text
     target_event.data.sender['nickname'] = nickname
     target_event.data.sender['id'] = user_id_text
@@ -3738,6 +3758,21 @@ def _acquire_qq_user_info_rate():
         return True
 
 
+def _log_qq_user_info_minor_mode(openid):
+    # 同一个账号每日只提示一次,避免未成年模式的用户把日志刷满。
+    now = time.monotonic()
+    key = str(openid)
+    with sdkQQUserInfoMinorLogLock:
+        last = sdkQQUserInfoMinorLogged.get(key, 0.0)
+        if now - last < 86400:
+            return
+        sdkQQUserInfoMinorLogged[key] = now
+    proc = getattr(OlivOS.pluginAPI, 'gProc', None)
+    if proc is not None:
+        proc.log(1, '获取用户基本信息返回 40011033(未成年人模式),已按缺少资料处理',
+                 [(modelName, 'default')])
+
+
 def _qq_user_info_code(raw_obj):
     if not isinstance(raw_obj, dict):
         return None
@@ -3779,6 +3814,10 @@ def _fetch_qq_user_basic_info(target_event, openid):
         and api_code in [None, 0]
     )
     if not flag_success or api_code == qqUserInfoNoFriendCode:
+        if api_code in qqUserInfoMinorModeCodes:
+            # 未成年人模式下平台不返回用户资料。这是账号自身状态,换接口也没用,
+            # 只按 miss 处理:不进缓存、不编数据,调用方回落到事件里的昵称。
+            _log_qq_user_info_minor_mode(openid)
         return None
     body = raw_obj
     if not _qq_nickname_usable(body.get('username', None)) and isinstance(body.get('data', None), dict):
