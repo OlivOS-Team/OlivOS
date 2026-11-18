@@ -125,6 +125,14 @@ def browser(navigation_host, tmp_path):
         wait.until(lambda _: find(selector).is_displayed() and find(selector).is_enabled())
         find(selector).click()
 
+    def type_text(selector, text):
+        # Chrome 158 对 sandbox iframe 内输入框的可交互性判定更严格，
+        # 先点击聚焦，避免直接 send_keys 被 ChromeDriver 拒绝。
+        field = find(selector)
+        wait.until(lambda _: field.is_displayed() and field.is_enabled())
+        field.click()
+        field.send_keys(text)
+
     def open_sidebar():
         if not driver.execute_script(
                 'return matchMedia("(max-width: 800px), (orientation: portrait)").matches'):
@@ -159,9 +167,9 @@ def browser(navigation_host, tmp_path):
         find('#token').send_keys(navigation_host.test_password)
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
-        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, select=select,
-                              open_sidebar=open_sidebar, wait_plugin_events=wait_plugin_events,
-                              host=navigation_host)
+        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, type_text=type_text,
+                              select=select, open_sidebar=open_sidebar,
+                              wait_plugin_events=wait_plugin_events, host=navigation_host)
     finally:
         driver.quit()
 
@@ -285,7 +293,7 @@ def test_plugin_menu_priority_refreshes_while_dialog_open(browser):
 def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
     driver = browser.driver
     identity = browser.select()
-    browser.find('#draft').send_keys('retained')
+    browser.type_text('#draft', 'retained')
     driver.switch_to.default_content()
     page_title = driver.execute_script('return state.frame.title')
     assert driver.execute_script(
@@ -299,7 +307,7 @@ def test_plugin_page_switch_preserves_input_and_frame_identity(browser):
 @pytest.mark.browser
 def test_plugin_restart_hides_pages_then_restores_the_open_page(browser):
     identity = browser.select()
-    browser.find('#draft').send_keys('before restart')
+    browser.type_text('#draft', 'before restart')
     browser.driver.switch_to.default_content()
     with browser.host.lock:
         plugins = browser.host.plugins
@@ -327,7 +335,7 @@ def test_plugin_restart_hides_pages_then_restores_the_open_page(browser):
 @pytest.mark.browser
 def test_stale_plugin_not_ready_event_keeps_open_page(browser):
     identity = browser.select()
-    browser.find('#draft').send_keys('keep me')
+    browser.type_text('#draft', 'keep me')
     browser.driver.switch_to.default_content()
     with browser.host.lock:
         browser.host.publish('events', {'type': 'plugins', 'ready': False})
@@ -364,7 +372,7 @@ def test_reload_action_hides_open_page_before_ready(browser):
 @pytest.mark.browser
 def test_plugin_browser_message_bridge_roundtrip(browser):
     browser.select()
-    browser.find('#draft').send_keys('roundtrip')
+    browser.type_text('#draft', 'roundtrip')
     browser.click('#request')
     browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：roundtrip')
 
@@ -382,7 +390,7 @@ def test_plugin_page_recovers_lost_session_before_open(browser, failure):
             else:
                 browser.host.sessions.pop(session)
     browser.select()
-    browser.find('#draft').send_keys('recovered')
+    browser.type_text('#draft', 'recovered')
     browser.click('#request')
     browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：recovered')
 
@@ -396,7 +404,7 @@ def test_plugin_frame_reload_recovers_missing_cookie(browser):
     browser.wait.until(lambda _: browser.driver.execute_script('return !!state.frame'))
     browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
     browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
-    browser.find('#draft').send_keys('reloaded')
+    browser.type_text('#draft', 'reloaded')
     browser.click('#request')
     browser.wait.until(lambda _: browser.find('#reply').text == '回包成功：reloaded')
 
@@ -405,7 +413,7 @@ def test_plugin_frame_reload_recovers_missing_cookie(browser):
 @pytest.mark.parametrize('evicted', [False, True])
 def test_open_plugin_survives_session_expiry_without_losing_form(browser, evicted):
     identity = browser.select()
-    browser.find('#draft').send_keys('retained after expiry')
+    browser.type_text('#draft', 'retained after expiry')
     browser.driver.switch_to.default_content()
     session = browser.driver.execute_script('state.sessionCheckedAt = 0; return state.session')
     with browser.host.lock:
@@ -1140,7 +1148,7 @@ def test_mobile_plugin_page_keeps_regular_layout_and_sidebar_drawer(browser):
     set_viewport(browser, 390, 844)
 
     identity = browser.select()
-    browser.find('#draft').send_keys('mobile draft')
+    browser.type_text('#draft', 'mobile draft')
     driver.switch_to.default_content()
 
     # 插件页不再独占可视区域：没有移动端工具栏，也不做全屏覆盖。
