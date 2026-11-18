@@ -14,7 +14,7 @@ import time
 
 __all__ = [
     'open_db', 'close_db', 'upsert_group', 'touch_group', 'remove_group', 'get_group',
-    'upsert_member', 'remove_member', 'get_members', 'list_seed_groups',
+    'upsert_member', 'remove_member', 'get_member', 'get_members', 'list_seed_groups',
     'evict_members_by_age', 'evict_groups_by_age', 'import_legacy', 'get_meta', 'set_meta',
 ]
 
@@ -36,9 +36,10 @@ _import_changes = None
 _log = logging.getLogger(__name__)
 
 _GROUP_FIELDS = ('joined_at', 'member_role', 'allow_proactive_msg', 'recv_msg_setting',
-                 'last_seen_at', 'state', 'members_state', 'updated_at', 'verified_at')
+                 'last_seen_at', 'state', 'members_state', 'updated_at', 'verified_at',
+                 'union_group_openid')
 _MEMBER_FIELDS = ('username', 'member_role', 'bot', 'joined_at', 'union_openid',
-                  'updated_at', 'source')
+                  'member_nickname', 'updated_at', 'source')
 
 
 def _connect(path, default_path):
@@ -59,17 +60,24 @@ def _connect(path, default_path):
                 recv_msg_setting TEXT, last_seen_at INTEGER NOT NULL,
                 state TEXT NOT NULL, members_state TEXT NOT NULL,
                 updated_at INTEGER NOT NULL, verified_at INTEGER,
+                union_group_openid TEXT,
                 PRIMARY KEY(bot_hash, group_openid));
             CREATE INDEX IF NOT EXISTS idx_groups_seen ON groups(last_seen_at);
             CREATE TABLE IF NOT EXISTS members(
                 bot_hash TEXT NOT NULL, group_openid TEXT NOT NULL,
                 member_openid TEXT NOT NULL, username TEXT, member_role TEXT,
                 bot INTEGER, joined_at TEXT, union_openid TEXT,
-                updated_at INTEGER NOT NULL, source TEXT,
+                member_nickname TEXT, updated_at INTEGER NOT NULL, source TEXT,
                 PRIMARY KEY(bot_hash, group_openid, member_openid));
             CREATE INDEX IF NOT EXISTS idx_members_scan ON members(bot_hash, updated_at);
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
         ''')
+        group_cols = {row[1] for row in db.execute('PRAGMA table_info(groups)')}
+        if 'union_group_openid' not in group_cols:
+            db.execute('ALTER TABLE groups ADD COLUMN union_group_openid TEXT')
+        member_cols = {row[1] for row in db.execute('PRAGMA table_info(members)')}
+        if 'member_nickname' not in member_cols:
+            db.execute('ALTER TABLE members ADD COLUMN member_nickname TEXT')
     except Exception:
         db.close()
         raise
@@ -254,6 +262,22 @@ def remove_member(bot_hash, group_openid, member_openid):
         _db()
         _pending_members[key] = None
         _changed('removed_member', key)
+
+
+def get_member(bot_hash, group_openid, member_openid):
+    key = (str(bot_hash), str(group_openid), str(member_openid))
+    with _LOCK:
+        if key[:2] in _deleted_group_members:
+            pending = _pending_members.get(key, None)
+            return None if pending is None else dict(pending)
+        if key in _pending_members:
+            row = _pending_members[key]
+            return None if row is None else dict(row)
+        row = _db().execute(
+            'SELECT * FROM members WHERE bot_hash=? AND group_openid=? AND member_openid=?',
+            key
+        ).fetchone()
+        return None if row is None else dict(row)
 
 
 def get_members(bot_hash, group_openid):

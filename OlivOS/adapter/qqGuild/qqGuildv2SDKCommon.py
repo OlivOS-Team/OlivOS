@@ -326,6 +326,16 @@ qqGroupApiRateLimitMap = {
     'group_member_blacklist_set': 60
 }
 qqGroupApiRateWindow = 60.0
+# 获取用户基本信息:按确认的 10 QPM 限流,与群管理额度分开计。
+sdkQQUserInfoRateHistory = deque()
+sdkQQUserInfoRateLock = threading.Lock()
+qqUserInfoRateLimit = 10
+qqUserInfoRateWindow = 60.0
+qqUserInfoNoFriendCode = 40184001
+# 未成年人模式:该账号在未成年人模式下不提供用户资料,按 miss 处理,不进缓存也不重试。
+qqUserInfoMinorModeCodes = {40011033}
+sdkQQUserInfoMinorLogged = {}
+sdkQQUserInfoMinorLogLock = threading.Lock()
 # 11253 按接口在本进程永久禁用；其他权限/频控错误按群退避。
 sdkQQGroupApiDenied = set()
 sdkQQGroupApiBackoff = {}
@@ -1528,6 +1538,9 @@ def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_i
             record['bot'] = user_obj['bot']
         if username is not None:
             record['name'] = username
+        allow_flag = user_obj.get('allow_proactive_msg', None)
+        if isinstance(allow_flag, bool):
+            record['allow_proactive_msg'] = allow_flag
         if role is not None:
             record['role'] = str(role)
         if chat_type is not None:
@@ -1555,6 +1568,7 @@ def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_i
         member_role = role
         if member_role is None:
             member_role = user_obj.get('member_role', None)
+        member_nickname = user_obj.get('member_nickname', None)
         _qq_group_member_cache_record(
             bot_hash,
             chat_id,
@@ -1562,7 +1576,8 @@ def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_i
             username=username,
             member_role=member_role,
             bot=user_obj.get('bot', None),
-            union_openid=user_obj.get('union_openid', None)
+            union_openid=user_obj.get('union_openid', None),
+            member_nickname=member_nickname
         )
     return record
 
@@ -1632,6 +1647,7 @@ def _qq_group_member_cache_record(
     bot=None,
     joined_at=None,
     union_openid=None,
+    member_nickname=None,
     flag_full_sync=False
 ):
     if group_openid is None or str(group_openid) == '':
@@ -1642,11 +1658,16 @@ def _qq_group_member_cache_record(
         member_role = None
     if isinstance(username, str) and username.strip() in ['', '用户', 'Nobody']:
         username = None
+    if not _qq_nickname_usable(member_nickname):
+        member_nickname = None
+    else:
+        member_nickname = member_nickname.strip()
     qqStore.touch_group(str(bot_hash), str(group_openid))
     qqStore.upsert_member(
         str(bot_hash), str(group_openid), str(member_openid),
         username=username, member_role=member_role, bot=bot,
         joined_at=joined_at, union_openid=union_openid,
+        member_nickname=member_nickname,
         source='sync' if flag_full_sync else 'event'
     )
 
@@ -2860,8 +2881,26 @@ def _apply_incoming_message_payload(target_event, message_obj, event_data):
     target_event.data.font = None
 
 
-def _apply_incoming_sender(target_event, user_id, nickname, role='member'):
+def _qq_user_fallback_name(user_id):
+    # 平台没下发 username 时,下游插件(如 OlivaDiceCore 的 tUserName)会拿到空名字。
+    # 这里按 openid 生成一个稳定的占位名,保证插件侧永远拿到非空用户名。
+    # 占位名只用于展示,不写进用户缓存,真正昵称一到就会被覆盖。
+    text = '' if user_id is None else str(user_id).strip()
+    if text == '':
+        return 'QQ用户'
+    tail = ''.join(char for char in text if char.isalnum())[-6:]
+    if tail == '':
+        return 'QQ用户'
+    return 'QQ用户%s' % tail
+
+
+def _apply_incoming_sender(target_event, user_id, nickname, role='member', card=None):
+    # nickname/name 只放全局昵称（QQ 用户名）。群名片单独放 card，
+    # 避免插件把群名片当成用户全局名（如 OlivaDiceCore 的 tUserName 读 sender['name']）。
     user_id_text = str(user_id)
+    # 缺 username 时补稳定占位名,别让插件拿到空用户名或占位词「用户」。
+    if not _qq_nickname_usable(nickname):
+        nickname = _qq_user_fallback_name(user_id_text)
     target_event.data.sender['user_id'] = user_id_text
     target_event.data.sender['nickname'] = nickname
     target_event.data.sender['id'] = user_id_text
@@ -2869,6 +2908,8 @@ def _apply_incoming_sender(target_event, user_id, nickname, role='member'):
     target_event.data.sender['sex'] = 'unknown'
     target_event.data.sender['age'] = 0
     target_event.data.sender['role'] = role
+    if _qq_nickname_usable(card):
+        target_event.data.sender['card'] = card.strip()
 
 
 def get_Event_from_SDK(target_event):
@@ -3094,7 +3135,13 @@ def get_Event_from_SDK(target_event):
                 event_data.get('group_id', None)
             )
             if group_openid is not None and str(group_openid) != '':
-                qqStore.touch_group(plugin_event_bot_hash, str(group_openid))
+                group_fields = {}
+                union_group_openid = event_data.get('union_group_openid', None)
+                if isinstance(union_group_openid, str) and union_group_openid.strip() != '':
+                    group_fields['union_group_openid'] = union_group_openid.strip()
+                qqStore.touch_group(
+                    plugin_event_bot_hash, str(group_openid), **group_fields
+                )
             # 解析机器人自身 openid,供 mentions 回填时排除自身条目。
             sub_self_open_id = _get_qq_group_self_open_id(
                 plugin_event_bot_hash,
@@ -3161,7 +3208,15 @@ def get_Event_from_SDK(target_event):
                 _get_qq_author_name_cached(
                     plugin_event_bot_hash, author, member_openid
                 ),
-                _get_qq_sender_role(author)
+                _get_qq_sender_role(author),
+                card=_get_qq_group_member_card(
+                    plugin_event_bot_hash,
+                    author,
+                    event_data.get(
+                        'group_openid', event_data.get('group_id', None)
+                    ),
+                    member_openid
+                )
             )
             target_event.data.host_id = None
             target_event.data.extend['group_id'] = str(group_openid)
@@ -3171,6 +3226,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
                 _get_qq_message_event_extend(event_type, event_data, face_data)
+            )
+            _attach_qq_user_event_fields(
+                target_event, author, member_openid, event_data, flag_group=True
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -3255,6 +3313,9 @@ def get_Event_from_SDK(target_event):
             target_event.data.extend['reply_msg_id'] = event_data.get('id', None)
             target_event.data.extend.update(
                 _get_qq_message_event_extend(event_type, event_data, face_data)
+            )
+            _attach_qq_user_event_fields(
+                target_event, author, user_openid, event_data, flag_group=False
             )
             if plugin_event_bot_hash in sdkSubSelfInfo:
                 target_event.data.extend['sub_self_id'] = str(sdkSubSelfInfo[plugin_event_bot_hash])
@@ -3630,6 +3691,254 @@ def get_Event_from_SDK(target_event):
         if event_id is not None:
             target_event.data.extend.setdefault('event_id', str(event_id))
             target_event.data.extend['qq_payload_id'] = str(event_id)
+
+
+def _qq_nickname_usable(value):
+    return isinstance(value, str) and value.strip() not in ['', '用户', 'Nobody']
+
+
+def _qq_user_avatar_url(appid, openid):
+    # 官方返回的头像地址不入库。对外一律按 appid + openid 自己拼。
+    if appid is None or openid is None:
+        return None
+    appid_text = str(appid).strip()
+    openid_text = str(openid).strip()
+    if appid_text in ['', '-1'] or openid_text in ['', '-1']:
+        return None
+    return 'https://q.qlogo.cn/qqapp/%s/%s/0' % (appid_text, openid_text)
+
+
+def _get_qq_group_member_card(bot_hash, author, group_openid=None, fallback_user_id=None):
+    # 只取群名片，不回落到 QQ 昵称：全局昵称由 _get_qq_author_name_cached 单独给。
+    if isinstance(author, dict) and _qq_nickname_usable(author.get('member_nickname', None)):
+        return author.get('member_nickname').strip()
+    member_openid = None
+    if isinstance(author, dict):
+        member_openid = author.get('member_openid', author.get('id', None))
+    if member_openid is None:
+        member_openid = fallback_user_id
+    if group_openid is None or member_openid is None:
+        return None
+    row = qqStore.get_member(bot_hash, group_openid, member_openid)
+    if isinstance(row, dict) and _qq_nickname_usable(row.get('member_nickname', None)):
+        return row.get('member_nickname').strip()
+    return None
+
+
+def _attach_qq_user_event_fields(target_event, author, openid, event_data=None, flag_group=False):
+    extend = getattr(getattr(target_event, 'data', None), 'extend', None)
+    if not isinstance(extend, dict):
+        return
+    appid = None
+    base_info = getattr(target_event, 'base_info', None)
+    if isinstance(base_info, dict):
+        appid = base_info.get('self_id', None)
+    if appid is None:
+        appid = getattr(getattr(target_event, 'bot_info', None), 'id', None)
+    avatar = _qq_user_avatar_url(appid, openid)
+    if avatar is not None:
+        extend['avatar'] = avatar
+    if isinstance(author, dict) and isinstance(author.get('allow_proactive_msg', None), bool):
+        extend['allow_proactive_msg'] = author['allow_proactive_msg']
+    if flag_group and isinstance(event_data, dict):
+        union_group = event_data.get('union_group_openid', None)
+        if isinstance(union_group, str) and union_group.strip() != '':
+            extend['union_group_openid'] = union_group.strip()
+
+
+def _acquire_qq_user_info_rate():
+    now = time.monotonic()
+    with sdkQQUserInfoRateLock:
+        history = sdkQQUserInfoRateHistory
+        while history and now - history[0] >= qqUserInfoRateWindow:
+            history.popleft()
+        if len(history) >= qqUserInfoRateLimit:
+            return False
+        history.append(now)
+        return True
+
+
+def _log_qq_user_info_minor_mode(openid):
+    # 同一个账号每日只提示一次,避免未成年模式的用户把日志刷满。
+    now = time.monotonic()
+    key = str(openid)
+    with sdkQQUserInfoMinorLogLock:
+        # 缺记录不能当 0：monotonic 从开机算起，新机器前 24 小时会被误判成「刚记过」。
+        last = sdkQQUserInfoMinorLogged.get(key)
+        if last is not None and now - last < 86400:
+            return
+        sdkQQUserInfoMinorLogged[key] = now
+    proc = getattr(OlivOS.pluginAPI, 'gProc', None)
+    if proc is not None:
+        proc.log(1, '获取用户基本信息返回 40011033(未成年人模式),已按缺少资料处理',
+                 [(modelName, 'default')])
+
+
+def _qq_user_info_code(raw_obj):
+    if not isinstance(raw_obj, dict):
+        return None
+    api_code = raw_obj.get('err_code', raw_obj.get('code', None))
+    if isinstance(api_code, str):
+        try:
+            api_code = int(api_code.strip())
+        except (TypeError, ValueError):
+            return api_code
+    return api_code
+
+
+def _fetch_qq_user_basic_info(target_event, openid):
+    # GET /v2/users/{openid}/info。失败、非好友、被限流都当 miss，不编数据。
+    # 响应里的 avatar 故意不读。
+    if openid is None or str(openid).strip() in ['', '-1'] or API is None:
+        return None
+    if not _acquire_qq_user_info_rate():
+        return None
+    try:
+        bot_info = get_SDK_bot_info_from_Event(target_event)
+        api_obj = API.getQQUserInfo(bot_info)
+        api_obj.metadata.openid = str(openid)
+        api_obj.do_api('GET')
+    except Exception:
+        return None
+    raw_obj = None
+    if api_obj.res is not None:
+        try:
+            raw_obj = json.loads(api_obj.res)
+        except (TypeError, ValueError):
+            raw_obj = None
+    if not isinstance(raw_obj, dict):
+        return None
+    api_code = _qq_user_info_code(raw_obj)
+    flag_success = (
+        api_obj.res_code is not None
+        and 200 <= api_obj.res_code < 300
+        and api_code in [None, 0]
+    )
+    if not flag_success or api_code == qqUserInfoNoFriendCode:
+        if api_code in qqUserInfoMinorModeCodes:
+            # 未成年人模式下平台不返回用户资料。这是账号自身状态,换接口也没用,
+            # 只按 miss 处理:不进缓存、不编数据,调用方回落到事件里的昵称。
+            _log_qq_user_info_minor_mode(openid)
+        return None
+    body = raw_obj
+    if not _qq_nickname_usable(body.get('username', None)) and isinstance(body.get('data', None), dict):
+        body = body['data']
+    result = {}
+    if _qq_nickname_usable(body.get('username', None)):
+        result['username'] = body.get('username').strip()
+    union_openid = body.get('union_openid', None)
+    if isinstance(union_openid, str) and union_openid.strip() != '':
+        result['union_openid'] = union_openid.strip()
+    if isinstance(body.get('allow_proactive_msg', None), bool):
+        result['allow_proactive_msg'] = body['allow_proactive_msg']
+    return result
+
+
+def _apply_qq_user_basic_info(bot_hash, user_id, fetched):
+    if not isinstance(fetched, dict) or len(fetched) == 0:
+        return None
+    payload = {'id': str(user_id)}
+    if _qq_nickname_usable(fetched.get('username', None)):
+        payload['username'] = fetched['username']
+    if fetched.get('union_openid', None):
+        payload['union_openid'] = fetched['union_openid']
+    if isinstance(fetched.get('allow_proactive_msg', None), bool):
+        payload['allow_proactive_msg'] = fetched['allow_proactive_msg']
+    return _register_qq_user_info(bot_hash, payload)
+
+
+def _take_qq_group_member_profile(target_event, group_id, user_id):
+    # 群成员详情未开放时，请求入口会把 11253 记在本进程内存里，这里直接跳过。
+    # 其它失败不当成永久禁用，交给调用方改打获取用户基本信息。
+    if group_id is None or str(group_id) == '' or user_id is None or str(user_id) == '':
+        return None
+    if _check_qq_group_api_denied('group_member_info') or event_action is None:
+        return None
+    raw_result = event_action._request_qq_group_member_info(
+        target_event, group_id, user_id
+    )
+    if not isinstance(raw_result, dict) or not raw_result.get('active', False):
+        return None
+    response = event_action._raw_response(raw_result)
+    if not isinstance(response, dict) or not _qq_nickname_usable(response.get('username', None)):
+        return None
+    member_role = response.get('member_role', None)
+    if member_role not in ['member', 'admin', 'owner']:
+        member_role = None
+    username = response.get('username').strip()
+    _register_qq_user_info(
+        target_event.bot_info.hash,
+        {
+            'member_openid': response.get('member_openid', user_id),
+            'username': username,
+            'bot': response.get('bot', None),
+            'union_openid': response.get('union_openid', None)
+        },
+        role=member_role,
+        chat_type='qq_group',
+        chat_id=str(group_id)
+    )
+    return {
+        'name': username,
+        'member_openid': str(response.get('member_openid', user_id)),
+        'union_openid': response.get('union_openid', None),
+        'role': member_role
+    }
+
+
+def _ensure_qq_user_basic_info(target_event, user_id, no_cache=False):
+    # 只有无缓存、缓存没有昵称、或调用方强制不走缓存时才打接口。缺头像不因此打。
+    bot_hash = target_event.bot_info.hash
+    record = None if no_cache else _get_qq_user_info(bot_hash, user_id)
+    need_fetch = (
+        no_cache
+        or record is None
+        or not _qq_nickname_usable(record.get('name', None))
+    )
+    fetched = None
+    if need_fetch:
+        fetched = _fetch_qq_user_basic_info(target_event, user_id)
+        if isinstance(fetched, dict) and len(fetched) > 0:
+            _apply_qq_user_basic_info(bot_hash, user_id, fetched)
+            if not no_cache:
+                record = _get_qq_user_info(bot_hash, user_id)
+    return record, fetched
+
+
+def _fill_qq_stranger_result(res_data, target_event, user_id, record, fetched, no_cache):
+    appid = getattr(getattr(target_event, 'bot_info', None), 'id', None)
+    avatar = _qq_user_avatar_url(appid, user_id)
+    if user_id is not None and str(user_id) != '':
+        res_data['data']['id'] = str(user_id)
+    if avatar is not None:
+        res_data['data']['avatar'] = avatar
+        res_data['active'] = True
+    source = fetched if no_cache else record
+    name = None
+    if no_cache:
+        if isinstance(fetched, dict) and _qq_nickname_usable(fetched.get('username', None)):
+            name = fetched['username']
+    elif record is not None and _qq_nickname_usable(record.get('name', None)):
+        name = record.get('name')
+    if name is not None:
+        res_data['active'] = True
+        res_data['data']['name'] = name
+    if not no_cache and record is not None:
+        for extra_key in [
+            'member_openid', 'user_openid', 'union_openid',
+            'union_user_account', 'role', 'chat_type', 'chat_id', 'time'
+        ]:
+            res_data['data'][extra_key] = record.get(extra_key, None)
+        allow_flag = record.get('allow_proactive_msg', None)
+    elif isinstance(fetched, dict):
+        allow_flag = fetched.get('allow_proactive_msg', None)
+        if fetched.get('union_openid', None):
+            res_data['data']['union_openid'] = fetched['union_openid']
+    else:
+        allow_flag = None
+    if isinstance(allow_flag, bool):
+        res_data['data']['allow_proactive_msg'] = allow_flag
+    return source
 
 
 class event_action_common(object):
@@ -4064,12 +4373,7 @@ class event_action_common(object):
         """把 markdown 卡片降级成普通文本：去图片、去链接语法与表格分隔行。"""
         lines = []
         for raw_line in str(content).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
-            # 只清整行的占位（U+200B）：那一行是给卡片撑行距用的，转纯文本时
-            # 还原成空行。调用方自己写在正文里的零宽字符要原样留着。
-            if raw_line.strip() == markdown_tag.qqMarkdownBlankLine:
-                line = ''
-            else:
-                line = raw_line
+            line = raw_line
             line = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', line)
             line = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', line)
             line = re.sub(r'^\s{0,3}#{1,6}\s*', '', line)
@@ -4706,12 +5010,6 @@ class event_action_common(object):
         tmp_raw = str(content)
         if tmp_raw.strip() == '':
             return None
-        # 空行占位（U+200B）是给卡片撑行距用的渲染辅助，日志里还原成空行；
-        # 调用方自己写的零宽字符不属于占位，原样保留，排查时才对得上原文。
-        tmp_raw = '\n'.join(
-            '' if line.strip() == markdown_tag.qqMarkdownBlankLine else line
-            for line in tmp_raw.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-        )
         # 日志一行一条：换行写字面量 \\n，正文一条都不截断。
         return tmp_raw.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '\\n')
 
@@ -5183,9 +5481,6 @@ class event_action_common(object):
             replacements[value] if part_type == 'image' else value
             for part_type, value in content_parts
         )
-        # QQ 的 Markdown 卡片会吞掉空行，拼好的正文统一补零宽占位，
-        # 否则插件排好的段落会在群里挤成一坨。
-        content = markdown_tag.normalize_blank_lines(content)
         result = event_action.create_markdown_message(
             target_event,
             chat_type,
@@ -5380,14 +5675,6 @@ class event_action_common(object):
                 markdown,
                 allow_at_all=chat_type == 'guild_channel'
             )
-        elif chat_type in ['qq_group', 'qq_private']:
-            # 同一个坑在插件直接调 markdown 接口时也要堵上：QQ 群聊/单聊的
-            # Markdown 卡片吞空行，正文里的空行补零宽占位才留得住段落间隔。
-            markdown = copy.deepcopy(markdown)
-            if isinstance(markdown.get('content', None), str):
-                markdown['content'] = markdown_tag.normalize_blank_lines(
-                    markdown['content']
-                )
 
         if chat_type in ['qq_group', 'qq_private']:
             if force_active:
@@ -6117,76 +6404,57 @@ class event_action_common(object):
         this_msg.data.code = int(code)
         return event_action._run_raw_api(this_msg, 'set_interaction_callback', 'PUT')
 
-    # ============ 用户信息(基于消息/事件积累的缓存) ============
+    # ============ 用户信息(缓存优先，缺昵称再打获取用户基本信息) ============
     def get_stranger_info(target_event, user_id, no_cache=False):
-        # 平台无"查用户资料"接口,数据来自消息/事件/mentions 积累的缓存;
-        # 返回结构与 OneBot get_stranger_info 对齐,并附带各类 openid。
+        # 私聊/通用查询:缓存优先。没有缓存、没有昵称、或 no_cache 时打
+        # GET /v2/users/{openid}/info。群场景走 get_group_member_info，先群后个人。
         res_data = OlivOS.contentAPI.api_result_data_template.get_stranger_info()
-        record = _get_qq_user_info(target_event.bot_info.hash, user_id)
-        if record is not None:
-            res_data['active'] = True
-            res_data['data']['name'] = record.get('name', None)
-            res_data['data']['id'] = str(user_id)
-            for extra_key in [
-                'member_openid', 'user_openid', 'union_openid',
-                'union_user_account', 'role', 'chat_type', 'chat_id', 'time'
-            ]:
-                res_data['data'][extra_key] = record.get(extra_key, None)
+        record, fetched = _ensure_qq_user_basic_info(target_event, user_id, no_cache)
+        _fill_qq_stranger_result(res_data, target_event, user_id, record, fetched, no_cache)
         return res_data
 
     def get_group_member_info(target_event, group_id, user_id, no_cache=False):
         res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_info()
         bot_hash = target_event.bot_info.hash
-        target_data = getattr(target_event, 'data', None)
-        extend_data = getattr(target_data, 'extend', None)
-        flag_from_group_event = (
-            isinstance(extend_data, dict)
-            and extend_data.get('flag_from_qq', False)
-            and not extend_data.get('flag_from_direct', False)
-            and group_id is not None
+        # 缓存够用就不打。不够时先打群成员详情；11253 记在本进程内存，之后跳过。
+        # 群接口无效或已跳过，再打获取用户基本信息。
+        record = None if no_cache else _get_qq_user_info(bot_hash, user_id)
+        need_name = (
+            no_cache
+            or record is None
+            or not _qq_nickname_usable(record.get('name', None))
         )
-        record = _get_qq_user_info(bot_hash, user_id)
-        if (record is None or no_cache) and flag_from_group_event:
-            # 兜底/刷新:调用真实的单成员接口(30 QPM 限速,11253 优雅降级)。
-            # 缓存命中的高频热路径(no_cache=False)完全不触发网络请求。
-            api_member_openid = user_id
-            if record is not None and record.get('member_openid', None):
-                api_member_openid = record['member_openid']
-            raw_result = event_action._request_qq_group_member_info(
-                target_event,
-                group_id,
-                api_member_openid
+        fetched = None
+        group_profile = None
+        if need_name and group_id is not None and str(group_id) != '':
+            group_profile = _take_qq_group_member_profile(
+                target_event, group_id, user_id
             )
-            if raw_result.get('active', False):
-                response = event_action._raw_response(raw_result)
-                if isinstance(response, dict):
-                    member_role = response.get('member_role', None)
-                    if member_role not in ['member', 'admin', 'owner']:
-                        member_role = None
-                    _register_qq_user_info(
-                        bot_hash,
-                        {
-                            'member_openid': response.get('member_openid', api_member_openid),
-                            'username': response.get('username', None),
-                            'bot': response.get('bot', None),
-                            'union_openid': response.get('union_openid', None)
-                        },
-                        role=member_role,
-                        chat_type='qq_group',
-                        chat_id=str(group_id)
-                    )
-                    res_data['data']['qq_member'] = copy.deepcopy(response)
-                    res_data['data']['qq_api_refreshed'] = True
-                    record = _get_qq_user_info(bot_hash, api_member_openid)
-            else:
-                # 无权限(11253)/限流:不抛异常,错误信息附在结果里,继续走缓存。
-                res_data['data']['qq_error'] = raw_result['data'].get('error', None)
-                res_data['data']['qq_error_code'] = raw_result['data'].get('error_code', None)
+        if group_profile is not None:
+            record = group_profile if no_cache else (
+                _get_qq_user_info(bot_hash, user_id) or group_profile
+            )
+        elif need_name:
+            record, fetched = _ensure_qq_user_basic_info(
+                target_event, user_id, no_cache
+            )
+            if no_cache:
+                record = None
+                if isinstance(fetched, dict) and _qq_nickname_usable(fetched.get('username', None)):
+                    record = {
+                        'name': fetched['username'],
+                        'union_openid': fetched.get('union_openid', None),
+                        'allow_proactive_msg': fetched.get('allow_proactive_msg', None)
+                    }
         if record is not None:
             res_data['active'] = True
             res_data['data']['name'] = record.get('name', None)
             res_data['data']['card'] = record.get('name', None)
             res_data['data']['id'] = str(user_id)
+            if isinstance(record.get('allow_proactive_msg', None), bool) and not no_cache:
+                res_data['data']['allow_proactive_msg'] = record['allow_proactive_msg']
+            elif no_cache and isinstance(fetched, dict) and isinstance(fetched.get('allow_proactive_msg', None), bool):
+                res_data['data']['allow_proactive_msg'] = fetched['allow_proactive_msg']
             res_data['data']['user_id'] = str(user_id)
             res_data['data']['group_id'] = None if group_id is None else str(group_id)
             res_data['data']['role'] = record.get('role', None)
@@ -6233,16 +6501,52 @@ class event_action_common(object):
                     )
                 )
                 res_data['data']['qq_mute_state'] = copy.deepcopy(mute_state)
+        card = None
+        if not no_cache and group_id is not None and str(group_id) != '':
+            member_row = qqStore.get_member(bot_hash, group_id, user_id)
+            if isinstance(member_row, dict) and _qq_nickname_usable(member_row.get('member_nickname', None)):
+                card = member_row.get('member_nickname').strip()
+        if not _qq_nickname_usable(card):
+            card = res_data['data'].get('name', None)
+        if _qq_nickname_usable(card):
+            res_data['active'] = True
+            res_data['data']['card'] = card
+            if res_data['data'].get('name', None) is None:
+                res_data['data']['name'] = card
+        avatar = _qq_user_avatar_url(getattr(target_event.bot_info, 'id', None), user_id)
+        if avatar is not None:
+            res_data['active'] = True
+            res_data['data']['id'] = str(user_id)
+            res_data['data']['user_id'] = str(user_id)
+            res_data['data']['avatar'] = avatar
+        if not no_cache and group_id is not None and str(group_id) != '':
+            group_row = qqStore.get_group(bot_hash, group_id)
+            union_group = None if group_row is None else group_row.get('union_group_openid', None)
+            if isinstance(union_group, str) and union_group.strip() != '':
+                res_data['data']['union_group_openid'] = union_group
+        if no_cache and isinstance(fetched, dict) and isinstance(fetched.get('allow_proactive_msg', None), bool):
+            res_data['data']['allow_proactive_msg'] = fetched['allow_proactive_msg']
         return res_data
 
     def get_user_info(target_event, user_id):
-        # SDK 级完整记录:昵称/角色/全部 openid/最后活跃时间等。
+        # SDK 级完整记录。缺昵称时与 get_stranger_info 一样补一次基本信息。
+        # avatar 只挂在返回副本上，不写进缓存。
         res_data = OlivOS.contentAPI.api_result_data_template.universal_result()
+        _ensure_qq_user_basic_info(target_event, user_id, no_cache=False)
         record = _get_qq_user_info(target_event.bot_info.hash, user_id)
+        avatar = _qq_user_avatar_url(getattr(target_event.bot_info, 'id', None), user_id)
         if record is not None:
             record.pop('time_monotonic', None)
+            if avatar is not None:
+                record['avatar'] = avatar
             res_data['active'] = True
             res_data['data']['user_info'] = record
+        elif avatar is not None:
+            res_data['active'] = True
+            res_data['data']['user_info'] = {
+                'id': str(user_id),
+                'avatar': avatar
+            }
         return res_data
 
     # ============ 未映射平台事件查询 ============
@@ -7610,270 +7914,6 @@ class markdown_tag:
     )
     qqAtEveryoneReg = re.compile(r'<qqbot-at-everyone\s*/>')
 
-    # QQ 的 Markdown 卡片会把空行压掉：正文里连续两个换行只渲染成一次换行，
-    # 段落之间想留一行空白必须用零宽空格占位。官方文档「换多行」示例也是
-    # 这么写的（第一行与第二行之间靠 \u200B 撑开）。这里统一用 U+200B。
-    qqMarkdownBlankLine = '\u200b'
-
-    @staticmethod
-    def fence_prefix(text, allow_indent=3):
-        """返回 (围栏字符, 长度)；不是围栏行返回 None。
-
-        缩进超过 3 个空格的围栏形状按 CommonMark 属于缩进代码块的内容，
-        不算围栏开头/收尾，否则缩进代码里的 ``` 会把后续正文吞进代码块。
-        """
-        raw = str(text)
-        indent = len(raw) - len(raw.lstrip(' \t'))
-        if indent > allow_indent:
-            return None
-        stripped = raw.strip()
-        if not stripped or stripped[0] not in '`~':
-            return None
-        char = stripped[0]
-        count = len(stripped) - len(stripped.lstrip(char))
-        if count < 3:
-            return None
-        return char, count
-
-    @staticmethod
-    def is_fence_open(line):
-        """判断是否是围栏开头，返回 (字符, 长度) 或 None。
-
-        反引号围栏的信息串里不能再出现反引号（```a`b），这种行只是普通文本。
-        """
-        fence = markdown_tag.fence_prefix(line)
-        if fence is None:
-            return None
-        char, count = fence
-        if char == '`' and '`' in str(line).strip()[count:]:
-            return None
-        return char, count
-
-    @staticmethod
-    def is_fence_close(line, fence_char, fence_len):
-        """判断是否是围栏的收尾行。
-
-        按 CommonMark 口径：字符必须与开头一致、长度不短于开头，且围栏后面
-        只能有空白。` ```python ` 这种带信息的行不会误闭合代码块。
-        """
-        fence = markdown_tag.fence_prefix(line)
-        if fence is None or fence[0] != fence_char or fence[1] < fence_len:
-            return False
-        return str(line).strip().lstrip(fence_char).strip() == ''
-
-    @staticmethod
-    def is_indented_code_line(line):
-        """缩进 4 个空格以上的非空行（缩进代码块的内容行）。"""
-        raw = str(line)
-        if raw.strip() == '':
-            return False
-        return len(raw) - len(raw.lstrip(' \t')) >= 4
-
-    @staticmethod
-    def is_block_line(line):
-        """判断一行是不是 Markdown 块级元素（引用、标题、围栏、表格、列表、分割线）。
-
-        块级元素自带上下间距，而且内部允许「空行后继续缩进内容」——在它后面
-        补占位行会打断块的边界，所以这类行相邻的空行不能动。
-        """
-        text = str(line).strip()
-        if text == '':
-            return False
-        if text[0] == '>':
-            return True
-        if text[0] == '#':
-            # ATX 标题：1~6 个 # 后跟空白，或整行只有这些 #（空标题）。
-            # QQ 群里常见的 `#话题` 两种都不是，旁边的空行仍要补占位。
-            index = 0
-            while index < len(text) and index < 6 and text[index] == '#':
-                index += 1
-            if index == len(text):
-                return True
-            return text[index].isspace()
-        # 表格行不在这里判：由 markdown_table_flags() 按「有没有分隔行」决定，
-        # 否则「| 开头的普通文本」会被误当成表格、白吃一条占位规则。
-        # 传原始行而不是 strip 过的：缩进 4 空格的围栏形状属于缩进代码块，
-        # 不能当围栏（is_fence_open 自己会判缩进）。
-        if markdown_tag.is_fence_open(line) is not None:
-            return True
-        compact = text.replace(' ', '').replace('\t', '')
-        if len(compact) >= 3 and len(set(compact)) == 1 and compact[0] in '-*_':
-            # 分割线允许标记之间带空格（`- - -`），但要求整行同一字符，
-            # `-*-` 这类混排只是普通文本。
-            return True
-        if text[0] in '-+*' and text[1:2].isspace():
-            return True
-        index = 0
-        while index < len(text) and index < 10 and text[index].isdigit():
-            index += 1
-        if 1 <= index <= 9 and text[index:index + 1] in ('.', ')'):
-            if text[index + 1:index + 2].isspace():
-                return True
-        return False
-
-    @staticmethod
-    def is_table_separator(line):
-        """判断一行是不是 GFM 表格的分隔行（允许没有外层竖线）。
-
-        `| --- | --- |`、`--- | ---`、`:-: | -` 都算；纯粹的 `---` 是分割线，
-        不含竖线所以不算。
-        """
-        text = str(line).strip()
-        if '|' not in text:
-            return False
-        cells = text.strip('|').split('|')
-        if not cells:
-            return False
-        for cell in cells:
-            if re.fullmatch(r':?-+:?', cell.strip()) is None:
-                return False
-        return True
-
-    @staticmethod
-    def is_table_line(line):
-        """判断一行是不是 Markdown 表格行（表头行 / 数据行 / 分隔行）。
-
-        只认以 `|` 开头的行；没有外层竖线的写法由 markdown_table_flags()
-        按「分隔行 + 相邻含竖线的行」补齐，避免把普通文本里带竖线的句子
-        当成表格。
-        """
-        return str(line).strip().startswith('|')
-
-    @staticmethod
-    def markdown_table_flags(lines):
-        """标出每一行是否属于 Markdown 表格。
-
-        以分隔行为锚点向上下扩展（连续的非空、含竖线行），因此：
-        没有分隔行的「以 | 开头的普通文本」不会被当成表格；
-        没有外层竖线的 GFM 写法（`a | b`）同样能识别出来。
-        """
-        texts = [str(line).strip() for line in lines]
-        flags = [False] * len(texts)
-        for index, text in enumerate(texts):
-            if not markdown_tag.is_table_separator(text):
-                continue
-            flags[index] = True
-            cursor = index - 1
-            while cursor >= 0 and texts[cursor] != '' and '|' in texts[cursor]:
-                flags[cursor] = True
-                cursor -= 1
-            cursor = index + 1
-            while cursor < len(texts) and texts[cursor] != '' and '|' in texts[cursor]:
-                flags[cursor] = True
-                cursor += 1
-        return flags
-
-    @staticmethod
-    def _neighbor_indexes(lines):
-        """线性扫一遍，返回每个位置左右最近的非空行下标（没有则 -1）。"""
-        prev_indexes = [-1] * len(lines)
-        last = -1
-        for index, line in enumerate(lines):
-            prev_indexes[index] = last
-            if str(line).strip() != '':
-                last = index
-        next_indexes = [-1] * len(lines)
-        last = -1
-        for index in range(len(lines) - 1, -1, -1):
-            next_indexes[index] = last
-            if str(lines[index]).strip() != '':
-                last = index
-        return prev_indexes, next_indexes
-
-    @staticmethod
-    def _decide_placeholder(lines, previous_index, following_index, table_flags):
-        """空行是否要补占位（邻居下标由调用方一次算好，避免逐行回溯）。"""
-        if (previous_index >= 0 and following_index >= 0
-                and markdown_tag.is_indented_code_line(lines[previous_index])
-                and markdown_tag.is_indented_code_line(lines[following_index])):
-            # 缩进代码块内部的空行属于代码内容，塞 U+200B 会改掉代码。
-            return False
-        if previous_index >= 0 and table_flags[previous_index]:
-            return True
-        if following_index >= 0 and table_flags[following_index]:
-            return True
-        if previous_index >= 0 and markdown_tag.is_block_line(lines[previous_index]):
-            return False
-        if following_index >= 0 and markdown_tag.is_block_line(lines[following_index]):
-            return False
-        return True
-
-    @staticmethod
-    def blank_line_needs_placeholder(lines, index, table_flags=None):
-        """单个空行是否需要补占位（外部调用入口，内部走预计算版本）。
-
-        空行前后任一侧是块级元素就不补：块级元素自己带间距，补了也不会更空；
-        反过来，块级元素前面的空行一旦换成非空行，手机端会把它当成块内的
-        lazy continuation（实测：引用块会把后面整段正文吞进引用框）。
-
-        表格是唯一例外：GFM 里表格的边界完全靠空行界定，空行被 QQ 吞掉时
-        两张相邻的表会连成一张（后一张的 `| --- |` 直接变成数据行），表格
-        后面的正文也会被吸进表格当成新行。表格不像引用块那样吃 lazy
-        continuation，补一行占位是安全的，所以表格两侧的空行一律要占位。
-        """
-        if table_flags is None:
-            table_flags = markdown_tag.markdown_table_flags(lines)
-        previous_index = index - 1
-        while previous_index >= 0 and str(lines[previous_index]).strip() == '':
-            previous_index -= 1
-        following_index = index + 1
-        while following_index < len(lines) and str(lines[following_index]).strip() == '':
-            following_index += 1
-        if following_index >= len(lines):
-            following_index = -1
-        return markdown_tag._decide_placeholder(
-            lines, previous_index, following_index, table_flags
-        )
-
-    @staticmethod
-    def normalize_blank_lines(text):
-        """给 QQ Markdown 正文的空行补零宽空格占位，保住段落间隔。
-
-        只在代码之外动手：围栏代码块与缩进代码块里的空行是代码的一部分，
-        塞进不可见字符等于改了插件要发的内容。块级元素（引用、列表、围栏、
-        分割线）相邻的空行保持原样，因为手机端会把占位行当成块内的 lazy
-        continuation；表格是例外（见 blank_line_needs_placeholder）。
-        已经是占位行（U+200B）的行不算空行，因此函数幂等；正文末尾的空行也不补。
-        """
-        source = str(text).replace('\r\n', '\n').replace('\r', '\n')
-        lines = source.split('\n')
-        last_content_index = -1
-        for index, line in enumerate(lines):
-            if line.strip() != '':
-                last_content_index = index
-        prev_indexes, next_indexes = markdown_tag._neighbor_indexes(lines)
-        table_flags = markdown_tag.markdown_table_flags(lines)
-        result = []
-        in_fence = False
-        fence_char = ''
-        fence_len = 0
-        for index, line in enumerate(lines):
-            if in_fence:
-                if markdown_tag.is_fence_close(line, fence_char, fence_len):
-                    in_fence = False
-                result.append(line)
-                continue
-            fence = markdown_tag.is_fence_open(line)
-            if fence is not None:
-                in_fence = True
-                fence_char, fence_len = fence
-                result.append(line)
-                continue
-            # 后面还有正文才需要占位；尾部空行补了只会在结尾多一行不可见字符。
-            if line.strip() == '' and index < last_content_index:
-                if markdown_tag._decide_placeholder(
-                    lines,
-                    prev_indexes[index],
-                    next_indexes[index],
-                    table_flags
-                ):
-                    result.append(markdown_tag.qqMarkdownBlankLine)
-                else:
-                    result.append(line)
-                continue
-            result.append(line)
-        return '\n'.join(result)
-
     def at_para(message_para, allow_at_all=True, flag_qq=True):
         if not isinstance(message_para, OlivOS.messageAPI.PARA.at):
             return ''
@@ -8215,6 +8255,20 @@ class API_common(object):
             self.metadata = None
             self.host = sdkAPIHost['default']
             self.route = sdkAPIRoute['users'] + '/@me'
+
+    # GET /v2/users/{openid}/info 获取用户基本信息（10 QPM）。非好友 40184001。
+    class getQQUserInfo(api_templet):
+        def __init__(self, bot_info=None):
+            api_templet.__init__(self)
+            self.bot_info = bot_info
+            self.data = None
+            self.metadata = self.metadata_T()
+            self.host = sdkAPIHost['default']
+            self.route = sdkAPIRoute['qq_users'] + '/{openid}/info'
+
+        class metadata_T(object):
+            def __init__(self):
+                self.openid = '-1'
 
     # POST /v2/generate_url_link (50 QPS)，响应为 {"data": {"url": "..."}}。
     class generateUrlLink(api_templet):
