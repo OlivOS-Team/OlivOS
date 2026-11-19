@@ -4991,7 +4991,7 @@ class event_action_common(object):
             try:
                 return req.get(
                     url,
-                    timeout=OlivOS.webTool.OlivOS_http_timeout,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout_transfer,
                     allow_redirects=False,
                     stream=True
                 )
