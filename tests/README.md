@@ -129,3 +129,26 @@ DoDo Poll/Link/EA、KOOK、黑盒语音、B站直播、OPQ、米游社大别野�
 测试矩阵：Python 3.11，Linux x64（含 Chrome）、Linux ARM64、Windows x64/ARM64、
 macOS Intel/Apple Silicon。不表示已在每个旧 Python 构建版本上运行测试。
 发布权限和发布动作沿用已有 workflow，测试只需仓库只读权限。
+
+## Adapter 通用业务测试
+
+test_adapter_business.py 以 adapter_test_support.py 中的能力矩阵为依据，为现有 SDK 生成通用业务用例。
+能力矩阵同时声明入站业务和出站方法；测试只为声明存在的能力生成参数，
+不支持的组合不会创建测试，也不会用大量 skip 掩盖差异。
+
+- test_sdk_events.py 与业务测试共用同一套 SDK 平台表、消息/通知 builder 和离线网络守卫。
+- 入站按 adapter 能力覆盖群/私聊消息、成员增减、禁言、撤回、请求、戳一戳、lifecycle/heartbeat。
+- 出站覆盖群/私聊回复与主动发送，以及删除消息、群/成员查询、禁言、踢人、请求处理和退群等接口。
+- Event -> pluginAPI -> 插件回调 -> reply 闭环覆盖群消息、私聊消息和群成员增加事件。
+- 出站测试只替换 adapter 的 event_action 边界，不替换 Event、事件转换或消息解析。
+- 新增 adapter 或能力时，应同步补充矩阵、payload builder 和运行期 event_action 契约。
+- 明确无法覆盖的组合写入 exemptions 并记录原因；例如 Milky 事件上报 sdk=onebot，
+  而 API.Event 当前按 sdk=milky 路由出站，矩阵将该差异登记为显式例外。
+- Telegram 的成员变更分支当前会被前置消息分支截断，因此矩阵不声明该能力；
+  若 adapter 修复该映射顺序，再补入站 case 即可自动生成测试。
+
+快速验证：
+
+```powershell
+python -m pytest tests/test_adapter_business.py -q
+```
