@@ -2195,7 +2195,7 @@ function renderTkMenuStatus(namespace) {
   if (status.hidden) return;
   const match = settings.panels.some((panel) => panel.namespace === namespace);
   status.textContent = settings.error || (match
-    ? '在插件页的「旧版 Tk 面板」区域管理只读预览。'
+    ? '在插件页的「可转换为 WebUI 的 GUI 面板」区域管理只读预览。'
     : '此插件版本没有已审核的 Tk 兼容描述，不能开启网页预览。原菜单不变。');
 }
 

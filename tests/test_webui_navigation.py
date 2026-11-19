@@ -174,7 +174,7 @@ def browser(navigation_host, tmp_path):
         driver.quit()
 
 
-def set_viewport(browser, width, height):
+def set_viewport(browser, width, height, *, mobile_device=False):
     """切换视口，并等侧边栏完成移动端/桌面端模式同步。
 
     matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
@@ -183,7 +183,7 @@ def set_viewport(browser, width, height):
     driver = browser.driver
     mobile = width <= 800
     driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': mobile_device})
     browser.wait.until(lambda _: driver.execute_script(
         '''
         const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
@@ -370,7 +370,8 @@ def test_reload_action_hides_open_page_before_ready(browser):
 
 
 @pytest.mark.browser
-def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
+@pytest.mark.parametrize('phone_width', [None, 320, 390])
+def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser, phone_width):
     from selenium.webdriver.common.keys import Keys
 
     def report(zone):
@@ -381,15 +382,27 @@ def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
         browser.host.Proc_info.rx_queue.put(packet)
 
     report('Asia/Shanghai')
+    if phone_width:
+        set_viewport(browser, phone_width, 640, mobile_device=True)
+        browser.open_sidebar()
     browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: '当前生效：上海（Asia/Shanghai）' in browser.find('#plugin-schedule-status').text)
     dropdown = '#plugin-schedule-timezone'
     assert browser.find(dropdown).get_attribute('value') == 'system'
-    assert browser.driver.execute_script('''
-        const reload = document.getElementById('reload-plugins').getBoundingClientRect();
-        const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
-        return zone.left > reload.right && Math.abs(zone.top - reload.top) < 4;
-    ''')
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
+            const save = document.getElementById('plugin-schedule-save').getBoundingClientRect();
+            return innerWidth === arguments[0] && document.documentElement.scrollWidth <= innerWidth &&
+                zone.height >= 44 && save.height >= 44 && save.right <= innerWidth &&
+                zone.right <= save.left && Math.abs(zone.top - save.top) < 4;
+        ''', phone_width)
+    else:
+        assert browser.driver.execute_script('''
+            const reload = document.getElementById('reload-plugins').getBoundingClientRect();
+            const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
+            return zone.left > reload.right && Math.abs(zone.top - reload.top) < 4;
+        ''')
     browser.click(dropdown)
     search = browser.find('.select-menu input[type="search"]')
     assert search == browser.driver.switch_to.active_element
@@ -400,11 +413,20 @@ def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
     search.send_keys('柏林')
     assert browser.find(f'{active} .select-menu-option-label').text == '柏林'
     assert browser.find(f'{active} .select-menu-option-detail').text == 'Europe/Berlin'
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const menu = document.querySelector('.select-menu').getBoundingClientRect();
+            return menu.left >= 0 && menu.right <= innerWidth && menu.top >= 0 && menu.bottom <= innerHeight;
+        ''')
     search.send_keys(Keys.CONTROL, 'a')
     search.send_keys('NoSuchCity')
     assert browser.find('.select-menu-empty').is_displayed()
     search.send_keys(Keys.CONTROL, 'a')
-    search.send_keys('europe/berlin', Keys.ENTER)
+    search.send_keys('europe/berlin')
+    if phone_width:
+        browser.click(active)
+    else:
+        search.send_keys(Keys.ENTER)
     assert browser.find(dropdown).get_attribute('value') == 'Europe/Berlin'
     browser.click('#plugin-schedule-save')
     browser.wait.until(lambda _: '重载插件后生效' in browser.find('#plugin-schedule-status').text)
@@ -421,15 +443,18 @@ def test_plugins_show_only_empty_state_when_no_tk_panel_is_available(browser, ha
         browser.host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': False, 'panels': [
             {'namespace': 'multi', 'event': 'settings', 'title': '原有设置'},
         ]})
+        set_viewport(browser, 320, 640, mobile_device=True)
+        browser.open_sidebar()
     browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: browser.find('#tk-bridge-empty').is_displayed())
-    assert browser.find('#tk-bridge-empty').text == '当前没有可转换的gui面板'
+    assert browser.find('#tk-bridge-empty').text == '当前没有可转换成 WebUI 的 GUI 面板'
     assert not browser.find('#tk-bridge-panel').is_displayed()
     assert not browser.driver.find_elements('css selector', '#tk-bridge-panels input')
 
 
 @pytest.mark.browser
-def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, monkeypatch):
+@pytest.mark.parametrize('phone_width', [None, 320])
+def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, monkeypatch, phone_width):
     from OlivOS.webUI import tkBridgeAPI
 
     host = browser.host
@@ -470,11 +495,20 @@ def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, mo
     host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': True, 'panels': [
         {'namespace': 'multi', 'event': 'read_only', 'title': '只读菜单'},
     ]})
+    if phone_width:
+        set_viewport(browser, phone_width, 640, mobile_device=True)
+        browser.open_sidebar()
     browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: browser.find('#tk-bridge-panels input').is_enabled())
+    assert browser.find('#tk-bridge-heading').text == '可转换为 WebUI 的 GUI 面板'
     assert not browser.find('#tk-bridge-empty').is_displayed()
     browser.click('#tk-bridge-panels input')
     browser.click('#tk-bridge-panels button')
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const dialog = document.getElementById('tk-bridge-dialog').getBoundingClientRect();
+            return innerWidth === arguments[0] && dialog.left >= 0 && dialog.right <= innerWidth;
+        ''', phone_width)
     browser.click('#tk-bridge-content section button')
     browser.wait.until(lambda _: '第二页' in browser.find('#tk-bridge-content').text)
     preview = browser.find('#tk-bridge-content').text

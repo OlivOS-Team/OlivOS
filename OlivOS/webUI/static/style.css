@@ -1766,6 +1766,19 @@ dialog::backdrop {
   .toolbar {
     gap: 8px;
   }
+  .plugin-schedule-form {
+    width: 100%;
+  }
+  .plugin-schedule-form label {
+    flex-basis: 100%;
+  }
+  .plugin-schedule-form .select-shell {
+    flex: 1;
+    min-width: 0;
+  }
+  .plugin-schedule-status {
+    text-align: start;
+  }
   th,
   td {
     padding: 10px;
