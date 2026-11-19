@@ -370,6 +370,88 @@ def test_reload_action_hides_open_page_before_ready(browser):
 
 
 @pytest.mark.browser
+def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
+    from selenium.webdriver.support.ui import Select
+
+    def report(zone):
+        saved = OlivOS.scheduleAPI.read_settings(browser.host.root)
+        packet = OlivOS.API.Control.packet('send', {
+            'data': {'action': 'plugin_schedule_status', 'data': dict(saved, effective_timezone=zone)},
+        })
+        browser.host.Proc_info.rx_queue.put(packet)
+
+    report('Asia/Shanghai')
+    browser.click('[data-page="plugins"]')
+    browser.click('#plugin-schedule-panel summary')
+    browser.wait.until(lambda _: '当前生效：Asia/Shanghai' in browser.find('#plugin-schedule-status').text)
+    choice = Select(browser.find('#plugin-schedule-timezone'))
+    assert choice.first_selected_option.get_attribute('value') == 'system'
+    choice.select_by_value('Europe/Berlin')
+    browser.click('#plugin-schedule-save')
+    browser.wait.until(lambda _: '重载插件后生效' in browser.find('#plugin-schedule-status').text)
+    assert '当前生效：Asia/Shanghai' in browser.find('#plugin-schedule-status').text
+    assert OlivOS.scheduleAPI.read_settings(browser.host.root)['timezone'] == 'Europe/Berlin'
+    report('Europe/Berlin')
+    browser.wait.until(lambda _: browser.find('#plugin-schedule-status').text == '当前生效：Europe/Berlin')
+
+
+@pytest.mark.browser
+def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, monkeypatch):
+    from OlivOS.webUI import tkBridgeAPI
+
+    host = browser.host
+    monkeypatch.setattr(tkBridgeAPI.platform, 'system', lambda: 'Windows')
+    send = host.send_control
+    revokes = queue.Queue()
+
+    def reply(data, **fields):
+        host.Proc_info.rx_queue.put(OlivOS.API.Control.packet('send', {
+            'data': dict(data, action='tk_bridge_reply', code=None, **fields),
+        }))
+
+    def section(text, **fields):
+        return dict(id='table', group='列表', type='table', columns=['条目'],
+                    rows=[{'id': 'row', 'cells': [text]}], **fields)
+
+    def control(action, key):
+        data = key.get('data', {})
+        if data.get('action') != 'tk_bridge_request':
+            return send(action, key)
+        match data['op']:
+            case 'open':
+                reply(data, snapshot={'revision': 'first', 'sections': [
+                    {'id': 'summary', 'group': '<概况>', 'type': 'label', 'text': '原始概况'},
+                    section('第一页', next_cursor='next'),
+                ]})
+            case 'read' if data.get('cursor') == 'next':
+                assert data['section_id'] == 'table'
+                reply(data, snapshot={'revision': 'second', 'sections': [section('第二页')]})
+            case 'read':
+                reply(data, unchanged=True)
+            case 'revoke':
+                revokes.put(data)
+            case _:
+                reply(data)
+
+    monkeypatch.setattr(host, 'send_control', control)
+    host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': True, 'panels': [
+        {'namespace': 'multi', 'event': 'read_only', 'title': '只读菜单'},
+    ]})
+    browser.click('[data-page="plugins"]')
+    browser.click('#tk-bridge-panels input')
+    browser.click('#tk-bridge-panels button')
+    browser.click('#tk-bridge-content section button')
+    browser.wait.until(lambda _: '第二页' in browser.find('#tk-bridge-content').text)
+    preview = browser.find('#tk-bridge-content').text
+    assert '<概况>' in preview and '原始概况' in preview and '第一页' not in preview
+    browser.click('[data-close="tk-bridge-dialog"]')
+    revoke = revokes.get(timeout=2)
+    browser.wait.until(lambda _: '正在撤销' in browser.find('#tk-bridge-panels').text)
+    reply(revoke)
+    browser.wait.until(lambda _: '只读菜单 · Tk 兼容' in browser.find('#tk-bridge-panels').text)
+
+
+@pytest.mark.browser
 def test_plugin_browser_message_bridge_roundtrip(browser):
     browser.select()
     browser.type_text('#draft', 'roundtrip')

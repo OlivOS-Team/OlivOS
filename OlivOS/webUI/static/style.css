@@ -1427,6 +1427,12 @@ dialog {
 dialog::backdrop {
   background: #0006;
 }
+#tk-bridge-content {
+  overflow-wrap: anywhere;
+}
+#tk-bridge-content pre {
+  white-space: pre-wrap;
+}
 .dialog-title button {
   display: grid;
   width: var(--control-height);

@@ -50,6 +50,11 @@ setuptools.setup(
         'grpcio',
         'grpcio-tools',
         'protobuf',
+        'APScheduler==3.10.1',
+        'setuptools<82',  # APScheduler 3.10.1 运行时会导入 pkg_resources。
+        'pytz>=2024.1',
+        'tzlocal>=4.3.1,<6',
+        'tzdata',
     ],
     license='AGPLv3 License',
     packages=setuptools.find_packages(),
