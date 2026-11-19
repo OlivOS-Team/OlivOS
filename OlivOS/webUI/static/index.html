@@ -15,6 +15,7 @@
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
     <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/timezone-cities-zh.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -326,23 +327,23 @@
           </div>
         </section>
         <section id="plugins" class="page" hidden>
-          <div class="toolbar">
+          <div class="toolbar plugin-toolbar">
             <button id="toggle-path">显示路径</button>
             <button id="open-plugin-folder">打开插件文件夹</button>
             <button id="reload-plugins" class="primary">重载插件</button>
-          </div>
-          <details id="plugin-schedule-panel">
-            <summary>定时任务时区</summary>
-            <form id="plugin-schedule-form" class="toolbar">
-              <label for="plugin-schedule-timezone">已保存的时区</label>
-              <select id="plugin-schedule-timezone" disabled></select>
+            <form id="plugin-schedule-form" class="plugin-schedule-form">
+              <label for="plugin-schedule-timezone">定时任务时区</label>
+              <select id="plugin-schedule-timezone" data-searchable aria-describedby="plugin-schedule-status" disabled>
+                <option>正在读取…</option>
+              </select>
               <button id="plugin-schedule-save" type="submit" disabled>保存时区</button>
             </form>
-            <p class="hint" id="plugin-schedule-status" role="status">打开设置以读取时区。</p>
-          </details>
+          </div>
+          <p class="hint plugin-schedule-status" id="plugin-schedule-status" role="status">正在读取时区设置…</p>
           <section id="tk-bridge-panel" aria-labelledby="tk-bridge-heading" hidden>
             <h2 id="tk-bridge-heading">旧版 Tk 面板</h2>
             <div id="tk-bridge-panels"></div>
+            <p class="hint" id="tk-bridge-empty" hidden>当前没有已审核的 Tk 面板，原桌面菜单仍可使用。</p>
             <p class="hint" id="tk-bridge-error" role="status" hidden></p>
           </section>
           <p class="hint">优先级数字越小越优先；仅影响事件分发顺序，不会改变插件加载顺序。</p>
@@ -440,6 +441,7 @@
         <dd id="menu-info"></dd>
       </dl>
       <div id="menu-items"></div>
+      <p class="hint" id="menu-tk-status" hidden></p>
     </dialog>
     <dialog id="qr-dialog">
       <div class="dialog-title">

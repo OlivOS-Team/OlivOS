@@ -371,7 +371,7 @@ def test_reload_action_hides_open_page_before_ready(browser):
 
 @pytest.mark.browser
 def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
-    from selenium.webdriver.support.ui import Select
+    from selenium.webdriver.common.keys import Keys
 
     def report(zone):
         saved = OlivOS.scheduleAPI.read_settings(browser.host.root)
@@ -382,17 +382,49 @@ def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
 
     report('Asia/Shanghai')
     browser.click('[data-page="plugins"]')
-    browser.click('#plugin-schedule-panel summary')
-    browser.wait.until(lambda _: '当前生效：Asia/Shanghai' in browser.find('#plugin-schedule-status').text)
-    choice = Select(browser.find('#plugin-schedule-timezone'))
-    assert choice.first_selected_option.get_attribute('value') == 'system'
-    choice.select_by_value('Europe/Berlin')
+    browser.wait.until(lambda _: '当前生效：上海（Asia/Shanghai）' in browser.find('#plugin-schedule-status').text)
+    dropdown = '#plugin-schedule-timezone'
+    assert browser.find(dropdown).get_attribute('value') == 'system'
+    assert browser.driver.execute_script('''
+        const reload = document.getElementById('reload-plugins').getBoundingClientRect();
+        const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
+        return zone.left > reload.right && Math.abs(zone.top - reload.top) < 4;
+    ''')
+    browser.click(dropdown)
+    search = browser.find('.select-menu input[type="search"]')
+    assert search == browser.driver.switch_to.active_element
+    search.send_keys('上海')
+    active = '.select-menu-option[data-active="true"]'
+    assert browser.find(f'{active} .select-menu-option-detail').text == 'Asia/Shanghai'
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('柏林')
+    assert browser.find(f'{active} .select-menu-option-label').text == '柏林'
+    assert browser.find(f'{active} .select-menu-option-detail').text == 'Europe/Berlin'
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('NoSuchCity')
+    assert browser.find('.select-menu-empty').is_displayed()
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('europe/berlin', Keys.ENTER)
+    assert browser.find(dropdown).get_attribute('value') == 'Europe/Berlin'
     browser.click('#plugin-schedule-save')
     browser.wait.until(lambda _: '重载插件后生效' in browser.find('#plugin-schedule-status').text)
-    assert '当前生效：Asia/Shanghai' in browser.find('#plugin-schedule-status').text
+    assert '当前生效：上海（Asia/Shanghai）' in browser.find('#plugin-schedule-status').text
     assert OlivOS.scheduleAPI.read_settings(browser.host.root)['timezone'] == 'Europe/Berlin'
     report('Europe/Berlin')
-    browser.wait.until(lambda _: browser.find('#plugin-schedule-status').text == '当前生效：Europe/Berlin')
+    browser.wait.until(lambda _: browser.find('#plugin-schedule-status').text == '当前生效：柏林（Europe/Berlin）')
+
+
+@pytest.mark.browser
+def test_plugins_explain_missing_tk_profiles_without_offering_a_switch(browser):
+    with browser.host.lock:
+        browser.host.plugins['multi'][3] = [['原有设置', 'multi', 'settings']]
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.find('#tk-bridge-empty').is_displayed())
+    assert '没有已审核的 Tk 面板' in browser.find('#tk-bridge-empty').text
+    assert not browser.driver.find_elements('css selector', '#tk-bridge-panels input')
+    browser.click('#plugin-rows tr:first-child td:last-child button')
+    assert '没有已审核的 Tk 兼容描述' in browser.find('#menu-tk-status').text
+    assert browser.find('#menu-items button').text == '原有设置'
 
 
 @pytest.mark.browser

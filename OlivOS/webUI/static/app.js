@@ -484,7 +484,7 @@ function resetLogin(message = '') {
   state.scheduleSettings = null;
   state.scheduleRequest++;
   state.scheduleSaving = false;
-  $('plugin-schedule-panel').open = false;
+  closeSelectMenu();
   renderScheduleSettings();
   state.tkBridgeSettings = null;
   state.tkBridgeRequest++;
@@ -632,7 +632,7 @@ async function navigate(page) {
     if (!state.dirty) await loadAccounts();
     await refreshStatus();
   }
-  if (page === 'plugins') await Promise.all([loadPlugins(), loadTkBridgeSettings()]);
+  if (page === 'plugins') await Promise.all([loadPlugins(), loadTkBridgeSettings(), loadScheduleSettings()]);
   if (page === 'logs') await openLogs();
   if (page === 'terminals') {
     await loadTerminals();
@@ -840,6 +840,8 @@ const selectMenuViewportGap = 8;
 const selectMenuState = {
   select: null,
   menu: null,
+  list: null,
+  search: null,
   items: [],
   activeIndex: -1,
   typeahead: '',
@@ -910,6 +912,9 @@ function appendSelectMenuItem(menu, items, option, index, groupDisabled) {
   item.append(element('span', option.textContent.trim() || option.value || '（空白选项）', {
     class: 'select-menu-option-label',
   }));
+  if (option.dataset.detail) {
+    item.append(element('span', option.dataset.detail, { class: 'select-menu-option-detail' }));
+  }
   menu.append(item);
   const entry = { option, element: item, disabled };
   const itemIndex = items.length;
@@ -925,46 +930,64 @@ function openSelectMenu(select) {
   if (!select || select.disabled) return;
   closeSelectMenu();
   select.focus({ preventScroll: true });
-  const menu = element('div', null, {
-    id: `customSelectMenu${++selectMenuState.sequence}`,
-    class: 'select-menu',
-    role: 'listbox',
-    'aria-label': selectMenuLabel(select),
-  });
+  const id = `customSelectMenu${++selectMenuState.sequence}`;
+  const menu = element('div', null, { class: 'select-menu' });
+  const searchable = select.hasAttribute('data-searchable');
+  const list = searchable ? element('div', null, { class: 'select-menu-list' }) : menu;
+  list.id = id;
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', selectMenuLabel(select));
+  let search = null;
+  if (searchable) {
+    menu.classList.add('select-menu-searchable');
+    search = element('input', null, {
+      type: 'search', role: 'combobox', autocomplete: 'off',
+      placeholder: '搜索城市或时区编号', 'aria-label': '搜索时区',
+      'aria-autocomplete': 'list', 'aria-expanded': 'true', 'aria-controls': id,
+    });
+    search.addEventListener('input', filterSelectMenu);
+    search.addEventListener('keydown', handleSelectSearchKeydown);
+    menu.append(search, list, element('p', '未找到匹配的时区。', { class: 'select-menu-empty', hidden: '' }));
+  }
   const items = [];
   let optionIndex = 0;
   Array.from(select.children).forEach((child) => {
     if (child.tagName === 'OPTGROUP') {
-      menu.append(element('div', child.label || '', {
+      list.append(element('div', child.label || '', {
         class: 'select-menu-group',
         role: 'presentation',
       }));
       Array.from(child.children).forEach((option) => {
         if (option.tagName !== 'OPTION') return;
-        appendSelectMenuItem(menu, items, option, optionIndex, child.disabled);
+        appendSelectMenuItem(list, items, option, optionIndex, child.disabled);
         optionIndex += 1;
       });
       return;
     }
     if (child.tagName === 'OPTION') {
-      appendSelectMenuItem(menu, items, child, optionIndex, false);
+      appendSelectMenuItem(list, items, child, optionIndex, false);
       optionIndex += 1;
     }
   });
-  menu.addEventListener('pointerdown', (event) => event.preventDefault());
+  menu.addEventListener('pointerdown', (event) => {
+    if (!searchable || event.target.closest('[role="option"]')) event.preventDefault();
+  });
   menu.style.visibility = 'hidden';
   selectMenuHost(select).append(menu);
   selectMenuState.select = select;
   selectMenuState.menu = menu;
+  selectMenuState.list = list;
+  selectMenuState.search = search;
   selectMenuState.items = items;
   selectMenuState.activeIndex = -1;
   select.classList.add('select-menu-open');
   select.setAttribute('aria-expanded', 'true');
-  select.setAttribute('aria-controls', menu.id);
+  select.setAttribute('aria-controls', id);
+  positionSelectMenu();
   const selectedIndex = items.findIndex((item) => item.option.selected && !item.disabled);
   setSelectActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabledSelectItem());
-  positionSelectMenu();
   menu.style.visibility = '';
+  if (search) search.focus({ preventScroll: true });
   document.addEventListener('pointerdown', handleSelectOutsidePointerDown, true);
   document.addEventListener('focusin', handleSelectFocusChange, true);
   window.addEventListener('resize', positionSelectMenu);
@@ -973,15 +996,20 @@ function openSelectMenu(select) {
 }
 
 function setSelectActiveIndex(index) {
-  if (!selectMenuState.menu || index < 0 || index >= selectMenuState.items.length) return;
+  if (!selectMenuState.menu) return;
   const item = selectMenuState.items[index];
-  if (!item || item.disabled) return;
+  if (index !== -1 && (!item || item.disabled || item.element.hidden)) return;
   selectMenuState.activeIndex = index;
   selectMenuState.items.forEach((entry, entryIndex) => {
     entry.element.dataset.active = String(entryIndex === index);
   });
-  selectMenuState.select.setAttribute('aria-activedescendant', item.element.id);
-  const menu = selectMenuState.menu;
+  const focusTarget = selectMenuState.search || selectMenuState.select;
+  if (!item) {
+    focusTarget.removeAttribute('aria-activedescendant');
+    return;
+  }
+  focusTarget.setAttribute('aria-activedescendant', item.element.id);
+  const menu = selectMenuState.list;
   const itemTop = item.element.offsetTop;
   const itemBottom = itemTop + item.element.offsetHeight;
   if (itemTop < menu.scrollTop) menu.scrollTop = itemTop;
@@ -995,8 +1023,8 @@ function moveSelectActive(delta) {
   if (!items.length) return;
   let index = selectMenuState.activeIndex;
   for (let count = 0; count < items.length; count += 1) {
-    index = (index + delta + items.length) % items.length;
-    if (!items[index].disabled) {
+    index = index < 0 && delta < 0 ? items.length - 1 : (index + delta + items.length) % items.length;
+    if (!items[index].disabled && !items[index].element.hidden) {
       setSelectActiveIndex(index);
       return;
     }
@@ -1004,7 +1032,7 @@ function moveSelectActive(delta) {
 }
 
 function firstEnabledSelectItem() {
-  return selectMenuState.items.findIndex((item) => !item.disabled);
+  return selectMenuState.items.findIndex((item) => !item.disabled && !item.element.hidden);
 }
 
 function lastEnabledSelectItem() {
@@ -1021,6 +1049,38 @@ function chooseSelectMenuItem(item) {
   select.selectedIndex = item.option.index;
   closeSelectMenu(true);
   if (changed) select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function filterSelectMenu() {
+  const { search, items, list, menu } = selectMenuState;
+  const words = search.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  for (const item of items) {
+    const { option } = item;
+    const text = `${option.textContent} ${option.value}`.toLowerCase();
+    item.element.hidden = !words.every((word) => text.includes(word));
+  }
+  list.querySelectorAll('.select-menu-group').forEach((group) => { group.hidden = words.length > 0; });
+  const first = firstEnabledSelectItem();
+  menu.querySelector('.select-menu-empty').hidden = first >= 0;
+  list.scrollTop = 0;
+  positionSelectMenu();
+  setSelectActiveIndex(first);
+}
+
+function handleSelectSearchKeydown(event) {
+  if (event.isComposing) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveSelectActive(event.key === 'ArrowDown' ? 1 : -1);
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    chooseSelectMenuItem(selectMenuState.items[selectMenuState.activeIndex]);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeSelectMenu(true);
+  } else if (event.key === 'Tab') {
+    closeSelectMenu(true);
+  }
 }
 
 function handleSelectKeydown(event) {
@@ -1104,7 +1164,7 @@ function positionSelectMenu() {
     return;
   }
   const maxWidth = Math.max(0, window.innerWidth - selectMenuViewportGap * 2);
-  const width = Math.min(Math.max(rect.width, 168), maxWidth);
+  const width = Math.min(Math.max(rect.width, selectMenuState.search ? 260 : 168), maxWidth);
   const left = Math.min(
     Math.max(rect.left, selectMenuViewportGap),
     Math.max(selectMenuViewportGap, window.innerWidth - width - selectMenuViewportGap),
@@ -1113,7 +1173,8 @@ function positionSelectMenu() {
   menu.style.left = `${Math.round(left)}px`;
   menu.style.maxHeight = `${Math.min(selectMenuMaxHeight, Math.max(80, window.innerHeight - 16))}px`;
   menu.style.top = '0px';
-  const naturalHeight = menu.scrollHeight;
+  const list = selectMenuState.list;
+  const naturalHeight = menu.scrollHeight + (list === menu ? 0 : list.scrollHeight - list.clientHeight);
   const availableBelow = window.innerHeight - rect.bottom - selectMenuGap - selectMenuViewportGap;
   const availableAbove = rect.top - selectMenuGap - selectMenuViewportGap;
   const height = Math.min(naturalHeight, selectMenuMaxHeight);
@@ -1136,7 +1197,7 @@ function handleSelectOutsidePointerDown(event) {
 }
 
 function handleSelectViewportScroll(event) {
-  if (event.target === selectMenuState.menu) return;
+  if (event.target === selectMenuState.menu || event.target === selectMenuState.list) return;
   positionSelectMenu();
 }
 
@@ -1162,6 +1223,8 @@ function closeSelectMenu(focusSelect = false) {
   if (selectMenuState.menu?.parentNode) selectMenuState.menu.remove();
   selectMenuState.select = null;
   selectMenuState.menu = null;
+  selectMenuState.list = null;
+  selectMenuState.search = null;
   selectMenuState.items = [];
   selectMenuState.activeIndex = -1;
   selectMenuState.typeahead = '';
@@ -1624,6 +1687,23 @@ async function loadPlugins() {
   renderPluginNavigation();
   return result;
 }
+function scheduleTimezoneLabel(zone) {
+  if (!zone) return '未知';
+  if (zone === 'UTC') return '协调世界时';
+  if (Object.hasOwn(timezoneCitiesZh, zone)) return timezoneCitiesZh[zone];
+  try {
+    const format = new Intl.DateTimeFormat('zh-CN', { timeZone: zone, timeZoneName: 'longGeneric' });
+    const canonical = format.resolvedOptions().timeZone;
+    if (Object.hasOwn(timezoneCitiesZh, canonical)) return timezoneCitiesZh[canonical];
+    const name = format.formatToParts(0).find((part) => part.type === 'timeZoneName')?.value;
+    if (name && /[\u3400-\u9fff]/.test(name)) return name;
+    return name ? `协调世界时偏移（${name}）` : `时区 ${zone}`;
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    return `时区 ${zone}`;
+  }
+}
+
 function renderScheduleSettings(message = '') {
   const result = state.scheduleSettings;
   const settings = result?.settings;
@@ -1632,31 +1712,46 @@ function renderScheduleSettings(message = '') {
   select.disabled = !settings?.revision || state.scheduleSaving;
   $('plugin-schedule-save').disabled = select.disabled || !select.value || select.value === settings.timezone;
   if (message || !settings) {
-    status.textContent = message || '打开设置以读取时区。';
+    status.textContent = message || '正在读取时区设置…';
   } else if (settings.error) {
     status.textContent = settings.error;
   } else if (!result.active) {
     status.textContent = '等待插件加载器报告生效时区。';
   } else {
     const active = result.active;
-    const current = active.error || `当前生效：${active.effective_timezone || '未知'}`;
+    const zone = active.effective_timezone;
+    const current = active.error || `当前生效：${scheduleTimezoneLabel(zone)}${zone ? `（${zone}）` : ''}`;
     status.textContent = active.revision === settings.revision
       ? current : `${current}。已保存的设置将在重载插件后生效。`;
   }
 }
 function applyScheduleSettings(result, preserveDraft) {
   const select = $('plugin-schedule-timezone');
-  const previous = state.scheduleSettings?.settings;
-  const draft = preserveDraft && previous?.revision && select.value !== previous.timezone ? select.value : '';
+  const previous = state.scheduleSettings;
+  const draft = preserveDraft && previous?.settings.revision && select.value !== previous.settings.timezone
+    ? select.value : '';
+  const selected = draft || result.settings.timezone || '';
   state.scheduleSettings = result;
-  const zones = element('optgroup', null, { label: '指定时区' });
-  for (const zone of result.choices) zones.append(element('option', zone, { value: zone }));
-  select.replaceChildren(element('option', '跟随系统（默认）', { value: 'system' }), zones);
-  select.value = draft || result.settings.timezone || '';
-  if (draft && previous.revision !== result.settings.revision) {
+  const choicesChanged = previous?.choices.length !== result.choices.length ||
+    result.choices.some((zone, index) => zone !== previous?.choices[index]);
+  if ((choicesChanged || selected !== select.value) && selectMenuState.select === select) closeSelectMenu(true);
+  if (choicesChanged) {
+    const zones = element('optgroup', null, { label: '指定时区' });
+    const aliases = [];
+    for (const zone of result.choices) {
+      const option = element('option', scheduleTimezoneLabel(zone), { value: zone, 'data-detail': zone });
+      if (zone === 'UTC' || Object.hasOwn(timezoneCitiesZh, zone)) zones.append(option);
+      else aliases.push(option);
+    }
+    // 中文名称相同的候选中，优先显示 CLDR 直接命名的时区，再显示别名。
+    zones.append(...aliases);
+    select.replaceChildren(element('option', '跟随系统', { value: 'system' }), zones);
+  }
+  select.value = selected;
+  if (draft && previous.settings.revision !== result.settings.revision) {
     // 保留编辑时的版本，避免后台刷新替用户接受另一标签页的改动。
-    state.scheduleSettings = { ...result, settings: previous };
-    renderScheduleSettings('其他窗口已修改时区。重新打开设置以读取最新值。');
+    state.scheduleSettings = { ...result, settings: previous.settings };
+    renderScheduleSettings('其他窗口已修改时区。重新进入插件页以读取最新值。');
   } else {
     renderScheduleSettings();
   }
@@ -1710,7 +1805,8 @@ function renderTkBridgeSettings() {
     }
   }
   const error = $('tk-bridge-error');
-  $('tk-bridge-panel').hidden = !panels.length && !settings?.error;
+  $('tk-bridge-panel').hidden = !settings;
+  $('tk-bridge-empty').hidden = !settings || panels.length > 0 || Boolean(settings.error);
   error.textContent = settings?.error || '';
   error.hidden = !error.textContent;
   $('tk-bridge-panels').replaceChildren(...panels.map((panel) => {
@@ -1749,6 +1845,7 @@ function renderTkBridgeSettings() {
     if (panel.reason) row.append(element('span', panel.reason, { class: 'hint' }));
     return row;
   }));
+  renderTkMenuStatus(state.menuNamespace);
 }
 async function loadTkBridgeSettings() {
   const sequence = ++state.tkBridgeRequest;
@@ -2093,6 +2190,18 @@ function renderPlugins() {
   $('toggle-path').textContent = state.showPath ? '隐藏路径' : '显示路径';
   refreshOpenMenuPriority();
 }
+function renderTkMenuStatus(namespace) {
+  const status = $('menu-tk-status');
+  const settings = state.tkBridgeSettings;
+  const hasMenu = Boolean(state.plugins[namespace]?.[3]?.length);
+  status.hidden = !settings || !hasMenu;
+  if (status.hidden) return;
+  const match = settings.panels.some((panel) => panel.namespace === namespace);
+  status.textContent = settings.error || (match
+    ? '在插件页的「旧版 Tk 面板」区域管理只读预览。'
+    : '此插件版本没有已审核的 Tk 兼容描述，不能开启网页预览。原菜单不变。');
+}
+
 function pluginMenu(namespace) {
   const plugin = state.plugins[namespace];
   state.menuNamespace = namespace;
@@ -2111,6 +2220,7 @@ function pluginMenu(namespace) {
       }),
     );
   if (!plugin[3]?.length) $('menu-items').append(element('p', '此插件没有声明菜单。'));
+  renderTkMenuStatus(namespace);
   $('menu-dialog').showModal();
 }
 function pluginPagePath(page) {
@@ -2573,8 +2683,7 @@ async function onPluginsEvent(item) {
     return;
   }
   await restorePluginsAfterReload();
-  if (state.page === 'plugins') await loadTkBridgeSettings();
-  if ($('plugin-schedule-panel').open) await loadScheduleSettings(true);
+  if (state.page === 'plugins') await Promise.all([loadTkBridgeSettings(), loadScheduleSettings(true)]);
   finishAction('reload', {
     started_at: item.started_at,
     message: `插件重载完成，当前已加载 ${Object.keys(state.plugins).length} 个插件。`,
@@ -2588,7 +2697,7 @@ async function handleEvent(item) {
   } else if (item.type === 'tk_bridge_status') {
     if (state.page === 'plugins') await loadTkBridgeSettings();
   } else if (item.type === 'plugin_schedule_status') {
-    if ($('plugin-schedule-panel').open && !state.scheduleSaving) await loadScheduleSettings(true);
+    if (state.page === 'plugins' && !state.scheduleSaving) await loadScheduleSettings(true);
   } else if (item.type === 'plugin_schedule_lifecycle_rejected' && item.operation === 'restart') {
     const pending = state.actions.reload;
     if (pending && Number.isFinite(item.started_at) &&
@@ -2818,9 +2927,6 @@ bind('open-plugin-folder', async () => {
   const result = await api('/api/plugins/open', { method: 'POST' });
   notify(`已在文件管理器中打开插件目录：${result.path}`);
 });
-bind('plugin-schedule-panel', () => {
-  if ($('plugin-schedule-panel').open && state.token) return loadScheduleSettings();
-}, 'toggle');
 bind('plugin-schedule-timezone', () => renderScheduleSettings(), 'change');
 bind('plugin-schedule-form', saveScheduleSettings, 'submit');
 bind('tk-bridge-dialog', () => {
