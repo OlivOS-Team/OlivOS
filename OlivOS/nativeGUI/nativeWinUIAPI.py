@@ -1302,15 +1302,14 @@ class dock(OlivOS.API.Proc_templet):
 
             def draw_eye():
                 visible = state['visible']
-                stroke = color['color_002'] if visible else color['color_004']
+                stroke = color['color_004']
                 canvas.delete('all')
                 canvas.create_rectangle(0, 0, 30, 30, outline='', fill=color['color_001'])
                 canvas.create_oval(3, 9, 27, 21, outline=stroke, width=2)
                 canvas.create_oval(11, 12, 19, 18, fill=stroke, outline=stroke)
-                if not visible:
-                    # 被遮蔽时画斜杠眼；明文可见时画睁眼（与 WebUI 一致：
-                    # 睁眼表示当前明文可见，斜杠眼表示当前被遮蔽）。
-                    canvas.create_line(3, 25, 27, 5, fill=stroke, width=2)
+                if visible:
+                    # 斜杠眼表示点击隐藏；睁眼表示点击显示。
+                    canvas.create_line(3, 5, 27, 25, fill=stroke, width=2)
 
             def toggle(event=None):
                 state['visible'] = not state['visible']

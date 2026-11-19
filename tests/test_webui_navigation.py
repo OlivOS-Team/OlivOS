@@ -225,6 +225,39 @@ def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser, f
 
 
 @pytest.mark.browser
+@pytest.mark.parametrize('page', ['login', 'accounts'])
+def test_password_eye_icon_matches_next_action(browser, page):
+    if page == 'login':
+        browser.click('#logout')
+        field = '#token'
+        form = '#login-form'
+    else:
+        browser.click('[data-page="accounts"]')
+        browser.click('#add-account')
+        field = '#account-form [data-field="password"]'
+        form = '#account-dialog'
+        if browser.driver.find_elements('css selector', '#account-extra-fields [data-field="password"]'):
+            browser.click('#account-form details summary')
+
+    browser.type_text(field, 'fixture-password')
+    toggle = f'{field} + .secret-toggle'
+
+    def check(input_type, action, svg_element):
+        assert browser.find(form).is_displayed()
+        secret = browser.find(field)
+        assert secret.get_attribute('type') == input_type and secret.get_attribute('value') == 'fixture-password'
+        assert browser.find(toggle).get_attribute('aria-label') == action
+        assert browser.find(toggle).get_attribute('title') == action
+        assert browser.find(f'{toggle} svg > {svg_element}:last-child').is_displayed()
+
+    check('password', '显示内容', 'circle')
+    browser.click(toggle)
+    check('text', '隐藏内容', 'path')
+    browser.click(toggle)
+    check('password', '显示内容', 'circle')
+
+
+@pytest.mark.browser
 def test_plugin_navigation_groups_multiple_entries_and_directly_opens_single(browser):
     assert browser.find('.plugin-page-group[data-plugin-namespace="multi"] .plugin-group-count').text == '4'
     assert browser.find('.plugin-page-group[data-plugin-namespace="single"] .plugin-single-entry').is_displayed()

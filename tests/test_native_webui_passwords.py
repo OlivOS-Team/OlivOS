@@ -74,6 +74,49 @@ def password_dialog_owner():
 
 
 @pytest.mark.native_gui
+def test_tray_password_eyes_match_next_action(dock, monkeypatch, password_dialog_owner):
+    import tkinter
+
+    owner = password_dialog_owner
+    dock.UIObject['main_tk'] = owner
+
+    def check_window(dialog):
+        entries = [widget for widget in dialog.winfo_children() if isinstance(widget, tkinter.Entry)]
+        eyes = [widget for widget in dialog.winfo_children() if isinstance(widget, tkinter.Canvas)]
+        assert len(entries) == len(eyes) == 2
+        dialog.update()
+
+        def has_slash(canvas):
+            return any(canvas.type(item) == 'line' for item in canvas.find_all())
+
+        def click(eye):
+            eye.event_generate('<ButtonPress-1>', x=15, y=15, when='tail')
+            eye.event_generate('<ButtonRelease-1>', x=15, y=15, when='tail')
+            dialog.update()
+
+        for index, (entry, eye) in enumerate(zip(entries, eyes)):
+            entry.insert(0, 'fixture-password')
+            assert entry.cget('show') == '*' and not has_slash(eye)
+            click(eye)
+            assert entry.cget('show') == '' and has_slash(eye)
+            assert entries[1 - index].cget('show') == '*' and not has_slash(eyes[1 - index])
+            click(eye)
+            assert entry.cget('show') == '*' and not has_slash(eye) and entry.get() == 'fixture-password'
+        next(widget for widget in dialog.winfo_children()
+             if isinstance(widget, tkinter.Button) and widget['text'] == '取消').invoke()
+
+    monkeypatch.setattr(tkinter.Toplevel, 'wait_window', check_window)
+    owner.deiconify()
+    try:
+        assert dock.askWebUIPassword() is None
+    finally:
+        for child in owner.winfo_children():
+            if isinstance(child, tkinter.Toplevel):
+                child.destroy()
+        owner.withdraw()
+
+
+@pytest.mark.native_gui
 @pytest.mark.parametrize('copy_fails', [False, True])
 def test_password_dialog_has_click_to_copy_and_selectable_password(
         monkeypatch, capsys, copy_fails, password_dialog_owner):

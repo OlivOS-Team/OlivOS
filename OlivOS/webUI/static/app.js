@@ -1378,19 +1378,18 @@ function addSecretToggle(input) {
   pupil.setAttribute('r', '3');
   const slash = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   slash.setAttribute('d', 'm3 3 18 18');
-  eye.append(outline, slash);
+  eye.append(outline, pupil);
   const toggle = button('', () => {
     const visible = input.type === 'password';
     input.type = visible ? 'text' : 'password';
-    eye.replaceChildren(outline, visible ? pupil : slash);
-    toggle.setAttribute('aria-pressed', String(visible));
-    toggle.setAttribute('aria-label', visible ? '隐藏内容' : '显示内容');
-    toggle.title = visible ? '隐藏内容' : '显示内容';
+    eye.replaceChildren(outline, visible ? slash : pupil);
+    const action = visible ? '隐藏内容' : '显示内容';
+    toggle.setAttribute('aria-label', action);
+    toggle.title = action;
   });
   toggle.className = 'secret-toggle';
   toggle.append(eye);
   toggle.setAttribute('aria-label', '显示内容');
-  toggle.setAttribute('aria-pressed', 'false');
   toggle.title = '显示内容';
   wrapper.append(input, toggle);
 }
