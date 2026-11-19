@@ -331,6 +331,20 @@
             <button id="open-plugin-folder">打开插件文件夹</button>
             <button id="reload-plugins" class="primary">重载插件</button>
           </div>
+          <details id="plugin-schedule-panel">
+            <summary>定时任务时区</summary>
+            <form id="plugin-schedule-form" class="toolbar">
+              <label for="plugin-schedule-timezone">已保存的时区</label>
+              <select id="plugin-schedule-timezone" disabled></select>
+              <button id="plugin-schedule-save" type="submit" disabled>保存时区</button>
+            </form>
+            <p class="hint" id="plugin-schedule-status" role="status">打开设置以读取时区。</p>
+          </details>
+          <section id="tk-bridge-panel" aria-labelledby="tk-bridge-heading" hidden>
+            <h2 id="tk-bridge-heading">旧版 Tk 面板</h2>
+            <div id="tk-bridge-panels"></div>
+            <p class="hint" id="tk-bridge-error" role="status" hidden></p>
+          </section>
           <p class="hint">优先级数字越小越优先；仅影响事件分发顺序，不会改变插件加载顺序。</p>
           <p id="plugin-priority-error" class="hint danger" hidden></p>
           <div class="panel table-wrap">
@@ -346,6 +360,14 @@
         </section>
       </main>
     </div>
+    <dialog id="tk-bridge-dialog" aria-labelledby="tk-bridge-title" aria-describedby="tk-bridge-status">
+      <div class="dialog-title">
+        <h2 id="tk-bridge-title">旧版 Tk 面板</h2>
+        <button type="button" data-close="tk-bridge-dialog" aria-label="关闭">×</button>
+      </div>
+      <p class="hint" id="tk-bridge-status" role="status"></p>
+      <div id="tk-bridge-content"></div>
+    </dialog>
     <dialog id="account-info-dialog" aria-labelledby="account-info-title">
       <div class="dialog-title">
         <h2 id="account-info-title">账号信息</h2>

@@ -22,7 +22,11 @@ conf/webui_auth.json.lock
 conf/.webui-auth-*
 data/webui/
 conf/*.webui-backup
+conf/plugin_schedule.json
+conf/plugin_tk_bridge.json
+conf/plugin_tk_profiles.json
 tmp/
+/docs/
 
 .venv/
 .pytest_cache/

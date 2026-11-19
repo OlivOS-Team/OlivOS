@@ -253,6 +253,35 @@ def test_all_rest_routes(client, host):
         assert host.Proc_info.control_queue.get_nowait().action == action
 
 
+def test_plugin_schedule_rejects_invalid_zone_and_stale_revision(client, host):
+    route = '/api/plugins/schedule'
+    initial = client.get(route).json['settings']
+    rejected = client.put(route, json={'revision': initial['revision'], 'timezone': 'CST'})
+    assert rejected.status_code == 400
+    assert client.get(route).json['settings']['timezone'] == 'system'
+    assert client.put(route, json={'revision': initial['revision'], 'timezone': 'Europe/Berlin'}).status_code == 200
+    assert client.put(route, json={'revision': initial['revision'], 'timezone': 'UTC'}).status_code == 409
+    anonymous = host.app.test_client()
+    assert anonymous.put(route, json={'timezone': 'UTC'}).status_code == 401
+    assert client.get(route).json['settings']['timezone'] == 'Europe/Berlin'
+
+
+def test_plugin_schedule_only_changes_active_timezone_after_loader_report(client, host):
+    route = '/api/plugins/schedule'
+    initial = client.get(route).json['settings']
+    old_status = dict(initial, effective_timezone='Asia/Shanghai')
+    send(host, {'action': 'plugin_schedule_status', 'data': old_status})
+    saved = client.put(route, json={'revision': initial['revision'], 'timezone': 'Europe/Berlin'}).json
+    assert saved['settings']['timezone'] == 'Europe/Berlin'
+    assert saved['active'] == old_status
+    assert host.Proc_info.control_queue.empty()  # 保存不能发起重载。
+    new_status = dict(saved['settings'], effective_timezone='Europe/Berlin')
+    send(host, {'action': 'update_data', 'data': {'ready': True}})
+    assert client.get(route).json['active'] == old_status
+    send(host, {'action': 'plugin_schedule_status', 'data': new_status})
+    assert client.get(route).json['active'] == new_status
+
+
 def test_status_exposes_version_and_slogan(client, host):
     # 仪表盘版本卡要同时显示版本号与标识大版本的简称。
     status = client.get('/api/status').json
@@ -1281,6 +1310,105 @@ def live_host(host):
     host.on_terminate()
     thread.join(timeout=5)
     assert not thread.is_alive()
+
+
+def test_tk_bridge_uses_live_socket_not_forwarded_headers(live_host, monkeypatch):
+    bridge = live_host.tk_bridge
+    monkeypatch.setattr(serverAPI.tkBridgeAPI.platform, 'system', lambda: 'Windows')
+    bridge.update({'generation': 'g1', 'tk_ready': True, 'panels': [
+        {'namespace': 'fixture', 'event': 'settings', 'title': '只读设置'},
+    ]})
+    with live_host.lock:
+        token = live_host.new_browser_token()
+    headers = {'X-Auth-Token': token, 'X-Forwarded-For': '192.0.2.1'}
+    assert not live_host.app.test_client().get('/api/tk_bridge', headers=headers).json['panels'][0]['available']
+
+    async def scenario():
+        url = f"http://127.0.0.1:{live_host.config['port']}/api/tk_bridge"
+        async with aiohttp.ClientSession() as client:
+            async with client.get(url, headers=headers) as response:
+                assert response.status == 200 and (await response.json())['panels'][0]['available']
+            async with client.get(url) as response:
+                assert response.status == 401
+
+    asyncio.run(scenario())
+
+
+def test_tk_bridge_reports_invalid_profiles_without_overwriting_preferences(client, host):
+    from OlivOS.webUI.tkBridgeAPI import CONFIG
+
+    path = host.root / CONFIG
+    path.parent.mkdir(exist_ok=True)
+    config = '{"version":1,"plugins":{"fixture":{"settings":true}}}'
+    path.write_text(config, encoding='utf-8')
+    error = 'Tk 兼容描述无法读取，请先修复 conf/plugin_tk_profiles.json'
+    host.tk_bridge.update({'generation': 'g1', 'tk_ready': False, 'panels': [], 'profile_error': error})
+    state = client.get('/api/tk_bridge').json
+    assert state['error'] == error and state['revision']
+    assert not state['panels'][0]['available'] and state['panels'][0]['enabled']
+    assert path.read_text(encoding='utf-8') == config
+
+
+@pytest.mark.parametrize('end', ['logout', 'reload', 'shutdown', 'expiry'])
+def test_tk_bridge_inflight_open_cannot_survive_revocation(host, monkeypatch, end):
+    from concurrent.futures import ThreadPoolExecutor
+
+    route = '/api/tk_bridge'
+    fields = {'namespace': 'fixture', 'event': 'settings'}
+    address = ('127.0.0.1', 9090)
+    environ = {'olivos.tk_bridge.peer': address, 'olivos.tk_bridge.local': address}
+    bridge = host.tk_bridge
+    monkeypatch.setattr(serverAPI.tkBridgeAPI.platform, 'system', lambda: 'Windows')
+    bridge.listen([address])
+    metadata = {'generation': 'g1', 'tk_ready': True, 'panels': [dict(fields, title='只读设置')]}
+    bridge.update(metadata)
+    send(host, {'action': 'update_data', 'data': {'shallow_plugin_priority_dict': {}}})
+    with host.lock:
+        owner_headers = {'X-Auth-Token': host.new_browser_token()}
+        other_headers = {'X-Auth-Token': host.new_browser_token()}
+    client = host.app.test_client()
+    settings = client.get(route, headers=owner_headers, environ_overrides=environ).json
+    assert settings['generation'] == 'g1' and settings['panels'][0]['available']
+    put = client.put(route + '/config', headers=owner_headers, environ_overrides=environ,
+                     json=dict(fields, enabled=True, revision=settings['revision']))
+    assert put.status_code == 200 and not put.json['panels'][0]['applied']
+
+    def intent():
+        return host.Proc_info.control_queue.get(timeout=1).key['data']
+
+    def reply(data, **extra):
+        send(host, dict(data, action='tk_bridge_reply', code=None, **extra))
+
+    configure = intent()
+    assert configure['op'] == 'configure'
+    reply(configure)
+    with ThreadPoolExecutor() as pool:
+        pending = pool.submit(host.app.test_client().post, route, headers=owner_headers,
+                              environ_overrides=environ, json=dict(fields, op='open'))
+        opened = intent()
+        assert opened['op'] == 'open'
+        other = client.post(route, headers=other_headers, environ_overrides=environ,
+                            json=dict(fields, op='close', bridge_id=opened['bridge_id']))
+        assert other.status_code == 200 and host.Proc_info.control_queue.empty()
+        if end == 'logout':
+            assert client.post('/api/logout', headers=owner_headers, json={}).status_code == 200
+        elif end == 'reload':
+            send(host, {'action': 'update_data', 'data': {'ready': False}})
+        elif end == 'shutdown':
+            host.on_terminate()
+            bridge.update(metadata)
+        else:
+            monkeypatch.setattr(bridge, 'clock', lambda: opened['expires'] + 1)
+            bridge.maintain()
+        revoke = intent()
+        assert revoke['op'] == 'revoke' and revoke['bridge_id'] == opened['bridge_id']
+        reply(opened, snapshot={'revision': 'old', 'sections': []})
+        response = pending.result(timeout=1)
+        assert response.json['code'] == {
+            'logout': 'auth', 'reload': 'stale_generation', 'shutdown': 'stale_generation', 'expiry': 'panel_closed',
+        }[end]
+        assert 'snapshot' not in response.json
+        reply(revoke)
 
 
 def test_busy_port_advances_and_tray_uses_actual_port(host, monkeypatch):

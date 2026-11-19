@@ -39,7 +39,7 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import assetAPI, authAPI, localAPI, pageAPI, resourceAPI
+from . import assetAPI, authAPI, localAPI, pageAPI, resourceAPI, tkBridgeAPI
 BUFFER_LIMIT = 500
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
 PLUGIN_PAGE_CACHE = 10
@@ -91,6 +91,7 @@ class server(OlivOS.API.Proc_templet):
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
         self.lock = threading.RLock()
+        self.tk_bridge = tkBridgeAPI.WebBridge(self)
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
         # 配置写坏时退回默认值，避免 WebUI 连带整个实例启动失败
@@ -106,6 +107,7 @@ class server(OlivOS.API.Proc_templet):
         self.plugins = {}
         self.plugin_order = []
         self.plugin_priority = {}
+        self.plugin_schedule_status = None
         self.plugin_pages = []
         self.plugin_roots = {}
         self.plugin_webui_paths = {}
@@ -239,6 +241,7 @@ class server(OlivOS.API.Proc_templet):
             # 在锁内快照要撤销的连接：重置后新建的登录不会被误关。
             retired = list(self.sockets)
             self.sockets.clear()
+            self.tk_bridge.revoke()
         if retired and self.loop and self.loop.is_running():
             try:
                 # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。
@@ -355,10 +358,14 @@ class server(OlivOS.API.Proc_templet):
         elif action == 'update_data':
             update = data.get('data', {})
             with self.lock:
-                self.plugins = copy.deepcopy(update.get('shallow_plugin_data_dict', {}))
-                self.plugin_order = copy.deepcopy(update.get('shallow_plugin_order_list', []))
-                self.plugin_priority = copy.deepcopy(update.get('shallow_plugin_priority_dict', {}))
-                self.plugin_pages = copy.deepcopy(update.get('shallow_plugin_webui_list', []))
+                for field, attribute in (
+                    ('shallow_plugin_data_dict', 'plugins'),
+                    ('shallow_plugin_order_list', 'plugin_order'),
+                    ('shallow_plugin_priority_dict', 'plugin_priority'),
+                    ('shallow_plugin_webui_list', 'plugin_pages'),
+                ):
+                    if field in update:
+                        setattr(self, attribute, copy.deepcopy(update[field]))
                 roots = update.get('shallow_plugin_webui_roots', {})
                 if roots or update.get('ready'):
                     self.retired_plugin_roots.update(set(self.plugin_roots.values()) - set(roots.values()))
@@ -366,6 +373,10 @@ class server(OlivOS.API.Proc_templet):
                     self.plugin_roots = copy.deepcopy(roots)
                     self.plugin_webui_paths = copy.deepcopy(update.get('shallow_plugin_webui_paths', {}))
                     self.prune_plugin_cache()
+                if update.get('ready') is False and not update.get('priority_only'):
+                    self.tk_bridge.invalidate()
+                elif 'tk_bridge' in update:
+                    self.tk_bridge.update(update['tk_bridge'])
             self.publish('events', {'type': 'plugins', 'ready': update.get('ready', False),
                                     'priority_only': update.get('priority_only', False),
                                     'started_at': update.get('load_started', 0)})
@@ -406,6 +417,17 @@ class server(OlivOS.API.Proc_templet):
                 self.update_available = status == 'available'
             self.publish('events', {'type': 'update_check_result', 'status': status,
                                     'started_at': data.get('started_at', 0)})
+        elif action == 'plugin_schedule_status':
+            with self.lock:
+                self.plugin_schedule_status = data.get('data')
+            self.publish('events', {'type': 'plugin_schedule_status'})
+        elif action == 'plugin_schedule_lifecycle_rejected':
+            self.publish('events', dict(data.get('data', {}), type=action))
+        elif action == 'tk_bridge_status':
+            self.tk_bridge.update(data.get('data'))
+            self.publish('events', {'type': 'tk_bridge_status'})
+        elif action == 'tk_bridge_reply':
+            self.tk_bridge.receive(data)
         elif action == 'webui_reply' and self.session_valid(data.get('session')):
             self.publish('events', {'type': 'plugin_reply', 'namespace': data.get('namespace'),
                                     'request_id': data.get('request_id'), 'payload': data.get('payload'),
@@ -588,6 +610,9 @@ class server(OlivOS.API.Proc_templet):
                                  content_length=len(body), environ_base={'REMOTE_ADDR': request.remote or ''})
         try:
             environ = builder.get_environ()
+            if request.transport is not None:
+                environ['olivos.tk_bridge.local'] = request.transport.get_extra_info('sockname')
+                environ['olivos.tk_bridge.peer'] = request.transport.get_extra_info('peername')
             response = await asyncio.get_running_loop().run_in_executor(
                 None, lambda: Response.from_app(self.app, environ, buffered=True))
             try:
@@ -629,6 +654,7 @@ class server(OlivOS.API.Proc_templet):
                     if error.errno not in (errno.EADDRINUSE, 10048) or port == 65535:
                         raise
             self.config['port'] = runner.addresses[0][1]
+            self.tk_bridge.listen(runner.addresses)
             self.listen_path.parent.mkdir(parents=True, exist_ok=True)
             listener = {
                 'host': self.config['host'], 'port': self.config['port'], 'pid': os.getpid(),
@@ -648,6 +674,7 @@ class server(OlivOS.API.Proc_templet):
             self.ready.set()
             self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；"
                         f"认证文件：{self.config['auth_path']}")
+            next_bridge_maintenance = time.monotonic()
             while not self.stop_event.is_set():
                 for _ in range(256):
                     try:
@@ -655,8 +682,13 @@ class server(OlivOS.API.Proc_templet):
                     except (queue.Empty, AttributeError):
                         break
                     self.consume(packet)
+                now = time.monotonic()
+                if now >= next_bridge_maintenance:
+                    self.tk_bridge.maintain()
+                    next_bridge_maintenance = now + 0.25
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
+            self.tk_bridge.stop()
             if self.local_manager is not None:
                 self.local_manager.close()
                 await asyncio.to_thread(self.local_manager.worker.join, 4)
@@ -708,6 +740,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.stop_event.set()
+        self.tk_bridge.stop()
         if self.local_manager is not None:
             self.local_manager.close()
 

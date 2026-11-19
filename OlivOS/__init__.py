@@ -35,6 +35,7 @@ from .core.core import API
 from .core.core import accountAPI
 from .core.core import accountMetadataAPI
 from .core.core import diagnoseAPI
+from .core.core import scheduleAPI
 from .core.core import pluginAPI
 from .core.web import updateAPI
 from .core.web import webTool
