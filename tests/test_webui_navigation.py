@@ -415,16 +415,17 @@ def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser):
 
 
 @pytest.mark.browser
-def test_plugins_explain_missing_tk_profiles_without_offering_a_switch(browser):
-    with browser.host.lock:
-        browser.host.plugins['multi'][3] = [['原有设置', 'multi', 'settings']]
+@pytest.mark.parametrize('has_unavailable_panel', [False, True])
+def test_plugins_show_only_empty_state_when_no_tk_panel_is_available(browser, has_unavailable_panel):
+    if has_unavailable_panel:
+        browser.host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': False, 'panels': [
+            {'namespace': 'multi', 'event': 'settings', 'title': '原有设置'},
+        ]})
     browser.click('[data-page="plugins"]')
     browser.wait.until(lambda _: browser.find('#tk-bridge-empty').is_displayed())
-    assert '没有已审核的 Tk 面板' in browser.find('#tk-bridge-empty').text
+    assert browser.find('#tk-bridge-empty').text == '当前没有可转换的gui面板'
+    assert not browser.find('#tk-bridge-panel').is_displayed()
     assert not browser.driver.find_elements('css selector', '#tk-bridge-panels input')
-    browser.click('#plugin-rows tr:first-child td:last-child button')
-    assert '没有已审核的 Tk 兼容描述' in browser.find('#menu-tk-status').text
-    assert browser.find('#menu-items button').text == '原有设置'
 
 
 @pytest.mark.browser
@@ -470,6 +471,8 @@ def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, mo
         {'namespace': 'multi', 'event': 'read_only', 'title': '只读菜单'},
     ]})
     browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.find('#tk-bridge-panels input').is_enabled())
+    assert not browser.find('#tk-bridge-empty').is_displayed()
     browser.click('#tk-bridge-panels input')
     browser.click('#tk-bridge-panels button')
     browser.click('#tk-bridge-content section button')

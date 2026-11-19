@@ -1804,19 +1804,17 @@ function renderTkBridgeSettings() {
       failTkPreview(preview, panel?.reason || '面板已关闭，请重新打开。');
     }
   }
-  const error = $('tk-bridge-error');
-  $('tk-bridge-panel').hidden = !settings;
-  $('tk-bridge-empty').hidden = !settings || panels.length > 0 || Boolean(settings.error);
-  error.textContent = settings?.error || '';
-  error.hidden = !error.textContent;
-  $('tk-bridge-panels').replaceChildren(...panels.map((panel) => {
+  const availablePanels = panels.filter((panel) => panel.available);
+  $('tk-bridge-panel').hidden = !availablePanels.length;
+  $('tk-bridge-empty').hidden = !settings || availablePanels.length > 0;
+  $('tk-bridge-panels').replaceChildren(...availablePanels.map((panel) => {
     const row = element('div', null, { class: 'toolbar' });
     const toggle = element('input', null, { type: 'checkbox' });
     toggle.checked = panel.enabled;
-    toggle.disabled = !panel.available || !settings.revision;
+    toggle.disabled = !settings.revision;
     const label = element('label');
     label.append(toggle, ` ${panel.title} · ${panel.namespace}`);
-    const launch = panel.available && panel.enabled && panel.applied && !panel.closing
+    const launch = panel.enabled && panel.applied && !panel.closing
       ? button(`${panel.title} · Tk 兼容`, () => openTkPreview(panel)) : null;
     toggle.addEventListener('change', async () => {
       const sequence = ++state.tkBridgeRequest;
@@ -1839,10 +1837,9 @@ function renderTkBridgeSettings() {
     });
     row.append(label);
     if (launch) row.append(launch);
-    if (panel.closing || (panel.available && !panel.applied)) {
+    if (panel.closing || !panel.applied) {
       row.append(element('span', panel.closing || !panel.enabled ? '正在撤销…' : '应用中…', { class: 'hint' }));
     }
-    if (panel.reason) row.append(element('span', panel.reason, { class: 'hint' }));
     return row;
   }));
   renderTkMenuStatus(state.menuNamespace);
