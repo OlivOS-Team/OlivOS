@@ -6,15 +6,13 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   OlivOS/core/core/tkBridgeAPI.py
+@File      :   OlivOS/webUI/tkBridgeAPI.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
 @Copyright :   (C) 2020-2026, OlivOS-Team
-@Desc      :   Allowlisted, read-only projection of independent Tk windows
+@Desc      :   宿主只读 Tk 兼容桥的回环认证与传输。
 '''
-
-"""宿主只读 Tk 兼容桥的回环认证与传输。"""
 
 import hashlib
 import ipaddress
