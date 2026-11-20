@@ -800,15 +800,15 @@ class event_action(object):
             bot_hash = target_event.bot_info.hash
             control_queue = target_event.plugin_info['control_queue']
             if 0 == duration:
+                this_msg = api.unban_group_member()
+                this_msg.params.group_id = str(group_id)
+                this_msg.params.user_id = str(user_id)
+                this_msg.do_api(bot_hash, control_queue)
+            else:
                 this_msg = api.ban_group_member()
                 this_msg.params.group_id = str(group_id)
                 this_msg.params.user_id = str(user_id)
                 this_msg.params.duration = str(duration)
-                this_msg.do_api(bot_hash, control_queue)
-            else:
-                this_msg = api.unban_group_member()
-                this_msg.params.group_id = str(group_id)
-                this_msg.params.user_id = str(user_id)
                 this_msg.do_api(bot_hash, control_queue)
 
     def set_group_admin(target_event, group_id, user_id, enable):
