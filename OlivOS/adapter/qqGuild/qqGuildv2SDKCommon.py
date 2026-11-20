@@ -6102,8 +6102,8 @@ class event_action_common(object):
             res_data['data']['name'] = str(sdkSelfInfo[target_event.bot_info.hash]['username'])
             res_data['data']['id'] = str(sdkSelfInfo[target_event.bot_info.hash]['id'])
         else:
-            this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
             try:
+                this_msg = API.getMe(get_SDK_bot_info_from_Event(target_event))
                 this_msg.do_api('GET')
                 if this_msg.res is not None:
                     raw_obj = init_api_json(this_msg.res)
