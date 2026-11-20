@@ -1133,7 +1133,8 @@ class PARA_templet(object):
         return json.dumps(obj=PARA_tmp.__dict__)
 
     def copy(self):
-        copy_tmp = PARA_templet(self.type, self.data.copy())
+        tmp_data = self.data.copy() if self.data is not None else None
+        copy_tmp = PARA_templet(self.type, tmp_data)
         return copy_tmp
 
     def cut(self):
