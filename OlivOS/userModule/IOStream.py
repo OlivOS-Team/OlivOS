@@ -75,16 +75,17 @@ def IO_construct(
         group = str(self.data.host_id)
     if 'group_id' in self.data.__dict__:
         group = str(self.data.group_id)
+    os.makedirs("plugin/tmp/Input", exist_ok=True)
     data_path = 'plugin/tmp/Input/{}_input_log.pickle'.format(plugin_name)
     if not os.path.exists("plugin/tmp/Input"):  # 检验数据文件与目录是否存在
         os.mkdir("plugin/tmp/Input")
-    if not os.path.exists("plugin/tmp/Input/input_data"):
-        os.mkdir("plugin/tmp/Input/input_data")
+    cache_path = None
+    os.makedirs("plugin/tmp/Input/input_data", exist_ok=True)
     if not os.path.exists(data_path):
         init_data = {}
-        with open(data_path, "wb", encoding="utf-8") as file:
-            pickle.dump(init_data, file, indent=4, ensure_ascii=False)
-    with open(data_path, "rb", encoding='utf8') as f:  # 导入输入流缓存数据
+        with open(data_path, "wb") as file:
+            pickle.dump(init_data, file)
+    with open(data_path, "rb") as f:  # 导入输入流缓存数据
         input_log: dict = pickle.load(f)
     if input_log.get(platform, None) is None:  # 检查文件结构
         input_log[platform] = {}
@@ -143,9 +144,9 @@ def IO_construct(
             return
         if not os.path.exists(cache_path):
             init_data = {}
-            with open(cache_path, "wb", encoding="utf-8") as file:
-                pickle.dump(init_data, file, indent=4, ensure_ascii=False)
-        with open(cache_path, "rb", encoding='utf8') as f:  # 导入输入流变量缓存数据
+            with open(cache_path, "wb") as file:
+                pickle.dump(init_data, file)
+        with open(cache_path, "rb") as f:  # 导入输入流变量缓存数据
             input_cache_data: dict = pickle.load(f)
         if input_cache_data.get('input_history_data', None) is None:
             input_cache_data['input_history_data'] = []
@@ -171,10 +172,10 @@ def IO_construct(
             input_log_data['time'] = time.time()
             input_log_data['index'] = new_index
             input_log_data['cache_file_name'] = cache_file_name
-            with open(data_path, "wb", encoding='utf8') as f:
-                pickle.dump(input_log, f, indent=4, ensure_ascii=False)
-            with open(cache_path, "wb", encoding='utf8') as f:
-                pickle.dump(cache_data, f, indent=4, ensure_ascii=False)
+            with open(data_path, "wb") as f:
+                pickle.dump(input_log, f)
+            with open(cache_path, "wb") as f:
+                pickle.dump(cache_data, f)
             return
         # 新序列不合法，结束输入流，删除缓存数据
         if mode == 1 and group:         # 群，接收群内所有人的信息
@@ -186,9 +187,10 @@ def IO_construct(
                 input_log[platform]['private'][user_id] = {}
         elif mode == 3 and group:       # 群内User，接收群内指定用户信息，可理解为群聊接收
             input_log[platform]['group'][group][user_id] = {}
-        with open(data_path, "wb", encoding='utf8') as f:
-            pickle.dump(input_log, f, indent=4, ensure_ascii=False)
-        os.remove(cache_path)
+        with open(data_path, "wb") as f:
+            pickle.dump(input_log, f)
+        if cache_path is not None and os.path.exists(cache_path):
+            os.remove(cache_path)
         return
     else:       # 终止输入流并删除缓存
         if mode == 1 and group:         # 群，接收群内所有人的信息
@@ -200,7 +202,8 @@ def IO_construct(
                 input_log[platform]['private'][user_id] = {}
         elif mode == 3 and group:       # 群内User，接收群内指定用户信息，可理解为群聊接收
             input_log[platform]['group'][group][user_id] = {}
-        with open(data_path, "wb", encoding='utf8') as f:
-            pickle.dump(input_log, f, indent=4, ensure_ascii=False)
-        os.remove(cache_path)
+        with open(data_path, "wb") as f:
+            pickle.dump(input_log, f)
+        if cache_path is not None and os.path.exists(cache_path):
+            os.remove(cache_path)
         return
