@@ -70,6 +70,7 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
 | QQ 官方机器人发送重试 | `test_qqguildv2_send_retry.py` | 按错误码分档重试（长度/服务端异常最多重试三次，超时/5xx/429 不重试）、重试与拆段占用被动回复额度、长度降级为纯文本并按字节拆段、内联标签不被切断 |
+| QQ 官方机器人被动回复规则 | `test_qqguildv2_passive_rules.py` | 群消息 `msg_id` 私聊回复发送者（仅限发送者本人）、群内与单聊共用同一个次数上限、群主/管理员 50 次与普通成员 5 次、11253 兜底、60 分钟有效期 |
 | QQ 官方机器人群缓存 | `test_qqguildv2_store.py`, `test_qqguildv2_group_cache.py` | JSON 迁移幂等、跳过非法文件及无有效文件时保留目录、SQLite 淘汰、接口权限禁用及群级退避 |
 | QQ 官方机器人用户资料 | `test_qqguildv2_user_info.py` | 缓存优先、缺昵称才打获取用户基本信息、失败不编数据、头像自拼、群名片按群、40011033 未成年人模式按 miss、缺昵称回落稳定占位名 |
 | QQ 官方机器人自身 openid | `test_qqguildv2_self_openid.py` | 文件命中零请求、种子群切换、权限禁用与事件字段兼容 |

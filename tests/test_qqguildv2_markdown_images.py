@@ -265,6 +265,7 @@ def test_remote_markdown_image_download_stops_at_size_limit(monkeypatch):
     response.close.assert_called_once()
     assert request.call_args.kwargs['stream'] is True
     assert request.call_args.kwargs['allow_redirects'] is False
+    assert request.call_args.kwargs['timeout'] == (5.0, 60.0)
 
 
 def test_mixed_markdown_with_reply_falls_back_to_plain_message(monkeypatch):

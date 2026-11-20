@@ -33,7 +33,7 @@ from flask import abort, g, jsonify, request, send_file, send_from_directory
 
 import OlivOS
 
-from . import resourceAPI
+from . import resourceAPI, tkBridgeAPI
 
 MASK = '********'
 # 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
@@ -639,7 +639,9 @@ def register_routes(host):
         body = request.get_json(silent=True) or {}
         with host.lock:
             host.sessions.pop(body.get('session'), None)
-            host.browser_tokens.pop(host.credential_key(request.headers.get('X-Auth-Token', '')), None)
+            owner = host.credential_key(request.headers.get('X-Auth-Token', ''))
+            host.browser_tokens.pop(owner, None)
+            host.tk_bridge.revoke(owner)
         response = jsonify(ok=True)
         response.delete_cookie(cookie_name(), path='/plugin/')
         return response
@@ -730,6 +732,32 @@ def register_routes(host):
             }
         return jsonify(payload)
 
+    @app.get('/api/plugins/schedule')
+    def plugin_schedule():
+        settings = OlivOS.scheduleAPI.read_settings(host.root)
+        with host.lock:
+            active = host.plugin_schedule_status
+        return jsonify(settings=settings, active=active, choices=OlivOS.scheduleAPI.timezone_choices())
+
+    @app.put('/api/plugins/schedule')
+    def save_plugin_schedule():
+        body = request.get_json()
+        if not isinstance(body, dict) or not isinstance(body.get('revision'), str):
+            raise ValueError('提交前请读取定时任务时区设置')
+        with host.lock:
+            if g.webui_auth_revision != host.credentials['revision']:
+                abort(401)
+            try:
+                settings = OlivOS.scheduleAPI.save_settings(host.root, body.get('timezone'), body['revision'])
+            except OlivOS.scheduleAPI.ScheduleConflict as error:
+                return jsonify(error=str(error)), 409
+            except OSError:
+                return jsonify(error='定时任务时区保存失败，请检查文件权限和磁盘空间'), 500
+            active = host.plugin_schedule_status
+        return jsonify(settings=settings, active=active, choices=OlivOS.scheduleAPI.timezone_choices())
+
+    tkBridgeAPI.register_routes(host)
+
     @app.put('/api/plugins/priority')
     def plugin_priority():
         body = request.get_json()
@@ -783,7 +811,7 @@ def register_routes(host):
     @app.post('/api/plugins/reload')
     def reload_plugins():
         started_at = time.time()
-        host.send_control('restart_send', 'plugin')
+        host.send_control('restart_send', {'type': 'plugin', 'started_at': started_at})
         return jsonify(ok=True, started_at=started_at), 202
 
     @app.post('/api/plugin_event')

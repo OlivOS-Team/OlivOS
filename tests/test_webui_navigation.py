@@ -174,7 +174,7 @@ def browser(navigation_host, tmp_path):
         driver.quit()
 
 
-def set_viewport(browser, width, height):
+def set_viewport(browser, width, height, *, mobile_device=False):
     """切换视口，并等侧边栏完成移动端/桌面端模式同步。
 
     matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
@@ -183,7 +183,7 @@ def set_viewport(browser, width, height):
     driver = browser.driver
     mobile = width <= 800
     driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False})
+        'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': mobile_device})
     browser.wait.until(lambda _: driver.execute_script(
         '''
         const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
@@ -222,6 +222,39 @@ def test_secret_visibility_toggle_preserves_value_and_does_not_submit(browser, f
         }, 0);
     """)
     assert result == ['password', 'text', 'password', 'fixture-secret', 'button', True]
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('page', ['login', 'accounts'])
+def test_password_eye_icon_matches_next_action(browser, page):
+    if page == 'login':
+        browser.click('#logout')
+        field = '#token'
+        form = '#login-form'
+    else:
+        browser.click('[data-page="accounts"]')
+        browser.click('#add-account')
+        field = '#account-form [data-field="password"]'
+        form = '#account-dialog'
+        if browser.driver.find_elements('css selector', '#account-extra-fields [data-field="password"]'):
+            browser.click('#account-form details summary')
+
+    browser.type_text(field, 'fixture-password')
+    toggle = f'{field} + .secret-toggle'
+
+    def check(input_type, action, svg_element):
+        assert browser.find(form).is_displayed()
+        secret = browser.find(field)
+        assert secret.get_attribute('type') == input_type and secret.get_attribute('value') == 'fixture-password'
+        assert browser.find(toggle).get_attribute('aria-label') == action
+        assert browser.find(toggle).get_attribute('title') == action
+        assert browser.find(f'{toggle} svg > {svg_element}:last-child').is_displayed()
+
+    check('password', '显示内容', 'circle')
+    browser.click(toggle)
+    check('text', '隐藏内容', 'path')
+    browser.click(toggle)
+    check('password', '显示内容', 'circle')
 
 
 @pytest.mark.browser
@@ -367,6 +400,157 @@ def test_reload_action_hides_open_page_before_ready(browser):
     browser.driver.switch_to.frame(browser.driver.execute_script('return state.frame'))
     browser.wait.until(lambda _: browser.driver.execute_script('return !!window.pageIdentity'))
     assert browser.driver.execute_script('return window.pageIdentity') != identity
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('phone_width', [None, 320, 390])
+def test_schedule_timezone_browser_keeps_saved_and_active_separate(browser, phone_width):
+    from selenium.webdriver.common.keys import Keys
+
+    def report(zone):
+        saved = OlivOS.scheduleAPI.read_settings(browser.host.root)
+        packet = OlivOS.API.Control.packet('send', {
+            'data': {'action': 'plugin_schedule_status', 'data': dict(saved, effective_timezone=zone)},
+        })
+        browser.host.Proc_info.rx_queue.put(packet)
+
+    report('Asia/Shanghai')
+    if phone_width:
+        set_viewport(browser, phone_width, 640, mobile_device=True)
+        browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: '当前生效：上海（Asia/Shanghai）' in browser.find('#plugin-schedule-status').text)
+    dropdown = '#plugin-schedule-timezone'
+    assert browser.find(dropdown).get_attribute('value') == 'system'
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
+            const save = document.getElementById('plugin-schedule-save').getBoundingClientRect();
+            return innerWidth === arguments[0] && document.documentElement.scrollWidth <= innerWidth &&
+                zone.height >= 44 && save.height >= 44 && save.right <= innerWidth &&
+                zone.right <= save.left && Math.abs(zone.top - save.top) < 4;
+        ''', phone_width)
+    else:
+        assert browser.driver.execute_script('''
+            const reload = document.getElementById('reload-plugins').getBoundingClientRect();
+            const zone = document.getElementById('plugin-schedule-timezone').getBoundingClientRect();
+            return zone.left > reload.right && Math.abs(zone.top - reload.top) < 4;
+        ''')
+    browser.click(dropdown)
+    search = browser.find('.select-menu input[type="search"]')
+    assert search == browser.driver.switch_to.active_element
+    search.send_keys('上海')
+    active = '.select-menu-option[data-active="true"]'
+    assert browser.find(f'{active} .select-menu-option-detail').text == 'Asia/Shanghai'
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('柏林')
+    assert browser.find(f'{active} .select-menu-option-label').text == '柏林'
+    assert browser.find(f'{active} .select-menu-option-detail').text == 'Europe/Berlin'
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const menu = document.querySelector('.select-menu').getBoundingClientRect();
+            return menu.left >= 0 && menu.right <= innerWidth && menu.top >= 0 && menu.bottom <= innerHeight;
+        ''')
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('NoSuchCity')
+    assert browser.find('.select-menu-empty').is_displayed()
+    search.send_keys(Keys.CONTROL, 'a')
+    search.send_keys('europe/berlin')
+    if phone_width:
+        browser.click(active)
+    else:
+        search.send_keys(Keys.ENTER)
+    assert browser.find(dropdown).get_attribute('value') == 'Europe/Berlin'
+    browser.click('#plugin-schedule-save')
+    browser.wait.until(lambda _: '重载插件后生效' in browser.find('#plugin-schedule-status').text)
+    assert '当前生效：上海（Asia/Shanghai）' in browser.find('#plugin-schedule-status').text
+    assert OlivOS.scheduleAPI.read_settings(browser.host.root)['timezone'] == 'Europe/Berlin'
+    report('Europe/Berlin')
+    browser.wait.until(lambda _: browser.find('#plugin-schedule-status').text == '当前生效：柏林（Europe/Berlin）')
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('has_unavailable_panel', [False, True])
+def test_plugins_show_only_empty_state_when_no_tk_panel_is_available(browser, has_unavailable_panel):
+    if has_unavailable_panel:
+        browser.host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': False, 'panels': [
+            {'namespace': 'multi', 'event': 'settings', 'title': '原有设置'},
+        ]})
+        set_viewport(browser, 320, 640, mobile_device=True)
+        browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.find('#tk-bridge-empty').is_displayed())
+    assert browser.find('#tk-bridge-empty').text == '当前没有可转换成 WebUI 的 GUI 面板'
+    assert not browser.find('#tk-bridge-panel').is_displayed()
+    assert not browser.driver.find_elements('css selector', '#tk-bridge-panels input')
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('phone_width', [None, 320])
+def test_tk_bridge_paginates_only_target_table_and_waits_for_release(browser, monkeypatch, phone_width):
+    from OlivOS.webUI import tkBridgeAPI
+
+    host = browser.host
+    monkeypatch.setattr(tkBridgeAPI.platform, 'system', lambda: 'Windows')
+    send = host.send_control
+    revokes = queue.Queue()
+
+    def reply(data, **fields):
+        host.Proc_info.rx_queue.put(OlivOS.API.Control.packet('send', {
+            'data': dict(data, action='tk_bridge_reply', code=None, **fields),
+        }))
+
+    def section(text, **fields):
+        return dict(id='table', group='列表', type='table', columns=['条目'],
+                    rows=[{'id': 'row', 'cells': [text]}], **fields)
+
+    def control(action, key):
+        data = key.get('data', {})
+        if data.get('action') != 'tk_bridge_request':
+            return send(action, key)
+        match data['op']:
+            case 'open':
+                reply(data, snapshot={'revision': 'first', 'sections': [
+                    {'id': 'summary', 'group': '<概况>', 'type': 'label', 'text': '原始概况'},
+                    section('第一页', next_cursor='next'),
+                ]})
+            case 'read' if data.get('cursor') == 'next':
+                assert data['section_id'] == 'table'
+                reply(data, snapshot={'revision': 'second', 'sections': [section('第二页')]})
+            case 'read':
+                reply(data, unchanged=True)
+            case 'revoke':
+                revokes.put(data)
+            case _:
+                reply(data)
+
+    monkeypatch.setattr(host, 'send_control', control)
+    host.tk_bridge.update({'generation': 'test-generation', 'tk_ready': True, 'panels': [
+        {'namespace': 'multi', 'event': 'read_only', 'title': '只读菜单'},
+    ]})
+    if phone_width:
+        set_viewport(browser, phone_width, 640, mobile_device=True)
+        browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.find('#tk-bridge-panels input').is_enabled())
+    assert browser.find('#tk-bridge-heading').text == '可转换为 WebUI 的 GUI 面板'
+    assert not browser.find('#tk-bridge-empty').is_displayed()
+    browser.click('#tk-bridge-panels input')
+    browser.click('#tk-bridge-panels button')
+    if phone_width:
+        assert browser.driver.execute_script('''
+            const dialog = document.getElementById('tk-bridge-dialog').getBoundingClientRect();
+            return innerWidth === arguments[0] && dialog.left >= 0 && dialog.right <= innerWidth;
+        ''', phone_width)
+    browser.click('#tk-bridge-content section button')
+    browser.wait.until(lambda _: '第二页' in browser.find('#tk-bridge-content').text)
+    preview = browser.find('#tk-bridge-content').text
+    assert '<概况>' in preview and '原始概况' in preview and '第一页' not in preview
+    browser.click('[data-close="tk-bridge-dialog"]')
+    revoke = revokes.get(timeout=2)
+    browser.wait.until(lambda _: '正在撤销' in browser.find('#tk-bridge-panels').text)
+    reply(revoke)
+    browser.wait.until(lambda _: '只读菜单 · Tk 兼容' in browser.find('#tk-bridge-panels').text)
 
 
 @pytest.mark.browser

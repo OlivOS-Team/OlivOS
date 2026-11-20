@@ -70,6 +70,7 @@ class Entity(object):
         account_bot_info_dict = {}
         plugin_bot_info_dict = {}
         logger_proc = None
+        schedule_status_packet = None
 
         preLoadPrint('OlivOS - Witness Union')
         # 仅在整个实例启动时清理；插件重载由 WebUI 切换挂载后回收旧快照。
@@ -245,6 +246,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 ]
                             gLoggerProc = Proc_dict[basic_conf_models_this['name']]
                         elif basic_conf_models_this['type'] == 'plugin':
+                            if basic_conf_models_this['name'] in Proc_dict:
+                                continue
                             proc_plugin_func_dict = {}
                             tmp_tx_queue_list = []
                             for tmp_tx_queue_list_this in basic_conf_models_this['tx_queue']:
@@ -967,6 +970,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     runtime=Proc_dict
                                 )
                                 Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('threading')
+                                if schedule_status_packet is not None:
+                                    Proc_dict[model_name].Proc_info.rx_queue.put(schedule_status_packet, block=False)
                         elif basic_conf_models_this['type'] == 'nativeWinUI' and not webui_only:
                             if platform.system() == 'Windows':
                                 if basic_conf_models_this['name'] not in Proc_dict:
@@ -1081,39 +1086,56 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                         elif basic_conf_models_this['type'] == 'update_get':
                             threading.Thread(
                                 target=update_get_func,
-                                args=(Proc_dict, basic_conf_models, basic_conf_models_this)
+                                args=(Proc_dict, basic_conf_models_this, main_control.control_queue)
                             ).start()
                         elif basic_conf_models_this['type'] == 'update_replace':
+                            exe_name = OlivOS.updateAPI.get_exe_name() if platform.system() == 'Windows' else None
+                            if exe_name is None or not os.path.isfile(os.path.join('resource', exe_name)):
+                                continue
+                            plugin_proc = next(
+                                (proc for proc in Proc_dict.values() if proc.Proc_type == 'plugin'), None)
+                            if plugin_proc is not None:
+                                request_plugin_lifecycle(plugin_proc, 'update_hit')
+                                continue
                             OlivOS.updateAPI.OlivOSUpdateReplace(
                                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
                             )
-                elif rx_packet_data.action == 'restart_do':
-                    # 重载链路：restart_send 投 restart_do → 这里弹出组件 → 异步 init_type 重建。
-                    # 真空期内重复到达的请求按空操作处理，不能裸取字典（会抛 KeyError 终结主控制循环）。
-                    proc_this = get_proc_for_restart(Proc_dict, rx_packet_data.key)
-                    proc_proc_this = Proc_Proc_dict.get(rx_packet_data.key)
-                    if proc_this is None or proc_proc_this is None:
-                        logG(4, OlivOS.L10NAPI.getTrans(
-                            '组件 [{0}] 不在运行中，已忽略重复的重载请求',
-                            [rx_packet_data.key],
-                            modelName
-                        ))
-                    else:
-                        Proc_type_this = proc_this.Proc_type
-                        time.sleep(proc_this.Proc_info.dead_interval)
-                        detach_proc_registration(proc_this)
-                        proc_proc_this.terminate()
-                        proc_proc_this.join()
-                        Proc_dict.pop(rx_packet_data.key, None)
-                        Proc_Proc_dict.pop(rx_packet_data.key, None)
-                        main_control.control_queue.put(
-                            OlivOS.API.Control.packet('init_type', Proc_type_this),
-                            block=False
-                        )
+                elif rx_packet_data.action in ('restart_do', 'plugin_lifecycle_complete'):
+                    request = rx_packet_data.key
+                    if isinstance(request, dict):
+                        operation = complete_plugin_lifecycle(rx_packet_data, Proc_dict, Proc_Proc_dict)
+                        if operation == 'restart':
+                            main_control.control_queue.put(main_control.packet('init', request['name']), block=False)
+                        elif operation == 'update':
+                            main_control.control_queue.put(
+                                main_control.packet('init_type', 'update_replace'), block=False)
+                        if (operation is not None and schedule_status_packet is not None
+                                and schedule_status_packet.key['schedule_source']['name'] == request['name']):
+                            schedule_status_packet = None
+                            _send_schedule_status(Proc_dict)
+                    elif rx_packet_data.action == 'restart_do':
+                        proc_this = get_proc_for_restart(Proc_dict, request)
+                        if proc_this is None or request not in Proc_Proc_dict:
+                            logG(4, f'组件 [{request}] 不在运行中，已忽略重载请求')
+                        elif proc_this.Proc_type == 'plugin':
+                            request_plugin_lifecycle(proc_this, 'restart_do')
+                        else:
+                            time.sleep(proc_this.Proc_info.dead_interval)
+                            stop_component(request, Proc_dict, Proc_Proc_dict)
+                            main_control.control_queue.put(main_control.packet('init_type', proc_this.Proc_type),
+                                                           block=False)
+                elif rx_packet_data.action == 'plugin_lifecycle_rejected':
+                    request = rx_packet_data.key
+                    proc_this = Proc_dict.get(request['name'])
+                    if request['generation'] == getattr(proc_this, 'schedule_generation', None):
+                        logG(3, f'组件 [{request["name"]}] 取消 {request["operation"]}: {request["reason"]}')
                 elif rx_packet_data.action == 'restart_send':
+                    request = rx_packet_data.key
+                    proc_type = request.get('type') if isinstance(request, dict) else request
+                    started_at = request.get('started_at') if isinstance(request, dict) else None
                     for tmp_Proc_name in basic_conf_models:
                         basic_conf_models_this = basic_conf_models[tmp_Proc_name]
-                        if basic_conf_models_this['type'] == rx_packet_data.key:
+                        if basic_conf_models_this['type'] == proc_type:
                             proc_this = get_proc_for_restart(Proc_dict, basic_conf_models_this['name'])
                             if proc_this is None:
                                 # WebUI 按钮与原生托盘菜单发同一个包，连点两下就会打在
@@ -1124,11 +1146,19 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     modelName
                                 ))
                                 continue
-                            proc_this.Proc_info.rx_queue.put(
-                                OlivOS.API.Control.packet('restart_do', basic_conf_models_this['name']),
-                                block=False
-                            )
+                            if proc_this.Proc_type == 'plugin':
+                                request_plugin_lifecycle(proc_this, 'restart_do', started_at)
+                            else:
+                                proc_this.Proc_info.rx_queue.put(
+                                    main_control.packet('restart_do', proc_this.Proc_name), block=False)
                 elif rx_packet_data.action == 'send':
+                    if (isinstance(rx_packet_data.key, dict)
+                            and rx_packet_data.key.get('target', {}).get('type') == 'webUI'
+                            and rx_packet_data.key.get('data', {}).get('action') == 'plugin_schedule_status'):
+                        if _current_schedule_source(rx_packet_data, Proc_dict):
+                            schedule_status_packet = rx_packet_data
+                            _send_schedule_status(Proc_dict, rx_packet_data)
+                        continue
                     OlivOS.webUI.serverAPI.forward_packet(rx_packet_data, Proc_dict)
                     if type(rx_packet_data.key) is dict:
                         if 'target' in rx_packet_data.key:
@@ -1324,46 +1354,23 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                             ],
                                 modelName
                             ))
-                elif rx_packet_data.action == 'stop_type':
-                    list_stop = []
-                    for tmp_Proc_name in Proc_Proc_dict:
-                        try:
-                            if (
-                                tmp_Proc_name in Proc_dict
-                                and rx_packet_data.key == Proc_dict[tmp_Proc_name].Proc_type
-                            ):
-                                detach_proc_registration(Proc_dict[tmp_Proc_name])
-                                Proc_Proc_dict[tmp_Proc_name].terminate()
-                                Proc_Proc_dict[tmp_Proc_name].join()
-                                list_stop.append(tmp_Proc_name)
-                                logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
-                                    tmp_Proc_name
-                                ],
-                                    modelName
-                                ))
-                        except Exception:
-                            traceback.print_exc()
-                    for tmp_Proc_name in list_stop:
-                        Proc_dict.pop(tmp_Proc_name)
-                        Proc_Proc_dict.pop(tmp_Proc_name)
-                elif rx_packet_data.action == 'stop':
-                    tmp_Proc_name = rx_packet_data.key
-                    try:
-                        if tmp_Proc_name in Proc_Proc_dict:
-                            if tmp_Proc_name in Proc_dict:
-                                detach_proc_registration(Proc_dict[tmp_Proc_name])
-                            Proc_Proc_dict[tmp_Proc_name].terminate()
-                            Proc_Proc_dict[tmp_Proc_name].join()
-                            logG(1, OlivOS.L10NAPI.getTrans('OlivOS model [{0}] will stop', [
-                                tmp_Proc_name
-                            ],
-                                modelName
-                            ))
-                            Proc_Proc_dict.pop(tmp_Proc_name)
-                        if tmp_Proc_name in Proc_dict:
-                            Proc_dict.pop(tmp_Proc_name)
-                    except Exception:
-                        traceback.print_exc()
+                elif rx_packet_data.action in ('stop_type', 'stop', 'stop_type_force', 'stop_force'):
+                    action = rx_packet_data.action
+                    if action.startswith('stop_type'):
+                        names = [name for name, proc in Proc_dict.items() if proc.Proc_type == rx_packet_data.key]
+                    else:
+                        names = [rx_packet_data.key]
+                    for name in names:
+                        proc = Proc_dict.get(name)
+                        if getattr(proc, 'Proc_type', None) == 'plugin' and not action.endswith('_force'):
+                            request_plugin_lifecycle(proc, 'plugin_stop')
+                        else:
+                            stop_component(name, Proc_dict, Proc_Proc_dict)
+                            logG(1, f'OlivOS model [{name}] will stop')
+                            if (getattr(proc, 'Proc_type', None) == 'plugin' and schedule_status_packet is not None
+                                    and schedule_status_packet.key['schedule_source']['name'] == name):
+                                schedule_status_packet = None
+                                _send_schedule_status(Proc_dict)
                 elif rx_packet_data.action == 'exit_total':
                     killMain()
                 bootMonitor(varDict=locals())
@@ -1429,23 +1436,12 @@ def patch_config_by_path(basic_conf: dict, patch_conf: dict, path: list):
                     basic_conf_this[conf_key] = patch_conf_this[conf_key]
 
 
-def update_get_func(
-        Proc_dict,
-        basic_conf_models,
-        basic_conf_models_this
-):
+def update_get_func(Proc_dict, basic_conf_models_this, control_queue):
     tmp_model_this_res = OlivOS.updateAPI.OlivOSUpdateGet(
         logger_proc=Proc_dict[basic_conf_models_this['logger_proc']]
     )
     if tmp_model_this_res:
-        for tmp_Proc_name in basic_conf_models:
-            basic_conf_models_this = basic_conf_models[tmp_Proc_name]
-            if basic_conf_models_this['type'] == 'plugin':
-                if Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue is not None:
-                    Proc_dict[basic_conf_models_this['name']].Proc_info.rx_queue.put(
-                        OlivOS.API.Control.packet('update_hit', basic_conf_models_this['name']),
-                        block=False
-                    )
+        control_queue.put(OlivOS.API.Control.packet('init_type', 'update_replace'), block=False)
 
 
 # 进程监控
@@ -1546,6 +1542,61 @@ def get_proc_for_restart(Proc_dict, proc_name):
     if proc_this.Proc_info.rx_queue is None:
         return None
     return proc_this
+
+
+def _current_schedule_source(packet, proc_dict):
+    source = packet.key.get('schedule_source')
+    if not isinstance(source, dict):
+        return False
+    name, generation = source.get('name'), source.get('generation')
+    if not isinstance(name, str) or not isinstance(generation, str):
+        return False
+    proc = proc_dict.get(name)
+    return getattr(proc, 'Proc_type', None) == 'plugin' and generation == proc.schedule_generation
+
+
+def _send_schedule_status(proc_dict, packet=None):
+    if packet is None:
+        packet = OlivOS.API.Control.packet('send', {
+            'target': {'type': 'webUI'},
+            'data': {'action': 'plugin_schedule_status', 'data': None},
+        })
+    # 清除包与状态包走同一队列，避免终止后再应用排队的旧状态。
+    for proc in proc_dict.values():
+        if proc.Proc_type == 'webUI' and proc.Proc_info.rx_queue is not None:
+            proc.Proc_info.rx_queue.put(packet, block=False)
+
+
+def request_plugin_lifecycle(proc, action, started_at=None):
+    if proc.Proc_info.rx_queue is not None:
+        proc.Proc_info.rx_queue.put(OlivOS.API.Control.packet(action, {
+            'generation': proc.schedule_generation, 'started_at': started_at,
+        }), block=False)
+
+
+def complete_plugin_lifecycle(packet, proc_dict, process_dict):
+    request = packet.key
+    name = request.get('name')
+    proc = proc_dict.get(name)
+    operation = request.get('operation')
+    permitted = ('restart',) if packet.action == 'restart_do' else ('stop', 'update')
+    if (operation not in permitted or name not in process_dict or getattr(proc, 'Proc_type', None) != 'plugin'
+            or request.get('generation') != proc.schedule_generation):
+        return None
+    stop_component(name, proc_dict, process_dict)
+    return operation
+
+
+def stop_component(name, proc_dict, process_dict):
+    proc = proc_dict.get(name)
+    process = process_dict.get(name)
+    if proc is not None:
+        detach_proc_registration(proc)
+    if process is not None:
+        process.terminate()
+        process.join()
+    proc_dict.pop(name, None)
+    process_dict.pop(name, None)
 
 
 # 日志工具

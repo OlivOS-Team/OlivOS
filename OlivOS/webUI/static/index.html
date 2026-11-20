@@ -15,6 +15,7 @@
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
     <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/timezone-cities-zh.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -326,11 +327,24 @@
           </div>
         </section>
         <section id="plugins" class="page" hidden>
-          <div class="toolbar">
+          <div class="toolbar plugin-toolbar">
             <button id="toggle-path">显示路径</button>
             <button id="open-plugin-folder">打开插件文件夹</button>
             <button id="reload-plugins" class="primary">重载插件</button>
+            <form id="plugin-schedule-form" class="plugin-schedule-form">
+              <label for="plugin-schedule-timezone">定时任务时区</label>
+              <select id="plugin-schedule-timezone" data-searchable aria-describedby="plugin-schedule-status" disabled>
+                <option>正在读取…</option>
+              </select>
+              <button id="plugin-schedule-save" type="submit" disabled>保存时区</button>
+            </form>
           </div>
+          <p class="hint plugin-schedule-status" id="plugin-schedule-status" role="status">正在读取时区设置…</p>
+          <section id="tk-bridge-panel" aria-labelledby="tk-bridge-heading" hidden>
+            <h2 id="tk-bridge-heading">可转换为 WebUI 的 GUI 面板</h2>
+            <div id="tk-bridge-panels"></div>
+          </section>
+          <p class="hint" id="tk-bridge-empty" hidden>当前没有可转换成 WebUI 的 GUI 面板</p>
           <p class="hint">优先级数字越小越优先；仅影响事件分发顺序，不会改变插件加载顺序。</p>
           <p id="plugin-priority-error" class="hint danger" hidden></p>
           <div class="panel table-wrap">
@@ -346,6 +360,14 @@
         </section>
       </main>
     </div>
+    <dialog id="tk-bridge-dialog" aria-labelledby="tk-bridge-title" aria-describedby="tk-bridge-status">
+      <div class="dialog-title">
+        <h2 id="tk-bridge-title">可转换为 WebUI 的 GUI 面板</h2>
+        <button type="button" data-close="tk-bridge-dialog" aria-label="关闭">×</button>
+      </div>
+      <p class="hint" id="tk-bridge-status" role="status"></p>
+      <div id="tk-bridge-content"></div>
+    </dialog>
     <dialog id="account-info-dialog" aria-labelledby="account-info-title">
       <div class="dialog-title">
         <h2 id="account-info-title">账号信息</h2>
@@ -418,6 +440,7 @@
         <dd id="menu-info"></dd>
       </dl>
       <div id="menu-items"></div>
+      <p class="hint" id="menu-tk-status" hidden></p>
     </dialog>
     <dialog id="qr-dialog">
       <div class="dialog-title">

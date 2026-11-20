@@ -46,6 +46,11 @@ dependencies = [
     "grpcio; sys_platform != 'win32' or platform_machine != 'ARM64'",
     "grpcio-tools; sys_platform != 'win32' or platform_machine != 'ARM64'",
     "protobuf",
+    "APScheduler==3.10.1",
+    "setuptools<82",  # APScheduler 3.10.1 运行时会导入 pkg_resources。
+    "pytz>=2024.1",
+    "tzlocal>=4.3.1,<6",
+    "tzdata",
 ]
 
 # 可选依赖组
@@ -113,7 +118,6 @@ extend = [
     "lxml",
     "pyyaml",
     "openpyxl",
-    "APScheduler==3.10.1",
     "js2py",
     "certifi",
     "httpx",

@@ -802,6 +802,26 @@ nav h2 {
 .select-menu.is-scrollable {
   overflow-y: auto;
 }
+.select-menu-searchable {
+  overflow: hidden;
+}
+.select-menu-searchable input {
+  flex: 0 0 auto;
+}
+.select-menu-list {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.select-menu-empty {
+  margin: 8px;
+  color: var(--muted);
+}
+.select-menu-option[hidden],
+.select-menu-group[hidden] {
+  display: none;
+}
 .select-menu.opens-above {
   transform-origin: bottom center;
   animation-name: select-menu-in-up;
@@ -826,6 +846,14 @@ nav h2 {
 }
 .select-menu-option-label {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.select-menu-option-detail {
+  margin-inline-start: auto;
+  padding-inline-start: 12px;
+  color: var(--muted);
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1139,6 +1167,29 @@ header h1 {
   gap: 12px;
   margin-bottom: 16px;
 }
+.plugin-toolbar {
+  margin-bottom: 6px;
+}
+.plugin-schedule-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  max-width: 100%;
+}
+.plugin-schedule-form .select-shell {
+  width: 11em;
+  max-width: 100%;
+}
+.plugin-schedule-form .select-shell > select {
+  width: 100%;
+  min-width: 0;
+}
+.plugin-schedule-status {
+  margin: 0 0 16px;
+  text-align: end;
+}
 .toolbar label:not(.check) {
   flex-direction: row;
   align-items: center;
@@ -1427,6 +1478,12 @@ dialog {
 dialog::backdrop {
   background: #0006;
 }
+#tk-bridge-content {
+  overflow-wrap: anywhere;
+}
+#tk-bridge-content pre {
+  white-space: pre-wrap;
+}
 .dialog-title button {
   display: grid;
   width: var(--control-height);
@@ -1708,6 +1765,19 @@ dialog::backdrop {
   }
   .toolbar {
     gap: 8px;
+  }
+  .plugin-schedule-form {
+    width: 100%;
+  }
+  .plugin-schedule-form label {
+    flex-basis: 100%;
+  }
+  .plugin-schedule-form .select-shell {
+    flex: 1;
+    min-width: 0;
+  }
+  .plugin-schedule-status {
+    text-align: start;
   }
   th,
   td {

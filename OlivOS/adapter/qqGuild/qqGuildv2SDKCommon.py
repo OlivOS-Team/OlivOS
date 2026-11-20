@@ -117,11 +117,21 @@ sdkTokenInfo = {}
 sdkTokenRefreshAhead = 60.0  # token 提前刷新窗口(秒),文档:过期前 60s 内可换新,旧 token 仍有效
 sdkMsgidinfo = {}
 sdkMsgidinfoLock = threading.Lock()
-sdkMsgidinfoTTL = 300.0
-sdkMsgidinfoMaxSize = 10000
+# 2026-11-17 起群聊被动回复有效期由 5 分钟延长至 60 分钟，本地 msg_seq 窗口要跟着
+# 对齐：提前过期会让同一个 msg_id 从 seq=1 重新计数，被平台按重复消息拒掉。
+# 窗口拉长后同一时刻在册的 msg_id 多了一个量级，容量同步放大。
+sdkMsgidinfoTTL = 3600.0
+sdkMsgidinfoMaxSize = 20000
 sdkEventidinfo = {}
 sdkEventidinfoLock = threading.Lock()
 sdkEventidinfoMaxSize = 10000
+# 群消息被动回复条数：普通成员 5 次，机器人是群主/管理员时 50 次（2026-11-17 起）。
+sdkGroupPassiveLimitInfo = {}
+sdkGroupPassiveLimitLock = threading.RLock()
+sdkGroupPassiveLimitTTL = 21600.0
+qqGroupPassiveLimitStandard = 5
+qqGroupPassiveLimitManager = 50
+qqGroupPassiveLimitRelation = {'owner', 'admin'}
 sdkSentMessageInfo = {}
 sdkSentMessageInfoLock = threading.Lock()
 sdkSentMessageInfoLastCleanup = 0.0
@@ -323,7 +333,9 @@ qqGroupApiRateLimitMap = {
     'group_member_info': 30,
     'group_batch_remove_members': 30,
     'group_member_blacklist_get': 30,
-    'group_member_blacklist_set': 60
+    'group_member_blacklist_set': 60,
+    # 群内角色查询（判断被动回复上限 5/50），官方额度 30 QPM。
+    'group_bot_state': 30
 }
 qqGroupApiRateWindow = 60.0
 # 获取用户基本信息:按确认的 10 QPM 限流,与群管理额度分开计。
@@ -1828,6 +1840,78 @@ def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
         'denied': api_code == qqGroupApiDeniedCode,
         'rate_limited': False
     }
+
+
+# ============ 群消息被动回复条数：群主/管理员 50 次 ============
+def _get_qq_group_passive_limit(bot_hash, group_openid, bot_info, no_cache=False, now=None):
+    """返回该群消息的被动回复次数上限（5 或 50）。
+
+    平台 2026-11-17 起把群消息的被动回复上限分档：普通成员 5 次，机器人账号的
+    开发者（管理员）是该群群主或管理员时 50 次；群内回复与群消息私聊回复共用
+    同一个 msg_id 的次数上限。群内角色变化很少，结果按 (bot, group) 缓存 6 小时，
+    接口不可用（11253 / 频控 / 退避）时按普通成员保守处理。
+    """
+    group_openid = None if group_openid is None else str(group_openid)
+    if group_openid is None or group_openid == '':
+        return qqGroupPassiveLimitStandard
+    bot_hash = str(bot_hash)
+    cache_key = (bot_hash, group_openid)
+    now = time.monotonic() if now is None else now
+    if not no_cache:
+        with sdkGroupPassiveLimitLock:
+            cache_data = sdkGroupPassiveLimitInfo.get(cache_key, None)
+            if (
+                isinstance(cache_data, dict)
+                and now - cache_data.get('cached_at', 0.0) < sdkGroupPassiveLimitTTL
+            ):
+                return cache_data['limit']
+    try:
+        api_obj = API.getQQGroupBotState(bot_info)
+        api_obj.metadata.group_openid = group_openid
+        api_result = _do_qq_group_api_request(
+            bot_info, api_obj, 'GET', 'group_bot_state'
+        )
+    except Exception:
+        traceback.print_exc()
+        return qqGroupPassiveLimitStandard
+    member_role = None
+    if api_result.get('active', False):
+        response = api_result.get('response', None)
+        if isinstance(response, dict):
+            member_role = response.get('member_role', None)
+    # 11253 也缓存：本进程已永久停用该接口，别每条消息都去撞一次。
+    if api_result.get('active', False) or api_result.get('denied', False):
+        limit = (
+            qqGroupPassiveLimitManager
+            if member_role in qqGroupPassiveLimitRelation
+            else qqGroupPassiveLimitStandard
+        )
+        with sdkGroupPassiveLimitLock:
+            sdkGroupPassiveLimitInfo[cache_key] = {
+                'limit': limit,
+                'member_role': member_role,
+                'cached_at': now
+            }
+        return limit
+    return qqGroupPassiveLimitStandard
+
+
+def get_qq_group_passive_limit(bot_info, group_openid, no_cache=False):
+    """插件入口：返回群消息被动回复次数上限（普通成员 5、群主/管理员 50）。
+
+    星号导入不会带出下划线开头的名字，插件侧要用这个公开入口。
+    """
+    try:
+        bot_hash = OlivOS.API.getBotHash(
+            bot_id=bot_info.id,
+            platform_sdk='qqGuildv2_link',
+            platform_platform='qqGuild',
+            platform_model=bot_info.model
+        )
+    except Exception:
+        traceback.print_exc()
+        return qqGroupPassiveLimitStandard
+    return _get_qq_group_passive_limit(bot_hash, group_openid, bot_info, no_cache=no_cache)
 
 
 # ============ Tier 2:定期全量错峰校准 ============
@@ -3941,6 +4025,34 @@ def _fill_qq_stranger_result(res_data, target_event, user_id, record, fetched, n
     return source
 
 
+def _get_qq_passive_scope(target_event, chat_type, chat_id, msg_id):
+    """确定 msg_id 被动回复的计数会话。
+
+    平台 2026-11-17 起允许把群消息的 msg_id 传给发单聊消息接口，私聊回复该消息的
+    发送者，且与群内回复共用同一个 msg_id 的次数上限。所以计数范围要跟着 msg_id
+    的来处走，不能跟着本次发送的目标会话走。
+    """
+    bot_hash = str(getattr(getattr(target_event, 'bot_info', None), 'hash', ''))
+    origin = _get_qq_rx_message(bot_hash, msg_id)
+    if isinstance(origin, dict):
+        origin_chat_type = origin.get('chat_type', None)
+        origin_chat_id = origin.get('chat_id', None)
+        if (
+            origin_chat_type in ['qq_group', 'qq_private']
+            and origin_chat_id is not None
+            and str(origin_chat_id) != ''
+        ):
+            return str(origin_chat_type), str(origin_chat_id)
+    return str(chat_type), str(chat_id)
+
+
+def _get_qq_passive_max_seq(scope_chat_type):
+    """msg_seq 的基础上限：单聊 4 次，群聊按普通成员的 5 次起步。"""
+    if scope_chat_type == 'qq_private':
+        return 4
+    return qqGroupPassiveLimitStandard
+
+
 class event_action_common(object):
     def _normalize_outgoing_message(target_event, message):
         if isinstance(message, OlivOS.messageAPI.Message_templet):
@@ -4007,6 +4119,10 @@ class event_action_common(object):
             source_chat_id = getattr(target_data, 'user_id', None)
         elif chat_type == 'qq_group' and not flag_direct:
             source_chat_id = getattr(target_data, 'group_id', None)
+        elif chat_type == 'qq_private' and not flag_direct:
+            # 群消息私聊回复（2026-11-17 起）：群消息的 msg_id 也可以用于发单聊消息，
+            # 私聊回复该群消息的发送者；要求目标就是这条消息的发送者本人。
+            source_chat_id = getattr(target_data, 'user_id', None)
         else:
             return None, None
         if source_chat_id is None or str(source_chat_id) != str(chat_id):
@@ -4037,11 +4153,32 @@ class event_action_common(object):
         api_obj.data.msg_id = None if msg_id is None else str(msg_id)
         api_obj.data.event_id = None if event_id is None else str(event_id)
         if msg_id is not None and chat_type in ['qq_group', 'qq_private']:
-            max_seq = 4 if chat_type == 'qq_private' else 5
-            msg_seq = get_msgid(
-                event_action._get_reply_seq_key(target_event, chat_type, chat_id, msg_id),
-                max_seq=max_seq
+            # 计数范围跟着 msg_id 的来处走：群消息的 msg_id 私聊回复时与群内回复共用计数。
+            scope_chat_type, scope_chat_id = _get_qq_passive_scope(
+                target_event, chat_type, chat_id, msg_id
             )
+            max_seq = _get_qq_passive_max_seq(scope_chat_type)
+            reply_seq_key = event_action._get_reply_seq_key(
+                target_event,
+                scope_chat_type,
+                scope_chat_id,
+                msg_id
+            )
+            msg_seq = get_msgid(reply_seq_key, max_seq=max_seq)
+            if msg_seq is None and scope_chat_type == 'qq_group':
+                # 普通成员只能回 5 次；机器人是群主/管理员时有 50 次。
+                # 触到基础上限才去查角色，常规路径不额外打接口。
+                try:
+                    scope_limit = _get_qq_group_passive_limit(
+                        str(target_event.bot_info.hash),
+                        scope_chat_id,
+                        get_SDK_bot_info_from_Event(target_event)
+                    )
+                except Exception:
+                    traceback.print_exc()
+                    scope_limit = max_seq
+                if scope_limit > max_seq:
+                    msg_seq = get_msgid(reply_seq_key, max_seq=scope_limit)
             if msg_seq == 0:
                 error = 'passive reply sequence cache is full'
             elif msg_seq is None:
@@ -4054,7 +4191,8 @@ class event_action_common(object):
             return res_data
         if event_id is not None and chat_type in ['qq_group', 'qq_private']:
             max_count = 4 if chat_type == 'qq_private' else 5
-            ttl = 3600.0 if chat_type == 'qq_private' else 300.0
+            # 2026-11-17 起群聊被动回复有效期同为 60 分钟。
+            ttl = 3600.0
             reply_count = use_eventid(
                 event_action._get_reply_seq_key(target_event, chat_type, chat_id, event_id),
                 max_count=max_count,
@@ -4991,7 +5129,7 @@ class event_action_common(object):
             try:
                 return req.get(
                     url,
-                    timeout=OlivOS.webTool.OlivOS_http_timeout,
+                    timeout=OlivOS.webTool.OlivOS_http_timeout_transfer,
                     allow_redirects=False,
                     stream=True
                 )

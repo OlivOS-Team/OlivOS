@@ -13,7 +13,8 @@ excludeList = [
 ]
 
 includeList = [
-    'tkinter'
+    'tkinter',
+    'tzdata',  # zoneinfo 运行时动态导入各地区的数据包。
 ]
 
 
@@ -60,12 +61,20 @@ def build_with_site_packages():
         "--follow-stdlib",
         "--enable-plugin=tk-inter",
         "--enable-plugin=pywebview",
+        "--include-package-data=pytz",
+        "--include-package-data=tzdata",
+        "--include-distribution-metadata=APScheduler",
+        "--include-distribution-metadata=pytz",
+        "--include-distribution-metadata=six",
+        "--include-distribution-metadata=setuptools",
+        "--include-distribution-metadata=tzlocal",
+        "--include-distribution-metadata=tzdata",
         "--low-memory",
         "--jobs=2",
         "--show-scons",
         "--show-progress"
     ])
-    for pkg in packages:
+    for pkg in dict.fromkeys(packages):
         if pkg.lower() not in excludeList:
             print(f"Hit {pkg}")
             cmd.extend([f"--include-package={pkg}"])
@@ -75,7 +84,7 @@ def build_with_site_packages():
         "main.py"
     ])
     print("\nbuild...")
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

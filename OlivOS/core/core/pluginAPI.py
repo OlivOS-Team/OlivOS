@@ -24,14 +24,18 @@ import json
 import traceback
 import zipfile
 import shutil
+from queue import Empty
+from uuid import uuid4
 
 if platform.system() == 'Windows':
     import tkinter
 
 import OlivOS
-from OlivOS.core.core import API
+from OlivOS.core.core import API, tkBridgeAPI
+from OlivOS.core.core.pluginSchedule import PluginSchedule
 
 modelName = 'pluginAPI'
+_SCHEDULE_OPERATIONS = {'restart_do': 'restart', 'update_hit': 'update', 'plugin_stop': 'stop'}
 
 gProc = None
 
@@ -215,6 +219,10 @@ class shallow(API.Proc_templet):
         self.tx_queue = []
         self.menu_queue = []
         self.database: OlivOS.userModule.UserConfDB.DataBaseAPI = None
+        # 进程启动前只分配可序列化的标识；线程、调度器和锁在子进程创建。
+        self.schedule_generation = uuid4().hex
+        self._schedule = None
+        self._schedule_lifecycle = None
 
     class rx_packet(object):
         def __init__(self, sdk_event):
@@ -266,6 +274,9 @@ class shallow(API.Proc_templet):
             self.Proc_data['main_tk'] = tkinter.Tk()
             self.Proc_data['main_tk'].withdraw()
             self.Proc_data['main_tk'].iconbitmap('./resource/tmp_favoricon.ico')
+            self._tk_bridge.start(self.Proc_data['main_tk'])
+            if self.Proc_data.get('tk_bridge_plugins_ready') and not self.Proc_config['ready_for_restart']:
+                self._send_tk_bridge({'action': 'tk_bridge_status', 'data': self._tk_bridge.metadata()})
             self.__update_GUI()
             self.Proc_data['main_tk'].mainloop()
 
@@ -278,6 +289,15 @@ class shallow(API.Proc_templet):
 
     def run(self):
         OlivOS.pluginAPI.gProc = self
+        profile_error = None
+        try:
+            tk_panels = tkBridgeAPI.load_panels('.')
+        except ValueError as error:
+            profile_error = str(error)
+            self.log(3, profile_error)
+            tk_panels = ()
+        self._tk_bridge = tkBridgeAPI.TkBridge(lambda: self.plugin_models_dict, self._send_tk_bridge,
+                                               proc=self, panels=tk_panels, profile_error=profile_error)
         if any(bot.platform.get('sdk') == 'qqGuildv2_link'
                for bot in self.Proc_data['bot_info_dict'].values()):
             try:
@@ -312,65 +332,130 @@ class shallow(API.Proc_templet):
         self.load_plugin_list()
         self.check_plugin_list()
         self.run_plugin_func(None, 'init_after')
+        self._schedule = PluginSchedule(self, self.schedule_generation)
+        schedule_status = self._schedule.start(self.plugin_models_dict.values())
+        self._send_schedule_event('plugin_schedule_status', schedule_status)
         self.log(2, OlivOS.L10NAPI.getTrans('OlivOS plugin shallow [{0}] is running', [self.Proc_name], modelName))
+        self.Proc_data['tk_bridge_plugins_ready'] = True
         self.sendPluginList(ready=True)
         self.Proc_data['restart_interval_base'] = time.monotonic()
         self.Proc_data['restart_at_last'] = time.strftime('%Y-%m-%d %H:%M')
         rx_count = 0
         idle_check_at = 0.0
         while True:
-            if self.Proc_info.rx_queue.empty() or self.Proc_config['ready_for_restart']:
-                time.sleep(self.Proc_info.scan_interval)
+            rx_packet_data = None
+            if not self.Proc_config['ready_for_restart']:
+                try:
+                    rx_packet_data = self.Proc_info.rx_queue.get_nowait()
+                except Empty:
+                    pass
+            # 先处理已取到的生命周期指令，再允许待处理的定时事件进池。
+            if type(rx_packet_data) is API.Control.packet:
+                operation = _SCHEDULE_OPERATIONS.get(rx_packet_data.action)
+                if operation is not None:
+                    generation = getattr(rx_packet_data, 'schedule_generation', self.schedule_generation)
+                    if generation != self.schedule_generation:
+                        continue
+                    self._request_schedule_lifecycle(operation, rx_packet_data.key)
+                    if self._advance_schedule_lifecycle() == 'timeout':
+                        rx_count = 0
+                    continue
+            if self._advance_schedule_lifecycle() == 'timeout':
+                rx_count = 0
+            timer_work = self._schedule.dispatch()
+            if rx_packet_data is None:
+                if not timer_work:
+                    time.sleep(self.Proc_info.scan_interval)
                 if (
                     self.Proc_config['enable_auto_restart']
-                    and not self.Proc_config['ready_for_restart']
                     and (self.Proc_config['restart_at'] or self.Proc_config['restart_interval'] > 0)
                 ):
                     now = time.monotonic()
                     if now - idle_check_at >= 1.0:
                         idle_check_at = now
                         self._check_restart_schedule()
-            else:
-                try:
-                    rx_packet_data = self.Proc_info.rx_queue.get(block=False)
-                except Exception:
-                    continue
-                if type(rx_packet_data) is API.Control.packet:
-                    if rx_packet_data.action == 'restart_do':
-                        self.Proc_config['ready_for_restart'] = True
-                        self.run_plugin_func(None, 'save')
-                        self.Proc_info.control_queue.put(
-                            API.Control.packet('restart_do', self.Proc_name), block=False)
-                        self.log(2, OlivOS.L10NAPI.getTrans(
-                            'OlivOS plugin shallow [{0}] will restart', [self.Proc_name], modelName))
-                        # 在运行过 save 指令后，将配置数据库关闭
-                        self.database.stop()
-                    elif rx_packet_data.action == 'update_hit':
-                        self.Proc_config['ready_for_restart'] = True
-                        self.run_plugin_func(None, 'save')
-                        self.Proc_info.control_queue.put(API.Control.packet('init_type', 'update_replace'),
-                                                         block=False)
-                        # 在运行过 save 指令后，将配置数据库关闭
-                        self.database.stop()
-                    elif rx_packet_data.action == 'send':
-                        webui_event = rx_packet_data.key.get('data', {}).get('webui')
-                        if webui_event or platform.system() != 'Windows' or not self.Proc_config['enable_gui']:
-                            self.run_plugin(rx_packet_data)
-                        else:
-                            self.menu_queue.append(rx_packet_data)
-                else:
-                    if self.Proc_config['treading_mode'] == 'none':
-                        self.run_plugin(rx_packet_data.sdk_event)
-                    elif self.Proc_config['treading_mode'] == 'full':
-                        t_run_plugin = None
-                        t_run_plugin = threading.Thread(target=self.run_plugin, args=(rx_packet_data.sdk_event,))
-                        t_run_plugin.start()
-                if self.Proc_config['enable_auto_restart']:
-                    rx_count += 1
-                    if rx_count == self.Proc_config['step_to_restart']:
-                        self.set_restart()
-                    elif self.Proc_config['restart_at'] or self.Proc_config['restart_interval'] > 0:
-                        self._check_restart_schedule()
+                continue
+            if self.Proc_config['ready_for_restart']:
+                continue
+            if type(rx_packet_data) is API.Control.packet:
+                if rx_packet_data.action == 'send':
+                    webui_event = rx_packet_data.key.get('data', {}).get('webui')
+                    if webui_event or platform.system() != 'Windows' or not self.Proc_config['enable_gui']:
+                        self.run_plugin(rx_packet_data)
+                    else:
+                        self.menu_queue.append(rx_packet_data)
+            elif self.Proc_config['treading_mode'] == 'none':
+                self.run_plugin(rx_packet_data.sdk_event)
+            elif self.Proc_config['treading_mode'] == 'full':
+                threading.Thread(target=self.run_plugin, args=(rx_packet_data.sdk_event,)).start()
+            if self.Proc_config['enable_auto_restart'] and self._schedule_lifecycle is None:
+                rx_count += 1
+                if rx_count == self.Proc_config['step_to_restart']:
+                    self.set_restart()
+                elif self.Proc_config['restart_at'] or self.Proc_config['restart_interval'] > 0:
+                    self._check_restart_schedule()
+
+    def _send_tk_bridge(self, data):
+        self.sendControlEvent('send', {'target': {'type': 'webUI'}, 'data': data})
+
+    def _send_schedule_event(self, action, data):
+        packet = {'target': {'type': 'webUI'}, 'data': {'action': action, 'data': data}}
+        if action == 'plugin_schedule_status':
+            packet['schedule_source'] = {'name': self.Proc_name, 'generation': self.schedule_generation}
+        self.sendControlEvent('send', packet)
+
+    def _request_schedule_lifecycle(self, operation, key):
+        request = key if isinstance(key, dict) else {}
+        if request.get('generation', self.schedule_generation) != self.schedule_generation:
+            return
+        request = {'name': self.Proc_name, 'generation': self.schedule_generation,
+                   'operation': operation, 'started_at': request.get('started_at')}
+        if self._schedule_lifecycle is not None:
+            self._reject_schedule_lifecycle(request, 'busy', self._schedule.running_tasks())
+            return
+        self._schedule.close_gate()
+        self._schedule_lifecycle = request, time.monotonic() + self.Proc_info.dead_interval
+
+    def _reject_schedule_lifecycle(self, request, reason, running):
+        tasks = [{'namespace': namespace, 'task_id': task_id} for namespace, task_id in running]
+        self.log(3, f'Plugin schedule {request["operation"]} rejected ({reason}): {running}')
+        self.sendControlEvent('plugin_lifecycle_rejected', dict(request, reason=reason))
+        self._send_schedule_event('plugin_schedule_lifecycle_rejected', {
+            'operation': request['operation'], 'reason': reason, 'tasks': tasks, 'started_at': request['started_at'],
+        })
+
+    def _advance_schedule_lifecycle(self):
+        if self._schedule_lifecycle is None:
+            return
+        request, deadline = self._schedule_lifecycle
+        if request is None:
+            if not self._schedule.running_tasks():
+                self._schedule.recover()
+                self._schedule_lifecycle = None
+                self.Proc_data['restart_interval_base'] = time.monotonic()
+            return
+        now = time.monotonic()
+        running, finished_late = self._schedule.drain_state(deadline)
+        if finished_late or (running and now >= deadline):
+            self._schedule_lifecycle = None, None
+            self._reject_schedule_lifecycle(request, 'timeout', sorted(set(running) | set(finished_late)))
+            return 'timeout'
+        if running:
+            return
+        self._schedule.shutdown()
+        self.Proc_config['ready_for_restart'] = True
+        self._schedule_lifecycle = None
+        bridge = getattr(self, '_tk_bridge', None)
+        if bridge is not None:
+            bridge.stop()
+            self._send_tk_bridge({'action': 'tk_bridge_status', 'data': bridge.metadata()})
+            if not bridge.cleaned.wait(self.Proc_info.dead_interval):
+                self.log(3, 'Tk 桥接清理尚未确认，即将关闭插件加载器')
+        self.run_plugin_func(None, 'save')
+        self.database.stop()
+        action = 'restart_do' if request['operation'] == 'restart' else 'plugin_lifecycle_complete'
+        self.sendControlEvent(action, request)
+        self.log(2, f'Plugin loader [{self.Proc_name}] ready for {request["operation"]}')
 
     def on_control_rx(self, packet):
         if type(packet) is API.Control.packet:
@@ -385,6 +470,10 @@ class shallow(API.Proc_templet):
                         self.set_restart()
                     elif 'plugin_priority_reload' == packet.key['data']['action']:
                         self.apply_plugin_priority()
+                    elif packet.key['data']['action'] == 'tk_bridge_request':
+                        bridge = getattr(self, '_tk_bridge', None)
+                        if bridge is not None:
+                            bridge.submit(packet.key['data'])
 
     def _check_restart_schedule(self):
         """按「定时点 → 滚动周期」的顺序检查自动重载，命中一次即返回。
@@ -394,7 +483,7 @@ class shallow(API.Proc_templet):
         """
         if not self.Proc_config['enable_auto_restart']:
             return False
-        if self.Proc_config['ready_for_restart']:
+        if self.Proc_config['ready_for_restart'] or self._schedule_lifecycle is not None:
             return False
         if self.Proc_config['restart_at']:
             slot = time.strftime('%H:%M')
@@ -430,7 +519,9 @@ class shallow(API.Proc_templet):
             ],
             modelName
         ))
-        self.Proc_info.rx_queue.put(API.Control.packet('restart_do', self.Proc_name), block=False)
+        packet = API.Control.packet('restart_do', self.Proc_name)
+        packet.schedule_generation = self.schedule_generation
+        self.Proc_info.rx_queue.put(packet, block=False)
 
     def set_check_update(self):
         self.log(2, OlivOS.L10NAPI.getTrans(
@@ -714,6 +805,8 @@ class shallow(API.Proc_templet):
                             modelName
                         ))
                 except Exception as e:
+                    if func_name == 'init_after':
+                        self.plugin_models_dict[plugin_models_index_this]['schedule_init_failed'] = True
                     # traceback.print_exc()
                     self.log(4, OlivOS.L10NAPI.getTrans(
                         'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
@@ -824,6 +917,7 @@ class shallow(API.Proc_templet):
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,
                     'shallow_plugin_webui_roots': tmp_plugin_webui_roots,
                     'shallow_plugin_webui_paths': tmp_plugin_webui_paths,
+                    'tk_bridge': self._tk_bridge.metadata() if hasattr(self, '_tk_bridge') else None,
                     'priority_only': priority_only
                 }
             }
@@ -1148,6 +1242,7 @@ class shallow(API.Proc_templet):
                                     modelName
                                 ))
                             except Exception as e:
+                                plugin_models_dict_this['schedule_init_failed'] = True
                                 self.log(4, OlivOS.L10NAPI.getTrans(
                                     'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}\n{3}', [
                                         plugin_models_dict_this['name'],

@@ -15,6 +15,7 @@
   "static": [
     "static-files.json",
     "app.js",
+    "timezone-cities-zh.js",
     "theme.js",
     "style.css",
     "logo.png",
