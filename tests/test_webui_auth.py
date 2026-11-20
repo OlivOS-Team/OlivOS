@@ -251,9 +251,11 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
         service = Service(executable_path=driver_path) if driver_path else None
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(f"http://127.0.0.1:{host.config['port']}")
+        wait = WebDriverWait(driver, 10)
+        wait.until(lambda d: d.find_element(By.ID, 'token').is_displayed())
         driver.find_element(By.ID, 'token').send_keys(host.test_password)
         driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
-        WebDriverWait(driver, 10).until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
+        wait.until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
         result = driver.execute_async_script('''
             const done = arguments[arguments.length - 1];
             const resetBetween = arguments[0];
@@ -333,7 +335,10 @@ def browser_auth(host):
         return ui.driver.find_element(By.CSS_SELECTOR, selector)
 
     def login():
+        ui.wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled())
         find('#token').send_keys(host.test_password)
+        ui.wait.until(lambda _: find('#login-form button[type=submit]').is_displayed()
+                      and find('#login-form button[type=submit]').is_enabled())
         find('#login-form button[type=submit]').click()
         ui.wait.until(lambda _: find('#shell').is_displayed())
 

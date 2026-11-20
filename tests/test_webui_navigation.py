@@ -164,6 +164,7 @@ def browser(navigation_host, tmp_path):
 
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
+        wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled())
         find('#token').send_keys(navigation_host.test_password)
         click('#login-form button[type=submit]')
         wait.until(lambda _: find('#shell').is_displayed())
