@@ -7,6 +7,16 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
+PLATFORM_ORDER = (
+    'windows-latest',
+    'windows-11-arm',
+    'ubuntu-latest',
+    'ubuntu-24.04-arm',
+    'macos-latest',
+    'macos-26-intel',
+)
+
+
 def _module_name(name):
     parts = name.replace('\\', '/').split('/')
     # 仓库根目录下的 hook/__init__ 文件不应各自形成一行，统一归入 root。
@@ -263,11 +273,21 @@ def _result_name(directory):
     return name
 
 
+def _platform_order_key(directory):
+    name = _result_name(directory)
+    try:
+        rank = PLATFORM_ORDER.index(name)
+    except ValueError:
+        rank = len(PLATFORM_ORDER)
+    return rank, name
+
+
 def collect_results(root):
     root = Path(root)
     if not root.is_dir():
         return []
-    directories = sorted(path for path in root.iterdir() if path.is_dir())
+    directories = [path for path in root.iterdir() if path.is_dir()]
+    directories.sort(key=_platform_order_key)
     if (root / 'coverage.json').is_file() or (root / 'junit.xml').is_file():
         directories.insert(0, root)
     elif not directories and (_find_report(root, 'coverage.json') or _find_report(root, 'junit.xml')):
