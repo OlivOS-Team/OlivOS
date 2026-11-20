@@ -161,7 +161,7 @@ def test_combined_report_shows_all_platforms_and_totals(tmp_path):
     assert '| `ubuntu-latest` | 50.00% | 50.00% | 5 | 2 |' in text
     assert '不同平台覆盖率分别统计，不跨平台平均。' in text
     # 平台明细放在可折叠区块中，避免汇总页过长。
-    assert '<summary>`ubuntu-latest` 明细</summary>' in text
+    assert '<summary>ubuntu-latest 明细</summary>' in text
 
 
 def test_collect_results_finds_reports_in_nested_test_results(tmp_path):

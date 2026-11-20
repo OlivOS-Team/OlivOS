@@ -371,7 +371,7 @@ def _combined_detail_section(results):
         name = _markdown_cell(result['name'])
         if report:
             report.extend([''])
-        report.extend(['<details>', '<summary>`{}` 明细</summary>'.format(name), ''])
+        report.extend(['<details>', '<summary>{} 明细</summary>'.format(name), ''])
         report.extend(parts)
         report.extend(['', '</details>'])
     return report
