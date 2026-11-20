@@ -41,7 +41,7 @@ jobs:
       run:
         shell: bash
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
       id: setup-python
@@ -90,13 +90,13 @@ jobs:
         fi
     
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.name }}
         path: ./OlivOS-PKG
     
     - name: Upload Publish Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: inputs.name == 'OlivOS-MacOS64-release' || inputs.name == 'OlivOS-MacOS-arm64-release'
       with:
         name: ${{ inputs.arch == 'arm64' && 'OlivOS-MacOS-arm64' || 'OlivOS-MacOS' }}

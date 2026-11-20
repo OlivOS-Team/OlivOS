@@ -41,7 +41,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
 
     - name: Install MSVC Build Tools
       if: false && inputs.build-type == 'nuitka'
@@ -100,13 +100,13 @@ jobs:
         }
     
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.name }}
         path: ./OlivOS-PKG
 
     - name: Upload Publish Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: inputs.name == 'OlivOS-Win64-release' || inputs.name == 'OlivOS-Win-arm64-release'
       with:
         name: ${{ inputs.arch == 'arm64' && 'OlivOS-Win-arm64' || 'OlivOS-Win' }}

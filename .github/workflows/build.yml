@@ -427,37 +427,37 @@ jobs:
       contents: write
     steps:
       - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-Win
           path: OlivOS-Win/
 
       - name: Download Windows arm64 Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-Win-arm64
           path: OlivOS-Win-arm64/
       
       - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-Linux
           path: OlivOS-Linux/
       
       - name: Download Linux arm64 Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-Linux-arm64
           path: OlivOS-Linux-arm64/
 
       - name: Download macOS Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-MacOS
           path: OlivOS-MacOS/
 
       - name: Download macOS arm64 Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OlivOS-MacOS-arm64
           path: OlivOS-MacOS-arm64/

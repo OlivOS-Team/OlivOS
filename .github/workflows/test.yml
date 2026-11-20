@@ -19,7 +19,7 @@ jobs:
       PYSTRAY_BACKEND: dummy
       OLIVOS_WEBUI_BROWSER: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
@@ -81,7 +81,7 @@ jobs:
         run: python script/coverage_summary.py test-results/coverage.json
       - name: Upload test and coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.os }}
           path: |
