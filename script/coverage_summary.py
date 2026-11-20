@@ -1,4 +1,4 @@
-'''Publish coverage totals and the largest gaps from coverage.py JSON, without hiding failures.'''
+'''从 coverage.py JSON 输出覆盖率总计与主要缺口，不隐藏失败。'''
 
 import json
 import os
@@ -37,7 +37,7 @@ def _module_totals(files):
 def main():
     path = Path(sys.argv[1])
     if not path.is_file():
-        print('Coverage report unavailable; inspect the test step for collection or runtime failures.')
+        print('覆盖率报告不可用；请检查测试步骤中的收集或运行失败。')
         return 1
     data = json.loads(path.read_text(encoding='utf-8'))
     totals = data['totals']
@@ -48,13 +48,13 @@ def main():
     lines = covered_lines / max(num_statements, 1) * 100
     branches = covered_branches / max(num_branches, 1) * 100
     report = [
-        '## Python functional test coverage', '',
-        f'Lines: **{lines:.2f}%** ({covered_lines}/{num_statements}); '
-        f'branches: **{branches:.2f}%** ({covered_branches}/{num_branches}).', '',
-        'HTML reports include missing lines, branches and test contexts. '
-        'JavaScript behavior is exercised by browser tests; Python coverage does not measure JavaScript.', '',
+        '## Python 功能测试覆盖率', '',
+        f'行：**{lines:.2f}%** ({covered_lines}/{num_statements})；'
+        f'分支：**{branches:.2f}%** ({covered_branches}/{num_branches})。', '',
+        'HTML 报告包含未覆盖行、分支与测试上下文。'
+        'JavaScript 行为由浏览器测试覆盖；Python 覆盖率不计量 JavaScript。', '',
     ]
-    module_header = '| Module | Line coverage | Branch coverage | Missing lines | Missing branches |'
+    module_header = '| 模块 | 行覆盖率 | 分支覆盖率 | 未覆盖行 | 未覆盖分支 |'
     report.extend([module_header, '| --- | ---: | ---: | ---: | ---: |'])
     modules = _module_totals(data['files'])
     ordered_modules = sorted(modules.items(), key=lambda item: item[1]['missing_lines'], reverse=True)
@@ -67,12 +67,12 @@ def main():
             f'| `{name}` | {line_ratio:.2f}% | {branch_ratio:.2f}% | '
             f'{missing_lines} | {missing_branches} |'
         )
-    report.extend(['', '| File with uncovered lines | Missing lines |', '| --- | ---: |'])
+    report.extend(['', '| 未覆盖行较多的文件 | 未覆盖行 |', '| --- | ---: |'])
     files = sorted(data['files'].items(), key=lambda item: item[1]['summary']['missing_lines'], reverse=True)
     for name, details in files[:15]:
         missing_lines = details['summary']['missing_lines']
         report.append(f'| `{name}` | {missing_lines} |')
-    report.extend(['', '| File with uncovered branches | Missing branches |', '| --- | ---: |'])
+    report.extend(['', '| 未覆盖分支较多的文件 | 未覆盖分支 |', '| --- | ---: |'])
     files = sorted(data['files'].items(), key=lambda item: item[1]['summary']['missing_branches'], reverse=True)
     for name, details in files[:15]:
         missing_branches = details['summary']['missing_branches']
