@@ -87,7 +87,7 @@ Python 覆盖率不计量 JavaScript；前端行为由真实浏览器用例验�
 | QQ 官方机器人 Markdown 排版 | `test_qqguildv2_markdown_blank_lines.py` | 空行补 U+200B 占位（引用/列表/围栏/分割线/标题不补，表格两侧补）、围栏闭合口径、无外层竖线的表格、幂等、日志预览与三条回退路径不残留占位 |
 | QQ 官方机器人入群申请 | `test_qqguildv2_join_request.py` | 入群申请标志解析与构造、审批接口参数校验、星号导入下私有工具函数的可见性 |
 | 协议启动器 | `test_protocol_booters.py` | Windows 启动器日志路由、NapCat 配置生成，不运行外部程序 |
-| 外部程序启动器 | `test_libbooter_support.py` | 启动器分派、账号修复文件、旧 GBK 压缩包、假子进程与假服务器，不运行 NapCat/go-cqhttp |
+| 外部程序启动器 | `test_libbooter_support.py` | 启动器分派、账号修复文件、旧 GBK 压缩包、假子进程与假服务器；仅 Windows 运行，不运行 NapCat/go-cqhttp |
 | 数据存储 | `test_user_database.py`, `test_legacy_config.py` | SQLite 持久化/隔离/并发/序列化，以及旧用户/群配置接口 |
 | 输入流缓存 | `test_iostream.py` | pickle 读写、缓存创建与清理、损坏文件、只读和并发边界 |
 | 启动与辅助功能 | `test_boot_and_metadata.py` | 配置合并、启动顺序、元数据、本地化、资源定位、更新请求与进程终止边界 |

@@ -14,6 +14,9 @@ import pytest
 import OlivOS
 
 
+pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Windows 启动器功能仅在 Windows 上可用')
+
+
 START_CASES = [
     ('libEXEModelAPI', 'startGoCqhttpLibExeModel', 'gocqhttp_show'),
     ('libWQEXEModelAPI', 'startWalleQLibExeModel', 'walleq_show'),
