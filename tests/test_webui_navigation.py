@@ -1,6 +1,5 @@
 """真实浏览器验证插件分组、独立功能页面、保活及响应式侧栏。"""
 
-import os
 import json
 import queue
 import threading
@@ -98,24 +97,12 @@ def navigation_host(tmp_path):
 
 
 @pytest.fixture
-def browser(navigation_host, tmp_path):
-    if not os.environ.get('OLIVOS_WEBUI_BROWSER'):
-        pytest.skip('Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
+def browser(navigation_host, chrome_session):
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
-    options = webdriver.ChromeOptions()
-    if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
-        options.add_argument('--no-sandbox')
-    for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
-                     '--window-size=1440,1000', f'--user-data-dir={tmp_path / "browser-profile"}'):
-        options.add_argument(argument)
-    if os.environ.get('OLIVOS_CHROME_BINARY'):
-        options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
-    path = os.environ.get('OLIVOS_CHROMEDRIVER')
-    driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
+    url = f"http://127.0.0.1:{navigation_host.config['port']}"
+    driver = chrome_session.prepare(url)
     wait = WebDriverWait(driver, 10)
     # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
     login_wait = WebDriverWait(driver, 30)
@@ -164,18 +151,15 @@ def browser(navigation_host, tmp_path):
             'const done = arguments[0];'
             'Promise.resolve(state.pluginEventChain).then(() => done(true), () => done(true));')
 
-    try:
-        driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
-        login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
-                         '登录页输入框未出现')
-        find('#token').send_keys(navigation_host.test_password)
-        click('#login-form button[type=submit]')
-        login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
-        yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, type_text=type_text,
-                              select=select, open_sidebar=open_sidebar,
-                              wait_plugin_events=wait_plugin_events, host=navigation_host)
-    finally:
-        driver.quit()
+    driver.get(url)
+    login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
+                     '登录页输入框未出现')
+    find('#token').send_keys(navigation_host.test_password)
+    click('#login-form button[type=submit]')
+    login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
+    yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, type_text=type_text,
+                          select=select, open_sidebar=open_sidebar,
+                          wait_plugin_events=wait_plugin_events, host=navigation_host)
 
 
 def set_viewport(browser, width, height, *, mobile_device=False):

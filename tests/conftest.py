@@ -15,6 +15,20 @@ def isolated_installation(tmp_path, monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture(scope='module')
+def chrome_session(tmp_path_factory):
+    if not os.environ.get('OLIVOS_WEBUI_BROWSER'):
+        pytest.skip('Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
+    from webui_test_support import ChromeSession
+
+    session = ChromeSession(tmp_path_factory.mktemp('browser-profile'))
+    session.open()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
 def pytest_collection_modifyitems(items):
     for item in items:
         if 'browser' in item.name or item.originalname in (
