@@ -945,10 +945,13 @@ class PARA_templet(object):
                 paraData['is_large'] = False
             elif type(self) is PARA.reply:
                 paraType = 'reply'
-                scene, peer_id, seq = self.data['id'].split('|')
-                paraData['message_seq'] = int(seq)
-                paraData['sender_id'] = int(peer_id)
-                paraData['time'] = int(time.time())
+                reply_parts = str(self.data['id']).split('|')
+                if len(reply_parts) == 3:
+                    paraData['message_seq'] = int(reply_parts[2])
+                    paraData['sender_id'] = int(reply_parts[1])
+                    paraData['time'] = int(time.time())
+                else:
+                    paraData['message_seq'] = int(reply_parts[0])
             elif type(self) is PARA.image:
                 paraType = 'image'
                 paraData['resource_id'] = self.data['file']
@@ -1004,8 +1007,8 @@ class PARA_templet(object):
                 paraData['is_large'] = False
             elif type(self) is PARA.reply:
                 paraType = 'reply'
-                scene, peer_id, seq = self.data['id'].split('|')
-                paraData['message_seq'] = int(seq)
+                reply_parts = str(self.data['id']).split('|')
+                paraData['message_seq'] = int(reply_parts[2] if len(reply_parts) == 3 else reply_parts[0])
             elif type(self) is PARA.image:
                 paraType = 'image'
                 paraData['uri'] = self.data['file']
