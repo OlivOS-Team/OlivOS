@@ -330,17 +330,21 @@ def browser_auth(host):
         path = os.environ.get('OLIVOS_CHROMEDRIVER')
         ui.driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
         ui.wait = WebDriverWait(ui.driver, 10)
+        # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
+        ui.login_wait = WebDriverWait(ui.driver, 30)
 
     def find(selector):
         return ui.driver.find_element(By.CSS_SELECTOR, selector)
 
     def login():
-        ui.wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled())
+        ui.login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
+                            '登录页输入框未出现')
         find('#token').send_keys(host.test_password)
-        ui.wait.until(lambda _: find('#login-form button[type=submit]').is_displayed()
-                      and find('#login-form button[type=submit]').is_enabled())
+        ui.login_wait.until(lambda _: find('#login-form button[type=submit]').is_displayed()
+                            and find('#login-form button[type=submit]').is_enabled(),
+                            '登录按钮未就绪')
         find('#login-form button[type=submit]').click()
-        ui.wait.until(lambda _: find('#shell').is_displayed())
+        ui.login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
 
     def logged_out():
         ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button[type=submit]').is_enabled())

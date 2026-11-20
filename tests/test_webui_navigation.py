@@ -117,6 +117,8 @@ def browser(navigation_host, tmp_path):
     path = os.environ.get('OLIVOS_CHROMEDRIVER')
     driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
     wait = WebDriverWait(driver, 10)
+    # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
+    login_wait = WebDriverWait(driver, 30)
 
     def find(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
@@ -164,10 +166,11 @@ def browser(navigation_host, tmp_path):
 
     try:
         driver.get(f"http://127.0.0.1:{navigation_host.config['port']}")
-        wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled())
+        login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
+                         '登录页输入框未出现')
         find('#token').send_keys(navigation_host.test_password)
         click('#login-form button[type=submit]')
-        wait.until(lambda _: find('#shell').is_displayed())
+        login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
         yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, type_text=type_text,
                               select=select, open_sidebar=open_sidebar,
                               wait_plugin_events=wait_plugin_events, host=navigation_host)
