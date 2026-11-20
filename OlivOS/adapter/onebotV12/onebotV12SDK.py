@@ -974,18 +974,18 @@ class event_action(object):
             if type(raw_obj) is list:
                 res_data['active'] = True
                 for raw_obj_this in raw_obj:
-                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_user_info_strip()
-                    tmp_res_data_this['data']['name'] = init_api_do_mapping_for_dict(raw_obj, ['user_name'], str)
-                    tmp_res_data_this['data']['id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
-                    tmp_res_data_this['data']['user_id'] = init_api_do_mapping_for_dict(raw_obj, ['user_id'], str)
-                    tmp_res_data_this['data']['group_id'] = this_msg.params.group_id
-                    tmp_res_data_this['data']['times']['join_time'] = 0
-                    tmp_res_data_this['data']['times']['last_sent_time'] = 0
-                    tmp_res_data_this['data']['times']['shut_up_timestamp'] = 0
-                    tmp_res_data_this['data']['role'] = 'member'
-                    tmp_res_data_this['data']['card'] = init_api_do_mapping_for_dict(raw_obj, ['user_remark'], str)
-                    tmp_res_data_this['data']['title'] = init_api_do_mapping_for_dict(
-                        raw_obj, ['user_displayname'], str
+                    tmp_res_data_this = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+                    tmp_res_data_this['name'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_name'], str)
+                    tmp_res_data_this['id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], str)
+                    tmp_res_data_this['user_id'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_id'], str)
+                    tmp_res_data_this['group_id'] = this_msg.params.group_id
+                    tmp_res_data_this['times']['join_time'] = 0
+                    tmp_res_data_this['times']['last_sent_time'] = 0
+                    tmp_res_data_this['times']['shut_up_timestamp'] = 0
+                    tmp_res_data_this['role'] = 'member'
+                    tmp_res_data_this['card'] = init_api_do_mapping_for_dict(raw_obj_this, ['user_remark'], str)
+                    tmp_res_data_this['title'] = init_api_do_mapping_for_dict(
+                        raw_obj_this, ['user_displayname'], str
                     )
                     res_data['data'].append(tmp_res_data_this)
         return res_data
