@@ -16,7 +16,7 @@ python -m pytest
 Windows 安装 `.[test,win]`。不需要真实机器人账号或平台凭据；文件写入测试临时目录，
 平台请求使用替身，本地 HTTP/WebSocket 测试监听回环地址和临时端口。
 
-Chrome 浏览器测试单独通过环境变量开启。Linux CI 自动安装兼容的 Chrome 和 ChromeDriver：
+Chrome 浏览器测试单独通过环境变量开启。Linux x64 和 Windows x64 CI 自动安装兼容的 Chrome 和 ChromeDriver：
 
 ```sh
 OLIVOS_WEBUI_BROWSER=1 python -m pytest -m browser
@@ -142,7 +142,7 @@ DoDo Poll/Link/EA、KOOK、黑盒语音、B站直播、OPQ、米游社大别野�
 `pypiPublish.yml` 保留 Test → 发布的门禁，不额外运行 Lint。
 保留上游新合并的 Linux ARM64 构建与产物发布逻辑。
 
-测试矩阵：Python 3.11，Linux x64（含 Chrome）、Linux ARM64、Windows x64/ARM64、
+测试矩阵：Python 3.11，Linux x64（含 Chrome）、Windows x64（含 Chrome）、Linux ARM64、Windows ARM64、
 macOS Intel/Apple Silicon。不表示已在每个旧 Python 构建版本上运行测试。
 发布权限和发布动作沿用已有 workflow，测试只需仓库只读权限。
 
