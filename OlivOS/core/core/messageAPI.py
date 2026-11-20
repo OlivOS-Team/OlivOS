@@ -206,10 +206,9 @@ class Message_templet(object):
     def get_from_dict(self, src_dict, key_list, default_val=None):
         tmp_src_dict = src_dict
         for key_list_this in key_list:
-            if key_list_this in tmp_src_dict:
-                tmp_src_dict = tmp_src_dict[key_list_this]
-            else:
+            if not isinstance(tmp_src_dict, dict) or key_list_this not in tmp_src_dict:
                 return default_val
+            tmp_src_dict = tmp_src_dict[key_list_this]
         return tmp_src_dict
 
     def get(self, get_type):
