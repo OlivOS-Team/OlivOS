@@ -76,11 +76,15 @@ jobs:
           --cov-report=term --cov-report=xml:test-results/coverage.xml
           --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json
           --junitxml=test-results/junit.xml
-      - name: Summarize tests and coverage
+      - name: Upload summary inputs
         if: always()
-        run: >-
-          python script/coverage_summary.py
-          test-results/coverage.json test-results/junit.xml
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-summary-${{ matrix.os }}
+          path: |
+            test-results/coverage.json
+            test-results/junit.xml
+          if-no-files-found: warn
       - name: Upload test and coverage reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -90,3 +94,22 @@ jobs:
             test-results/
             .coverage
           include-hidden-files: true
+
+  summary:
+    name: Test and coverage summary
+    needs: functional
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download summary reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: test-summary-*
+          path: test-summary
+      - name: Summarize tests and coverage
+        run: python script/coverage_summary.py --combined test-summary

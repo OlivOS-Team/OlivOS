@@ -1,4 +1,4 @@
-'''从 coverage.py JSON 与 JUnit XML 输出测试结果和覆盖率汇总，不隐藏失败。'''
+'''从 coverage.py JSON 与 JUnit XML 输出单个或跨平台组合的测试与覆盖率汇总。'''
 
 import json
 import os
@@ -130,6 +130,20 @@ def _junit_summary(path):
     return summary
 
 
+def _failure_section(summary):
+    if summary is None or not summary['failed_cases']:
+        return []
+    failed_cases = summary['failed_cases']
+    report = ['| 失败或错误用例 | 结果 | 摘要 |', '| --- | --- | --- |']
+    for identifier, outcome, message in failed_cases[:20]:
+        report.append(
+            f'| `{_markdown_cell(identifier)}` | {outcome} | {_markdown_cell(message)} |'
+        )
+    if len(failed_cases) > 20:
+        report.extend(['', f'另有 {len(failed_cases) - 20} 条失败或错误，请在 JUnit 报告或日志中查看。'])
+    return report
+
+
 def _test_section(summary):
     if summary is None:
         return ['JUnit 报告不可用；请检查测试步骤中的收集或运行失败。']
@@ -141,31 +155,33 @@ def _test_section(summary):
             summary['errors'], summary['skipped'], summary['duration'],
         ),
     ]
-    failed_cases = summary['failed_cases']
-    if failed_cases:
-        report.extend(['', '| 失败或错误用例 | 结果 | 摘要 |', '| --- | --- | --- |'])
-        for identifier, outcome, message in failed_cases[:20]:
-            report.append(
-                f'| `{_markdown_cell(identifier)}` | {outcome} | {_markdown_cell(message)} |'
-            )
-        if len(failed_cases) > 20:
-            report.extend(['', f'另有 {len(failed_cases) - 20} 条失败或错误，请在 JUnit 报告或日志中查看。'])
+    failures = _failure_section(summary)
+    if failures:
+        report.extend([''])
+        report.extend(failures)
     return report
 
 
-def _coverage_section(data):
+def _coverage_totals(data):
     totals = data['totals']
     covered_lines = totals['covered_lines']
     num_statements = totals['num_statements']
     covered_branches = totals.get('covered_branches', 0)
     num_branches = totals.get('num_branches', 0)
-    lines = covered_lines / max(num_statements, 1) * 100
-    branches = covered_branches / max(num_branches, 1) * 100
+    return {
+        'covered_lines': covered_lines,
+        'num_statements': num_statements,
+        'covered_branches': covered_branches,
+        'num_branches': num_branches,
+        'lines': covered_lines / max(num_statements, 1) * 100,
+        'branches': covered_branches / max(num_branches, 1) * 100,
+        'missing_lines': max(num_statements - covered_lines, 0),
+        'missing_branches': max(num_branches - covered_branches, 0),
+    }
+
+
+def _coverage_detail(data):
     report = [
-        f'行：**{lines:.2f}%** ({covered_lines}/{num_statements})；'
-        f'分支：**{branches:.2f}%** ({covered_branches}/{num_branches})。', '',
-        'HTML 报告包含未覆盖行、分支与测试上下文。'
-        'JavaScript 行为由浏览器测试覆盖；Python 覆盖率不计量 JavaScript。', '',
         '| 模块 | 行覆盖率 | 分支覆盖率 | 未覆盖行 | 未覆盖分支 |',
         '| --- | ---: | ---: | ---: | ---: |',
     ]
@@ -193,6 +209,20 @@ def _coverage_section(data):
     return report
 
 
+def _coverage_section(data):
+    totals = _coverage_totals(data)
+    report = [
+        '行：**{:.2f}%** ({}/{})；分支：**{:.2f}%** ({}/{})。'.format(
+            totals['lines'], totals['covered_lines'], totals['num_statements'],
+            totals['branches'], totals['covered_branches'], totals['num_branches'],
+        ), '',
+        'HTML 报告包含未覆盖行、分支与测试上下文。'
+        'JavaScript 行为由浏览器测试覆盖；Python 覆盖率不计量 JavaScript。', '',
+    ]
+    report.extend(_coverage_detail(data))
+    return report
+
+
 def _load_coverage(path):
     if not path.is_file():
         return None
@@ -217,10 +247,159 @@ def build_report(coverage_path, junit_path=None):
     return '\n'.join(report) + '\n', data is not None
 
 
+def _find_report(directory, filename):
+    direct = directory / filename
+    if direct.is_file():
+        return direct
+    matches = sorted(directory.rglob(filename))
+    return matches[0] if matches else None
+
+
+def _result_name(directory):
+    name = directory.name
+    for prefix in ('test-summary-', 'summary-'):
+        if name.startswith(prefix):
+            return name[len(prefix):]
+    return name
+
+
+def collect_results(root):
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    directories = sorted(path for path in root.iterdir() if path.is_dir())
+    if (root / 'coverage.json').is_file() or (root / 'junit.xml').is_file():
+        directories.insert(0, root)
+    elif not directories and (_find_report(root, 'coverage.json') or _find_report(root, 'junit.xml')):
+        directories.append(root)
+    results = []
+    for directory in directories:
+        coverage_path = _find_report(directory, 'coverage.json')
+        junit_path = _find_report(directory, 'junit.xml')
+        if coverage_path is None and junit_path is None:
+            continue
+        results.append({
+            'name': _result_name(directory),
+            'coverage': _load_coverage(coverage_path) if coverage_path is not None else None,
+            'tests': _junit_summary(junit_path),
+        })
+    return results
+
+
+def _combined_test_section(results):
+    report = [
+        '| 平台 | 总数 | 通过 | 失败 | 错误 | 跳过 | 耗时 |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ]
+    totals = {'total': 0, 'passed': 0, 'failures': 0, 'errors': 0, 'skipped': 0, 'duration': 0.0}
+    available = False
+    missing = []
+    for result in results:
+        summary = result['tests']
+        name = _markdown_cell(result['name'])
+        if summary is None:
+            report.append('| `{}` | - | - | - | - | - | - |'.format(name))
+            missing.append(result['name'])
+            continue
+        available = True
+        for field in totals:
+            totals[field] += summary[field]
+        report.append(
+            '| `{}` | {} | {} | {} | {} | {} | {:.2f} 秒 |'.format(
+                name, summary['total'], summary['passed'], summary['failures'],
+                summary['errors'], summary['skipped'], summary['duration'],
+            )
+        )
+    if not available:
+        return ['JUnit 报告不可用；请检查测试步骤中的收集或运行失败。']
+    report.append(
+        '| **合计** | {} | {} | {} | {} | {} | {:.2f} 秒 |'.format(
+            totals['total'], totals['passed'], totals['failures'],
+            totals['errors'], totals['skipped'], totals['duration'],
+        )
+    )
+    if missing:
+        report.extend(['', 'JUnit 报告缺失：{}。'.format('、'.join(missing))])
+    return report
+
+
+def _combined_coverage_section(results):
+    report = [
+        '| 平台 | 行覆盖率 | 分支覆盖率 | 未覆盖行 | 未覆盖分支 |',
+        '| --- | ---: | ---: | ---: | ---: |',
+    ]
+    available = False
+    missing = []
+    for result in results:
+        data = result['coverage']
+        name = _markdown_cell(result['name'])
+        if data is None:
+            report.append('| `{}` | - | - | - | - |'.format(name))
+            missing.append(result['name'])
+            continue
+        available = True
+        totals = _coverage_totals(data)
+        report.append(
+            '| `{}` | {:.2f}% | {:.2f}% | {} | {} |'.format(
+                name, totals['lines'], totals['branches'],
+                totals['missing_lines'], totals['missing_branches'],
+            )
+        )
+    if not available:
+        return ['覆盖率报告不可用；请检查测试步骤中的收集或运行失败。'], False
+    report.extend(['', '不同平台覆盖率分别统计，不跨平台平均。'])
+    if missing:
+        report.extend(['', '覆盖率报告缺失：{}。'.format('、'.join(missing))])
+    return report, True
+
+
+def _combined_detail_section(results):
+    report = []
+    for result in results:
+        parts = []
+        summary = result['tests']
+        if summary is not None and summary['failed_cases']:
+            parts.extend(['**测试失败或错误**', ''])
+            parts.extend(_failure_section(summary))
+        if result['coverage'] is not None:
+            if parts:
+                parts.extend([''])
+            parts.extend(['**覆盖率明细**', ''])
+            parts.extend(_coverage_detail(result['coverage']))
+        if not parts:
+            continue
+        name = _markdown_cell(result['name'])
+        if report:
+            report.extend([''])
+        report.extend(['<details>', '<summary>`{}` 明细</summary>'.format(name), ''])
+        report.extend(parts)
+        report.extend(['', '</details>'])
+    return report
+
+
+def build_combined_report(results):
+    report = ['## Python 功能测试与覆盖率（全部平台）', '', '### 测试执行结果', '']
+    report.extend(_combined_test_section(results))
+    report.extend(['', '### 覆盖率', ''])
+    coverage_report, coverage_available = _combined_coverage_section(results)
+    report.extend(coverage_report)
+    details = _combined_detail_section(results)
+    if details:
+        report.extend(['', '### 平台明细', ''])
+        report.extend(details)
+    return '\n'.join(report) + '\n', coverage_available
+
+
 def main():
-    coverage_path = Path(sys.argv[1])
-    junit_path = Path(sys.argv[2]) if len(sys.argv) > 2 else coverage_path.with_name('junit.xml')
-    text, coverage_available = build_report(coverage_path, junit_path)
+    if len(sys.argv) < 2:
+        _write_stdout('用法：coverage_summary.py <coverage.json> [junit.xml] 或 --combined <artifact-root>')
+        return 2
+    if sys.argv[1] == '--combined' and len(sys.argv) >= 3:
+        text, coverage_available = build_combined_report(collect_results(Path(sys.argv[2])))
+    else:
+        coverage_path = Path(sys.argv[1])
+        junit_path = Path(sys.argv[2]) if len(sys.argv) > 2 else coverage_path.with_name('junit.xml')
+        text, coverage_available = build_report(coverage_path, junit_path)
     _write_stdout(text)
     destination = os.environ.get('GITHUB_STEP_SUMMARY')
     if destination:

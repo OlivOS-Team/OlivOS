@@ -67,6 +67,8 @@ python -m pytest --cov=OlivOS --cov-branch --cov-context=test \
   --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json \
   --junitxml=test-results/junit.xml
 python script/coverage_summary.py test-results/coverage.json test-results/junit.xml
+# CI 汇总 job 下载各平台 artifact 后生成一份跨平台报告
+python script/coverage_summary.py --combined test-summary
 ```
 
 CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），任何一个前置阶段失败后面都不会跑。

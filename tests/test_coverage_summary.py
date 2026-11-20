@@ -122,3 +122,59 @@ def test_report_marks_coverage_missing_but_keeps_test_result(tmp_path):
     assert available is False
     assert '| 1 | 1 | 0 | 0 | 0 | 0.10 秒 |' in text
     assert '覆盖率报告不可用' in text
+
+
+def test_combined_report_shows_all_platforms_and_totals(tmp_path):
+    '''跨平台汇总应显示每个平台的结果、合计与明细。'''
+    ubuntu = tmp_path / 'test-summary-ubuntu-latest'
+    windows = tmp_path / 'test-summary-windows-latest'
+    ubuntu.mkdir()
+    windows.mkdir()
+    _write_coverage(ubuntu / 'coverage.json')
+    _write_junit(
+        ubuntu / 'junit.xml',
+        [
+            ('tests.test_sample', 'test_ok', '0.10', None, None),
+            ('tests.test_sample', 'test_ok_too', '0.20', None, None),
+        ],
+        {'tests': '2', 'failures': '0', 'errors': '0', 'skipped': '0', 'time': '0.30'},
+    )
+    _write_coverage(windows / 'coverage.json')
+    _write_junit(
+        windows / 'junit.xml',
+        [
+            ('tests.test_sample', 'test_ok', '0.10', None, None),
+            ('tests.test_sample', 'test_ok_too', '0.20', None, None),
+            ('tests.test_sample', 'test_skip', '0.00', 'skipped', 'skip'),
+        ],
+        {'tests': '3', 'failures': '0', 'errors': '0', 'skipped': '1', 'time': '0.30'},
+    )
+    module = _summary_module()
+    results = module.collect_results(tmp_path)
+    text, available = module.build_combined_report(results)
+    assert available is True
+    # 每个平台的测试统计必须出现在同一张表，并提供跨平台合计。
+    assert '| `ubuntu-latest` | 2 | 2 | 0 | 0 | 0 |' in text
+    assert '| `windows-latest` | 3 | 2 | 0 | 0 | 1 |' in text
+    assert '| **合计** | 5 | 4 | 0 | 0 | 1 |' in text
+    # 覆盖率按平台分别展示，不做跨平台平均。
+    assert '| `ubuntu-latest` | 50.00% | 50.00% | 5 | 2 |' in text
+    assert '不同平台覆盖率分别统计，不跨平台平均。' in text
+    # 平台明细放在可折叠区块中，避免汇总页过长。
+    assert '<summary>`ubuntu-latest` 明细</summary>' in text
+
+
+def test_collect_results_finds_reports_in_nested_test_results(tmp_path):
+    '''artifact 保留 test-results 子目录时仍能找到覆盖率与 JUnit 报告。'''
+    reports = tmp_path / 'test-summary-macos-latest' / 'test-results'
+    reports.mkdir(parents=True)
+    _write_coverage(reports / 'coverage.json')
+    _write_junit(
+        reports / 'junit.xml',
+        [('tests.test_sample', 'test_ok', '0.10', None, None)],
+        {'tests': '1', 'failures': '0', 'errors': '0', 'skipped': '0', 'time': '0.10'},
+    )
+    results = _summary_module().collect_results(tmp_path)
+    assert [result['name'] for result in results] == ['macos-latest']
+    assert results[0]['coverage']['totals']['covered_lines'] == 5
+    assert results[0]['tests']['passed'] == 1

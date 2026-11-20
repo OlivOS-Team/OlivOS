@@ -39,8 +39,9 @@ python script/coverage_summary.py test-results/coverage.json test-results/junit.
 HTML 入口为 `test-results/html/index.html`，可查看每个文件执行过/未执行的行、缺失分支，
 以及经过该行的测试上下文。XML 供覆盖率工具读取，JSON 用于统计，JUnit XML 提供通过、失败、
 错误、跳过数量和失败用例清单。
-CI 上传这些报告和原始 `.coverage`，并在同一份 job summary 中组合显示测试执行结果、
-行/分支覆盖率及缺口最大的模块。
+CI 中各平台先上传 `coverage.json` 与 `junit.xml`，再由单独的 summary job 下载后运行
+`python script/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
+跨平台测试统计总表、覆盖率总表、跨平台合计以及可折叠的平台明细。
 
 统计范围为整个 `OlivOS/` Python 代码，含未执行的协议适配器和平台专用代码。
 仅排除第三方内置库、二进制/图片内嵌数据和生成的 `staticData.py`，不排除难测的业务代码。
@@ -48,7 +49,7 @@ Python 覆盖率不计量 JavaScript；前端行为由真实浏览器用例验�
 不同平台的报告分别保存，不能简单平均成一个全平台覆盖率。
 
 2026-11-21 本地基线（Windows、Python 3.11、默认离线功能测试，不启用浏览器用例）：
-**3378 项通过，85 项跳过**。语句覆盖率 **65.24%**（22872/35056），
+**3384 项通过，85 项跳过**。语句覆盖率 **65.24%**（22872/35056），
 分支覆盖率 **50.99%**（6720/13180）。该数字包含本轮新增的 API 路由、adapter 出站、
 协议传输、启动运行时、IOStream、libBooter、原生 GUI 辅助函数和 QQ 官方机器人公共 SDK 用例；
 它不是远端 Linux/ARM64 CI 的执行结果，也不包含真实浏览器用例对 JavaScript 的验证。
