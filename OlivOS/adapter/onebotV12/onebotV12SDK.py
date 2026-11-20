@@ -827,7 +827,7 @@ class event_action(object):
                 this_msg.do_api(bot_hash, control_queue)
 
     def get_login_info(target_event: OlivOS.API.Event):
-        res_data = OlivOS.contentAPI.api_result_data_template.get_group_info()
+        res_data = OlivOS.contentAPI.api_result_data_template.get_login_info()
         raw_obj = None
         if target_event.bot_info is not None:
             bot_hash = target_event.bot_info.hash
