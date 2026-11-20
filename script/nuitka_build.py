@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import site
@@ -69,11 +70,16 @@ def build_with_site_packages():
         "--include-distribution-metadata=setuptools",
         "--include-distribution-metadata=tzlocal",
         "--include-distribution-metadata=tzdata",
-        "--low-memory",
-        "--jobs=2",
+        "--report=./nuitka-report.xml",
         "--show-scons",
         "--show-progress"
     ])
+    # 默认使用 Nuitka 的 CPU 并行；需要限制内存时可用环境变量显式覆盖。
+    if os.environ.get('OLIVOS_NUITKA_LOW_MEMORY') == '1':
+        cmd.append('--low-memory')
+    jobs = os.environ.get('OLIVOS_NUITKA_JOBS')
+    if jobs:
+        cmd.append(f'--jobs={jobs}')
     for pkg in dict.fromkeys(packages):
         if pkg.lower() not in excludeList:
             print(f"Hit {pkg}")
