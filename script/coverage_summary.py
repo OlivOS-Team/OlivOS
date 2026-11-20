@@ -34,10 +34,22 @@ def _module_totals(files):
     return modules
 
 
+def _write_stdout(text):
+    '''输出中文摘要；本地编码无法表示时回退到 UTF-8，兼容 Windows CI 的 cp1252。'''
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        reconfigure = getattr(sys.stdout, 'reconfigure', None)
+        if reconfigure is None:
+            raise
+        reconfigure(encoding='utf-8')
+        print(text)
+
+
 def main():
     path = Path(sys.argv[1])
     if not path.is_file():
-        print('覆盖率报告不可用；请检查测试步骤中的收集或运行失败。')
+        _write_stdout('覆盖率报告不可用；请检查测试步骤中的收集或运行失败。')
         return 1
     data = json.loads(path.read_text(encoding='utf-8'))
     totals = data['totals']
@@ -78,7 +90,7 @@ def main():
         missing_branches = details['summary']['missing_branches']
         report.append(f'| `{name}` | {missing_branches} |')
     text = '\n'.join(report) + '\n'
-    print(text)
+    _write_stdout(text)
     destination = os.environ.get('GITHUB_STEP_SUMMARY')
     if destination:
         with open(destination, 'a', encoding='utf-8') as stream:
