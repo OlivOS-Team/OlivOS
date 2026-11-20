@@ -10,6 +10,9 @@ jobs:
   tests:
     needs: lint
     uses: ./.github/workflows/test.yml
+    permissions:
+      actions: read
+      contents: read
 
   build:
     needs: tests
