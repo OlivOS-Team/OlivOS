@@ -251,9 +251,11 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
         service = Service(executable_path=driver_path) if driver_path else None
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(f"http://127.0.0.1:{host.config['port']}")
+        wait = WebDriverWait(driver, 10)
+        wait.until(lambda d: d.find_element(By.ID, 'token').is_displayed())
         driver.find_element(By.ID, 'token').send_keys(host.test_password)
         driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
-        WebDriverWait(driver, 10).until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
+        wait.until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
         result = driver.execute_async_script('''
             const done = arguments[arguments.length - 1];
             const resetBetween = arguments[0];
@@ -286,24 +288,10 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
 
 
 @pytest.fixture
-def browser_auth(host):
-    if not os.environ.get('OLIVOS_WEBUI_BROWSER'):
-        pytest.skip('Set OLIVOS_WEBUI_BROWSER=1 to run Chrome')
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
+def browser_auth(host, chrome_session):
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
-    options = webdriver.ChromeOptions()
-    if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
-        options.add_argument('--no-sandbox')
-    # 认证用例操作桌面侧边栏控件；显式桌面视口避免 Chrome 默认 800px 进入移动抽屉。
-    for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
-                     '--window-size=1440,1000',
-                     f'--user-data-dir={host.root / "auth-profile"}'):
-        options.add_argument(argument)
-    if os.environ.get('OLIVOS_CHROME_BINARY'):
-        options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
     services = []
     ui = SimpleNamespace(driver=None, host=host)
 
@@ -325,17 +313,23 @@ def browser_auth(host):
         assert service.credentials == host.credentials
 
     def open_browser():
-        path = os.environ.get('OLIVOS_CHROMEDRIVER')
-        ui.driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
+        ui.driver = chrome_session.open()
         ui.wait = WebDriverWait(ui.driver, 10)
+        # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
+        ui.login_wait = WebDriverWait(ui.driver, 30)
 
     def find(selector):
         return ui.driver.find_element(By.CSS_SELECTOR, selector)
 
     def login():
+        ui.login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
+                            '登录页输入框未出现')
         find('#token').send_keys(host.test_password)
+        ui.login_wait.until(lambda _: find('#login-form button[type=submit]').is_displayed()
+                            and find('#login-form button[type=submit]').is_enabled(),
+                            '登录按钮未就绪')
         find('#login-form button[type=submit]').click()
-        ui.wait.until(lambda _: find('#shell').is_displayed())
+        ui.login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
 
     def logged_out():
         ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button[type=submit]').is_enabled())
@@ -349,13 +343,13 @@ def browser_auth(host):
     try:
         host.config.update(host='127.0.0.1', port=0)
         ui.url = start(host)
-        open_browser()
+        ui.driver = chrome_session.prepare(ui.url)
+        ui.wait = WebDriverWait(ui.driver, 10)
+        ui.login_wait = WebDriverWait(ui.driver, 30)
         ui.driver.get(ui.url)
         login()
         yield ui
     finally:
-        if ui.driver is not None:
-            ui.driver.quit()
         for service, worker in services:
             service.on_terminate()
             worker.join(timeout=5)

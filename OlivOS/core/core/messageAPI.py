@@ -206,10 +206,9 @@ class Message_templet(object):
     def get_from_dict(self, src_dict, key_list, default_val=None):
         tmp_src_dict = src_dict
         for key_list_this in key_list:
-            if key_list_this in tmp_src_dict:
-                tmp_src_dict = tmp_src_dict[key_list_this]
-            else:
+            if not isinstance(tmp_src_dict, dict) or key_list_this not in tmp_src_dict:
                 return default_val
+            tmp_src_dict = tmp_src_dict[key_list_this]
         return tmp_src_dict
 
     def get(self, get_type):
@@ -946,10 +945,13 @@ class PARA_templet(object):
                 paraData['is_large'] = False
             elif type(self) is PARA.reply:
                 paraType = 'reply'
-                scene, peer_id, seq = self.data['id'].split('|')
-                paraData['message_seq'] = int(seq)
-                paraData['sender_id'] = int(peer_id)
-                paraData['time'] = int(time.time())
+                reply_parts = str(self.data['id']).split('|')
+                if len(reply_parts) == 3:
+                    paraData['message_seq'] = int(reply_parts[2])
+                    paraData['sender_id'] = int(reply_parts[1])
+                    paraData['time'] = int(time.time())
+                else:
+                    paraData['message_seq'] = int(reply_parts[0])
             elif type(self) is PARA.image:
                 paraType = 'image'
                 paraData['resource_id'] = self.data['file']
@@ -1005,8 +1007,8 @@ class PARA_templet(object):
                 paraData['is_large'] = False
             elif type(self) is PARA.reply:
                 paraType = 'reply'
-                scene, peer_id, seq = self.data['id'].split('|')
-                paraData['message_seq'] = int(seq)
+                reply_parts = str(self.data['id']).split('|')
+                paraData['message_seq'] = int(reply_parts[2] if len(reply_parts) == 3 else reply_parts[0])
             elif type(self) is PARA.image:
                 paraType = 'image'
                 paraData['uri'] = self.data['file']
@@ -1131,7 +1133,8 @@ class PARA_templet(object):
         return json.dumps(obj=PARA_tmp.__dict__)
 
     def copy(self):
-        copy_tmp = PARA_templet(self.type, self.data.copy())
+        tmp_data = self.data.copy() if self.data is not None else None
+        copy_tmp = PARA_templet(self.type, tmp_data)
         return copy_tmp
 
     def cut(self):

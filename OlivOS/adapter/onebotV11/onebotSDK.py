@@ -882,7 +882,7 @@ class event_action(object):
     def reply_group_msg(target_event, message):
         event_action.send_group_msg(
             target_event=target_event,
-            user_id=target_event.data.group_id,
+            group_id=target_event.data.group_id,
             message=message
         )
 

@@ -67,6 +67,21 @@ class RESPONSE_STATUS_CODE(IntEnum):
     FAIL = 500
 
 
+def _normalize_access_token_response(res):
+    '''Return a cacheable token payload or None for an error/malformed reply.'''
+
+    if not isinstance(res, dict):
+        return None
+    token = res.get('accessToken')
+    try:
+        expire_in = int(res.get('expireIn'))
+    except (TypeError, ValueError):
+        return None
+    if token is None or expire_in <= 0:
+        return None
+    return {'accessToken': token, 'expireIn': expire_in}
+
+
 class bot_info_T(object):
     def __init__(self, id=-1, AppKey=None, AppSecret=None, model='private'):
         self.id = id
@@ -89,7 +104,7 @@ class bot_info_T(object):
             if time_this < self._expire_time:
                 return self._access_token
         api_obj = API.getAccessToken(self)
-        res = api_obj.do_api()
+        res = _normalize_access_token_response(api_obj.do_api())
         if res is not None:
             self._access_token = res["accessToken"]
             self._expire_time = time_this + max(int(res["expireIn"])-200, 200)              # 提早 200s 更新 access token

@@ -37,11 +37,15 @@ jobs:
   build:
     if: inputs.enable && (inputs.runs-on == 'macos-latest' || inputs.runs-on == 'macos-26-intel')
     runs-on: ${{ inputs.runs-on }}
+    # Nuitka 需要编译全部 site-packages，设置充足上限避免编译超时。
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
+    env:
+      NUITKA_CACHE_DIR: ${{ github.workspace }}/.nuitka-cache
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     
     - name: Setup Python ${{ inputs.python-version }} (${{ inputs.python-arch }})
       id: setup-python
@@ -51,6 +55,15 @@ jobs:
         cache: pip
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
+
+    - name: Cache Nuitka build cache
+      if: inputs.build-type == 'nuitka'
+      uses: actions/cache@v6
+      with:
+        path: .nuitka-cache
+        key: nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-${{ hashFiles('pyproject.toml', 'setup.py', 'script/nuitka_build.py') }}
+        restore-keys: |
+          nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       id: build
@@ -77,6 +90,7 @@ jobs:
         if [[ ${{ inputs.build-type == 'pyinstaller' && '1' || '0' }} -eq 1 ]]; then
           "${PYTHON}" -m PyInstaller ./OlivOS.spec
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
+          export OLIVOS_NUITKA_JOBS=$(getconf _NPROCESSORS_ONLN)
           "${PYTHON}" ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
@@ -89,14 +103,22 @@ jobs:
           cp ./dist/OlivOS* ./OlivOS-PKG/
         fi
     
+    - name: Upload Nuitka compilation report
+      if: always() && inputs.build-type == 'nuitka'
+      uses: actions/upload-artifact@v6
+      with:
+        name: nuitka-report-${{ inputs.name }}
+        path: ./nuitka-report.xml
+        if-no-files-found: warn
+
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.name }}
         path: ./OlivOS-PKG
     
     - name: Upload Publish Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: inputs.name == 'OlivOS-MacOS64-release' || inputs.name == 'OlivOS-MacOS-arm64-release'
       with:
         name: ${{ inputs.arch == 'arm64' && 'OlivOS-MacOS-arm64' || 'OlivOS-MacOS' }}

@@ -16,7 +16,7 @@ python -m pytest
 Windows 安装 `.[test,win]`。不需要真实机器人账号或平台凭据；文件写入测试临时目录，
 平台请求使用替身，本地 HTTP/WebSocket 测试监听回环地址和临时端口。
 
-Chrome 浏览器测试单独通过环境变量开启。Linux CI 自动安装兼容的 Chrome 和 ChromeDriver：
+Chrome 浏览器测试单独通过环境变量开启。Linux x64 和 Windows x64 CI 自动安装兼容的 Chrome 和 ChromeDriver：
 
 ```sh
 OLIVOS_WEBUI_BROWSER=1 python -m pytest -m browser
@@ -24,6 +24,8 @@ OLIVOS_WEBUI_BROWSER=1 python -m pytest -m browser
 
 PowerShell 使用 `$env:OLIVOS_WEBUI_BROWSER='1'` 后运行同一 pytest 命令。
 已有浏览器/驱动可通过 `OLIVOS_CHROME_BINARY`、`OLIVOS_CHROMEDRIVER` 指定路径。
+浏览器 fixture 在每个测试模块内复用同一个 Chrome 进程，并在用例开始前关闭遗留标签页；
+这样既保持不同端口的页面隔离，也避免 Windows CI 连续启动浏览器造成随机超时。
 原生 Tk 界面用例只在 Windows 运行，窗口保持隐藏；不启动托盘或真实协议程序。
 
 ## 覆盖率
@@ -33,22 +35,26 @@ python -m pytest --cov=OlivOS --cov-branch --cov-context=test \
   --cov-report=term --cov-report=xml:test-results/coverage.xml \
   --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json \
   --junitxml=test-results/junit.xml
-python script/coverage_summary.py test-results/coverage.json
+python script/coverage_summary.py test-results/coverage.json test-results/junit.xml
 ```
 
 HTML 入口为 `test-results/html/index.html`，可查看每个文件执行过/未执行的行、缺失分支，
-以及经过该行的测试上下文。XML 供覆盖率工具读取，JSON 用于统计，JUnit XML 用于定位失败用例。
-CI 上传这些报告和原始 `.coverage`，并在 job summary 中列出行、分支覆盖率及缺口最大的模块。
+以及经过该行的测试上下文。XML 供覆盖率工具读取，JSON 用于统计，JUnit XML 提供通过、失败、
+错误、跳过数量和失败用例清单。
+CI 中各平台先上传 `coverage.json` 与 `junit.xml`，再由单独的 summary job 下载后运行
+`python script/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
+跨平台测试统计总表、覆盖率总表、跨平台合计以及可折叠的平台明细。
 
 统计范围为整个 `OlivOS/` Python 代码，含未执行的协议适配器和平台专用代码。
 仅排除第三方内置库、二进制/图片内嵌数据和生成的 `staticData.py`，不排除难测的业务代码。
 Python 覆盖率不计量 JavaScript；前端行为由真实浏览器用例验证。
 不同平台的报告分别保存，不能简单平均成一个全平台覆盖率。
 
-2026-09-22 本地验收基线（Windows、干净 Python 3.11 环境，同时开启 Chrome）：
-21 个测试文件、177 个独立测试函数，经参数化后 **413 项通过，0 失败、0 跳过**。
-行覆盖率 **34.43%**（10352/30067），分支覆盖率 **16.15%**（1799/11142），
-coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/ARM64 CI 的执行结果。
+2026-11-21 本地基线（Windows、Python 3.11、默认离线功能测试，不启用浏览器用例）：
+**3378 项通过，85 项跳过**。语句覆盖率 **65.24%**（22872/35056），
+分支覆盖率 **50.99%**（6720/13180）。该数字包含本轮新增的 API 路由、adapter 出站、
+协议传输、启动运行时、IOStream、libBooter、原生 GUI 辅助函数和 QQ 官方机器人公共 SDK 用例；
+它不是远端 Linux/ARM64 CI 的执行结果，也不包含真实浏览器用例对 JavaScript 的验证。
 
 当前先建立真实基线，不设置未经评估的全仓库百分比门槛。后续改良优先顺序：
 
@@ -63,11 +69,15 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | --- | --- | --- |
 | 账号配置 | `test_accounts.py` | 保存/读取、启停过滤、身份隔离、安全读取、端口分配 |
 | 消息结构 | `test_messages.py` | CQ/OP、OneBot V12、Milky、文本/提及/媒体/轻应用转换、无效输入 |
+| 消息结构扩展 | `test_messages_extended.py` | 全部 PARA 段往返、OBV12/Milky 解析、CQ/OP 转义、未知段与畸形中间值 |
 | 插件调度 | `test_plugin_dispatch.py` | 调用顺序与优先级覆盖、热重载、阻断、平台过滤、异常捕获、未知账号和重载请求 |
 | 插件 WebUI 资源 | `test_opk_webui_lifecycle.py` | 源码/OPK、路径与 namespace、init 资源、重载/卸载、文件占用、越界和链接限制 |
 | 账号与 SDK 边界 | `test_adapters.py` | 20 个适配器的账号映射、OneBot 消息/通知/请求、虚拟终端、活动时间、QQ webhook 验签 |
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
+| API 事件路由 | `test_api_event_routing.py` | `reply`/`send`/查询/管理动作的跨平台支持矩阵、未支持平台不串路由、远程模式短路 |
+| Adapter 出站 API | `test_adapter_api_contracts.py`, `test_adapter_api_extended.py` | OneBot/KOOK/小黑盒/Milky 的 URL、鉴权、请求体、成功与错误响应、异步受理和返回归一化 |
+| 协议传输循环 | `test_adapter_transports.py` | Link/Host/Webhook/Poll 的入站帧、出站控制包、停止、异常帧、队列与重连路径 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
 | QQ 官方机器人发送重试 | `test_qqguildv2_send_retry.py` | 按错误码分档重试（长度/服务端异常最多重试三次，超时/5xx/429 不重试）、重试与拆段占用被动回复额度、长度降级为纯文本并按字节拆段、内联标签不被切断 |
 | QQ 官方机器人被动回复规则 | `test_qqguildv2_passive_rules.py` | 群消息 `msg_id` 私聊回复发送者（仅限发送者本人）、群内与单聊共用同一个次数上限、群主/管理员 50 次与普通成员 5 次、11253 兜底、60 分钟有效期 |
@@ -77,15 +87,20 @@ coverage.py 行与分支综合指标 **29.49%**。此基线不是远端 Linux/AR
 | QQ 官方机器人图文卡片 | `test_qqguildv2_card_messages.py` | 群聊/单聊 `msg_type=8` 图文卡片发送、字段校验、indeAPI 入口与被动回复降级 |
 | QQ 官方机器人按钮 | `test_qqguildv2_interactions.py` | 回调按钮投递、群/单聊/频道上下文、原始数据、自动 ACK 与去重、并发/队列上限与过期、异常恢复、被动回复及异常载荷 |
 | QQ 官方机器人分享链接 | `test_qqguildv2_share_links.py` | 请求构造、输入限制与服务端失败响应 |
+| QQ 官方机器人公共 SDK | `test_qqguildv2_common_contracts.py` | payload/API 模板、查询与撤回、消息缓存、分片上传参数、键盘/卡片校验和原始响应包装 |
 | QQ 官方机器人 Markdown 图片 | `test_qqguildv2_media_images.py`, `test_qqguildv2_markdown_images.py` | 素材接口请求、重复图片去重、自动图文转 Markdown、临时素材清理、不确定发送结果与上传失败回退 |
 | QQ 官方机器人 Markdown 排版 | `test_qqguildv2_markdown_blank_lines.py` | 空行补 U+200B 占位（引用/列表/围栏/分割线/标题不补，表格两侧补）、围栏闭合口径、无外层竖线的表格、幂等、日志预览与三条回退路径不残留占位 |
 | QQ 官方机器人入群申请 | `test_qqguildv2_join_request.py` | 入群申请标志解析与构造、审批接口参数校验、星号导入下私有工具函数的可见性 |
 | 协议启动器 | `test_protocol_booters.py` | Windows 启动器日志路由、NapCat 配置生成，不运行外部程序 |
+| 外部程序启动器 | `test_libbooter_support.py` | 启动器分派、账号修复文件、旧 GBK 压缩包、假子进程与假服务器；仅 Windows 运行，不运行 NapCat/go-cqhttp |
 | 数据存储 | `test_user_database.py`, `test_legacy_config.py` | SQLite 持久化/隔离/并发/序列化，以及旧用户/群配置接口 |
+| 输入流缓存 | `test_iostream.py` | pickle 读写、缓存创建与清理、损坏文件、只读和并发边界 |
 | 启动与辅助功能 | `test_boot_and_metadata.py` | 配置合并、启动顺序、元数据、本地化、资源定位、更新请求与进程终止边界 |
+| 启动运行时 | `test_boot_runtime.py` | 启动装配、按账号/模型创建进程、控制包路由、停止与清理，全部使用假进程和假队列 |
 | 日志 | `test_logging.py` | 文本清理、队列满、等级过滤、文件批量写入、GUI 转发 |
 | 原生终端 | `test_native_terminal.py` | 坏历史记录、特殊字符串、控件异常、限频与轮转、后续记录继续显示 |
 | 原生账号管理 | `test_native_accounts.py` | 托盘入口、编辑草稿隔离、新建/修改/删除、保存与热重载总线 |
+| 原生 GUI 辅助函数 | `test_native_gui_helpers.py` | Tk 树控件、账号列表、发布控制包；Windows 使用隐藏窗口，非 Windows 跳过 |
 | 原生插件管理 | `test_native_plugins.py` | 生效顺序展示、用户/默认优先级标签、修改/置顶/置底/恢复默认与热重载 |
 | WebUI 后端 | `test_webui.py` | HTTP/WS 认证、账号保存与状态（含版本号与版本简称）、日志与终端、插件事件、优先级编辑、监听端口和重启反馈 |
 | WebUI 登录 | `test_webui_auth.py` | 凭据生命周期、并发登录、重启、错误提示、短暂断网和跨标签退出 |
@@ -103,9 +118,11 @@ DoDo Poll/Link/EA、KOOK、黑盒语音、B站直播、OPQ、米游社大别野�
 未知事件应被忽略，后续正常消息仍可处理；DoDo EA 没有事件类型字段，改测不合法的消息记录。
 对不存在相同功能的平台，不强行套用 QQ 分享链接或其他平台特有接口测试。
 
-这是必要功能的初始回归集合，不代表所有平台接口和实际连接场景均已验证。
-真实平台登录、外部可执行文件安装、服务端协议变化、完整重连和完整桌面操作仍有覆盖缺口。
-旧 `IOStream` 输入流实现尚无功能覆盖，其历史文件操作/状态机需要单独梳理；该文件仍计入覆盖率分母。
+这是必要功能的回归集合，不代表所有平台接口和实际连接场景均已验证。
+真实平台登录、外部可执行文件安装、服务端协议变化、完整网络重连和完整桌面操作仍有覆盖缺口。
+`IOStream` 已覆盖基本的 pickle 读写、缓存清理和异常输入；真实历史数据迁移、长期运行下的文件占用与
+跨平台路径差异仍需单独验证。新增难测模块用例统一使用临时目录、假进程、假队列、本地回环服务或
+隐藏窗口，不启动真实平台、NapCat/go-cqhttp 或可见桌面程序。
 
 ## 旧测试取舍
 
@@ -127,7 +144,7 @@ DoDo Poll/Link/EA、KOOK、黑盒语音、B站直播、OPQ、米游社大别野�
 `pypiPublish.yml` 保留 Test → 发布的门禁，不额外运行 Lint。
 保留上游新合并的 Linux ARM64 构建与产物发布逻辑。
 
-测试矩阵：Python 3.11，Linux x64（含 Chrome）、Linux ARM64、Windows x64/ARM64、
+测试矩阵：Python 3.11，Linux x64（含 Chrome）、Windows x64（含 Chrome）、Linux ARM64、Windows ARM64、
 macOS Intel/Apple Silicon。不表示已在每个旧 Python 构建版本上运行测试。
 发布权限和发布动作沿用已有 workflow，测试只需仓库只读权限。
 

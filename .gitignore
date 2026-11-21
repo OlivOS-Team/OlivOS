@@ -10,6 +10,8 @@ flake8_output.log
 *.egg-info
 build
 dist
+.nuitka-cache/
+nuitka-report.xml
 .vscode/settings.json
 *.opk
 .workbuddy

@@ -37,11 +37,15 @@ jobs:
   build:
     if: inputs.enable && (inputs.runs-on == 'windows-latest' || inputs.runs-on == 'windows-11-arm')
     runs-on: ${{ inputs.runs-on }}
+    # Nuitka 需要编译全部 site-packages，设置充足上限避免编译超时。
+    timeout-minutes: 180
     defaults:
       run:
         shell: pwsh
+    env:
+      NUITKA_CACHE_DIR: ${{ github.workspace }}/.nuitka-cache
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
 
     - name: Install MSVC Build Tools
       if: false && inputs.build-type == 'nuitka'
@@ -58,6 +62,15 @@ jobs:
         cache: pip
         architecture: ${{ inputs.python-arch }}
         freethreaded: ${{ inputs.freethreaded && true || false }}
+
+    - name: Cache Nuitka build cache
+      if: inputs.build-type == 'nuitka'
+      uses: actions/cache@v6
+      with:
+        path: .nuitka-cache
+        key: nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-${{ hashFiles('pyproject.toml', 'setup.py', 'script/nuitka_build.py') }}
+        restore-keys: |
+          nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-
     
     - name: Build by ${{ inputs.build-type }} (${{ inputs.debug && 'Debug' || 'Release' }})
       id: build
@@ -83,6 +96,7 @@ jobs:
           & $PYTHON -m PyInstaller ./OlivOS.spec
         } elseif (${{ inputs.build-type == 'nuitka' && '1' || '0' }}) {
           cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
+          $env:OLIVOS_NUITKA_JOBS = $env:NUMBER_OF_PROCESSORS
           & $PYTHON ./script/nuitka_build.py
         }
         mkdir OlivOS-PKG
@@ -99,14 +113,22 @@ jobs:
           }
         }
     
+    - name: Upload Nuitka compilation report
+      if: always() && inputs.build-type == 'nuitka'
+      uses: actions/upload-artifact@v6
+      with:
+        name: nuitka-report-${{ inputs.name }}
+        path: ./nuitka-report.xml
+        if-no-files-found: warn
+
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.name }}
         path: ./OlivOS-PKG
 
     - name: Upload Publish Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: inputs.name == 'OlivOS-Win64-release' || inputs.name == 'OlivOS-Win-arm64-release'
       with:
         name: ${{ inputs.arch == 'arm64' && 'OlivOS-Win-arm64' || 'OlivOS-Win' }}
