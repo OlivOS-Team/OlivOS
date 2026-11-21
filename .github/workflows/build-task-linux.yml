@@ -39,6 +39,8 @@ jobs:
     # ubuntu-24.04-arm 之后这个条件会直接变 false，job 被静默跳过。
     if: inputs.enable && startsWith(inputs.runs-on, 'ubuntu-')
     runs-on: ${{ inputs.runs-on }}
+    # Nuitka 需要编译全部 site-packages，设置充足上限避免编译超时。
+    timeout-minutes: 180
     # container:
     #   image: node:20-alpine
     #   options: --platform linux/${{ inputs.arch }}
