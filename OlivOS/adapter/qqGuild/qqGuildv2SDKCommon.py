@@ -5062,6 +5062,22 @@ class event_action_common(object):
         except Exception:
             traceback.print_exc()
 
+    def _log_markdown_quote_warning(target_event):
+        try:
+            if target_event.log_func is not None:
+                target_event.log_func(
+                    3,
+                    '带引用的 Markdown 消息：接收方 QQ 版本较低时会丢失全部 Markdown 格式与图片，'
+                    '并可能让被引用的内容再重复显示一次；建议改用自行构建的引用块（正文以 > 开头）。',
+                    [
+                        (target_event.getBotIDStr(), 'default'),
+                        (modelName, 'default'),
+                        ('markdown_image', 'callback')
+                    ]
+                )
+        except Exception:
+            traceback.print_exc()
+
     def _resolve_public_image_addresses(url):
         """
         解析并校验远程图片域名，返回全部公网 IP（升序）。
@@ -5580,14 +5596,14 @@ class event_action_common(object):
         image_sources = {}
         image_segments = []
         has_text_content = False
-        # QQ 不支持带图片的 Markdown 消息作为引用回复：消息带 reply 段（或调用方
-        # 显式给了 quote_msg_id）就整条交回普通图文路径，由旧逻辑带引用发送。
+        # 平台可以发送带引用的 Markdown 图文消息；只是低版本 QQ 客户端存在兼容问题，
+        # 发送时由 create_markdown_message 输出一条警告日志提醒开发者。
         if quote_msg_id is None:
             quote_msg_id = event_action._get_message_reference_id(message)
-        if quote_msg_id is not None:
-            return None, '带引用的图文消息不走 Markdown'
         for segment in message.data:
-            if isinstance(segment, OlivOS.messageAPI.PARA.text):
+            if isinstance(segment, OlivOS.messageAPI.PARA.reply):
+                continue
+            elif isinstance(segment, OlivOS.messageAPI.PARA.text):
                 text_content = segment.OP()
                 content_parts.append(('text', text_content))
                 has_text_content = has_text_content or text_content.strip() != ''
@@ -5861,6 +5877,8 @@ class event_action_common(object):
         this_msg.data.keyboard = keyboard
         if quote_msg_id is not None and str(quote_msg_id) != '':
             this_msg.data.message_reference = {'message_id': str(quote_msg_id)}
+            if chat_type in ['qq_group', 'qq_private']:
+                event_action._log_markdown_quote_warning(target_event)
         res_data = event_action._send_qq_api(
             target_event,
             this_msg,

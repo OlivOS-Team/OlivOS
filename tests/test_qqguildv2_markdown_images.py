@@ -4,6 +4,8 @@ import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
+
 import OlivOS
 from OlivOS.adapter.qqGuild import qqGuildv2SDKCommon as common
 
@@ -19,6 +21,13 @@ def _target_event():
         platform_model='public'
     )
     return SimpleNamespace(bot_info=bot, log_func=None)
+
+
+def _target_event_with_logger(logs):
+    event = _target_event()
+    event.log_func = lambda level, msg, segments: logs.append((level, msg, segments))
+    event.getBotIDStr = lambda: 'qqGuild|10001'
+    return event
 
 
 def test_local_markdown_images_deduplicate_by_content(monkeypatch):
@@ -268,10 +277,19 @@ def test_remote_markdown_image_download_stops_at_size_limit(monkeypatch):
     assert request.call_args.kwargs['timeout'] == (5.0, 60.0)
 
 
-def test_mixed_markdown_with_reply_falls_back_to_plain_message(monkeypatch):
-    """QQ 不支持 Markdown 图文+引用：带 reply 段时整条回退普通图文，引用交给旧路径。"""
-    upload = Mock(side_effect=AssertionError('带引用的消息不应走 Markdown 上传'))
+def test_mixed_markdown_with_reply_sends_markdown_with_quote(monkeypatch):
+    """带 reply 段的图文消息仍然走 Markdown，并把 reply 里的 id 透传给 quote_msg_id。"""
+    uploaded = [{'image_id': 'id-1', 'url': 'qqbot-media://image/v1/t'}]
+    upload = Mock(return_value=(
+        {'image_0': '![image #20px #10px](qqbot-media://image/v1/t)'},
+        uploaded,
+        None
+    ))
     monkeypatch.setattr(SDK.event_action, '_upload_markdown_images', upload)
+    delete = Mock()
+    monkeypatch.setattr(SDK.event_action, '_delete_markdown_images', delete)
+    send = Mock(return_value={'active': True, 'data': {'http_status': 200}})
+    monkeypatch.setattr(SDK.event_action, 'create_markdown_message', send)
     message = OlivOS.messageAPI.Message_templet('olivos_para', [
         OlivOS.messageAPI.PARA.reply('ROBOT1.0_quote'),
         OlivOS.messageAPI.PARA.image('https://i0.hdslb.com/cover.jpg'),
@@ -282,9 +300,15 @@ def test_mixed_markdown_with_reply_falls_back_to_plain_message(monkeypatch):
         _target_event(), 'qq_group', 'group', message
     )
 
-    assert result is None
-    assert '引用' in error
-    upload.assert_not_called()
+    assert error is None
+    assert result['active'] is True
+    upload.assert_called_once()
+    send.assert_called_once()
+    assert send.call_args.kwargs['quote_msg_id'] == 'ROBOT1.0_quote'
+    assert send.call_args.args[3]['content'] == (
+        '![image #20px #10px](qqbot-media://image/v1/t)BV号：BV184JQ6LEW9'
+    )
+    delete.assert_called_once_with(send.call_args.args[0], uploaded)
 
 
 def test_mixed_markdown_rejects_real_media_segments_with_type_name(monkeypatch):
@@ -671,3 +695,65 @@ def test_mixed_markdown_rejection_fallback_keeps_force_active(monkeypatch):
     assert result['active'] is True
     assert fallback.call_args.kwargs['force_active'] is True
     assert fallback.call_args.kwargs['allow_markdown'] is False
+
+
+@pytest.mark.parametrize('chat_type', ['qq_group', 'qq_private'])
+def test_create_markdown_message_warns_when_quote_msg_id_is_set(monkeypatch, chat_type):
+    """QQ 群/私聊发送带引用的 Markdown 消息时，应打一条 WARN 级兼容警告日志。"""
+    logs = []
+    target = _target_event_with_logger(logs)
+    send_api = Mock(return_value={'active': True, 'data': {'http_status': 200}})
+    monkeypatch.setattr(SDK.event_action, '_send_qq_api', send_api)
+
+    result = SDK.event_action.create_markdown_message(
+        target,
+        chat_type,
+        'target-id',
+        {'content': 'hello **markdown**'},
+        quote_msg_id='ROBOT1.0_quote'
+    )
+
+    assert result['active'] is True
+    assert send_api.call_args.args[1].data.message_reference == {'message_id': 'ROBOT1.0_quote'}
+    assert len(logs) == 1
+    level, message, segments = logs[0]
+    assert level == 3
+    assert '引用' in message
+    assert 'Markdown' in message
+    assert 'QQ' in message
+    assert segments == [
+        ('qqGuild|10001', 'default'),
+        (common.modelName, 'default'),
+        ('markdown_image', 'callback')
+    ]
+
+
+@pytest.mark.parametrize(
+    'chat_type,quote_msg_id',
+    [
+        ('qq_group', None),
+        ('qq_group', ''),
+        ('qq_private', None),
+        ('guild_channel', 'ROBOT1.0_quote'),
+    ]
+)
+def test_create_markdown_message_does_not_warn_without_qq_quote(monkeypatch, chat_type, quote_msg_id):
+    """未带引用（或空引用、非 QQ 群/私聊场景）发 Markdown 时，不应触发引用警告日志。"""
+    logs = []
+    target = _target_event_with_logger(logs)
+    monkeypatch.setattr(
+        SDK.event_action,
+        '_send_qq_api',
+        Mock(return_value={'active': True, 'data': {'http_status': 200}})
+    )
+
+    result = SDK.event_action.create_markdown_message(
+        target,
+        chat_type,
+        'target-id',
+        {'content': 'hello **markdown**'},
+        quote_msg_id=quote_msg_id
+    )
+
+    assert result['active'] is True
+    assert logs == []
