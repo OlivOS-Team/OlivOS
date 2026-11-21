@@ -97,7 +97,9 @@ jobs:
           fi
           rm -rf ./smoke ./smoke.log
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
-          export OLIVOS_NUITKA_JOBS=$(getconf _NPROCESSORS_ONLN)
+          # 托管运行器内存有限；降低并行编译并启用低内存模式，避免大型模块编译时 OOM。
+          export OLIVOS_NUITKA_JOBS="${OLIVOS_NUITKA_JOBS:-2}"
+          export OLIVOS_NUITKA_LOW_MEMORY="${OLIVOS_NUITKA_LOW_MEMORY:-1}"
           "${PYTHON}" ./script/nuitka_build.py
         fi
         mkdir OlivOS-PKG
