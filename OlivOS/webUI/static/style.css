@@ -1741,6 +1741,12 @@ header h1 {
   line-height: 1.2;
   white-space: nowrap;
 }
+.performance-view-value-network {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+  white-space: normal;
+}
 .performance-panel {
   min-width: 0;
 }

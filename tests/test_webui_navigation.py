@@ -1910,6 +1910,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
     assert '↓ 8.0 KiB/s' in network_summary
     assert '↑' not in network_summary
+    network_value = driver.execute_script(
+        "return document.getElementById('performance-network-value').textContent")
+    assert '↓ 8.0 KiB/s' in network_value
+    assert '↑ 4.0 KiB/s' in network_value
     traffic_summary = driver.execute_script(
         "return document.querySelector('[data-performance-summary=\"traffic\"]').textContent")
     assert '↓ 5' in traffic_summary

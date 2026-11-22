@@ -1321,6 +1321,8 @@ function renderPerformanceStatistics(data) {
   setPerformanceSummary('memory', formatPercent(memory.percent));
   setPerformanceSummary('disk', formatPercent(disk.percent));
   setPerformanceSummary('network', `↓ ${formatRate(network.recv_bps)}`);
+  setPerformanceReadout('performance-network-value',
+    `↓ ${formatRate(network.recv_bps)} · ↑ ${formatRate(network.sent_bps)}`);
   setPerformanceSummary('traffic',
     `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
 
