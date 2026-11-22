@@ -1747,6 +1747,12 @@ header h1 {
   text-align: right;
   white-space: normal;
 }
+.performance-view-value-processes {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+  white-space: normal;
+}
 .performance-panel {
   min-width: 0;
 }
@@ -1916,8 +1922,14 @@ header h1 {
   gap: 4px 10px;
   padding: 3px 8px;
   border-left: 1px dashed var(--line);
+  border-radius: 4px;
   color: var(--muted);
   font-size: 12px;
+  transition: background-color 60ms ease-out, color 60ms ease-out;
+}
+.process-thread:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 .process-thread-id {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;

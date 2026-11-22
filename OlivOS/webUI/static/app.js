@@ -1335,7 +1335,10 @@ function formatIoPriority(value) {
 }
 function processThreadElement(thread) {
   const row = element('li', null, { class: 'process-thread' });
-  const name = thread.name ? ` · ${thread.name}` : '';
+  const names = [];
+  if (thread.name) names.push(thread.name);
+  if (thread.python_name && thread.python_name !== thread.name) names.push(thread.python_name);
+  const name = names.length ? ` · ${names.join(' / ')}` : '';
   row.append(element('span', `线程 ${formatCount(thread.id)}${name}`, {
     class: 'process-thread-id',
   }));
@@ -1352,7 +1355,7 @@ function processThreadElement(thread) {
   meta.push(`用户 ${formatCpuTime(thread.user)}`);
   meta.push(`内核 ${formatCpuTime(thread.system)}`);
   if (thread.priority !== null && thread.priority !== undefined) {
-    meta.push(`优先级 ${formatCount(thread.priority)}`);
+    meta.push(`优先级 ${formatSignedCount(thread.priority)}`);
   }
   if (thread.nice !== null && thread.nice !== undefined) {
     meta.push(`Nice ${formatSignedCount(thread.nice)}`);
@@ -1361,6 +1364,11 @@ function processThreadElement(thread) {
     meta.push(`处理器 ${formatCount(thread.processor)}`);
   }
   if (thread.ctx_switches) meta.push(`切换 ${formatContextSwitches(thread.ctx_switches)}`);
+  if (thread.wchan) meta.push(`等待 ${thread.wchan}`);
+  if (thread.start_time !== null && thread.start_time !== undefined) {
+    meta.push(`启动 ${formatDateTime(thread.start_time)}`);
+  }
+  if (thread.start_module) meta.push(`起始 ${thread.start_module}`);
   row.append(element('span', meta.join(' · '), { class: 'process-thread-cpu' }));
   return row;
 }
@@ -1813,6 +1821,7 @@ function renderPerformanceStatistics(data) {
   setPerformanceSummary('traffic',
     `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
   setPerformanceSummary('processes', `${formatCount(process.count)} 进程`);
+  setPerformanceSummary('processes-detail', processScale);
 
   setPerformanceStat('cpu-logical', formatCount(cpu.count));
   setPerformanceStat('cpu-machine-load', loadValue);

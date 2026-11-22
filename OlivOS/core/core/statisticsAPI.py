@@ -38,6 +38,13 @@ PROCESS_CMDLINE_LIMIT = 1200
 PROCESS_PATH_LIMIT = 1024
 PROCESS_DETAIL_ITEMS_LIMIT = 100
 PROCESS_THREAD_DETAIL_LIMIT = 256
+_WINDOWS_THREAD_QUERY_INFORMATION = 0x0040
+_WINDOWS_THREAD_QUERY_LIMITED_INFORMATION = 0x0800
+_WINDOWS_PROCESS_QUERY_INFORMATION = 0x0400
+_WINDOWS_PROCESS_VM_READ = 0x0010
+_WINDOWS_THREAD_START_ADDRESS = 9
+_WINDOWS_THREAD_PRIORITY_ERROR = 0x7FFFFFFF
+_WINDOWS_PROCESS_MODULE_LIMIT = 1024
 SECRET_ARGUMENT = re.compile(
     r'password|passwd|token|secret|cookie|authorization|'
     r'access[_-]?key|api[_-]?key|(?:^|[_-])key$', re.I
@@ -144,7 +151,305 @@ def _parse_linux_thread_stat(content):
         result['nice'] = _optional_int(fields[16])
     if len(fields) >= 37:
         result['processor'] = _optional_int(fields[36])
+    if len(fields) >= 20:
+        result['start_time_ticks'] = _optional_int(fields[19])
     return result
+
+
+# 读取 /proc 文本时统一处理编码错误和长度上限。
+def _read_proc_text(path, limit):
+    try:
+        with open(path, 'r', encoding='utf-8', errors='replace') as source:
+            return _text(source.read(), limit)
+    except Exception:
+        return None
+
+
+# Python 线程名只在当前进程内可映射到 native_id。
+def _python_thread_names(pid):
+    try:
+        if int(pid) != os.getpid():
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    result = {}
+    try:
+        threads = threading.enumerate()
+    except Exception:
+        return result
+    for thread in threads:
+        native_id = getattr(thread, 'native_id', None)
+        try:
+            native_id = int(native_id)
+        except (TypeError, ValueError):
+            continue
+        name = _text(getattr(thread, 'name', None), 128)
+        if name:
+            result[native_id] = name
+    return result
+
+
+def _linux_clock_ticks():
+    try:
+        return int(os.sysconf('SC_CLK_TCK'))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+
+
+def _linux_boot_time():
+    try:
+        return float(psutil.boot_time())
+    except Exception:
+        return None
+
+
+_WINDOWS_LIBRARIES = {}
+_WINDOWS_LIBRARY_LOCK = threading.Lock()
+
+
+class _WindowsModuleInfo(ctypes.Structure):
+    _fields_ = [
+        ('lpBaseOfDll', ctypes.c_void_p),
+        ('SizeOfImage', ctypes.c_ulong),
+        ('EntryPoint', ctypes.c_void_p),
+    ]
+
+
+def _windows_library(name):
+    if platform.system() != 'Windows':
+        return None
+    with _WINDOWS_LIBRARY_LOCK:
+        library = _WINDOWS_LIBRARIES.get(name)
+        if library is not None:
+            return library
+        try:
+            library = ctypes.WinDLL(name, use_last_error=True)
+        except Exception:
+            return None
+        _WINDOWS_LIBRARIES[name] = library
+        return library
+
+
+def _windows_kernel32():
+    library = _windows_library('kernel32')
+    if library is None:
+        return None
+    try:
+        library.OpenThread.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        library.OpenThread.restype = ctypes.c_void_p
+        library.CloseHandle.argtypes = [ctypes.c_void_p]
+        library.CloseHandle.restype = ctypes.c_int
+        library.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        library.OpenProcess.restype = ctypes.c_void_p
+        library.GetThreadPriority.argtypes = [ctypes.c_void_p]
+        library.GetThreadPriority.restype = ctypes.c_int
+        library.LocalFree.argtypes = [ctypes.c_void_p]
+        library.LocalFree.restype = ctypes.c_void_p
+        description = getattr(library, 'GetThreadDescription', None)
+        if description is not None:
+            description.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)]
+            description.restype = ctypes.c_long
+    except Exception:
+        return None
+    return library
+
+
+def _windows_ntdll():
+    library = _windows_library('ntdll')
+    if library is None:
+        return None
+    try:
+        query = getattr(library, 'NtQueryInformationThread', None)
+        if query is not None:
+            query.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p,
+                ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong),
+            ]
+            query.restype = ctypes.c_long
+    except Exception:
+        return None
+    return library
+
+
+def _windows_psapi():
+    library = _windows_library('psapi')
+    if library is None:
+        return None
+    try:
+        enum_ex = getattr(library, 'EnumProcessModulesEx', None)
+        if enum_ex is not None:
+            enum_ex.argtypes = [
+                ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.c_ulong,
+                ctypes.POINTER(ctypes.c_ulong), ctypes.c_ulong,
+            ]
+            enum_ex.restype = ctypes.c_int
+        library.EnumProcessModules.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.c_ulong,
+            ctypes.POINTER(ctypes.c_ulong),
+        ]
+        library.EnumProcessModules.restype = ctypes.c_int
+        library.GetModuleFileNameExW.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_ulong,
+        ]
+        library.GetModuleFileNameExW.restype = ctypes.c_ulong
+        library.GetModuleInformation.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(_WindowsModuleInfo), ctypes.c_ulong,
+        ]
+        library.GetModuleInformation.restype = ctypes.c_int
+    except Exception:
+        return None
+    return library
+
+
+# 一次枚举进程模块，供该进程下的所有线程起始地址复用。
+def _windows_process_modules(pid, kernel32, psapi):
+    if kernel32 is None or psapi is None:
+        return []
+    process = None
+    try:
+        process = kernel32.OpenProcess(
+            _WINDOWS_PROCESS_QUERY_INFORMATION | _WINDOWS_PROCESS_VM_READ, 0, int(pid)
+        )
+        if not process:
+            return []
+        modules = (ctypes.c_void_p * _WINDOWS_PROCESS_MODULE_LIMIT)()
+        needed = ctypes.c_ulong()
+        enum_ex = getattr(psapi, 'EnumProcessModulesEx', None)
+        if enum_ex is not None:
+            ok = enum_ex(process, modules, ctypes.sizeof(modules), ctypes.byref(needed), 0x03)
+            if not ok:
+                ok = psapi.EnumProcessModules(
+                    process, modules, ctypes.sizeof(modules), ctypes.byref(needed)
+                )
+        else:
+            ok = psapi.EnumProcessModules(process, modules, ctypes.sizeof(modules), ctypes.byref(needed))
+        if not ok:
+            return []
+        count = min(
+            needed.value // ctypes.sizeof(ctypes.c_void_p), _WINDOWS_PROCESS_MODULE_LIMIT
+        )
+        result = []
+        path_buffer = ctypes.create_unicode_buffer(PROCESS_PATH_LIMIT)
+        for index in range(count):
+            handle = modules[index]
+            info = _WindowsModuleInfo()
+            if not psapi.GetModuleInformation(
+                process, handle, ctypes.byref(info), ctypes.sizeof(info)
+            ):
+                continue
+            base = int(info.lpBaseOfDll or 0)
+            size = int(info.SizeOfImage or 0)
+            path_buffer.value = ''
+            if not psapi.GetModuleFileNameExW(
+                process, handle, path_buffer, len(path_buffer)
+            ):
+                continue
+            path = _text(path_buffer.value, PROCESS_PATH_LIMIT)
+            if path:
+                result.append((base, base + size, os.path.basename(path)))
+        return result
+    except Exception:
+        return []
+    finally:
+        if process:
+            try:
+                kernel32.CloseHandle(process)
+            except Exception:
+                pass
+
+
+def _windows_thread_start_module(address, modules):
+    if not address:
+        return None
+    for base, end, name in modules or ():
+        if base <= address < end:
+            offset = address - base
+            return _text('%s+0x%X' % (name, offset) if offset else name, 256)
+    return _text('0x%X' % address, 256)
+
+
+# Windows 线程没有独立命令行，补充描述、优先级和起始模块。
+def _windows_thread_detail(tid, kernel32, ntdll, modules):
+    result = {'name': None, 'priority': None, 'start_address': None, 'start_module': None}
+    if kernel32 is None:
+        return result
+    handle = None
+    for access in (
+        _WINDOWS_THREAD_QUERY_INFORMATION | _WINDOWS_THREAD_QUERY_LIMITED_INFORMATION,
+        _WINDOWS_THREAD_QUERY_INFORMATION,
+        _WINDOWS_THREAD_QUERY_LIMITED_INFORMATION,
+    ):
+        try:
+            handle = kernel32.OpenThread(access, 0, int(tid))
+        except Exception:
+            handle = None
+        if handle:
+            break
+    if not handle:
+        return result
+    try:
+        description = getattr(kernel32, 'GetThreadDescription', None)
+        if description is not None:
+            text = ctypes.c_wchar_p()
+            try:
+                if description(handle, ctypes.byref(text)) >= 0:
+                    result['name'] = _text(text.value, 256)
+            except Exception:
+                pass
+            finally:
+                try:
+                    kernel32.LocalFree(text)
+                except Exception:
+                    pass
+        priority = getattr(kernel32, 'GetThreadPriority', None)
+        if priority is not None:
+            value = priority(handle)
+            if value != _WINDOWS_THREAD_PRIORITY_ERROR:
+                result['priority'] = int(value)
+        query = getattr(ntdll, 'NtQueryInformationThread', None) if ntdll is not None else None
+        if query is not None:
+            address = ctypes.c_void_p()
+            status = query(
+                handle, _WINDOWS_THREAD_START_ADDRESS, ctypes.byref(address),
+                ctypes.sizeof(address), None,
+            )
+            if status == 0 and address.value:
+                result['start_address'] = int(address.value)
+                result['start_module'] = _windows_thread_start_module(address.value, modules)
+    except Exception:
+        pass
+    finally:
+        try:
+            kernel32.CloseHandle(handle)
+        except Exception:
+            pass
+    return result
+
+
+# 批量查询 Windows 线程，失败时保留基础采样字段。
+def _windows_thread_details(pid, rows, python_names=None, kernel32=None, ntdll=None, psapi=None):
+    if kernel32 is None:
+        kernel32 = _windows_kernel32()
+    if ntdll is None:
+        ntdll = _windows_ntdll()
+    if psapi is None:
+        psapi = _windows_psapi()
+    if kernel32 is None:
+        return
+    names = python_names or {}
+    modules = _windows_process_modules(pid, kernel32, psapi)
+    for row in rows or ():
+        detail = _windows_thread_detail(row.get('id'), kernel32, ntdll, modules)
+        if detail['name']:
+            row['name'] = detail['name']
+        elif not row.get('name'):
+            row['name'] = names.get(row.get('id'))
+        if detail['priority'] is not None:
+            row['priority'] = detail['priority']
+        if detail['start_address'] is not None:
+            row['start_address'] = detail['start_address']
+        if detail['start_module']:
+            row['start_module'] = detail['start_module']
 
 
 def _named_numbers(value):
@@ -546,8 +851,9 @@ class server(API.Proc_templet):
         self._last_process_cpu_total = cpu_seconds
         return result
 
+    # 线程共享进程命令行；Linux 额外提供等待点和启动时间。
     @staticmethod
-    def _linux_thread_detail(pid, tid):
+    def _linux_thread_detail(pid, tid, boot_time=None):
         base = '/proc/{0}/task/{1}'.format(pid, tid)
         result = {
             'name': None,
@@ -556,31 +862,37 @@ class server(API.Proc_templet):
             'nice': None,
             'processor': None,
             'ctx_switches': None,
+            'wchan': None,
+            'start_time': None,
         }
-        try:
-            with open(base + '/comm', 'r', encoding='utf-8', errors='replace') as source:
-                result['name'] = _text(source.read(), 64)
-        except Exception:
-            pass
-        try:
-            with open(base + '/stat', 'r', encoding='utf-8', errors='replace') as source:
-                result.update(_parse_linux_thread_stat(source.read()))
-        except Exception:
-            pass
-        try:
+        name = _read_proc_text(base + '/comm', 64)
+        if name:
+            result['name'] = name
+        stat = _read_proc_text(base + '/stat', 4096)
+        if stat:
+            parsed = _parse_linux_thread_stat(stat)
+            start_ticks = parsed.pop('start_time_ticks', None)
+            result.update(parsed)
+            if start_ticks is not None:
+                clock_ticks = _linux_clock_ticks()
+                boot = boot_time if boot_time is not None else _linux_boot_time()
+                if clock_ticks and boot is not None:
+                    result['start_time'] = _round(boot + float(start_ticks) / clock_ticks, 3)
+        wchan = _read_proc_text(base + '/wchan', 128)
+        if wchan and wchan != '0':
+            result['wchan'] = wchan
+        status_text = _read_proc_text(base + '/status', 16384)
+        if status_text:
             counters = {}
-            with open(base + '/status', 'r', encoding='utf-8', errors='replace') as source:
-                for line in source:
-                    key, separator, value = line.partition(':')
-                    if separator and key in ('voluntary_ctxt_switches', 'nonvoluntary_ctxt_switches'):
-                        counters[key] = _non_negative_int(value.strip())
+            for line in status_text.splitlines():
+                key, separator, value = line.partition(':')
+                if separator and key in ('voluntary_ctxt_switches', 'nonvoluntary_ctxt_switches'):
+                    counters[key] = _non_negative_int(value.strip())
             if counters:
                 result['ctx_switches'] = {
                     'voluntary': counters.get('voluntary_ctxt_switches', 0),
                     'involuntary': counters.get('nonvoluntary_ctxt_switches', 0),
                 }
-        except Exception:
-            pass
         return result
 
     def _process_detail(self, proc, now, cache_updates, previous_threads, thread_cache_updates):
@@ -678,6 +990,7 @@ class server(API.Proc_templet):
         threads = self._safe(proc.threads)
         if threads is not None:
             thread_rows = []
+            python_names = _python_thread_names(pid)
             for thread in threads:
                 tid = _non_negative_int(getattr(thread, 'id', 0))
                 thread_user = _non_negative_float(getattr(thread, 'user_time', 0.0))
@@ -696,18 +1009,26 @@ class server(API.Proc_templet):
                     'system': _round(thread_system, 3),
                     'cpu_percent': thread_cpu_percent,
                     'name': None,
+                    'python_name': python_names.get(tid),
                     'state': None,
                     'priority': None,
                     'nice': None,
                     'processor': None,
                     'ctx_switches': None,
+                    'wchan': None,
+                    'start_time': None,
+                    'start_address': None,
+                    'start_module': None,
                 })
             detail['threads'] = sorted(thread_rows, key=lambda item: item['id'])
             detail['thread_count'] = len(detail['threads'])
             if platform.system() == 'Linux':
+                boot_time = self._safe(psutil.boot_time)
                 for row in detail['threads'][:PROCESS_THREAD_DETAIL_LIMIT]:
-                    row.update(self._linux_thread_detail(pid, row['id']))
+                    row.update(self._linux_thread_detail(pid, row['id'], boot_time))
                 detail['threads_truncated'] = len(detail['threads']) > PROCESS_THREAD_DETAIL_LIMIT
+            elif platform.system() == 'Windows':
+                _windows_thread_details(pid, detail['threads'], python_names)
         else:
             num_threads = getattr(proc, 'num_threads', None)
             if callable(num_threads):

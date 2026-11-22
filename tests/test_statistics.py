@@ -418,6 +418,9 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
         ],
         children=[child],
     )
+    # 线程详情同时保留 Python 线程名；平台分支在单测中隔离。
+    monkeypatch.setattr(statisticsAPI, '_python_thread_names', lambda pid: {1001: 'MainThread'})
+    monkeypatch.setattr(statisticsAPI.platform, 'system', lambda: 'Test')
     monkeypatch.setattr(statisticsAPI.psutil, 'Process', lambda pid: root)
     monitor = make_statistics_monitor()
     first = monitor.process_tree_snapshot(now=10.0)
@@ -428,6 +431,7 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
     assert first['roots'][0]['pid'] == 100
     assert first['roots'][0]['children'][0]['pid'] == 101
     assert [item['id'] for item in first['roots'][0]['threads']] == [1001, 1002]
+    assert first['roots'][0]['threads'][0]['python_name'] == 'MainThread'
     assert first['roots'][0]['cmdline'] == 'python.exe main.py --token ********'
     assert 'secret-value' not in first['roots'][0]['cmdline']
     assert first['roots'][0]['exe'] == 'C:/OlivOS/python.exe'
@@ -519,8 +523,121 @@ def test_linux_thread_stat_parser_extracts_state_priority_and_processor():
     fields[0] = 'S'
     fields[15] = '20'
     fields[16] = '0'
+    fields[19] = '500'
     fields[36] = '3'
     parsed = statisticsAPI._parse_linux_thread_stat(
         '123 (worker name) ' + ' '.join(fields)
     )
-    assert parsed == {'state': 'S', 'priority': 20, 'nice': 0, 'processor': 3}
+    assert parsed == {
+        'state': 'S', 'priority': 20, 'nice': 0, 'processor': 3, 'start_time_ticks': 500,
+    }
+
+
+def test_python_thread_names_only_map_current_process(monkeypatch):
+    # Python 线程名只在当前进程内可用，不能把其它 PID 的线程误映射过来。
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        statisticsAPI.threading,
+        'enumerate',
+        lambda: [
+            SimpleNamespace(native_id=321, name='MainThread'),
+            SimpleNamespace(native_id=None, name='ignored'),
+        ],
+    )
+    assert statisticsAPI._python_thread_names(statisticsAPI.os.getpid()) == {321: 'MainThread'}
+    assert statisticsAPI._python_thread_names(statisticsAPI.os.getpid() + 1) == {}
+
+
+def test_linux_thread_detail_reads_wait_channel_and_start_time(monkeypatch):
+    # Linux 线程详情应补充 comm、等待点、启动时间和上下文切换。
+    fields = ['0'] * 40
+    fields[0] = 'S'
+    fields[15] = '20'
+    fields[16] = '0'
+    fields[19] = '500'
+    fields[36] = '3'
+    files = {
+        '/proc/100/task/200/comm': 'worker',
+        '/proc/100/task/200/stat': '123 (worker name) ' + ' '.join(fields),
+        '/proc/100/task/200/wchan': 'futex_wait_queue_me',
+        '/proc/100/task/200/status': (
+            'voluntary_ctxt_switches: 7\n'
+            'nonvoluntary_ctxt_switches: 2\n'
+        ),
+    }
+    monkeypatch.setattr(
+        statisticsAPI, '_read_proc_text', lambda path, limit: files.get(path)
+    )
+    monkeypatch.setattr(statisticsAPI, '_linux_clock_ticks', lambda: 100)
+    detail = statisticsAPI.server._linux_thread_detail(100, 200, boot_time=1000.0)
+    assert detail['name'] == 'worker'
+    assert detail['state'] == 'S'
+    assert detail['wchan'] == 'futex_wait_queue_me'
+    assert detail['start_time'] == 1005.0
+    assert detail['priority'] == 20
+    assert detail['processor'] == 3
+    assert detail['ctx_switches'] == {'voluntary': 7, 'involuntary': 2}
+
+
+def test_windows_thread_details_include_description_priority_and_start_module(monkeypatch):
+    # Windows 线程详情应补齐线程描述、相对优先级、起始地址和所属模块。
+    descriptions = {201: 'worker-thread'}
+    priorities = {201: -2, 202: statisticsAPI._WINDOWS_THREAD_PRIORITY_ERROR}
+    addresses = {201: 0x2000, 202: 0x3500, 203: 0x1500}
+    closed = []
+
+    class FakeKernel32(object):
+        def OpenThread(self, access, inherit, tid):
+            return 1000 + tid
+
+        def CloseHandle(self, handle):
+            closed.append(handle)
+            return 1
+
+        def GetThreadDescription(self, handle, output):
+            output._obj.value = descriptions.get(handle - 1000, '')
+            return 0
+
+        def GetThreadPriority(self, handle):
+            return priorities.get(handle - 1000, 0)
+
+        def LocalFree(self, value):
+            return None
+
+    class FakeNtdll(object):
+        def NtQueryInformationThread(self, handle, info_class, output, size, returned):
+            output._obj.value = addresses[handle - 1000]
+            return 0
+
+    rows = [
+        {'id': 201, 'name': None, 'python_name': 'worker', 'priority': None,
+         'start_address': None, 'start_module': None},
+        {'id': 202, 'name': None, 'python_name': None, 'priority': None,
+         'start_address': None, 'start_module': None},
+        {'id': 203, 'name': None, 'python_name': 'fallback-thread', 'priority': None,
+         'start_address': None, 'start_module': None},
+    ]
+    monkeypatch.setattr(
+        statisticsAPI,
+        '_windows_process_modules',
+        lambda pid, kernel32, psapi: [
+            (0x1000, 0x3000, 'python311.dll'),
+            (0x3000, 0x4000, 'worker.dll'),
+        ],
+    )
+    statisticsAPI._windows_thread_details(
+        100, rows, {201: 'worker-python', 203: 'fallback-thread'},
+        FakeKernel32(), FakeNtdll(), object()
+    )
+    assert rows[0]['name'] == 'worker-thread'
+    assert rows[0]['priority'] == -2
+    assert rows[0]['start_address'] == 0x2000
+    assert rows[0]['start_module'] == 'python311.dll+0x1000'
+    assert rows[1]['name'] is None
+    assert rows[1]['priority'] is None
+    assert rows[1]['start_address'] == 0x3500
+    assert rows[1]['start_module'] == 'worker.dll+0x500'
+    assert rows[2]['name'] == 'fallback-thread'
+    assert rows[2]['start_module'] == 'python311.dll+0x500'
+    assert closed == [1201, 1202, 1203]

@@ -1534,10 +1534,15 @@ def process_tree_snapshot():
             'num_fds': 42,
             'threads': [
                 {'id': 1001, 'user': 0.8, 'system': 0.2, 'cpu_percent': 50.0,
-                 'name': 'main', 'state': 'S', 'priority': 20, 'nice': 0, 'processor': 1,
-                 'ctx_switches': {'voluntary': 30, 'involuntary': 1}},
+                 'name': 'main', 'python_name': 'MainThread', 'state': 'S',
+                 'priority': 20, 'nice': 0, 'processor': 1,
+                 'ctx_switches': {'voluntary': 30, 'involuntary': 1},
+                 'wchan': 'futex_wait_queue_me',
+                 'start_time': PROCESS_ROOT_CREATED_AT + 1,
+                 'start_module': 'python311.dll+0x4A2C'},
                 {'id': 1002, 'user': 0.4, 'system': 0.1, 'cpu_percent': 25.0,
-                 'name': 'worker', 'state': 'R', 'priority': 20, 'nice': 0, 'processor': 2,
+                 'name': 'worker', 'python_name': 'Thread-1', 'state': 'R',
+                 'priority': 20, 'nice': 0, 'processor': 2,
                  'ctx_switches': {'voluntary': 10, 'involuntary': 0}},
             ],
             'threads_truncated': False,
@@ -2065,6 +2070,11 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     """))
     assert '2 个进程' in browser.find('#performance-processes-readout').text
     assert '3 个线程' in browser.find('#performance-processes-readout').text
+    process_summary = browser.find('#performance-view-processes .performance-view-value').text
+    assert process_summary.startswith('3 ')
+    assert len(process_summary.split()) == 8
+    assert ' 18 ' in process_summary
+    assert ' 400 ' in process_summary
     assert driver.execute_script("""
         return {
           rootBadge: document.querySelector('.process-root-badge').textContent,
@@ -2089,9 +2099,27 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     first_thread = driver.execute_script(
         "return document.querySelector('#performance-process-tree .process-thread').textContent")
     assert 'main' in first_thread
+    assert 'MainThread' in first_thread
     assert '睡眠' in first_thread
     assert 'CPU 50.0%' in first_thread
     assert 'Nice 0' in first_thread
+    assert '等待 futex_wait_queue_me' in first_thread
+    assert '启动 ' in first_thread
+    assert '起始 python311.dll+0x4A2C' in first_thread
+
+    # 线程行悬停时整行高亮，便于在长线程列表中横向对齐各列字段。
+    from selenium.webdriver.common.action_chains import ActionChains
+
+    thread_row = browser.find('#performance-process-tree .process-thread')
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", thread_row)
+    background_script = "return getComputedStyle(arguments[0]).backgroundColor;"
+    background_before = driver.execute_script(background_script, thread_row)
+    ActionChains(driver).move_to_element(thread_row).perform()
+    browser.wait.until(lambda _: driver.execute_script(
+        "return getComputedStyle(arguments[0]).backgroundColor !== arguments[1];",
+        thread_row, background_before))
+    assert driver.execute_script(background_script, thread_row) not in {
+        'rgba(0, 0, 0, 0)', 'transparent'}
 
     # 文件、连接与内存详情只在用户点击后按需请求，并限制展示条目数。
     browser.click('#performance-process-tree .process-detail-button')
