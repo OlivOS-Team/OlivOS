@@ -637,6 +637,56 @@ def test_collapsing_plugin_group_does_not_unload_frames(browser):
 
 
 @pytest.mark.browser
+def test_plugin_navigation_matches_sidebar_selection_style(browser):
+    from selenium.webdriver.common.action_chains import ActionChains
+
+    browser.select()
+    driver = browser.driver
+    driver.switch_to.default_content()
+    entry = browser.find('#plugin-links .plugin-link-entry.active')
+    category = browser.find('[data-performance-category="cpu"]')
+    time.sleep(0.2)
+    # 插件页面入口应对齐导航基准；性能分类复用导航样式，因此用作可见参照。
+    active_styles = driver.execute_script("""
+        return [arguments[0], arguments[1]].map((node) => {
+          const style = getComputedStyle(node);
+          return [style.backgroundColor, style.borderColor, style.boxShadow];
+        });
+    """, entry, category)
+    assert active_styles[0] == active_styles[1]
+
+    # 插件入口按下态也应对齐导航基准；性能分类复用同一套按下效果。
+    pressed_script = """
+        const style = getComputedStyle(arguments[0]);
+        return {
+          background: style.backgroundColor,
+          border: style.borderColor,
+          shadow: style.boxShadow,
+          outline: style.outline,
+        };
+    """
+    ActionChains(driver).click_and_hold(entry).perform()
+    time.sleep(0.2)
+    entry_pressed = driver.execute_script(pressed_script, entry)
+    ActionChains(driver).release(entry).perform()
+    time.sleep(0.05)
+
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('performance-content').hidden"))
+    category = browser.find('[data-performance-category="cpu"]')
+    ActionChains(driver).click_and_hold(category).perform()
+    time.sleep(0.2)
+    category_pressed = driver.execute_script(pressed_script, category)
+    ActionChains(driver).release(category).perform()
+    assert entry_pressed == category_pressed
+
+
+@pytest.mark.browser
 def test_duplicate_plugin_and_page_names_are_disambiguated(browser):
     with browser.host.lock:
         browser.host.plugins['single'][0] = browser.host.plugins['multi'][0]
@@ -2001,6 +2051,8 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
 
 @pytest.mark.browser
 def test_performance_page_renders_category_navigation_and_mobile_layout(browser):
+    from selenium.webdriver.common.action_chains import ActionChains
+
     driver = browser.driver
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=statistics_snapshot,
@@ -2012,6 +2064,39 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
     assert browser.find('#page-title').text == '性能'
     assert browser.find('[data-page="performance"]').get_attribute('aria-current') == 'page'
+    # 性能分类复用主页面导航的选中态：主题背景、主色边框与左侧强调条应与导航基准一致。
+    assert driver.execute_script("""
+        const navigation = getComputedStyle(
+          document.querySelector('#navigation [data-page="performance"]'));
+        const performanceCategory = getComputedStyle(
+          document.querySelector('[data-performance-category="cpu"]'));
+        return {
+          background: performanceCategory.backgroundColor === navigation.backgroundColor,
+          border: performanceCategory.borderColor === navigation.borderColor,
+          shadow: performanceCategory.boxShadow === navigation.boxShadow,
+        };
+    """) == {'background': True, 'border': True, 'shadow': True}
+    navigation_button = browser.find('#navigation [data-page="performance"]')
+    category_button = browser.find('[data-performance-category="cpu"]')
+    pressed_script = """
+        const style = getComputedStyle(arguments[0]);
+        return {
+          background: style.backgroundColor,
+          border: style.borderColor,
+          shadow: style.boxShadow,
+          outline: style.outline,
+        };
+    """
+    ActionChains(driver).click_and_hold(navigation_button).perform()
+    time.sleep(0.2)
+    navigation_pressed = driver.execute_script(pressed_script, navigation_button)
+    ActionChains(driver).release(navigation_button).perform()
+    time.sleep(0.05)
+    ActionChains(driver).click_and_hold(category_button).perform()
+    time.sleep(0.2)
+    category_pressed = driver.execute_script(pressed_script, category_button)
+    ActionChains(driver).release(category_button).perform()
+    assert category_pressed == navigation_pressed
     assert driver.execute_script("""
         return ['performance-cpu-chart-title', 'performance-memory-chart-title',
           'performance-disk-usage-chart-title', 'performance-network-chart-title',
@@ -2108,8 +2193,6 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '起始 python311.dll+0x4A2C' in first_thread
 
     # 线程行悬停时整行高亮，便于在长线程列表中横向对齐各列字段。
-    from selenium.webdriver.common.action_chains import ActionChains
-
     thread_row = browser.find('#performance-process-tree .process-thread')
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", thread_row)
     background_script = "return getComputedStyle(arguments[0]).backgroundColor;"

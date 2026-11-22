@@ -442,6 +442,14 @@ nav a {
   display: flex;
   align-items: center;
   gap: 10px;
+  border: 1px solid transparent;
+}
+#navigation button.active {
+  border-color: var(--primary-border);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+#navigation button:active:not(:disabled) {
+  border-color: var(--accent);
 }
 .nav-icon {
   width: 20px;
@@ -495,6 +503,9 @@ nav h2 {
   color: var(--muted);
   font-size: 14px;
 }
+#plugin-links :is(.plugin-link-entry, .plugin-link-external) {
+  border: 1px solid transparent;
+}
 #plugin-links button.cached:not(.active) {
   background: var(--cached-bg);
   color: var(--cached-text);
@@ -507,6 +518,14 @@ nav h2 {
   background: var(--selected-bg);
   color: var(--selected-text);
   font-weight: 600;
+}
+#plugin-links .plugin-link-entry.active {
+  border-color: var(--primary-border);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+#plugin-links :is(.plugin-link-entry, .plugin-link-external):active:not(:disabled) {
+  background: var(--control-bg-active);
+  border-color: var(--accent);
 }
 .plugin-page-group + .plugin-page-group {
   margin-top: 6px;
