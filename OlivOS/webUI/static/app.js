@@ -107,6 +107,8 @@ const state = {
   uptimeSnapshot: null,
   uptimeClock: null,
   statistics: null,
+  performanceStatistics: null,
+  performanceCategory: 'cpu',
   dashboardTimer: null,
   authGeneration: 0,
   cachedLogin: false,
@@ -122,11 +124,15 @@ const state = {
 };
 const titles = {
   dashboard: '仪表盘',
+  performance: '性能',
   accounts: '账号',
   logs: '日志',
   terminals: '终端',
   plugins: '插件',
 };
+function isStatusPage(page) {
+  return page === 'dashboard' || page === 'performance';
+}
 const levels = {
   '-1': 'TRACE',
   0: 'DEBUG',
@@ -419,7 +425,7 @@ async function login(ev, token = null, ticket = null) {
     startEventStream(result.cursor);
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (state.page !== 'dashboard') {
+      if (!isStatusPage(state.page)) {
         checkAuthentication();
         if (state.page === 'logs') loadLogDisplay().catch(notifyError);
         // 账号页要跟着连接状态变，不能只在进入页面那一刻刷一次。
@@ -429,7 +435,7 @@ async function login(ev, token = null, ticket = null) {
     }, 10000);
     clearInterval(state.dashboardTimer);
     state.dashboardTimer = setInterval(() => {
-      if (state.page === 'dashboard' && !document.hidden) {
+      if (isStatusPage(state.page) && !document.hidden) {
         refreshStatus().then(() => ensureSession()).catch(notifyError);
       }
     }, 3000);
@@ -475,6 +481,7 @@ function resetLogin(message = '') {
   state.uptimeSnapshot = null;
   state.uptimeClock = null;
   state.statistics = null;
+  state.performanceStatistics = null;
   state.token = '';
   state.session = '';
   state.sessionRefresh = null;
@@ -640,7 +647,7 @@ async function navigate(page) {
   if (page !== 'plugin-page') rememberPage();
   if (page === 'dashboard') startUptimeLoop();
   else stopUptimeLoop();
-  if (page === 'dashboard') await refreshStatus();
+  if (isStatusPage(page)) await refreshStatus();
   if (page === 'accounts') {
     if (!state.dirty) await loadAccounts();
     await refreshStatus();
@@ -688,58 +695,344 @@ function sampledAtText(timestamp) {
   if (!Number.isFinite(date.getTime())) return '';
   return `更新于 ${date.toLocaleTimeString('zh-CN', { hour12: false })}`;
 }
-function metricCard(label, value, detail) {
-  const card = element('div', null, { class: 'metric-card' });
+function metricChart(options = {}) {
+  return element('div', null, {
+    id: options.id,
+    class: 'statistics-chart metric-card-chart',
+    role: 'img',
+    'aria-label': options.label || '',
+  });
+}
+function metricCard(label, value, detail, options = {}) {
+  const card = element('div', null, {
+    class: options.chart ? 'metric-card metric-chart-card' : 'metric-card',
+  });
   card.append(
     element('span', label, { class: 'metric-label' }),
     element('strong', value, { class: 'metric-value' }),
-    element('span', detail, { class: 'metric-detail' }),
   );
+  if (options.chart) {
+    const visual = element('div', null, { class: 'metric-card-visual' });
+    visual.append(metricChart(options.chart));
+    card.append(visual);
+  }
+  card.append(element('span', detail, { class: 'metric-detail' }));
   return card;
 }
-function setMetrics(container, items) {
-  container.replaceChildren(...items.map(([label, value, detail]) => metricCard(label, value, detail)));
+function svgNode(tag, attrs = {}) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
 }
-function renderTrend(container, series, fixedMaximum = null) {
+function clampPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.min(100, Math.max(0, number));
+}
+function ringMetricCard(label, percent, detail, tone = 'cpu', options = {}) {
+  const value = clampPercent(percent);
+  const card = element('div', null, {
+    class: `metric-card metric-ring-card metric-ring-${tone}` +
+      (options.chart ? ' metric-chart-card' : ''),
+    'data-ring': tone,
+  });
+  const ring = element('div', null, {
+    class: 'metric-ring',
+    'data-percent': String(value),
+  });
+  const svg = svgNode('svg', {
+    viewBox: '0 0 100 100',
+    'aria-hidden': 'true',
+    focusable: 'false',
+  });
+  svg.append(
+    svgNode('circle', { class: 'metric-ring-track', cx: '50', cy: '50', r: '42' }),
+    svgNode('circle', {
+      class: 'metric-ring-progress',
+      cx: '50',
+      cy: '50',
+      r: '42',
+      pathLength: '100',
+      'stroke-dasharray': '100',
+      'stroke-dashoffset': String(100 - value),
+      transform: 'rotate(-90 50 50)',
+    }),
+  );
+  if (options.secondaryPercent !== undefined && options.secondaryPercent !== null) {
+    const secondary = clampPercent(options.secondaryPercent);
+    ring.dataset.secondaryPercent = String(secondary);
+    svg.append(svgNode('circle', {
+      class: 'metric-ring-secondary',
+      cx: '50',
+      cy: '50',
+      r: '32',
+      pathLength: '100',
+      'stroke-dasharray': '100',
+      'stroke-dashoffset': String(100 - secondary),
+      transform: 'rotate(-90 50 50)',
+    }));
+  }
+  ring.append(svg, element('strong', formatPercent(value), { class: 'metric-value metric-ring-value' }));
+  card.append(element('span', label, { class: 'metric-label' }));
+  if (options.chart) {
+    const visual = element('div', null, {
+      class: 'metric-card-visual metric-card-visual-overlay',
+    });
+    visual.append(metricChart(options.chart), ring);
+    card.append(visual);
+  } else {
+    card.append(ring);
+  }
+  card.append(element('span', detail, { class: 'metric-detail' }));
+  return card;
+}
+function formatOptionalCount(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? formatCount(number) : '—';
+}
+function formatLoad(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(2) : '—';
+}
+function trafficBucketValues(traffic, key) {
+  return (traffic?.history || []).map((item) => {
+    const number = Number(item?.[key]);
+    return Number.isFinite(number) ? Math.max(0, number) : 0;
+  });
+}
+function formatTrafficBucket(value) {
+  return `${formatCount(value)} 条`;
+}
+function chartTimeText(timestamp, slotFromRight) {
+  if (timestamp !== null && timestamp !== undefined) {
+    const date = new Date(Number(timestamp) * 1000);
+    if (Number.isFinite(date.getTime())) {
+      return date.toLocaleTimeString('zh-CN', { hour12: false });
+    }
+  }
+  return `第 ${slotFromRight} 个采样点`;
+}
+function setMetrics(container, items) {
+  container.replaceChildren(...items.map(([label, value, detail, options = {}]) => (
+    options.ring
+      ? ringMetricCard(label, value, detail, options.tone, options)
+      : metricCard(label, value, detail, options)
+  )));
+}
+const chartHoverState = new WeakMap();
+function renderTrend(container, series, fixedMaximum = null, capacity = null, options = {}) {
+  if (!container) return;
   const width = 100;
   const height = 40;
   const padding = 2;
-  const cleaned = series.map((item) => ({
-    className: item.className,
-    values: (item.values || []).map((value) => {
-      const number = Number(value);
-      return Number.isFinite(number) ? Math.max(0, number) : 0;
-    }),
+  const plotWidth = width - padding * 2;
+  const plotHeight = height - padding * 2;
+  const rawSeries = (series || []).map((item) => ({
+    className: item.className || '',
+    legendClass: item.legendClass || '',
+    label: item.label || '',
+    formatValue: typeof item.formatValue === 'function' ? item.formatValue : formatCount,
+    values: Array.isArray(item.values) ? item.values : [],
   }));
-  const allValues = cleaned.flatMap((item) => item.values);
-  const maximum = fixedMaximum === null ? Math.max(1, ...allValues) : fixedMaximum;
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const y of [padding, height / 2, height - padding]) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('class', 'chart-grid');
-    line.setAttribute('x1', '0');
-    line.setAttribute('x2', String(width));
-    line.setAttribute('y1', String(y));
-    line.setAttribute('y2', String(y));
-    svg.append(line);
-  }
-  for (const item of cleaned) {
-    if (!item.values.length) continue;
-    const denominator = Math.max(1, item.values.length - 1);
-    const points = item.values.map((value, index) => {
-      const x = padding + (width - padding * 2) * (item.values.length === 1 ? 1 : index / denominator);
-      const y = height - padding - (height - padding * 2) * Math.min(1, value / maximum);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
+  const maxLength = rawSeries.reduce((maximum, item) => Math.max(maximum, item.values.length), 0);
+  const requestedCapacity = Number(capacity);
+  const effectiveCapacity = Number.isFinite(requestedCapacity)
+    ? Math.max(2, Math.floor(requestedCapacity))
+    : Math.max(2, maxLength);
+  const sourceTimestamps = Array.isArray(options.timestamps) ? options.timestamps : [];
+  const timestampPadding = Math.max(0, effectiveCapacity - sourceTimestamps.length);
+  const timestamps = new Array(timestampPadding).fill(null)
+    .concat(sourceTimestamps.slice(-effectiveCapacity));
+  const cleaned = rawSeries.map((item) => {
+    const recent = item.values.slice(-effectiveCapacity);
+    const numeric = recent.map((value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? Math.max(0, number) : null;
     });
-    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    polyline.setAttribute('class', `chart-series ${item.className}`);
-    polyline.setAttribute('points', points.join(' '));
+    const paddingCount = effectiveCapacity - numeric.length;
+    return {
+      ...item,
+      values: new Array(paddingCount).fill(0).concat(numeric.map((value) => (
+        value === null ? 0 : value
+      ))),
+      actual: new Array(paddingCount).fill(false).concat(numeric.map((value) => value !== null)),
+      rawValues: new Array(paddingCount).fill(null).concat(numeric),
+    };
+  });
+  const allValues = cleaned.flatMap((item) => item.values);
+  const maximum = fixedMaximum === null
+    ? Math.max(1, ...allValues)
+    : Math.max(1, Number(fixedMaximum) || 1);
+  const logarithmic = options.scale === 'log';
+  const scaleValue = (value) => (
+    logarithmic ? Math.log10(1 + Math.max(0, value)) : value
+  );
+  const scaleMaximum = Math.max(Number.EPSILON, scaleValue(maximum));
+  const svg = svgNode('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    preserveAspectRatio: 'none',
+    'aria-hidden': 'true',
+  });
+  svg.dataset.capacity = String(effectiveCapacity);
+  svg.dataset.seriesCount = String(cleaned.length);
+  svg.dataset.scale = logarithmic ? 'log' : 'linear';
+  const defs = svgNode('defs');
+  svg.append(defs);
+  const denominator = Math.max(1, effectiveCapacity - 1);
+  const xForIndex = (index) => padding + plotWidth * (index / denominator);
+  const yForValue = (value) => (
+    height - padding - plotHeight * Math.min(1, scaleValue(value) / scaleMaximum)
+  );
+  for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+    const value = maximum * ratio;
+    const y = yForValue(value);
+    const gridline = svgNode('line', {
+      class: 'chart-grid',
+      x1: '0',
+      x2: String(width),
+      y1: String(y),
+      y2: String(y),
+    });
+    gridline.dataset.gridRatio = String(ratio);
+    gridline.dataset.gridValue = String(value);
+    svg.append(gridline);
+  }
+  for (const [index, item] of cleaned.entries()) {
+    const points = item.values.map((value, index) => (
+      `${xForIndex(index).toFixed(2)},${yForValue(value).toFixed(2)}`
+    ));
+    if (options.area) {
+      const gradientId = `${container.id || 'trend'}-area-${index}`;
+      const gradient = svgNode('linearGradient', {
+        id: gradientId,
+        x1: '0',
+        y1: '0',
+        x2: '0',
+        y2: '1',
+        class: `chart-gradient ${item.className.replace(/^chart-series-/, 'chart-gradient-')}`,
+      });
+      gradient.append(
+        svgNode('stop', { offset: '0%', class: 'chart-gradient-stop chart-gradient-start' }),
+        svgNode('stop', { offset: '100%', class: 'chart-gradient-stop chart-gradient-end' }),
+      );
+      defs.append(gradient);
+      const baseline = height - padding;
+      const areaPoints = [
+        `${xForIndex(0).toFixed(2)},${baseline}`,
+        ...points,
+        `${xForIndex(item.values.length - 1).toFixed(2)},${baseline}`,
+      ];
+      const area = svgNode('path', {
+        class: 'chart-area',
+        d: `M ${areaPoints.join(' L ')} Z`,
+        fill: `url(#${gradientId})`,
+      });
+      area.dataset.series = item.className;
+      svg.append(area);
+    }
+    const polyline = svgNode('polyline', {
+      class: `chart-series ${item.className}`,
+      points: points.join(' '),
+    });
+    polyline.dataset.series = item.className;
     svg.append(polyline);
   }
-  container.replaceChildren(svg);
+  const cursor = svgNode('line', {
+    class: 'chart-cursor',
+    x1: '0',
+    x2: '0',
+    y1: String(padding),
+    y2: String(height - padding),
+  });
+  cursor.style.display = 'none';
+  svg.append(cursor);
+  const tooltip = element('div', null, {
+    class: 'chart-tooltip',
+    'aria-hidden': 'true',
+  });
+  tooltip.hidden = true;
+  container.replaceChildren(svg, tooltip);
+
+  function hideHover() {
+    cursor.style.display = 'none';
+    tooltip.hidden = true;
+    tooltip.replaceChildren();
+  }
+  function positionTooltip(x) {
+    const ratio = x / width;
+    if (ratio < 0.24) {
+      tooltip.style.left = '4px';
+      tooltip.style.right = 'auto';
+      tooltip.style.transform = 'none';
+    } else if (ratio > 0.76) {
+      tooltip.style.left = 'auto';
+      tooltip.style.right = '4px';
+      tooltip.style.transform = 'none';
+    } else {
+      tooltip.style.left = `${(ratio * 100).toFixed(2)}%`;
+      tooltip.style.right = 'auto';
+      tooltip.style.transform = 'translateX(-50%)';
+    }
+  }
+  function showHover(index) {
+    const slot = Math.max(0, Math.min(effectiveCapacity - 1, Math.floor(index)));
+    const x = xForIndex(slot);
+    cursor.setAttribute('x1', String(x));
+    cursor.setAttribute('x2', String(x));
+    cursor.style.display = '';
+    const hasData = cleaned.some((item) => item.actual[slot]);
+    tooltip.replaceChildren();
+    if (hasData) {
+      tooltip.append(element('span', chartTimeText(timestamps[slot], effectiveCapacity - slot), {
+        class: 'chart-tooltip-time',
+      }));
+      for (const item of cleaned) {
+        const row = element('div', null, { class: 'chart-tooltip-row' });
+        const dot = element('i', null, {
+          class: `legend-dot ${item.legendClass}`.trim(),
+        });
+        const value = item.actual[slot] ? item.formatValue(item.rawValues[slot]) : '—';
+        row.append(
+          dot,
+          element('span', item.label, { class: 'chart-tooltip-label' }),
+          element('strong', value, { class: 'chart-tooltip-value' }),
+        );
+        tooltip.append(row);
+      }
+    } else {
+      tooltip.append(element('span', '暂无历史采样', { class: 'chart-tooltip-empty' }));
+    }
+    positionTooltip(x);
+    tooltip.hidden = false;
+  }
+  function slotFromEvent(event) {
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return null;
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const plotRatio = Math.max(0, Math.min(1, (ratio * width - padding) / plotWidth));
+    return Math.round(plotRatio * (effectiveCapacity - 1));
+  }
+  function handlePointer(event) {
+    const slot = slotFromEvent(event);
+    if (slot === null) return;
+    chartHoverState.set(container, slot);
+    showHover(slot);
+  }
+  container.onpointerenter = handlePointer;
+  container.onpointermove = handlePointer;
+  container.onpointerleave = () => {
+    chartHoverState.delete(container);
+    hideHover();
+  };
+  const previous = chartHoverState.get(container);
+  if (previous !== undefined && container.matches(':hover')) showHover(previous);
+  else if (!container.matches(':hover')) {
+    chartHoverState.delete(container);
+    hideHover();
+  }
 }
 function showStatisticsUnavailable(reason) {
   state.statistics = null;
@@ -773,43 +1066,372 @@ function renderStatistics(data) {
     Number.isFinite(Number(disk.volume_count)) && Number(disk.volume_count) > 0
       ? `${formatCount(disk.volume_count)} 个卷`
       : '',
+    `读取 ${formatRate(disk.read_bps)} · 写入 ${formatRate(disk.write_bps)}`,
   ].filter(Boolean).join(' · ');
-  const load = cpu.load_1 === null || cpu.load_1 === undefined
+  const loadValue = formatLoad(cpu.load_1);
+  const load = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const threadDetail = process.threads === null || process.threads === undefined
+    ? '— 线程'
+    : `${formatCount(process.threads)} 线程`;
+  const processCpu = process.cpu_percent === null || process.cpu_percent === undefined
     ? ''
-    : ` · 负载 ${Number(cpu.load_1).toFixed(2)}`;
-  const processDetail = [
-    formatBytes(process.rss),
-    `CPU ${formatPercent(process.cpu_percent)}`,
-    Number.isFinite(Number(process.threads)) ? `${formatCount(process.threads)} 线程` : '',
-  ].filter(Boolean).join(' · ');
+    : ` · ${(Math.max(0, Number(process.cpu_percent) || 0) / 100).toFixed(2)} 核心`;
+  const cpuDetail = `${formatCount(cpu.count)} 逻辑核心${load} | ` +
+    `OlivOS ${formatOptionalCount(process.count)} 进程 · ${threadDetail}${processCpu}`;
+  const memoryTotal = Number(memory.total);
+  const processMemoryPercent = Number.isFinite(memoryTotal) && memoryTotal > 0
+    ? Math.max(0, Number(process.rss) || 0) * 100 / memoryTotal
+    : 0;
+  const memoryDetail = `${formatBytes(memory.used)} / ${formatBytes(memory.total)} · ` +
+    `换入 ${formatRate(memory.swap_in_bps)} · 换出 ${formatRate(memory.swap_out_bps)} | ` +
+    `OlivOS ${formatBytes(process.rss)} (${formatPercent(processMemoryPercent)})`;
   setMetrics($('performance-metrics'), [
-    ['CPU 使用率', formatPercent(cpu.percent), `${formatCount(cpu.count)} 逻辑核心${load}`],
-    ['内存占用', formatPercent(memory.percent), `${formatBytes(memory.used)} / ${formatBytes(memory.total)}`],
-    ['磁盘占用', formatPercent(disk.percent), diskDetail],
-    ['网络下行', formatRate(network.recv_bps), `${formatCount(network.packets_recv_per_second)} 包/秒`],
-    ['网络上行', formatRate(network.sent_bps), `${formatCount(network.packets_sent_per_second)} 包/秒`],
-    ['OlivOS 进程', `${formatCount(process.count)} 个`, processDetail || '暂无进程树数据'],
-  ]);
-  setMetrics($('traffic-metrics'), [
-    ['入站消息', `${formatCount(traffic.inbound_per_minute)} 条/分钟`,
-      `累计 ${formatCount(traffic.inbound_total)} 条`],
-    ['出站消息', `${formatCount(traffic.outbound_per_minute)} 条/分钟`,
-      `累计 ${formatCount(traffic.outbound_total)} 条`],
-    ['事件总量', `${formatCount(traffic.event_per_minute)} 条/分钟`,
-      `累计 ${formatCount(traffic.event_total)} 条`],
+    ['CPU', cpu.percent, cpuDetail, {
+      ring: true, tone: 'cpu',
+      chart: { id: 'dashboard-cpu-chart', label: 'CPU 使用率趋势' },
+    }],
+    ['内存', memory.percent, memoryDetail, {
+      ring: true, tone: 'memory', secondaryPercent: processMemoryPercent,
+      chart: { id: 'dashboard-memory-chart', label: '内存占用趋势' },
+    }],
+    ['磁盘', disk.percent, diskDetail, {
+      ring: true, tone: 'disk',
+      chart: { id: 'dashboard-disk-chart', label: '磁盘读取与写入速率趋势' },
+    }],
+    ['网络', `↓ ${formatRate(network.recv_bps)} · ↑ ${formatRate(network.sent_bps)}`,
+      `下行 ${formatCount(network.packets_recv_per_second)} 包/秒 · ` +
+      `上行 ${formatCount(network.packets_sent_per_second)} 包/秒`, {
+        chart: { id: 'dashboard-network-chart', label: '网络下行与上行速率趋势' },
+      }],
+    ['收发消息',
+      `↓ ${formatCount(traffic.inbound_per_minute)} 条/分钟 · ` +
+      `↑ ${formatCount(traffic.outbound_per_minute)} 条/分钟`,
+      `累计 收 ${formatCount(traffic.inbound_total)} · 发 ${formatCount(traffic.outbound_total)}`, {
+        chart: { id: 'dashboard-traffic-chart', label: '收发消息趋势' },
+      }],
     ['失败事件', `${formatCount(traffic.failed_per_minute)} 条/分钟`,
-      `累计 ${formatCount(traffic.failed_total)} 条`],
+      `累计 ${formatCount(traffic.failed_total)} 条`, {
+        chart: { id: 'dashboard-failure-chart', label: '失败事件趋势' },
+      }],
   ]);
   const history = performance.history || {};
-  renderTrend($('performance-chart'), [
-    { className: 'chart-series-cpu', values: history.cpu_percent || [] },
-    { className: 'chart-series-memory', values: history.memory_percent || [] },
-  ], 100);
+  renderTrend($('dashboard-cpu-chart'), [
+    {
+      className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
+      formatValue: formatPercent, values: history.cpu_percent || [],
+    },
+  ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
+  renderTrend($('dashboard-memory-chart'), [
+    {
+      className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
+      formatValue: formatPercent, values: history.memory_percent || [],
+    },
+    {
+      className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
+      formatValue: formatRate, values: history.swap_in_bps || [],
+    },
+    {
+      className: 'chart-series-swap-out', legendClass: 'legend-swap-out', label: '换出',
+      formatValue: formatRate, values: history.swap_out_bps || [],
+    },
+  ], null, history.capacity, {
+    timestamps: history.timestamps || [], area: true, scale: 'log',
+  });
+  renderTrend($('dashboard-disk-chart'), [
+    {
+      className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
+      formatValue: formatRate, values: history.disk_read_bps || [],
+    },
+    {
+      className: 'chart-series-disk-write', legendClass: 'legend-disk-write', label: '写入',
+      formatValue: formatRate, values: history.disk_write_bps || [],
+    },
+  ], null, history.capacity, {
+    timestamps: history.timestamps || [], area: true, scale: 'log',
+  });
+  renderTrend($('dashboard-network-chart'), [
+    {
+      className: 'chart-series-network-down', legendClass: 'legend-network-down', label: '网络下行',
+      formatValue: formatRate, values: history.network_recv_bps || [],
+    },
+    {
+      className: 'chart-series-network-up', legendClass: 'legend-network-up', label: '网络上行',
+      formatValue: formatRate, values: history.network_sent_bps || [],
+    },
+  ], null, history.capacity, {
+    timestamps: history.timestamps || [], area: true, scale: 'log',
+  });
   const trafficHistory = traffic.history || [];
-  renderTrend($('traffic-chart'), [
-    { className: 'chart-series-inbound', values: trafficHistory.map((item) => item.inbound) },
-    { className: 'chart-series-outbound', values: trafficHistory.map((item) => item.outbound) },
-  ]);
+  renderTrend($('dashboard-traffic-chart'), [
+    {
+      className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '收',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+    },
+    {
+      className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '发',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+    area: true,
+  });
+  renderTrend($('dashboard-failure-chart'), [
+    {
+      className: 'chart-series-failed', legendClass: 'legend-failed', label: '失败',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'failed'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+    area: true,
+  });
+}
+function setPerformanceReadout(id, text) {
+  const node = $(id);
+  if (node) node.textContent = text;
+}
+const performanceCategories = ['cpu', 'memory', 'disk', 'network', 'traffic'];
+function setPerformanceSummary(category, value) {
+  document.querySelectorAll(`[data-performance-summary="${category}"]`).forEach((node) => {
+    node.textContent = value;
+  });
+}
+function setPerformanceStat(name, value) {
+  document.querySelectorAll(`[data-performance-stat="${name}"]`).forEach((node) => {
+    node.textContent = value;
+  });
+}
+function setPerformanceCategory(category) {
+  const selected = performanceCategories.includes(category) ? category : 'cpu';
+  state.performanceCategory = selected;
+  document.querySelectorAll('[data-performance-category]').forEach((button) => {
+    const active = button.dataset.performanceCategory === selected;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
+  });
+  document.querySelectorAll('[data-performance-view]').forEach((view) => {
+    view.hidden = view.dataset.performanceView !== selected;
+  });
+}
+function renderPerformanceMini(container, values) {
+  if (!container) return;
+  const width = 100;
+  const height = 22;
+  const padding = 2;
+  const capacity = 60;
+  const numeric = (Array.isArray(values) ? values : []).slice(-capacity).map((value) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, number) : 0;
+  });
+  while (numeric.length < capacity) numeric.unshift(0);
+  const maximum = Math.max(1, ...numeric);
+  const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
+  const yFor = (value) => (
+    height - padding - (height - padding * 2) * Math.min(1, value / maximum)
+  );
+  const points = numeric.map((value, index) => (
+    `${xFor(index).toFixed(2)},${yFor(value).toFixed(2)}`
+  ));
+  const svg = svgNode('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    preserveAspectRatio: 'none',
+    'aria-hidden': 'true',
+  });
+  const baseline = height - padding;
+  const area = svgNode('path', {
+    class: 'mini-area',
+    d: `M ${padding.toFixed(2)},${baseline.toFixed(2)} L ${points.join(' L ')} ` +
+      `L ${xFor(numeric.length - 1).toFixed(2)},${baseline.toFixed(2)} Z`,
+  });
+  const line = svgNode('polyline', { class: 'mini-line', points: points.join(' ') });
+  svg.append(area, line);
+  container.replaceChildren(svg);
+}
+function showPerformanceStatisticsUnavailable(reason) {
+  state.performanceStatistics = null;
+  const content = $('performance-content');
+  const note = $('performance-statistics-note');
+  const sampled = $('performance-sampled');
+  if (content) content.hidden = true;
+  if (note) {
+    note.hidden = false;
+    note.textContent = reason === 'statistics_warming_up'
+      ? '监测组件正在启动，稍后自动重试。'
+      : '性能与流量统计暂不可用，不影响其他功能。';
+  }
+  if (sampled) sampled.textContent = '';
+}
+function renderPerformanceStatistics(data) {
+  if (!data?.available || !data.performance || !data.traffic) {
+    showPerformanceStatisticsUnavailable(data?.reason);
+    return;
+  }
+  state.performanceStatistics = data;
+  const content = $('performance-content');
+  const note = $('performance-statistics-note');
+  const sampled = $('performance-sampled');
+  if (content) content.hidden = false;
+  if (note) {
+    note.hidden = true;
+    note.textContent = '';
+  }
+  if (sampled) sampled.textContent = sampledAtText(data.sampled_at);
+
+  const performance = data.performance;
+  const traffic = data.traffic;
+  const cpu = performance.cpu || {};
+  const memory = performance.memory || {};
+  const disk = performance.disk || {};
+  const network = performance.network || {};
+  const process = performance.process || {};
+  const history = performance.history || {};
+  const timestamps = history.timestamps || [];
+  const loadValue = formatLoad(cpu.load_1);
+  const load = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const swap = memory.swap_percent === null || memory.swap_percent === undefined
+    ? '—'
+    : formatPercent(memory.swap_percent);
+  const processScale = [
+    `${formatCount(process.count)} 进程`,
+    `${formatOptionalCount(process.threads)} 线程`,
+    `${formatOptionalCount(process.handles)} 句柄`,
+  ].join(' · ');
+
+  setPerformanceReadout('performance-cpu-readout',
+    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${load}`);
+  setPerformanceReadout('performance-memory-readout',
+    `${formatPercent(memory.percent)} · ${formatBytes(memory.used)} / ${formatBytes(memory.total)} · Swap ${swap}`);
+  setPerformanceReadout('performance-disk-usage-readout',
+    `${formatPercent(disk.percent)} · ${formatBytes(disk.used)} / ${formatBytes(disk.total)} · ` +
+    `${formatCount(disk.volume_count)} 个卷`);
+  setPerformanceReadout('performance-disk-io-readout',
+    `读取 ${formatRate(disk.read_bps)} · 写入 ${formatRate(disk.write_bps)}`);
+  setPerformanceReadout('performance-network-readout',
+    `下行 ${formatRate(network.recv_bps)} · 上行 ${formatRate(network.sent_bps)}`);
+  setPerformanceReadout('performance-load-readout',
+    `OlivOS 负载 ${loadValue} · ${processScale}`);
+  setPerformanceReadout('performance-process-memory-readout',
+    `${formatBytes(process.rss)} · ${processScale}`);
+  setPerformanceReadout('performance-traffic-readout',
+    `入站 ${formatCount(traffic.inbound_per_minute)} 条/分钟 · ` +
+    `出站 ${formatCount(traffic.outbound_per_minute)} 条/分钟`);
+
+  setPerformanceSummary('cpu', formatPercent(cpu.percent));
+  setPerformanceSummary('memory', formatPercent(memory.percent));
+  setPerformanceSummary('disk', formatPercent(disk.percent));
+  setPerformanceSummary('network', `↓ ${formatRate(network.recv_bps)}`);
+  setPerformanceSummary('traffic',
+    `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
+
+  setPerformanceStat('cpu-utilization', formatPercent(cpu.percent));
+  setPerformanceStat('cpu-logical', formatCount(cpu.count));
+  setPerformanceStat('cpu-load', loadValue);
+  setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
+  setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
+  setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
+  setPerformanceStat('memory-used', formatBytes(memory.used));
+  setPerformanceStat('memory-available', formatBytes(memory.available));
+  setPerformanceStat('memory-total', formatBytes(memory.total));
+  setPerformanceStat('memory-swap', swap);
+  setPerformanceStat('memory-swap-in', formatRate(memory.swap_in_bps));
+  setPerformanceStat('memory-swap-out', formatRate(memory.swap_out_bps));
+  setPerformanceStat('disk-percent', formatPercent(disk.percent));
+  setPerformanceStat('disk-used', formatBytes(disk.used));
+  setPerformanceStat('disk-total', formatBytes(disk.total));
+  setPerformanceStat('disk-volumes', `${formatCount(disk.volume_count)} 个卷`);
+  setPerformanceStat('disk-read', formatRate(disk.read_bps));
+  setPerformanceStat('disk-write', formatRate(disk.write_bps));
+  setPerformanceStat('network-recv', formatRate(network.recv_bps));
+  setPerformanceStat('network-sent', formatRate(network.sent_bps));
+  setPerformanceStat('network-packets-recv',
+    `${formatCount(network.packets_recv_per_second)} 个/秒`);
+  setPerformanceStat('network-packets-sent',
+    `${formatCount(network.packets_sent_per_second)} 个/秒`);
+  setPerformanceStat('traffic-in', `${formatCount(traffic.inbound_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-out', `${formatCount(traffic.outbound_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-in-total', formatCount(traffic.inbound_total));
+  setPerformanceStat('traffic-out-total', formatCount(traffic.outbound_total));
+
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="cpu"]'), history.cpu_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="memory"]'), history.memory_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="disk"]'), history.disk_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="traffic"]'),
+    trafficBucketValues(traffic, 'inbound'));
+
+  renderTrend($('performance-cpu-chart'), [
+    {
+      className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
+      formatValue: formatPercent, values: history.cpu_percent || [],
+    },
+  ], 100, history.capacity, { timestamps });
+  renderTrend($('performance-memory-chart'), [
+    {
+      className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
+      formatValue: formatPercent, values: history.memory_percent || [],
+    },
+    {
+      className: 'chart-series-swap', legendClass: 'legend-swap', label: 'Swap 使用率',
+      formatValue: formatPercent, values: history.swap_percent || [],
+    },
+  ], 100, history.capacity, { timestamps });
+  renderTrend($('performance-disk-usage-chart'), [
+    {
+      className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',
+      formatValue: formatPercent, values: history.disk_percent || [],
+    },
+  ], 100, history.capacity, { timestamps });
+  renderTrend($('performance-disk-io-chart'), [
+    {
+      className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
+      formatValue: formatRate, values: history.disk_read_bps || [],
+    },
+    {
+      className: 'chart-series-disk-write', legendClass: 'legend-disk-write', label: '写入',
+      formatValue: formatRate, values: history.disk_write_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
+  renderTrend($('performance-network-chart'), [
+    {
+      className: 'chart-series-network-down', legendClass: 'legend-network-down', label: '网络下行',
+      formatValue: formatRate, values: history.network_recv_bps || [],
+    },
+    {
+      className: 'chart-series-network-up', legendClass: 'legend-network-up', label: '网络上行',
+      formatValue: formatRate, values: history.network_sent_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
+  renderTrend($('performance-load-chart'), [
+    {
+      className: 'chart-series-load', legendClass: 'legend-load', label: 'OlivOS 负载',
+      formatValue: formatLoad, values: history.load_1 || [],
+    },
+  ], null, history.capacity, { timestamps });
+  renderTrend($('performance-process-memory-chart'), [
+    {
+      className: 'chart-series-process-memory', legendClass: 'legend-process-memory',
+      label: 'OlivOS 进程内存', formatValue: formatBytes, values: history.process_rss || [],
+    },
+  ], null, history.capacity, { timestamps });
+  const trafficHistory = traffic.history || [];
+  renderTrend($('performance-traffic-chart'), [
+    {
+      className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '入站',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+    },
+    {
+      className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '出站',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+  });
+  setPerformanceCategory(state.performanceCategory);
 }
 function uptimeText(milliseconds) {
   const total = Math.max(0, Math.floor(milliseconds / 1000));
@@ -919,7 +1541,8 @@ async function refreshStatus() {
   $('update-status').textContent = status.update_available
     ? '发现可用更新。'
     : '当前未收到新版本通知。';
-  renderStatistics(status.statistics);
+  if (state.page === 'performance') renderPerformanceStatistics(status.statistics);
+  else if (state.page === 'dashboard') renderStatistics(status.statistics);
   state.accountConnections = status.account_connections || {};
   if (state.page === 'accounts') renderAccounts();
 }
@@ -2972,6 +3595,23 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('plugin-pages-close', closePluginPages);
+document.querySelectorAll('[data-performance-category]').forEach((button) => {
+  button.addEventListener('click', () => {
+    setPerformanceCategory(button.dataset.performanceCategory);
+  });
+  button.addEventListener('keydown', (event) => {
+    const direction = {
+      ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1,
+    }[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    const buttons = [...document.querySelectorAll('[data-performance-category]')];
+    const index = buttons.indexOf(button);
+    const next = buttons[(index + direction + buttons.length) % buttons.length];
+    setPerformanceCategory(next.dataset.performanceCategory);
+    next.focus();
+  });
+});
 bind('sidebar-toggle', toggleSidebar);
 bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
@@ -3153,8 +3793,8 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
   if (state.tkBridge?.id) refreshTkPreview(state.tkBridge);
-  if (state.token && state.page === 'dashboard') {
-    startUptimeLoop();
+  if (state.token && isStatusPage(state.page)) {
+    if (state.page === 'dashboard') startUptimeLoop();
     refreshStatus().then(() => ensureSession()).catch(notifyError);
   }
 });

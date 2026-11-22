@@ -15,6 +15,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import copy
+import ctypes
 import os
 import platform
 import threading
@@ -63,6 +64,98 @@ def _rate(current, previous, elapsed):
     if previous is None or elapsed <= 0:
         return 0.0
     return max(0.0, (current - previous) / elapsed)
+
+
+class _WindowsMemoryIO(object):
+    # Windows 的 psutil 交换区计数器恒为 0，改用 PDH 的硬缺页读写速率。
+    PDH_FMT_DOUBLE = 0x00000200
+    PAGE_SIZE = 4096
+    COUNTERS = (r'\Memory\Pages Input/sec', r'\Memory\Pages Output/sec')
+
+    class _CounterValue(ctypes.Structure):
+        _fields_ = [('status', ctypes.c_ulong), ('value', ctypes.c_double)]
+
+    def __init__(self):
+        self.pdh = None
+        self.query = None
+        self.counters = []
+        self.disabled = platform.system() != 'Windows'
+        if self.disabled:
+            return
+        try:
+            pdh = ctypes.WinDLL('pdh')
+            pdh.PdhOpenQueryW.argtypes = [
+                ctypes.c_wchar_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p)]
+            pdh.PdhOpenQueryW.restype = ctypes.c_ulong
+            add_func = getattr(pdh, 'PdhAddEnglishCounterW', None)
+            if add_func is None:
+                add_func = pdh.PdhAddCounterW
+            add_func.argtypes = [
+                ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_size_t,
+                ctypes.POINTER(ctypes.c_void_p)]
+            add_func.restype = ctypes.c_ulong
+            pdh.PdhCollectQueryData.argtypes = [ctypes.c_void_p]
+            pdh.PdhCollectQueryData.restype = ctypes.c_ulong
+            pdh.PdhGetFormattedCounterValue.argtypes = [
+                ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p,
+                ctypes.POINTER(self._CounterValue)]
+            pdh.PdhGetFormattedCounterValue.restype = ctypes.c_ulong
+            pdh.PdhCloseQuery.argtypes = [ctypes.c_void_p]
+            pdh.PdhCloseQuery.restype = ctypes.c_ulong
+            self.pdh = pdh
+            self._add_func = add_func
+        except Exception:
+            self.disabled = True
+
+    def _open(self):
+        query = ctypes.c_void_p()
+        if self.pdh.PdhOpenQueryW(None, 0, ctypes.byref(query)) != 0:
+            return False
+        counters = []
+        for path in self.COUNTERS:
+            counter = ctypes.c_void_p()
+            if self._add_func(query, path, 0, ctypes.byref(counter)) != 0:
+                self.pdh.PdhCloseQuery(query)
+                return False
+            counters.append(counter)
+        if self.pdh.PdhCollectQueryData(query) != 0:
+            self.pdh.PdhCloseQuery(query)
+            return False
+        self.query = query
+        self.counters = counters
+        return True
+
+    def sample(self):
+        if self.disabled:
+            return None
+        if self.query is None:
+            if not self._open():
+                self.disabled = True
+            return None
+        try:
+            if self.pdh.PdhCollectQueryData(self.query) != 0:
+                return None
+            values = []
+            for counter in self.counters:
+                value = self._CounterValue()
+                status = self.pdh.PdhGetFormattedCounterValue(
+                    counter, self.PDH_FMT_DOUBLE, None, ctypes.byref(value)
+                )
+                if status != 0:
+                    return None
+                values.append(max(0.0, float(value.value)) * self.PAGE_SIZE)
+            return values
+        except Exception:
+            return None
+
+    def close(self):
+        if self.query is not None and self.pdh is not None:
+            try:
+                self.pdh.PdhCloseQuery(self.query)
+            except Exception:
+                pass
+        self.query = None
+        self.counters = []
 
 
 def unavailable_snapshot(reason='statistics_unavailable'):
@@ -237,6 +330,8 @@ class server(API.Proc_templet):
         self._last_io_at = None
         self._last_disk_io = None
         self._last_net_io = None
+        self._last_swap_io = None
+        self._memory_io = _WindowsMemoryIO()
         self._last_process_cpu_at = None
         self._last_process_cpu_total = 0.0
 
@@ -298,9 +393,10 @@ class server(API.Proc_templet):
         self._last_process_cpu_total = cpu_seconds
         return result
 
-    def _sample_io(self, now):
+    def _sample_io(self, now, swap=None):
         disk_io = self._safe(psutil.disk_io_counters)
         net_io = self._safe(psutil.net_io_counters)
+        swap_io = swap
         result = {
             'disk_read_bps': 0.0,
             'disk_write_bps': 0.0,
@@ -308,8 +404,11 @@ class server(API.Proc_templet):
             'net_recv_bps': 0.0,
             'packets_sent_per_second': 0.0,
             'packets_recv_per_second': 0.0,
+            'swap_in_bps': 0.0,
+            'swap_out_bps': 0.0,
         }
         elapsed = 0.0 if self._last_io_at is None else max(0.0, now - self._last_io_at)
+        memory_io = self._memory_io.sample()
         if elapsed > 0:
             if disk_io is not None and self._last_disk_io is not None:
                 result['disk_read_bps'] = _round(_rate(
@@ -331,9 +430,20 @@ class server(API.Proc_templet):
                 result['packets_recv_per_second'] = _round(_rate(
                     net_io.packets_recv, self._last_net_io.packets_recv, elapsed
                 ))
+            if memory_io is not None:
+                result['swap_in_bps'] = _round(memory_io[0])
+                result['swap_out_bps'] = _round(memory_io[1])
+            elif swap_io is not None and self._last_swap_io is not None:
+                result['swap_in_bps'] = _round(_rate(
+                    getattr(swap_io, 'sin', 0), getattr(self._last_swap_io, 'sin', 0), elapsed
+                ))
+                result['swap_out_bps'] = _round(_rate(
+                    getattr(swap_io, 'sout', 0), getattr(self._last_swap_io, 'sout', 0), elapsed
+                ))
         self._last_io_at = now
         self._last_disk_io = disk_io
         self._last_net_io = net_io
+        self._last_swap_io = swap_io
         return result
 
     def _disk_usage_metrics(self):
@@ -400,7 +510,7 @@ class server(API.Proc_templet):
         memory = self._safe(psutil.virtual_memory)
         swap = self._safe(psutil.swap_memory)
         disk_usage = self._disk_usage_metrics()
-        io = self._sample_io(now)
+        io = self._sample_io(now, swap)
         process = self._process_tree_metrics()
         load_1 = load_5 = load_15 = None
         if load is not None and len(load) >= 3:
@@ -428,6 +538,8 @@ class server(API.Proc_templet):
                 'available': memory_available,
                 'percent': memory_percent,
                 'swap_percent': swap_percent,
+                'swap_in_bps': io['swap_in_bps'],
+                'swap_out_bps': io['swap_out_bps'],
             },
             'disk': {
                 'path': os.getcwd(),
@@ -457,9 +569,21 @@ class server(API.Proc_templet):
             self.performance_history.append({
                 'ts': sample['sampled_at'],
                 'cpu_percent': sample['cpu']['percent'],
+                'load_1': sample['cpu']['load_1'],
                 'memory_percent': sample['memory']['percent'],
+                'swap_percent': _non_negative_float(sample['memory'].get('swap_percent'), 0.0),
+                'swap_in_bps': sample['memory']['swap_in_bps'],
+                'swap_out_bps': sample['memory']['swap_out_bps'],
+                'disk_percent': sample['disk']['percent'],
+                'disk_read_bps': sample['disk']['read_bps'],
+                'disk_write_bps': sample['disk']['write_bps'],
                 'network_recv_bps': sample['network']['recv_bps'],
                 'network_sent_bps': sample['network']['sent_bps'],
+                'process_count': sample['process']['count'],
+                'process_rss': sample['process']['rss'],
+                'process_cpu_percent': sample['process']['cpu_percent'],
+                'process_threads': sample['process']['threads'],
+                'process_handles': sample['process']['handles'],
             })
             self._roll_traffic_bucket_locked(now)
         return sample
@@ -513,6 +637,9 @@ class server(API.Proc_templet):
         )
         return _round(total * 60.0 / elapsed)
 
+    def _history_series(self, key):
+        return [item.get(key) for item in self.performance_history]
+
     def snapshot(self):
         try:
             with self.lock:
@@ -521,10 +648,24 @@ class server(API.Proc_templet):
                 performance = copy.deepcopy(self._last_sample)
                 performance['history'] = {
                     'interval': _non_negative_float(self.Proc_info.scan_interval, 1.0),
-                    'cpu_percent': [item['cpu_percent'] for item in self.performance_history],
-                    'memory_percent': [item['memory_percent'] for item in self.performance_history],
-                    'network_recv_bps': [item['network_recv_bps'] for item in self.performance_history],
-                    'network_sent_bps': [item['network_sent_bps'] for item in self.performance_history],
+                    'capacity': self.history_size,
+                    'timestamps': self._history_series('ts'),
+                    'cpu_percent': self._history_series('cpu_percent'),
+                    'load_1': self._history_series('load_1'),
+                    'memory_percent': self._history_series('memory_percent'),
+                    'swap_percent': self._history_series('swap_percent'),
+                    'swap_in_bps': self._history_series('swap_in_bps'),
+                    'swap_out_bps': self._history_series('swap_out_bps'),
+                    'disk_percent': self._history_series('disk_percent'),
+                    'disk_read_bps': self._history_series('disk_read_bps'),
+                    'disk_write_bps': self._history_series('disk_write_bps'),
+                    'network_recv_bps': self._history_series('network_recv_bps'),
+                    'network_sent_bps': self._history_series('network_sent_bps'),
+                    'process_count': self._history_series('process_count'),
+                    'process_rss': self._history_series('process_rss'),
+                    'process_cpu_percent': self._history_series('process_cpu_percent'),
+                    'process_threads': self._history_series('process_threads'),
+                    'process_handles': self._history_series('process_handles'),
                 }
                 now_wall = time.time()
                 history = [dict(item) for item in self.traffic_history]
@@ -544,6 +685,8 @@ class server(API.Proc_templet):
                         'outbound_per_minute': self._traffic_rate(history, 'outbound', now_wall),
                         'event_per_minute': self._traffic_rate(history, 'events', now_wall),
                         'failed_per_minute': self._traffic_rate(history, 'failed', now_wall),
+                        'bucket_seconds': self.traffic_bucket_seconds,
+                        'history_capacity': self.traffic_history_size,
                         'history': history,
                     },
                 }
@@ -558,6 +701,7 @@ class server(API.Proc_templet):
             except Exception:
                 self.log(4, 'statistics sample failed: %s' % traceback.format_exc())
             self.stop_event.wait(self.Proc_info.scan_interval)
+        self._memory_io.close()
 
     def on_terminate(self):
         self.stop_event.set()

@@ -172,13 +172,30 @@ def test_statistics_snapshot_warms_up_before_first_sample():
 
 def test_statistics_snapshot_is_json_serializable_and_history_is_bounded():
     # 快照必须能直接交给 Flask jsonify，且历史长度受配置限制。
-    monitor = make_statistics_monitor(history_size=2, traffic_history_size=2)
+    monitor = make_statistics_monitor(
+        history_size=2, traffic_bucket_seconds=5.0, traffic_history_size=2)
     for _ in range(3):
         monitor.sample()
     snapshot = monitor.snapshot()
     assert snapshot['available'] is True
-    assert isinstance(snapshot['performance']['history']['cpu_percent'], list)
-    assert len(snapshot['performance']['history']['cpu_percent']) <= 2
+    history = snapshot['performance']['history']
+    assert history['capacity'] == 2
+    assert isinstance(history['cpu_percent'], list)
+    assert len(history['cpu_percent']) <= 2
+    # 性能页依赖各历史数组严格对齐，任意新增序列都不能单独变长或变短。
+    series_names = (
+        'cpu_percent', 'load_1', 'memory_percent', 'swap_percent', 'swap_in_bps', 'swap_out_bps',
+        'disk_percent',
+        'disk_read_bps', 'disk_write_bps', 'network_recv_bps', 'network_sent_bps',
+        'process_count', 'process_rss', 'process_cpu_percent', 'process_threads',
+        'process_handles',
+    )
+    lengths = {name: len(history[name]) for name in series_names}
+    assert set(lengths.values()) == {len(history['timestamps'])}
+    assert history['timestamps'] == sorted(history['timestamps'])
+    # 流量快照要暴露桶时长和历史容量，便于前端直接展示历史桶计数并换算顶部速率。
+    assert snapshot['traffic']['bucket_seconds'] == 5.0
+    assert snapshot['traffic']['history_capacity'] == 2
     assert json.loads(json.dumps(snapshot, ensure_ascii=False)) == snapshot
 
 
@@ -224,6 +241,24 @@ def test_statistics_disk_usage_aggregates_all_volumes(monkeypatch):
     assert [item['mountpoint'] for item in disk['volumes']] == ['C:\\', 'D:\\']
 
 
+def test_statistics_swap_io_uses_counter_delta(monkeypatch):
+    # 内存 IO 使用交换区累计计数器的差值，计数器回退时按 0 处理。
+    from types import SimpleNamespace
+
+    readings = [
+        SimpleNamespace(sin=1000, sout=2000, percent=0.0),
+        SimpleNamespace(sin=3000, sout=1500, percent=0.0),
+    ]
+    monkeypatch.setattr(statisticsAPI.psutil, 'swap_memory', lambda: readings.pop(0))
+    monitor = make_statistics_monitor()
+    monitor._memory_io.disabled = True
+    first = monitor._sample_performance()
+    second = monitor._sample_performance()
+    assert first['memory']['swap_in_bps'] == 0.0
+    assert second['memory']['swap_in_bps'] > 0.0
+    assert second['memory']['swap_out_bps'] == 0.0
+
+
 def test_statistics_sample_degrades_when_psutil_fails(monkeypatch):
     # 系统探针不可用时仍要产出结构完整的快照，仪表盘不能因此报错。
     def fail(*args, **kwargs):
@@ -238,6 +273,12 @@ def test_statistics_sample_degrades_when_psutil_fails(monkeypatch):
     assert snapshot['available'] is True
     assert snapshot['performance']['cpu']['percent'] == 0.0
     assert snapshot['performance']['memory']['total'] == 0
+    # 平台探针无法提供线程数或句柄数时，历史采样必须保留 None，
+    # 不能把它们伪造成真实存在的 0。
+    assert snapshot['performance']['process']['threads'] is None
+    assert snapshot['performance']['process']['handles'] is None
+    assert snapshot['performance']['history']['process_threads'] == [None]
+    assert snapshot['performance']['history']['process_handles'] == [None]
 
 
 def test_statistics_process_cpu_uses_cpu_time_delta(monkeypatch):

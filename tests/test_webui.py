@@ -263,8 +263,28 @@ def test_status_returns_statistics_snapshot_and_degrades_without_monitor(client,
     assert missing['reason'] == 'statistics_unavailable'
 
     from types import SimpleNamespace
-    snapshot = {'available': True, 'sampled_at': 123.0, 'performance': {'cpu': {'percent': 12.5}},
-                'traffic': {'inbound_total': 3}}
+    # /api/status 只透传统计快照；性能页需要的容量、时间戳和分项历史不能另开路由。
+    snapshot = {
+        'available': True,
+        'sampled_at': 123.0,
+        'performance': {
+            'cpu': {'percent': 12.5},
+            'history': {
+                'capacity': 120,
+                'timestamps': [120.0, 121.0],
+                'cpu_percent': [10.0, 12.5],
+                'load_1': [0.8, 1.25],
+                'swap_percent': [0.0, 0.0],
+                'disk_percent': [20.0, 20.0],
+                'disk_read_bps': [0.0, 1024.0],
+                'disk_write_bps': [0.0, 2048.0],
+                'process_cpu_percent': [1.0, 2.0],
+                'process_threads': [None, None],
+                'process_handles': [None, None],
+            },
+        },
+        'traffic': {'inbound_total': 3, 'bucket_seconds': 5.0, 'history_capacity': 60},
+    }
     host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=lambda: snapshot)
     assert client.get('/api/status').json['statistics'] == snapshot
 

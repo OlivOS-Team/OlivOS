@@ -1267,6 +1267,15 @@ def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
 
 
 @pytest.mark.browser
+def test_sidebar_orders_performance_between_logs_and_terminals(browser):
+    # 主导航保持“仪表盘、账号、日志、性能、终端、插件”的顺序。
+    assert browser.driver.execute_script("""
+        return [...document.querySelectorAll('#navigation [data-page]')]
+          .map((node) => node.dataset.page);
+    """) == ['dashboard', 'accounts', 'logs', 'performance', 'terminals', 'plugins']
+
+
+@pytest.mark.browser
 def test_mobile_sidebar_closes_after_navigation(browser):
     driver = browser.driver
     driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
@@ -1411,19 +1420,23 @@ def test_dashboard_uptime_advances_smoothly_between_status_refreshes(browser):
     assert any(delta > 0 for delta in deltas), deltas
 
 
-def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0):
+def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
+                        cpu_percent=32.5, memory_percent=37.5, disk_percent=25.0,
+                        process_threads=18, process_handles=400):
     # 仪表盘浏览器用例使用的完整快照，字段与 statisticsAPI.server.snapshot() 保持一致。
     now = time.time()
+    timestamps = [now - 30, now - 20, now - 10, now]
     return {
         'available': True,
         'sampled_at': now,
         'performance': {
             'sampled_at': now,
-            'cpu': {'percent': 32.5, 'count': 8, 'load_1': 1.25, 'load_5': 1.0, 'load_15': 0.8},
+            'cpu': {'percent': cpu_percent, 'count': 8, 'load_1': 1.25, 'load_5': 1.0, 'load_15': 0.8},
             'memory': {'total': 16 * 1024 ** 3, 'used': 6 * 1024 ** 3,
-                       'available': 10 * 1024 ** 3, 'percent': 37.5, 'swap_percent': 0.0},
+                       'available': 10 * 1024 ** 3, 'percent': memory_percent,
+                       'swap_percent': 0.0, 'swap_in_bps': 512, 'swap_out_bps': 256},
             'disk': {'path': 'D:/fixture', 'total': 512 * 1024 ** 3, 'used': 128 * 1024 ** 3,
-                     'percent': 25.0, 'volume_count': 2,
+                     'percent': disk_percent, 'volume_count': 2,
                      'volumes': [{'device': 'C:', 'mountpoint': 'C:\\', 'total': 256 * 1024 ** 3,
                                   'used': 64 * 1024 ** 3, 'percent': 25.0},
                                  {'device': 'D:', 'mountpoint': 'D:\\', 'total': 256 * 1024 ** 3,
@@ -1432,13 +1445,28 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0):
             'network': {'sent_bps': 4096, 'recv_bps': 8192,
                         'packets_sent_per_second': 10, 'packets_recv_per_second': 20},
             'process': {'count': 3, 'rss': 256 * 1024 ** 2, 'cpu_percent': 12.5,
-                        'threads': 18, 'handles': 400},
+                        'threads': process_threads, 'handles': process_handles},
             'history': {
                 'interval': 1.0,
-                'cpu_percent': [10.0, 20.0, 30.0, 32.5],
-                'memory_percent': [34.0, 35.0, 36.0, 37.5],
+                'capacity': 120,
+                'timestamps': timestamps,
+                'cpu_percent': [10.0, 20.0, 30.0, cpu_percent],
+                'load_1': [0.8, 0.95, 1.1, 1.25],
+                'memory_percent': [34.0, 35.0, 36.0, memory_percent],
+                'swap_percent': [0.0, 0.0, 0.0, 0.0],
+                'swap_in_bps': [0, 128, 256, 512],
+                'swap_out_bps': [0, 64, 128, 256],
+                'disk_percent': [20.0, 21.0, 23.0, disk_percent],
+                'disk_read_bps': [100, 200, 500, 1024],
+                'disk_write_bps': [200, 400, 1000, 2048],
                 'network_recv_bps': [1000, 2000, 4000, 8192],
                 'network_sent_bps': [500, 1000, 2000, 4096],
+                'process_count': [2, 2, 3, 3],
+                'process_rss': [200 * 1024 ** 2, 220 * 1024 ** 2,
+                                240 * 1024 ** 2, 256 * 1024 ** 2],
+                'process_cpu_percent': [8.0, 9.0, 10.0, 12.5],
+                'process_threads': [16, 17, 18, process_threads],
+                'process_handles': [380, 390, 395, process_handles],
             },
         },
         'traffic': {
@@ -1450,6 +1478,8 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0):
             'outbound_per_minute': 3.0,
             'event_per_minute': 6.0,
             'failed_per_minute': 1.0,
+            'bucket_seconds': 5.0,
+            'history_capacity': 60,
             'history': [
                 {'ts': now - 10, 'inbound': 10, 'outbound': 4, 'events': 11, 'failed': 0},
                 {'ts': now - 5, 'inbound': 12, 'outbound': 5, 'events': 13, 'failed': 1},
@@ -1459,40 +1489,259 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0):
     }
 
 
+def chart_contract(driver, selector):
+    # 读取图表容量与每条折线的实际点数，用于验证补零后横轴点位固定。
+    return driver.execute_script(r"""
+        const svg = document.querySelector(arguments[0]).querySelector('svg');
+        return {
+          capacity: Number(svg.dataset.capacity),
+          seriesCount: Number(svg.dataset.seriesCount),
+          pointCounts: [...svg.querySelectorAll('.chart-series')].map(
+            (series) => series.getAttribute('points').trim().split(/\s+/).length),
+        };
+    """, selector)
+
+
+def hover_chart(driver, selector, ratio):
+    # 按图表真实宽度换算指针位置并悬停，返回值来自页面实际生成的时间提示框。
+    return driver.execute_script("""
+        const container = document.querySelector(arguments[0]);
+        const svg = container.querySelector('svg');
+        const rect = svg.getBoundingClientRect();
+        container.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: rect.left + rect.width * arguments[1],
+          clientY: rect.top + rect.height / 2,
+        }));
+        const tooltip = container.querySelector('.chart-tooltip');
+        const cursor = container.querySelector('.chart-cursor');
+        return {
+          hidden: tooltip.hidden,
+          text: tooltip.textContent,
+          cursorVisible: getComputedStyle(cursor).display !== 'none',
+        };
+    """, selector, ratio)
+
+
+def metric_card_text(driver, label):
+    # 按指标名称读取合并网格中的卡片文本，避免依赖卡片在 DOM 里的固定序号。
+    return driver.execute_script("""
+        const card = [...document.querySelectorAll('#performance-metrics .metric-card')]
+          .find((node) => node.querySelector('.metric-label').textContent === arguments[0]);
+        return card ? card.textContent : '';
+    """, label)
+
+
 @pytest.mark.browser
 def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     driver = browser.driver
-    counts = {'inbound': 120, 'inbound_per_minute': 5.0}
+    counts = {
+        'inbound': 120, 'inbound_per_minute': 5.0,
+        'cpu': 32.5, 'memory': 37.5, 'disk': 25.0,
+    }
 
     def snapshot():
         return statistics_snapshot(
-            inbound=counts['inbound'], inbound_per_minute=counts['inbound_per_minute'])
+            inbound=counts['inbound'], inbound_per_minute=counts['inbound_per_minute'],
+            cpu_percent=counts['cpu'], memory_percent=counts['memory'],
+            disk_percent=counts['disk'])
 
     browser.host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=snapshot)
     browser.open_sidebar()
     browser.click('[data-page="dashboard"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('statistics-content').hidden"))
-    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 10
-    assert 'CPU 使用率' in browser.find('#performance-metrics').text
-    assert '入站消息' in browser.find('#traffic-metrics').text
+    assert browser.find('#performance-title').text == '性能'
     assert driver.execute_script(
-        "return document.querySelector('#traffic-metrics .metric-value').textContent") == '5 条/分钟'
+        "return document.querySelectorAll('#statistics-content .dashboard-panel').length") == 1
+    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 6
+    assert 'CPU' in browser.find('#performance-metrics').text
+    assert '内存' in browser.find('#performance-metrics').text
+    assert '磁盘' in browser.find('#performance-metrics').text
+    assert '收发消息' in browser.find('#performance-metrics').text
+    assert '事件总量' not in browser.find('#performance-metrics').text
+    assert 'OlivOS 进程' not in browser.find('#performance-metrics').text
     assert '2 个卷' in browser.find('#performance-metrics').text
+    # 网络与消息卡片分别合并上下行、出入站数据，并和普通性能指标处于同一网格。
+    network_text = metric_card_text(driver, '网络')
+    assert '↓ 8.0 KiB/s' in network_text and '↑ 4.0 KiB/s' in network_text
+    traffic_text = metric_card_text(driver, '收发消息')
+    assert '↓ 5 条/分钟 · ↑ 3 条/分钟' in traffic_text
+    assert '累计 收 120 · 发 45' in traffic_text
+    # 磁盘卡的环图表示占用率，小字同时展示读写瞬时速率。
+    disk_text = metric_card_text(driver, '磁盘')
+    assert '读取 1.0 KiB/s' in disk_text and '写入 2.0 KiB/s' in disk_text
+    # OlivOS 进程规模归入 CPU 卡，进程内存归入内存卡并画成环内副弧。
+    cpu_text = metric_card_text(driver, 'CPU')
+    assert 'OlivOS 3 进程' in cpu_text and '18 线程' in cpu_text and '0.13 核心' in cpu_text
+    assert '| OlivOS 3 进程' in cpu_text
+    memory_text = metric_card_text(driver, '内存')
+    assert 'OlivOS 256.0 MiB (1.6%)' in memory_text and '| OlivOS 256.0 MiB' in memory_text
+    assert '换入 512 B/s' in memory_text and '换出 256 B/s' in memory_text
+    memory_ring = browser.find('.metric-ring-card[data-ring="memory"] .metric-ring')
+    secondary_arc = memory_ring.find_element('css selector', '.metric-ring-secondary')
+    assert abs(float(memory_ring.get_attribute('data-secondary-percent')) - 1.5625) < 0.0001
+    assert abs(float(secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
+    # CPU、内存、磁盘使用环形卡，网络和消息卡保留文字卡。
+    rings = driver.execute_script("""
+        return [...document.querySelectorAll('.metric-ring-card')].map((card) => ({
+          label: card.querySelector('.metric-label').textContent,
+          value: card.querySelector('.metric-value').textContent,
+          offset: Number(card.querySelector('.metric-ring-progress').getAttribute('stroke-dashoffset')),
+        }));
+    """)
+    assert [(item['label'], item['value'], item['offset']) for item in rings] == [
+        ('CPU', '32.5%', 67.5),
+        ('内存', '37.5%', 62.5),
+        ('磁盘', '25.0%', 75.0),
+    ]
+    # 六张趋势图分别嵌入 CPU、内存、磁盘、网络、收发消息和失败事件卡片，独立趋势区不再保留。
+    assert driver.execute_script("return document.querySelectorAll('.trend-card').length") == 0
+    cards = driver.execute_script("""
+        return [...document.querySelectorAll('#performance-metrics .metric-card')].map((card) => {
+          const chart = card.querySelector('.metric-card-chart');
+          return {
+            label: card.querySelector('.metric-label').textContent,
+            chart: chart ? chart.id : '',
+            ring: Boolean(card.querySelector('.metric-ring')),
+          };
+        });
+    """)
+    assert cards == [
+        {'label': 'CPU', 'chart': 'dashboard-cpu-chart', 'ring': True},
+        {'label': '内存', 'chart': 'dashboard-memory-chart', 'ring': True},
+        {'label': '磁盘', 'chart': 'dashboard-disk-chart', 'ring': True},
+        {'label': '网络', 'chart': 'dashboard-network-chart', 'ring': False},
+        {'label': '收发消息', 'chart': 'dashboard-traffic-chart', 'ring': False},
+        {'label': '失败事件', 'chart': 'dashboard-failure-chart', 'ring': False},
+    ]
+    # 这一页的折线图不再显示图例，信息由图表悬停提示和卡片文字承担。
+    assert driver.execute_script(
+        "return document.querySelectorAll('#performance-metrics .chart-legend').length") == 0
+    # CPU/内存/磁盘/网络图固定 120 点容量，收发消息与失败事件图沿用统计模块的 60 点容量；数据不足时左侧补零。
+    assert chart_contract(driver, '#dashboard-cpu-chart') == {
+        'capacity': 120, 'seriesCount': 1, 'pointCounts': [120]}
+    assert chart_contract(driver, '#dashboard-memory-chart') == {
+        'capacity': 120, 'seriesCount': 3, 'pointCounts': [120, 120, 120]}
+    # 内存图同时绘制占用率与换入/换出速率。
+    assert driver.execute_script("""
+        return [...document.querySelectorAll('#dashboard-memory-chart .chart-series')]
+          .map((series) => series.dataset.series);
+    """) == ['chart-series-memory', 'chart-series-swap-in', 'chart-series-swap-out']
+    # 比例类图表保持线性，内存/磁盘 IO、网络使用对数标尺；收发消息和失败事件使用线性标尺。
+    assert driver.execute_script("""
+        return ['#dashboard-cpu-chart', '#dashboard-memory-chart', '#dashboard-disk-chart',
+          '#dashboard-network-chart', '#dashboard-traffic-chart',
+          '#dashboard-failure-chart'].map(
+          (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
+    """) == ['linear', 'log', 'log', 'log', 'linear', 'linear']
+    assert chart_contract(driver, '#dashboard-disk-chart') == {
+        'capacity': 120, 'seriesCount': 2, 'pointCounts': [120, 120]}
+    # 磁盘折线图必须绘制读取/写入速率，而不是磁盘占用率。
+    assert driver.execute_script("""
+        return [...document.querySelectorAll('#dashboard-disk-chart .chart-series')]
+          .map((series) => series.dataset.series);
+    """) == ['chart-series-disk-read', 'chart-series-disk-write']
+    assert chart_contract(driver, '#dashboard-network-chart') == {
+        'capacity': 120, 'seriesCount': 2, 'pointCounts': [120, 120]}
+    assert chart_contract(driver, '#dashboard-traffic-chart') == {
+        'capacity': 60, 'seriesCount': 2, 'pointCounts': [60, 60]}
+    assert chart_contract(driver, '#dashboard-failure-chart') == {
+        'capacity': 60, 'seriesCount': 1, 'pointCounts': [60]}
+    # 环形图绝对定位在折线图左侧，与图表区域重叠但保留原有百分比显示。
+    assert driver.execute_script("""
+        const card = [...document.querySelectorAll('#performance-metrics .metric-card')]
+          .find((node) => node.querySelector('.metric-label').textContent === 'CPU');
+        const ring = card.querySelector('.metric-ring');
+        const chart = card.querySelector('.metric-card-chart');
+        const ringRect = ring.getBoundingClientRect();
+        const chartRect = chart.getBoundingClientRect();
+        return getComputedStyle(ring).position === 'absolute' &&
+          Math.abs(ringRect.left - chartRect.left) <= 1 &&
+          ringRect.right > chartRect.left &&
+          ringRect.bottom > chartRect.top &&
+          ringRect.top < chartRect.bottom;
+    """)
+    # 六张卡片图都使用渐变面积填充，性能页仍保持无面积的独立图表。
+    assert driver.execute_script("""
+        return ['#dashboard-cpu-chart', '#dashboard-memory-chart', '#dashboard-disk-chart',
+          '#dashboard-network-chart', '#dashboard-traffic-chart',
+          '#dashboard-failure-chart'].map((selector) => {
+          const chart = document.querySelector(selector);
+          const areas = [...chart.querySelectorAll('.chart-area')];
+          return [areas.length, areas.every(
+            (area) => area.getAttribute('fill').startsWith('url(#'))];
+        });
+    """) == [[1, True], [3, True], [2, True], [2, True], [2, True], [1, True]]
+    assert driver.execute_script(
+        "return document.querySelector('#dashboard-cpu-chart .chart-series-cpu')"
+        ".getAttribute('points').split(' ')[0].endsWith(',38.00')")
+    network_tip = hover_chart(driver, '#dashboard-network-chart', 0.999)
+    assert network_tip['hidden'] is False and network_tip['cursorVisible'] is True
+    assert '网络下行' in network_tip['text'] and '8.0 KiB/s' in network_tip['text']
+    assert '网络上行' in network_tip['text'] and '4.0 KiB/s' in network_tip['text']
+    disk_tip = hover_chart(driver, '#dashboard-disk-chart', 0.999)
+    assert '读取' in disk_tip['text'] and '1.0 KiB/s' in disk_tip['text']
+    assert '写入' in disk_tip['text'] and '2.0 KiB/s' in disk_tip['text']
+    memory_tip = hover_chart(driver, '#dashboard-memory-chart', 0.999)
+    assert '内存使用率' in memory_tip['text'] and '37.5%' in memory_tip['text']
+    assert '换入' in memory_tip['text'] and '512 B/s' in memory_tip['text']
+    assert '换出' in memory_tip['text'] and '256 B/s' in memory_tip['text']
+    # 收发消息和失败事件的悬停值直接使用桶内实际条数，不再换算成条/分钟。
+    traffic_tip = hover_chart(driver, '#dashboard-traffic-chart', 0.999)
+    assert '收' in traffic_tip['text'] and '8 条' in traffic_tip['text']
+    assert '发' in traffic_tip['text'] and '3 条' in traffic_tip['text']
+    failure_tip = hover_chart(driver, '#dashboard-failure-chart', 0.999)
+    assert '失败' in failure_tip['text'] and '1 条' in failure_tip['text']
+
+    # 悬停提示高于图表时必须能溢出显示，不能被子卡片裁掉底部。
+    tooltip_overflow = driver.execute_script("""
+        const chart = document.querySelector('#dashboard-memory-chart');
+        const tooltip = chart.querySelector('.chart-tooltip');
+        return {
+          overflow: getComputedStyle(chart).overflow,
+          tooltipBottom: tooltip.getBoundingClientRect().bottom,
+          chartBottom: chart.getBoundingClientRect().bottom,
+        };
+    """)
+    assert tooltip_overflow['overflow'] == 'visible'
+    assert tooltip_overflow['tooltipBottom'] > tooltip_overflow['chartBottom']
+    padding_tip = hover_chart(driver, '#dashboard-network-chart', 0.0)
+    assert padding_tip['hidden'] is False
+    assert '暂无历史采样' in padding_tip['text']
+    # 百分比越界与非法值只能在环图边界内收敛，不能生成负数或超出整圈的进度。
+    clamped = driver.execute_script("""
+        const high = ringMetricCard('High', 150, '', 'cpu');
+        const low = ringMetricCard('Low', 'invalid', '', 'cpu');
+        return [high, low].map((card) => [
+          card.querySelector('.metric-value').textContent,
+          card.querySelector('.metric-ring-progress').getAttribute('stroke-dashoffset'),
+        ]);
+    """)
+    assert clamped == [['100.0%', '0'], ['0.0%', '100']]
 
     # 修改快照后主动刷新，确认轮询会把累计值更新到现有卡片，而不是重复堆叠。
     counts['inbound'] = 140
     counts['inbound_per_minute'] = 6.0
+    counts['cpu'] = 46.0
+    counts['memory'] = 51.0
+    counts['disk'] = 72.0
     driver.execute_async_script("""
         const done = arguments[0];
         refreshStatus().then(() => done(true), (error) => done(String(error)));
     """)
-    assert driver.execute_script(
-        "return document.querySelector('#traffic-metrics .metric-value').textContent") == '6 条/分钟'
-    assert '累计 140 条' in browser.find('#traffic-metrics').text
-    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 10
+    traffic_text = metric_card_text(driver, '收发消息')
+    assert '↓ 6 条/分钟 · ↑ 3 条/分钟' in traffic_text
+    assert '累计 收 140 · 发 45' in traffic_text
+    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 6
+    assert driver.execute_script("return document.querySelectorAll('.metric-card-chart').length") == 6
+    updated = driver.execute_script("""
+        return [...document.querySelectorAll('.metric-ring-card .metric-value')]
+          .map((node) => node.textContent);
+    """)
+    assert updated == ['46.0%', '51.0%', '72.0%']
 
-    # 宽屏保持 3 列，中等屏先收为单栏统计面板，手机屏再逐步降到 2 列和 1 列。
+    # 宽屏 3 列，中等宽度 2 列，窄屏 1 列。
     def metric_rows(selector):
         return driver.execute_script("""
             const tops = [...document.querySelectorAll(arguments[0])].map(
@@ -1507,23 +1756,60 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
 
     assert metric_rows('#performance-metrics .metric-card') == [3, 3]
 
+    # 所有卡片应保持等高，避免不同行因小字换行而高低不齐。
+    assert driver.execute_script("""
+        const heights = [...document.querySelectorAll('#performance-metrics .metric-card')]
+          .map((card) => Math.round(card.getBoundingClientRect().height));
+        return new Set(heights).size;
+    """) == 1
+
+    # 折线图和环形图保持与调整前相近的高度，避免卡片被撑得过高。
+    visual = driver.execute_script("""
+        const card = [...document.querySelectorAll('#performance-metrics .metric-card')]
+          .find((node) => node.querySelector('.metric-label').textContent === 'CPU');
+        const chart = card.querySelector('.metric-card-chart').getBoundingClientRect();
+        const ring = card.querySelector('.metric-ring').getBoundingClientRect();
+        return {chart: chart.height, ringWidth: ring.width, ringHeight: ring.height};
+    """)
+    assert 74 <= visual['chart'] <= 84
+    assert 64 <= visual['ringWidth'] <= 74
+    assert abs(visual['ringWidth'] - visual['ringHeight']) <= 1
+
     set_viewport(browser, 900, 720, mobile_device=True)
     panel_tops = driver.execute_script("""
         return [...document.querySelectorAll('.dashboard-panel')].map(
           (panel) => Math.round(panel.getBoundingClientRect().top));
     """)
-    assert panel_tops[1] > panel_tops[0]
+    assert len(panel_tops) == 1
 
-    # 320px 是最窄的验收宽度；同时检查深浅主题下指标文字与卡片背景有足够对比度。
-    set_viewport(browser, 390, 640, mobile_device=True)
     assert metric_rows('#performance-metrics .metric-card') == [2, 2, 2]
-    assert metric_rows('#traffic-metrics .metric-card') == [2, 2]
+
+    # 两列布局下环形卡与普通卡同排，折线图底边必须对齐。
+    chart_bottoms = driver.execute_script("""
+        const cards = [...document.querySelectorAll('#performance-metrics .metric-card')];
+        const find = (label) => cards.find(
+          (node) => node.querySelector('.metric-label').textContent === label);
+        return ['磁盘', '网络'].map((label) => Math.round(
+          find(label).querySelector('.metric-card-chart').getBoundingClientRect().bottom));
+    """)
+    assert abs(chart_bottoms[0] - chart_bottoms[1]) <= 1
+
+    # 窄屏降到单列，同时避免水平滚动、图表越界并保持卡片对比度。
+    set_viewport(browser, 390, 640, mobile_device=True)
+    assert metric_rows('#performance-metrics .metric-card') == [1, 1, 1, 1, 1, 1]
 
     set_viewport(browser, 320, 640, mobile_device=True)
     browser.wait.until(lambda _: driver.execute_script(
         "return document.documentElement.scrollWidth <= innerWidth"))
     assert metric_rows('#performance-metrics .metric-card') == [1, 1, 1, 1, 1, 1]
-    assert metric_rows('#traffic-metrics .metric-card') == [1, 1, 1, 1]
+    chart_cards_fit = driver.execute_script("""
+        return [...document.querySelectorAll('.metric-chart-card')].every((card) => {
+          const chart = card.querySelector('.metric-card-chart').getBoundingClientRect();
+          const box = card.getBoundingClientRect();
+          return chart.left >= box.left && chart.right <= box.right;
+        });
+    """)
+    assert chart_cards_fit
     contrasts = driver.execute_script("""
         function channels(color) {
           return (color.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
@@ -1549,17 +1835,20 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     assert contrasts['dark'] >= 7
     assert driver.execute_script("return document.documentElement.scrollWidth <= innerWidth")
 
-    # 移动端必须按工具栏、更新通知、运行时长、系统性能、消息流量依次纵向排列。
+    # 移动端必须按工具栏、更新通知、运行时长、性能标题、收发消息卡片依次纵向排列。
     tops = driver.execute_script("""
+        const trafficCard = [...document.querySelectorAll('#performance-metrics .metric-card')]
+          .find((card) => card.querySelector('.metric-label').textContent === '收发消息');
         const selectors = [
           '#dashboard .runtime-summary .toolbar',
           '#update-status',
           '#runtime',
           '#performance-title',
-          '#traffic-title',
         ];
-        return selectors.map((selector) => Math.round(
+        const tops = selectors.map((selector) => Math.round(
           document.querySelector(selector).getBoundingClientRect().top));
+        tops.push(Math.round(trafficCard.getBoundingClientRect().top));
+        return tops;
     """)
     assert all(later > earlier for earlier, later in zip(tops, tops[1:])), tops
     # 仪表盘只能通过 /api/status 获取统计，不能再请求旧路由。
@@ -1567,6 +1856,182 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
         return performance.getEntriesByType('resource')
           .some((entry) => entry.name.includes('/api/statistics'));
     """)
+
+
+@pytest.mark.browser
+def test_performance_page_renders_category_navigation_and_mobile_layout(browser):
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+    assert browser.find('#page-title').text == '性能'
+    assert browser.find('[data-page="performance"]').get_attribute('aria-current') == 'page'
+    assert browser.find('#performance-load-chart-title').text == 'OlivOS 负载'
+    assert 'OlivOS 负载 1.25' in browser.find('#performance-load-readout').text
+    assert '正在读取监测数据' not in browser.find('#performance-statistics-note').text
+
+    # 左侧分类导航按任务管理器风格排列，默认选中 CPU，并显示每类的小型趋势图。
+    category_state = driver.execute_script("""
+        return [...document.querySelectorAll('#performance-content .performance-category')]
+          .map((node) => ({
+            key: node.dataset.performanceCategory,
+            selected: node.getAttribute('aria-selected'),
+            mini: Boolean(node.querySelector('[data-performance-mini] .mini-line')),
+          }));
+    """)
+    assert [item['key'] for item in category_state] == ['cpu', 'memory', 'disk', 'network', 'traffic']
+    assert category_state[0]['selected'] == 'true'
+    assert all(item['mini'] for item in category_state)
+    network_summary = driver.execute_script(
+        "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
+    assert '↓ 8.0 KiB/s' in network_summary
+    assert '↑' not in network_summary
+    traffic_summary = driver.execute_script(
+        "return document.querySelector('[data-performance-summary=\"traffic\"]').textContent")
+    assert '↓ 5' in traffic_summary
+    assert '↑ 3' in traffic_summary
+    assert '条/分钟' not in traffic_summary
+    assert driver.execute_script("""
+        const list = document.querySelector('.performance-categories');
+        const detail = document.querySelector('.performance-detail');
+        return getComputedStyle(document.getElementById('performance-content')).display === 'grid' &&
+          list.getBoundingClientRect().right <= detail.getBoundingClientRect().left;
+    """)
+    assert driver.execute_script("""
+        return [...document.querySelectorAll('[data-performance-view]')]
+          .filter((view) => !view.hidden).map((view) => view.dataset.performanceView);
+    """) == ['cpu']
+
+    # 8 张图表仍全部渲染，且容量、序列数和标尺保持原有约束。
+    expected = {
+        '#performance-cpu-chart': (120, 1),
+        '#performance-memory-chart': (120, 2),
+        '#performance-disk-usage-chart': (120, 1),
+        '#performance-disk-io-chart': (120, 2),
+        '#performance-network-chart': (120, 2),
+        '#performance-load-chart': (120, 1),
+        '#performance-process-memory-chart': (120, 1),
+        '#performance-traffic-chart': (60, 2),
+    }
+    for selector, (capacity, series_count) in expected.items():
+        actual = chart_contract(driver, selector)
+        assert actual['capacity'] == capacity, selector
+        assert actual['seriesCount'] == series_count, selector
+        assert actual['pointCounts'] == [capacity] * series_count, selector
+
+    # 比例类图表保持线性；内存/磁盘 IO、网络使用对数标尺；流量图使用线性标尺。
+    assert driver.execute_script("""
+        return ['#performance-cpu-chart', '#performance-memory-chart',
+          '#performance-disk-usage-chart', '#performance-disk-io-chart',
+          '#performance-network-chart', '#performance-load-chart',
+          '#performance-process-memory-chart', '#performance-traffic-chart'].map(
+          (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
+    """) == ['linear', 'linear', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
+
+    # 横线按数值刻度映射：线性标尺等距，对数标尺非等距。
+    grid_contracts = driver.execute_script("""
+        return ['#performance-cpu-chart', '#performance-network-chart'].map((selector) => {
+          const svg = document.querySelector(selector).querySelector('svg');
+          const ys = [...svg.querySelectorAll('.chart-grid')]
+            .map((line) => Number(line.getAttribute('y1')));
+          const gaps = ys.slice(1).map((value, index) => Math.abs(value - ys[index]));
+          return {scale: svg.dataset.scale, count: ys.length, gaps};
+        });
+    """)
+    assert grid_contracts[0]['scale'] == 'linear'
+    assert grid_contracts[0]['count'] == 5
+    assert max(grid_contracts[0]['gaps']) - min(grid_contracts[0]['gaps']) < 0.01
+    assert grid_contracts[1]['scale'] == 'log'
+    assert grid_contracts[1]['count'] == 5
+    assert max(grid_contracts[1]['gaps']) - min(grid_contracts[1]['gaps']) > 1
+
+    # 切换左侧分类后，右侧只展示对应详情，悬停提示使用该分类的图表。
+    tooltip_cases = {
+        'cpu': [
+            ('#performance-cpu-chart', ['CPU 使用率', '32.5%']),
+            ('#performance-load-chart', ['OlivOS 负载', '1.25']),
+        ],
+        'memory': [
+            ('#performance-memory-chart', ['内存使用率', '37.5%', 'Swap 使用率', '0.0%']),
+            ('#performance-process-memory-chart', ['OlivOS 进程内存', 'MiB']),
+        ],
+        'disk': [
+            ('#performance-disk-usage-chart', ['磁盘占用率', '25.0%']),
+            ('#performance-disk-io-chart', ['读取', '1.0 KiB/s', '写入', '2.0 KiB/s']),
+        ],
+        'network': [
+            ('#performance-network-chart', ['网络下行', '8.0 KiB/s', '网络上行', '4.0 KiB/s']),
+        ],
+        'traffic': [
+            ('#performance-traffic-chart', ['8 条', '3 条']),
+        ],
+    }
+    for category, cases in tooltip_cases.items():
+        browser.click(f'[data-performance-category="{category}"]')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return !document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
+            category))
+        assert driver.execute_script(
+            "return [...document.querySelectorAll('[data-performance-view]')]"
+            ".filter((view) => !view.hidden).map((view) => view.dataset.performanceView)",
+        ) == [category]
+        assert driver.execute_script(
+            "return document.querySelector('[data-performance-category=\"' + arguments[0] + '\"]')"
+            ".getAttribute('aria-selected')", category) == 'true'
+        for selector, fragments in cases:
+            tooltip = hover_chart(driver, selector, 0.999)
+            assert tooltip['hidden'] is False, (category, selector)
+            for fragment in fragments:
+                assert fragment in tooltip['text'], (category, selector, fragment, tooltip['text'])
+    browser.click('[data-performance-category="cpu"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('performance-view-cpu').hidden"))
+    assert '暂无历史采样' in hover_chart(driver, '#performance-cpu-chart', 0.0)['text']
+
+    # 刷新快照时只更新现有节点；平台缺线程/句柄数据时显示破折号，不伪造 0。
+    updated = statistics_snapshot(cpu_percent=55.0, process_threads=None, process_handles=None)
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: updated)
+    driver.execute_async_script("""
+        const done = arguments[0];
+        refreshStatus().then(() => done(true), (error) => done(String(error)));
+    """)
+    assert '55.0%' in browser.find('#performance-cpu-readout').text
+    browser.click('[data-performance-category="memory"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('performance-view-memory').hidden"))
+    assert '— 线程' in browser.find('#performance-process-memory-readout').text
+    assert '— 句柄' in browser.find('#performance-process-memory-readout').text
+    assert driver.execute_script(
+        "return document.querySelectorAll('#performance-content .performance-panel').length") == 8
+
+    # 移动端分类栏转为横向滚动，右侧详情单列显示且所有分类都不撑出视口。
+    set_viewport(browser, 390, 844, mobile_device=True)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.getElementById('shell').dataset.sidebarOpen === 'false'"))
+
+    set_viewport(browser, 320, 640, mobile_device=True)
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.documentElement.scrollWidth <= innerWidth"))
+    assert driver.execute_script(
+        "return getComputedStyle(document.querySelector('.performance-categories')).flexDirection") == 'row'
+    for category in ('cpu', 'memory', 'disk', 'network', 'traffic'):
+        browser.click(f'[data-performance-category="{category}"]')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return !document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
+            category))
+        assert driver.execute_script("""
+            const view = [...document.querySelectorAll('[data-performance-view]')]
+              .find((node) => !node.hidden);
+            return [...view.querySelectorAll('.performance-panel')].every((panel) => (
+              panel.getBoundingClientRect().right <= document.documentElement.clientWidth + 1
+            )) && document.documentElement.scrollWidth <= innerWidth;
+        """)
 
 
 @pytest.mark.browser
@@ -1583,6 +2048,23 @@ def test_dashboard_statistics_failure_degrades_without_blocking_page(browser):
     assert driver.execute_script("return document.getElementById('statistics-content').hidden")
     assert browser.find('[data-page="dashboard"]').is_displayed()
     assert browser.find('#runtime').is_displayed()
+
+
+@pytest.mark.browser
+def test_performance_statistics_failure_degrades_without_blocking_page(browser):
+    driver = browser.driver
+
+    def fail():
+        raise RuntimeError('fixture performance statistics failure')
+
+    browser.host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=fail)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: '暂不可用' in browser.find('#performance-statistics-note').text)
+    assert browser.find('#page-title').text == '性能'
+    assert driver.execute_script("return document.getElementById('performance-content').hidden")
+    assert browser.find('#performance-statistics-note').is_displayed()
+    assert browser.find('[data-page="performance"]').is_displayed()
 
 
 @pytest.mark.browser
