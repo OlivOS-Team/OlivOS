@@ -18,6 +18,7 @@ import copy
 import ctypes
 import os
 import platform
+import re
 import threading
 import time
 import traceback
@@ -33,6 +34,14 @@ DEFAULT_HISTORY_SIZE = 120
 DEFAULT_TRAFFIC_BUCKET_SECONDS = 5.0
 DEFAULT_TRAFFIC_HISTORY_SIZE = 60
 TRAFFIC_TARGET = {'type': 'statistics', 'fliter': 'control_only'}
+PROCESS_CMDLINE_LIMIT = 1200
+PROCESS_PATH_LIMIT = 1024
+PROCESS_DETAIL_ITEMS_LIMIT = 100
+PROCESS_THREAD_DETAIL_LIMIT = 256
+SECRET_ARGUMENT = re.compile(
+    r'password|passwd|token|secret|cookie|authorization|'
+    r'access[_-]?key|api[_-]?key|(?:^|[_-])key$', re.I
+)
 
 
 def _non_negative_int(value, default=0):
@@ -58,6 +67,142 @@ def _round(value, digits=2):
         return round(float(value), digits)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _optional_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if result != result or result in (float('inf'), float('-inf')):
+        return None
+    return result
+
+
+def _text(value, limit):
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+    except Exception:
+        return None
+    if len(text) > limit:
+        return text[:max(0, limit - 1)] + '…'
+    return text
+
+
+def _masked_cmdline(parts, limit=PROCESS_CMDLINE_LIMIT):
+    # 命令行可能带令牌或密码，展示前屏蔽疑似敏感参数及其后一项。
+    if isinstance(parts, str):
+        parts = [parts]
+    masked = []
+    mask_next = False
+    for part in parts:
+        text = str(part)
+        if mask_next:
+            masked.append('********')
+            mask_next = False
+            continue
+        if SECRET_ARGUMENT.search(text):
+            key, separator, _ = text.partition('=')
+            if separator:
+                masked.append(key + '=********')
+            else:
+                masked.append(text)
+                mask_next = True
+            continue
+        masked.append(text)
+    return _text(' '.join(masked), limit)
+
+
+def _io_priority(value):
+    if value is None:
+        return None
+    if hasattr(value, 'ioclass'):
+        return {'class': _optional_int(value.ioclass), 'value': _optional_int(value.value)}
+    return {'class': _optional_int(value), 'value': None}
+
+
+def _parse_linux_thread_stat(content):
+    # /proc/<pid>/task/<tid>/stat 的 comm 可包含空格，先按最后一个右括号切分。
+    try:
+        fields = content.rsplit(')', 1)[1].split()
+    except IndexError:
+        return {}
+    result = {}
+    if fields:
+        result['state'] = fields[0][:8]
+    if len(fields) >= 17:
+        result['priority'] = _optional_int(fields[15])
+        result['nice'] = _optional_int(fields[16])
+    if len(fields) >= 37:
+        result['processor'] = _optional_int(fields[36])
+    return result
+
+
+def _named_numbers(value):
+    if value is None:
+        return None
+    result = {}
+    for name in getattr(value, '_fields', ()) or ():
+        item = getattr(value, name, None)
+        if item is None or isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            result[name] = item
+        elif isinstance(item, float):
+            result[name] = _round(item, 3)
+    return result or None
+
+
+def _address_row(value):
+    if value is None:
+        return None
+    if hasattr(value, 'ip'):
+        return {
+            'ip': _text(getattr(value, 'ip', ''), 128),
+            'port': _optional_int(getattr(value, 'port', None)),
+        }
+    try:
+        if isinstance(value, (tuple, list)) and len(value) >= 2:
+            return {'ip': _text(value[0], 128), 'port': _optional_int(value[1])}
+    except Exception:
+        pass
+    return {'ip': _text(value, 128), 'port': None}
+
+
+def _open_file_row(item):
+    return {
+        'path': _text(getattr(item, 'path', ''), PROCESS_PATH_LIMIT),
+        'fd': _optional_int(getattr(item, 'fd', None)),
+        'mode': _text(getattr(item, 'mode', ''), 32),
+        'position': _optional_int(getattr(item, 'position', None)),
+    }
+
+
+def _connection_row(item):
+    return {
+        'fd': _optional_int(getattr(item, 'fd', None)),
+        'family': _text(getattr(item, 'family', ''), 32),
+        'type': _text(getattr(item, 'type', ''), 32),
+        'laddr': _address_row(getattr(item, 'laddr', None)),
+        'raddr': _address_row(getattr(item, 'raddr', None)),
+        'status': _text(getattr(item, 'status', ''), 32),
+    }
+
+
+def _memory_map_row(item):
+    return {
+        'path': _text(getattr(item, 'path', ''), PROCESS_PATH_LIMIT),
+        'metrics': _named_numbers(item),
+    }
 
 
 def _rate(current, previous, elapsed):
@@ -334,6 +479,9 @@ class server(API.Proc_templet):
         self._memory_io = _WindowsMemoryIO()
         self._last_process_cpu_at = None
         self._last_process_cpu_total = 0.0
+        self._process_detail_lock = threading.Lock()
+        self._process_detail_cpu = {}
+        self._thread_detail_cpu = {}
 
     @staticmethod
     def _safe(func, default=None):
@@ -342,12 +490,17 @@ class server(API.Proc_templet):
         except Exception:
             return default
 
-    def _process_tree_totals(self):
-        result = {'count': 0, 'rss': 0, 'cpu_percent': 0.0, 'threads': None, 'handles': None}
+    def _process_tree(self):
         try:
             root = psutil.Process(os.getpid())
-            processes = [root] + root.children(recursive=True)
+            return root, [root] + root.children(recursive=True)
         except Exception:
+            return None, []
+
+    def _process_tree_totals(self):
+        result = {'count': 0, 'rss': 0, 'cpu_percent': 0.0, 'threads': None, 'handles': None}
+        root, processes = self._process_tree()
+        if root is None:
             return result, None
         result['count'] = len(processes)
         rss = 0
@@ -392,6 +545,364 @@ class server(API.Proc_templet):
         self._last_process_cpu_at = now
         self._last_process_cpu_total = cpu_seconds
         return result
+
+    @staticmethod
+    def _linux_thread_detail(pid, tid):
+        base = '/proc/{0}/task/{1}'.format(pid, tid)
+        result = {
+            'name': None,
+            'state': None,
+            'priority': None,
+            'nice': None,
+            'processor': None,
+            'ctx_switches': None,
+        }
+        try:
+            with open(base + '/comm', 'r', encoding='utf-8', errors='replace') as source:
+                result['name'] = _text(source.read(), 64)
+        except Exception:
+            pass
+        try:
+            with open(base + '/stat', 'r', encoding='utf-8', errors='replace') as source:
+                result.update(_parse_linux_thread_stat(source.read()))
+        except Exception:
+            pass
+        try:
+            counters = {}
+            with open(base + '/status', 'r', encoding='utf-8', errors='replace') as source:
+                for line in source:
+                    key, separator, value = line.partition(':')
+                    if separator and key in ('voluntary_ctxt_switches', 'nonvoluntary_ctxt_switches'):
+                        counters[key] = _non_negative_int(value.strip())
+            if counters:
+                result['ctx_switches'] = {
+                    'voluntary': counters.get('voluntary_ctxt_switches', 0),
+                    'involuntary': counters.get('nonvoluntary_ctxt_switches', 0),
+                }
+        except Exception:
+            pass
+        return result
+
+    def _process_detail(self, proc, now, cache_updates, previous_threads, thread_cache_updates):
+        # 进程与线程的 CPU 百分比都用同一 pid + create_time 的两次 CPU 时间差计算。
+        try:
+            pid = int(proc.pid)
+        except Exception:
+            return None
+        detail = {
+            'pid': pid,
+            'ppid': 0,
+            'name': '',
+            'status': '',
+            'username': '',
+            'create_time': 0.0,
+            'cmdline': None,
+            'exe': None,
+            'memory_rss': 0,
+            'memory_vms': 0,
+            'memory_percent': None,
+            'memory_peak': None,
+            'memory_private': None,
+            'memory_shared': None,
+            'cpu_percent': 0.0,
+            'cpu_user': 0.0,
+            'cpu_system': 0.0,
+            'cpu_children_user': None,
+            'cpu_children_system': None,
+            'cpu_iowait': None,
+            'nice': None,
+            'io_priority': None,
+            'cpu_affinity': None,
+            'ctx_switches': None,
+            'io': None,
+            'thread_count': None,
+            'handles': None,
+            'num_fds': None,
+            'threads': None,
+            'threads_truncated': False,
+            'children': [],
+        }
+        detail['ppid'] = _non_negative_int(self._safe(proc.ppid, 0))
+        detail['name'] = self._safe(proc.name, '') or ''
+        detail['status'] = self._safe(proc.status, '') or ''
+        detail['username'] = self._safe(proc.username, '') or ''
+        detail['create_time'] = _round(self._safe(proc.create_time, 0.0), 3)
+        cmdline = self._safe(proc.cmdline)
+        if cmdline:
+            detail['cmdline'] = _masked_cmdline(cmdline)
+        detail['exe'] = _text(self._safe(proc.exe), PROCESS_PATH_LIMIT)
+        memory = self._safe(proc.memory_info)
+        detail['memory_rss'] = max(0, int(getattr(memory, 'rss', 0) or 0))
+        detail['memory_vms'] = max(0, int(getattr(memory, 'vms', 0) or 0))
+        memory_percent = self._safe(proc.memory_percent)
+        if memory_percent is not None:
+            detail['memory_percent'] = _round(memory_percent, 2)
+        peak = getattr(memory, 'peak_wset', None)
+        if peak is None:
+            peak = getattr(memory, 'peak', None)
+        detail['memory_peak'] = _optional_int(peak)
+        detail['memory_private'] = _optional_int(getattr(memory, 'private', None))
+        detail['memory_shared'] = _optional_int(getattr(memory, 'shared', None))
+        cpu_times = self._safe(proc.cpu_times)
+        user = _non_negative_float(getattr(cpu_times, 'user', 0.0))
+        system = _non_negative_float(getattr(cpu_times, 'system', 0.0))
+        detail['cpu_user'] = _round(user, 3)
+        detail['cpu_system'] = _round(system, 3)
+        detail['cpu_children_user'] = _optional_float(getattr(cpu_times, 'children_user', None))
+        detail['cpu_children_system'] = _optional_float(getattr(cpu_times, 'children_system', None))
+        detail['cpu_iowait'] = _optional_float(getattr(cpu_times, 'iowait', None))
+        detail['nice'] = _optional_int(self._safe(proc.nice))
+        detail['io_priority'] = _io_priority(self._safe(proc.ionice))
+        affinity = self._safe(proc.cpu_affinity)
+        if isinstance(affinity, (list, tuple)):
+            values = []
+            for item in affinity:
+                value = _optional_int(item)
+                if value is not None:
+                    values.append(value)
+            detail['cpu_affinity'] = values
+        ctx_switches = self._safe(proc.num_ctx_switches)
+        if ctx_switches is not None:
+            detail['ctx_switches'] = {
+                'voluntary': _non_negative_int(getattr(ctx_switches, 'voluntary', 0)),
+                'involuntary': _non_negative_int(getattr(ctx_switches, 'involuntary', 0)),
+            }
+        io_counters = self._safe(proc.io_counters)
+        if io_counters is not None:
+            detail['io'] = {
+                name: _non_negative_int(getattr(io_counters, name, 0))
+                for name in ('read_count', 'write_count', 'read_bytes', 'write_bytes',
+                             'other_count', 'other_bytes')
+                if hasattr(io_counters, name)
+            }
+        threads = self._safe(proc.threads)
+        if threads is not None:
+            thread_rows = []
+            for thread in threads:
+                tid = _non_negative_int(getattr(thread, 'id', 0))
+                thread_user = _non_negative_float(getattr(thread, 'user_time', 0.0))
+                thread_system = _non_negative_float(getattr(thread, 'system_time', 0.0))
+                thread_total = thread_user + thread_system
+                thread_key = (pid, detail['create_time'], tid)
+                previous = previous_threads.get(thread_key)
+                thread_cpu_percent = 0.0
+                if previous is not None:
+                    elapsed = max(0.0, now - previous[0])
+                    thread_cpu_percent = _round(_rate(thread_total, previous[1], elapsed) * 100.0, 2)
+                thread_cache_updates[thread_key] = (now, thread_total)
+                thread_rows.append({
+                    'id': tid,
+                    'user': _round(thread_user, 3),
+                    'system': _round(thread_system, 3),
+                    'cpu_percent': thread_cpu_percent,
+                    'name': None,
+                    'state': None,
+                    'priority': None,
+                    'nice': None,
+                    'processor': None,
+                    'ctx_switches': None,
+                })
+            detail['threads'] = sorted(thread_rows, key=lambda item: item['id'])
+            detail['thread_count'] = len(detail['threads'])
+            if platform.system() == 'Linux':
+                for row in detail['threads'][:PROCESS_THREAD_DETAIL_LIMIT]:
+                    row.update(self._linux_thread_detail(pid, row['id']))
+                detail['threads_truncated'] = len(detail['threads']) > PROCESS_THREAD_DETAIL_LIMIT
+        else:
+            num_threads = getattr(proc, 'num_threads', None)
+            if callable(num_threads):
+                value = self._safe(num_threads)
+                if value is not None:
+                    detail['thread_count'] = _non_negative_int(value)
+        num_fds = getattr(proc, 'num_fds', None)
+        if callable(num_fds):
+            value = self._safe(num_fds)
+            if value is not None:
+                detail['num_fds'] = _non_negative_int(value)
+        num_handles = getattr(proc, 'num_handles', None)
+        if callable(num_handles):
+            value = self._safe(num_handles)
+            if value is not None:
+                detail['handles'] = _non_negative_int(value)
+        total_cpu = user + system
+        key = (pid, detail['create_time'])
+        with self._process_detail_lock:
+            previous = self._process_detail_cpu.get(key)
+        if previous is not None:
+            elapsed = max(0.0, now - previous[0])
+            detail['cpu_percent'] = _round(_rate(total_cpu, previous[1], elapsed) * 100.0)
+        cache_updates[key] = (now, total_cpu)
+        return detail
+
+    def process_tree_snapshot(self, now=None):
+        # 进程树只在 WebUI 打开“进程”标签时按需读取，避免每秒深挖线程明细。
+        root, processes = self._process_tree()
+        if root is None or not processes:
+            return {
+                'available': False,
+                'reason': 'process_tree_unavailable',
+                'sampled_at': time.time(),
+                'root_pid': None,
+                'process_count': 0,
+                'thread_count': 0,
+                'roots': [],
+            }
+        now = time.monotonic() if now is None else now
+        details = {}
+        cache_updates = {}
+        thread_cache_updates = {}
+        with self._process_detail_lock:
+            previous_threads = dict(self._thread_detail_cpu)
+        for proc in processes:
+            detail = self._process_detail(
+                proc, now, cache_updates, previous_threads, thread_cache_updates
+            )
+            if detail is not None:
+                details[detail['pid']] = detail
+        if not details:
+            return {
+                'available': False,
+                'reason': 'process_tree_unavailable',
+                'sampled_at': time.time(),
+                'root_pid': None,
+                'process_count': 0,
+                'thread_count': 0,
+                'roots': [],
+            }
+        with self._process_detail_lock:
+            current_keys = set((detail['pid'], detail['create_time']) for detail in details.values())
+            for key in list(self._process_detail_cpu):
+                if key not in current_keys:
+                    del self._process_detail_cpu[key]
+            self._process_detail_cpu.update(cache_updates)
+            current_thread_keys = set()
+            for detail in details.values():
+                for thread in detail['threads'] or []:
+                    current_thread_keys.add((detail['pid'], detail['create_time'], thread['id']))
+            for key in list(self._thread_detail_cpu):
+                if key not in current_thread_keys:
+                    del self._thread_detail_cpu[key]
+            self._thread_detail_cpu.update(thread_cache_updates)
+        children_by_parent = {}
+        for detail in details.values():
+            children_by_parent.setdefault(detail['ppid'], []).append(detail)
+        for children in children_by_parent.values():
+            children.sort(key=lambda item: item['pid'])
+        seen = set()
+
+        def attach(detail):
+            if detail['pid'] in seen:
+                return
+            seen.add(detail['pid'])
+            for child in children_by_parent.get(detail['pid'], []):
+                if child['pid'] in seen:
+                    continue
+                detail['children'].append(child)
+                attach(child)
+
+        root_pid = _non_negative_int(getattr(root, 'pid', 0))
+        root_detail = details.get(root_pid) if root_pid else None
+        if root_detail is None:
+            root_detail = details[sorted(details)[0]]
+        roots = [root_detail]
+        attach(root_detail)
+        for detail in sorted(details.values(), key=lambda item: item['pid']):
+            if detail['pid'] not in seen:
+                attach(detail)
+                roots.append(detail)
+        thread_count = sum((detail['thread_count'] or 0) for detail in details.values())
+        return {
+            'available': True,
+            'sampled_at': time.time(),
+            'root_pid': root_pid or None,
+            'process_count': len(details),
+            'thread_count': thread_count,
+            'roots': roots,
+        }
+
+    @staticmethod
+    def _detail_unavailable(pid, reason):
+        return {
+            'available': False,
+            'reason': reason,
+            'pid': pid,
+            'sampled_at': time.time(),
+            'open_files': None,
+            'connections': None,
+            'memory_full': None,
+            'memory_maps': None,
+            'errors': [],
+        }
+
+    @staticmethod
+    def _detail_value(label, func, errors):
+        if func is None:
+            errors.append(label)
+            return None
+        try:
+            return func()
+        except Exception:
+            errors.append(label)
+            return None
+
+    @staticmethod
+    def _limited_detail(items, mapper):
+        if items is None:
+            return None
+        values = list(items)
+        return {
+            'count': len(values),
+            'items': [mapper(item) for item in values[:PROCESS_DETAIL_ITEMS_LIMIT]],
+            'truncated': len(values) > PROCESS_DETAIL_ITEMS_LIMIT,
+        }
+
+    @staticmethod
+    def _process_connections(proc):
+        method = getattr(proc, 'net_connections', None)
+        if callable(method):
+            return method(kind='inet')
+        method = getattr(proc, 'connections', None)
+        if callable(method):
+            return method(kind='inet')
+        raise AttributeError('connections unavailable')
+
+    def process_detail_snapshot(self, pid, create_time=None):
+        # 文件、连接、完整内存与映射只在用户主动展开时读取，并限制返回条目数。
+        pid = _non_negative_int(pid, -1)
+        root, processes = self._process_tree()
+        if root is None:
+            return self._detail_unavailable(pid, 'process_tree_unavailable')
+        match = None
+        for proc in processes:
+            if _non_negative_int(getattr(proc, 'pid', -1), -1) == pid:
+                match = proc
+                break
+        if match is None:
+            return self._detail_unavailable(pid, 'process_not_found')
+        actual_create_time = _round(self._safe(match.create_time, 0.0), 3)
+        expected_create_time = _optional_float(create_time)
+        if expected_create_time is not None and abs(actual_create_time - expected_create_time) > 0.001:
+            return self._detail_unavailable(pid, 'process_changed')
+        errors = []
+        open_files = self._detail_value('open_files', getattr(match, 'open_files', None), errors)
+        connections = self._detail_value(
+            'connections', lambda: self._process_connections(match), errors
+        )
+        memory_full = self._detail_value(
+            'memory_full', getattr(match, 'memory_full_info', None), errors
+        )
+        memory_maps = self._detail_value('memory_maps', getattr(match, 'memory_maps', None), errors)
+        return {
+            'available': True,
+            'pid': pid,
+            'create_time': actual_create_time,
+            'sampled_at': time.time(),
+            'open_files': self._limited_detail(open_files, _open_file_row),
+            'connections': self._limited_detail(connections, _connection_row),
+            'memory_full': _named_numbers(memory_full),
+            'memory_maps': self._limited_detail(memory_maps, _memory_map_row),
+            'errors': errors,
+        }
 
     def _sample_io(self, now, swap=None):
         disk_io = self._safe(psutil.disk_io_counters)

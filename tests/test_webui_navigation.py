@@ -1489,6 +1489,125 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
     }
 
 
+def process_tree_snapshot():
+    # 进程标签使用按需接口，这里提供一棵包含父子进程和线程的最小树。
+    now = time.time()
+    return {
+        'available': True,
+        'sampled_at': now,
+        'root_pid': 1000,
+        'process_count': 2,
+        'thread_count': 3,
+        'roots': [{
+            'pid': 1000,
+            'ppid': 900,
+            'name': 'python.exe',
+            'status': 'running',
+            'username': 'tester',
+            'create_time': now - 60,
+            'cmdline': 'python.exe main.py --token ********',
+            'exe': 'C:/OlivOS/python.exe',
+            'memory_rss': 128 * 1024 ** 2,
+            'memory_vms': 256 * 1024 ** 2,
+            'memory_percent': 3.2,
+            'memory_peak': 144 * 1024 ** 2,
+            'memory_private': 120 * 1024 ** 2,
+            'memory_shared': 8 * 1024 ** 2,
+            'cpu_percent': 2.5,
+            'cpu_user': 1.2,
+            'cpu_system': 0.3,
+            'cpu_children_user': 0.1,
+            'cpu_children_system': 0.05,
+            'cpu_iowait': 0.0,
+            'nice': 0,
+            'io_priority': {'class': 2, 'value': 0},
+            'cpu_affinity': [0, 1, 2, 3],
+            'ctx_switches': {'voluntary': 120, 'involuntary': 4},
+            'io': {'read_count': 10, 'write_count': 20,
+                   'read_bytes': 10240, 'write_bytes': 20480},
+            'thread_count': 2,
+            'handles': 100,
+            'num_fds': 42,
+            'threads': [
+                {'id': 1001, 'user': 0.8, 'system': 0.2, 'cpu_percent': 50.0,
+                 'name': 'main', 'state': 'S', 'priority': 20, 'nice': 0, 'processor': 1,
+                 'ctx_switches': {'voluntary': 30, 'involuntary': 1}},
+                {'id': 1002, 'user': 0.4, 'system': 0.1, 'cpu_percent': 25.0,
+                 'name': 'worker', 'state': 'R', 'priority': 20, 'nice': 0, 'processor': 2,
+                 'ctx_switches': {'voluntary': 10, 'involuntary': 0}},
+            ],
+            'threads_truncated': False,
+            'children': [{
+                'pid': 1001,
+                'ppid': 1000,
+                'name': 'python.exe',
+                'status': 'sleeping',
+                'username': 'tester',
+                'create_time': now - 30,
+                'cmdline': 'python.exe plugin_worker.py',
+                'exe': 'C:/OlivOS/python.exe',
+                'memory_rss': 64 * 1024 ** 2,
+                'memory_vms': 128 * 1024 ** 2,
+                'memory_percent': 1.6,
+                'cpu_percent': 0.5,
+                'cpu_user': 0.2,
+                'cpu_system': 0.1,
+                'thread_count': 1,
+                'handles': 20,
+                'num_fds': 18,
+                'threads': [
+                    {'id': 1003, 'user': 0.2, 'system': 0.1, 'cpu_percent': 0.0,
+                     'name': 'worker', 'state': 'S', 'priority': 20, 'nice': 0, 'processor': 3},
+                ],
+                'threads_truncated': False,
+                'children': [],
+            }],
+        }],
+    }
+
+
+def process_detail_snapshot(pid, create_time=None):
+    # 进程详情按需加载，覆盖文件、连接、完整内存和内存映射四类高成本数据。
+    return {
+        'available': True,
+        'pid': pid,
+        'create_time': create_time or 0.0,
+        'sampled_at': time.time(),
+        'open_files': {
+            'count': 2,
+            'items': [
+                {'path': 'C:/OlivOS/logfile/a.log', 'fd': 3, 'mode': 'r', 'position': 0},
+                {'path': 'C:/OlivOS/conf/account.json', 'fd': 4, 'mode': 'r', 'position': 0},
+            ],
+            'truncated': False,
+        },
+        'connections': {
+            'count': 1,
+            'items': [{
+                'fd': 5, 'family': 'AF_INET', 'type': 'SOCK_STREAM',
+                'laddr': {'ip': '127.0.0.1', 'port': 8080},
+                'raddr': {'ip': '127.0.0.1', 'port': 9090},
+                'status': 'ESTABLISHED',
+            }],
+            'truncated': False,
+        },
+        'memory_full': {
+            'rss': 128 * 1024 ** 2, 'vms': 256 * 1024 ** 2,
+            'uss': 96 * 1024 ** 2, 'pss': 100 * 1024 ** 2,
+            'private': 120 * 1024 ** 2, 'peak_wset': 144 * 1024 ** 2,
+        },
+        'memory_maps': {
+            'count': 1,
+            'items': [{
+                'path': 'C:/Windows/System32/ntdll.dll',
+                'metrics': {'rss': 4096, 'size': 8192, 'pss': 5000},
+            }],
+            'truncated': False,
+        },
+        'errors': [],
+    }
+
+
 def chart_contract(driver, selector):
     # 读取图表容量与每条折线的实际点数，用于验证补零后横轴点位固定。
     return driver.execute_script(r"""
@@ -1875,7 +1994,9 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
 def test_performance_page_renders_category_navigation_and_mobile_layout(browser):
     driver = browser.driver
     browser.host.runtime['statistics'] = SimpleNamespace(
-        Proc_type='statistics', snapshot=statistics_snapshot)
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
     browser.open_sidebar()
     browser.click('[data-page="performance"]')
     browser.wait.until(lambda _: driver.execute_script(
@@ -1903,7 +2024,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             mini: Boolean(node.querySelector('[data-performance-mini] .mini-line')),
           }));
     """)
-    assert [item['key'] for item in category_state] == ['cpu', 'memory', 'disk', 'network', 'traffic']
+    assert [item['key'] for item in category_state] == [
+        'cpu', 'memory', 'disk', 'network', 'traffic', 'processes',
+    ]
     assert category_state[0]['selected'] == 'true'
     assert all(item['mini'] for item in category_state)
     network_summary = driver.execute_script(
@@ -1929,6 +2052,59 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         return [...document.querySelectorAll('[data-performance-view]')]
           .filter((view) => !view.hidden).map((view) => view.dataset.performanceView);
     """) == ['cpu']
+
+    # 进程标签按需读取进程树，显示父子进程与每个进程下的线程。
+    browser.click('[data-performance-category="processes"]')
+    browser.wait.until(lambda _: driver.execute_script("""
+        return !document.getElementById('performance-view-processes').hidden &&
+          document.querySelectorAll('#performance-process-tree .process-node').length === 2;
+    """))
+    assert '2 个进程' in browser.find('#performance-processes-readout').text
+    assert '3 个线程' in browser.find('#performance-processes-readout').text
+    assert driver.execute_script("""
+        return {
+          rootBadge: document.querySelector('.process-root-badge').textContent,
+          threads: document.querySelectorAll('#performance-process-tree .process-thread').length,
+          children: document.querySelectorAll('#performance-process-tree .process-children .process-node').length,
+        };
+    """) == {'rootBadge': 'OlivOS 主进程', 'threads': 3, 'children': 1}
+    process_facts = driver.execute_script(
+        "return document.querySelector('.process-facts').textContent")
+    assert '虚拟内存' in process_facts
+    assert '256.0 MiB' in process_facts
+    assert 'CPU 亲和性' in process_facts
+    assert '0-3（4）' in process_facts
+    assert '读 10.0 KiB（10 次）' in process_facts
+    assert '写 20.0 KiB（20 次）' in process_facts
+    process_commands = driver.execute_script("""
+        return [...document.querySelectorAll('.process-command')]
+          .map((node) => node.textContent).join('\\n');
+    """)
+    assert 'C:/OlivOS/python.exe' in process_commands
+    assert 'main.py' in process_commands
+    first_thread = driver.execute_script(
+        "return document.querySelector('#performance-process-tree .process-thread').textContent")
+    assert 'main' in first_thread
+    assert '睡眠' in first_thread
+    assert 'CPU 50.0%' in first_thread
+    assert 'Nice 0' in first_thread
+
+    # 文件、连接与内存详情只在用户点击后按需请求，并限制展示条目数。
+    browser.click('#performance-process-tree .process-detail-button')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.querySelector('.process-detail-summary') !== null"))
+    detail_text = driver.execute_script(
+        "return document.querySelector('.process-detail').textContent")
+    assert '打开文件 2' in detail_text
+    assert '网络连接 1' in detail_text
+    assert '内存映射 1' in detail_text
+    assert 'C:/OlivOS/logfile/a.log' in detail_text
+    assert '127.0.0.1:8080' in detail_text
+    assert 'ntdll.dll' in detail_text
+    assert '独占' in detail_text
+    browser.click('[data-performance-category="cpu"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('performance-view-cpu').hidden"))
 
     # 8 张图表仍全部渲染，且容量、序列数和标尺保持原有约束。
     expected = {
@@ -2046,7 +2222,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '— 线程' in browser.find('#performance-process-memory-readout').text
     assert '— 句柄' in browser.find('#performance-process-memory-readout').text
     assert driver.execute_script(
-        "return document.querySelectorAll('#performance-content .performance-panel').length") == 8
+        "return document.querySelectorAll('#performance-content .performance-panel').length") == 9
 
     # 网络与消息的 4 项事实表用占位单元补齐空位，占位底色必须与正常单元一致。
     set_viewport(browser, 1280, 800)

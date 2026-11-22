@@ -465,6 +465,58 @@ def statistics_snapshot(host):
                 'performance': None, 'traffic': None}
 
 
+def statistics_process_snapshot(host):
+    """按需读取 OlivOS 进程与线程树，避免把线程明细塞进周期性状态快照。"""
+    for proc in list(getattr(host, 'runtime', {}).values()):
+        if getattr(proc, 'Proc_type', None) != 'statistics':
+            continue
+        snapshot = getattr(proc, 'process_tree_snapshot', None)
+        if not callable(snapshot):
+            break
+        try:
+            data = snapshot()
+        except Exception:
+            break
+        if isinstance(data, dict):
+            return data
+    return {
+        'available': False,
+        'reason': 'statistics_unavailable',
+        'sampled_at': 0,
+        'root_pid': None,
+        'process_count': 0,
+        'thread_count': 0,
+        'roots': [],
+    }
+
+
+def statistics_process_detail(host, pid, create_time=None):
+    """按需读取单个 OlivOS 进程的文件、连接与完整内存详情。"""
+    for proc in list(getattr(host, 'runtime', {}).values()):
+        if getattr(proc, 'Proc_type', None) != 'statistics':
+            continue
+        snapshot = getattr(proc, 'process_detail_snapshot', None)
+        if not callable(snapshot):
+            break
+        try:
+            data = snapshot(pid, create_time=create_time)
+        except Exception:
+            break
+        if isinstance(data, dict):
+            return data
+    return {
+        'available': False,
+        'reason': 'statistics_unavailable',
+        'pid': pid,
+        'sampled_at': 0,
+        'open_files': None,
+        'connections': None,
+        'memory_full': None,
+        'memory_maps': None,
+        'errors': [],
+    }
+
+
 PLUGIN_PRIORITY_PATH = 'conf/plugin_priority.json'
 PLUGIN_PRIORITY_LIMIT = 2 ** 31
 
@@ -672,6 +724,15 @@ def register_routes(host):
     @app.get('/api/status')
     def status():
         return jsonify(runtime_status(host))
+
+    @app.get('/api/performance/processes')
+    def performance_processes():
+        return jsonify(statistics_process_snapshot(host))
+
+    @app.get('/api/performance/processes/<int:pid>')
+    def performance_process_detail(pid):
+        create_time = request.args.get('create_time', type=float)
+        return jsonify(statistics_process_detail(host, pid, create_time))
 
     @app.route('/api/accounts', methods=['GET', 'POST'])
     def accounts():

@@ -331,6 +331,23 @@
                 </span>
                 <span class="performance-category-spark" data-performance-mini="traffic" aria-hidden="true"></span>
               </button>
+              <button class="performance-category" id="performance-category-processes" type="button"
+                      role="tab" data-performance-category="processes" aria-selected="false"
+                      aria-controls="performance-view-processes">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+                    <rect x="3" y="17" width="6" height="4" rx="1"></rect>
+                    <rect x="15" y="17" width="6" height="4" rx="1"></rect>
+                    <path d="M12 7v5M6 17v-5h12v5"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">进程</span>
+                  <span class="performance-category-value" data-performance-summary="processes"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="processes" aria-hidden="true"></span>
+              </button>
             </div>
             <div class="performance-detail">
               <section id="performance-view-cpu" class="performance-view" data-performance-view="cpu"
@@ -521,6 +538,27 @@
                   <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
                        aria-hidden="true"></div>
                 </dl>
+              </section>
+              <section id="performance-view-processes" class="performance-view" data-performance-view="processes"
+                       role="tabpanel" aria-labelledby="performance-category-processes" hidden>
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>进程</h3>
+                    <p id="performance-processes-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value" data-performance-summary="processes"></strong>
+                </div>
+                <section class="panel performance-panel performance-process-panel"
+                         aria-labelledby="performance-processes-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-processes-title">OlivOS 进程与线程</h3>
+                    <button id="performance-processes-refresh" class="process-refresh-button"
+                            type="button">刷新</button>
+                  </div>
+                  <p id="performance-processes-note" class="process-empty" role="status"></p>
+                  <div id="performance-process-tree" class="process-tree" role="tree"
+                       aria-label="OlivOS 进程与线程树"></div>
+                </section>
               </section>
             </div>
           </div>

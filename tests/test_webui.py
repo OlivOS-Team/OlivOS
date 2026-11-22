@@ -242,7 +242,8 @@ def test_pwa_icon_dimensions(name, size):
 def test_all_rest_routes(client, host):
     for endpoint in ['/api/status', '/api/accounts', '/api/accounts/schema',
                      '/api/logs', '/api/plugins', '/api/terminals',
-                     '/api/accounts/webhook?id=10001']:
+                     '/api/accounts/webhook?id=10001', '/api/performance/processes',
+                     '/api/performance/processes/100']:
         response = client.get(endpoint)
         assert response.status_code == 200, endpoint
     # 统计已并入 /api/status，不再保留独立统计路由。
@@ -301,6 +302,94 @@ def test_status_statistics_degrades_when_monitor_raises(client, host):
     assert response.status_code == 200
     assert response.json['statistics']['available'] is False
     assert response.json['statistics']['reason'] == 'statistics_unavailable'
+
+
+def test_performance_processes_returns_monitor_snapshot(client, host):
+    # 进程树按需从统计组件读取，不应混入周期性的 /api/status 响应。
+    from types import SimpleNamespace
+
+    snapshot = {
+        'available': True,
+        'sampled_at': 123.0,
+        'root_pid': 100,
+        'process_count': 2,
+        'thread_count': 3,
+        'roots': [{
+            'pid': 100,
+            'ppid': 1,
+            'name': 'python.exe',
+            'threads': [{'id': 1001, 'user': 0.5, 'system': 0.25}],
+            'children': [],
+        }],
+    }
+    host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', process_tree_snapshot=lambda: snapshot)
+    response = client.get('/api/performance/processes')
+    assert response.status_code == 200
+    assert response.json == snapshot
+    assert 'roots' not in client.get('/api/status').json['statistics']
+
+
+def test_performance_processes_degrades_when_monitor_raises(client, host):
+    # 进程树读取失败不能影响性能页其它指标，接口返回统一降级结构。
+    from types import SimpleNamespace
+
+    def fail():
+        raise RuntimeError('fixture process tree failure')
+
+    host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', process_tree_snapshot=fail)
+    response = client.get('/api/performance/processes')
+    assert response.status_code == 200
+    assert response.json['available'] is False
+    assert response.json['reason'] == 'statistics_unavailable'
+    assert response.json['roots'] == []
+
+
+def test_performance_process_detail_returns_monitor_snapshot(client, host):
+    # 进程详情按需读取，create_time 透传给统计组件用于防止 PID 复用。
+    from types import SimpleNamespace
+
+    snapshot = {
+        'available': True,
+        'pid': 100,
+        'create_time': 123.0,
+        'sampled_at': 456.0,
+        'open_files': {'count': 1, 'items': [], 'truncated': False},
+        'connections': {'count': 0, 'items': [], 'truncated': False},
+        'memory_full': {'rss': 1024},
+        'memory_maps': None,
+        'errors': [],
+    }
+    calls = []
+
+    def detail(pid, create_time=None):
+        calls.append((pid, create_time))
+        return snapshot
+
+    host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', process_detail_snapshot=detail)
+    response = client.get('/api/performance/processes/100?create_time=123.0')
+    assert response.status_code == 200
+    assert response.json == snapshot
+    assert calls == [(100, 123.0)]
+
+
+def test_performance_process_detail_degrades_when_monitor_raises(client, host):
+    # 单个进程详情失败不能影响进程树或性能页其它指标。
+    from types import SimpleNamespace
+
+    def fail(pid, create_time=None):
+        raise RuntimeError('fixture process detail failure')
+
+    host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', process_detail_snapshot=fail)
+    response = client.get('/api/performance/processes/100')
+    assert response.status_code == 200
+    assert response.json['available'] is False
+    assert response.json['reason'] == 'statistics_unavailable'
+    assert response.json['pid'] == 100
+    assert response.json['open_files'] is None
 
 
 def test_status_keeps_existing_contract_with_statistics(client, host):

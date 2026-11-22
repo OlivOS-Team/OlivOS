@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import json
 import queue
+from collections import namedtuple
 from unittest.mock import Mock
 
 import OlivOS
@@ -286,9 +287,12 @@ def test_statistics_process_cpu_uses_cpu_time_delta(monkeypatch):
     from contextlib import nullcontext
 
     class FakeCpuTimes(object):
-        def __init__(self, user, system):
+        def __init__(self, user, system, children_user=0.1, children_system=0.05, iowait=0.0):
             self.user = user
             self.system = system
+            self.children_user = children_user
+            self.children_system = children_system
+            self.iowait = iowait
 
     class FakeProcess(object):
         def __init__(self):
@@ -318,3 +322,205 @@ def test_statistics_process_cpu_uses_cpu_time_delta(monkeypatch):
     assert monitor._process_tree_metrics(now=10.0)['cpu_percent'] == 0.0
     proc.cpu = 6.5
     assert monitor._process_tree_metrics(now=12.0)['cpu_percent'] == 75.0
+
+
+def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypatch):
+    # 进程树快照要保留父子关系、每个进程的线程明细，并用两次 CPU 时间差计算进程负载。
+    from types import SimpleNamespace
+
+    class FakeCpuTimes(object):
+        def __init__(self, user, system, children_user=0.1, children_system=0.05, iowait=0.0):
+            self.user = user
+            self.system = system
+            self.children_user = children_user
+            self.children_system = children_system
+            self.iowait = iowait
+
+    class FakeProcess(object):
+        def __init__(self, pid, ppid, cpu=1.0, threads=None, children=None):
+            self.pid = pid
+            self.parent_pid = ppid
+            self.cpu = cpu
+            self.thread_rows = threads or []
+            self.child_items = children or []
+
+        def ppid(self):
+            return self.parent_pid
+
+        def name(self):
+            return 'python.exe'
+
+        def status(self):
+            return 'running'
+
+        def username(self):
+            return 'tester'
+
+        def create_time(self):
+            return 100.0
+
+        def memory_info(self):
+            return SimpleNamespace(rss=1024, vms=2048, peak_wset=1536, private=900, shared=100)
+
+        def memory_percent(self):
+            return 25.0
+
+        def cmdline(self):
+            return ['python.exe', 'main.py', '--token', 'secret-value']
+
+        def exe(self):
+            return 'C:/OlivOS/python.exe'
+
+        def cpu_times(self):
+            return FakeCpuTimes(self.cpu, 0.0)
+
+        def nice(self):
+            return 5
+
+        def ionice(self):
+            return SimpleNamespace(ioclass=2, value=4)
+
+        def cpu_affinity(self):
+            return [0, 1, 2, 3]
+
+        def num_ctx_switches(self):
+            return SimpleNamespace(voluntary=10, involuntary=2)
+
+        def io_counters(self):
+            return SimpleNamespace(
+                read_count=1, write_count=2, read_bytes=1024, write_bytes=2048,
+                other_count=3, other_bytes=4096)
+
+        def num_fds(self):
+            return 12
+
+        def threads(self):
+            return self.thread_rows
+
+        def num_threads(self):
+            return len(self.thread_rows)
+
+        def num_handles(self):
+            return 7
+
+        def children(self, recursive=True):
+            return self.child_items
+
+    child = FakeProcess(
+        101, 100,
+        threads=[SimpleNamespace(id=1003, user_time=0.2, system_time=0.1)],
+    )
+    root = FakeProcess(
+        100, 1,
+        threads=[
+            SimpleNamespace(id=1002, user_time=0.4, system_time=0.1),
+            SimpleNamespace(id=1001, user_time=0.5, system_time=0.25),
+        ],
+        children=[child],
+    )
+    monkeypatch.setattr(statisticsAPI.psutil, 'Process', lambda pid: root)
+    monitor = make_statistics_monitor()
+    first = monitor.process_tree_snapshot(now=10.0)
+    assert first['available'] is True
+    assert first['root_pid'] == 100
+    assert first['process_count'] == 2
+    assert first['thread_count'] == 3
+    assert first['roots'][0]['pid'] == 100
+    assert first['roots'][0]['children'][0]['pid'] == 101
+    assert [item['id'] for item in first['roots'][0]['threads']] == [1001, 1002]
+    assert first['roots'][0]['cmdline'] == 'python.exe main.py --token ********'
+    assert 'secret-value' not in first['roots'][0]['cmdline']
+    assert first['roots'][0]['exe'] == 'C:/OlivOS/python.exe'
+    assert first['roots'][0]['memory_percent'] == 25.0
+    assert first['roots'][0]['memory_peak'] == 1536
+    assert first['roots'][0]['memory_private'] == 900
+    assert first['roots'][0]['memory_shared'] == 100
+    assert first['roots'][0]['nice'] == 5
+    assert first['roots'][0]['io_priority'] == {'class': 2, 'value': 4}
+    assert first['roots'][0]['cpu_affinity'] == [0, 1, 2, 3]
+    assert first['roots'][0]['ctx_switches'] == {'voluntary': 10, 'involuntary': 2}
+    assert first['roots'][0]['io']['read_bytes'] == 1024
+    assert first['roots'][0]['io']['write_bytes'] == 2048
+    assert first['roots'][0]['num_fds'] == 12
+    assert first['roots'][0]['cpu_children_user'] == 0.1
+    assert first['roots'][0]['cpu_percent'] == 0.0
+
+    root.cpu = 2.5
+    child.cpu = 2.0
+    root.thread_rows[0].user_time = 0.9
+    root.thread_rows[1].user_time = 1.5
+    child.thread_rows[0].user_time = 0.5
+    second = monitor.process_tree_snapshot(now=12.0)
+    assert second['roots'][0]['cpu_percent'] == 75.0
+    assert second['roots'][0]['children'][0]['cpu_percent'] == 50.0
+    assert [item['cpu_percent'] for item in second['roots'][0]['threads']] == [50.0, 25.0]
+    assert second['roots'][0]['children'][0]['threads'][0]['cpu_percent'] == 15.0
+
+
+def test_statistics_process_detail_returns_limited_files_connections_and_memory(monkeypatch):
+    # 文件、连接、完整内存与内存映射只在按需详情中读取，并限制单次返回条目数。
+    from types import SimpleNamespace
+
+    FullMemory = namedtuple('FullMemory', ['rss', 'vms', 'uss', 'pss'])
+    MemoryMap = namedtuple('MemoryMap', ['path', 'rss', 'size', 'pss'])
+
+    class FakeProcess(object):
+        pid = 100
+
+        def create_time(self):
+            return 100.0
+
+        def children(self, recursive=True):
+            return []
+
+        def open_files(self):
+            return [SimpleNamespace(path='/tmp/file-%d.log' % index, fd=index, mode='r',
+                                    position=0) for index in range(101)]
+
+        def net_connections(self, kind='inet'):
+            return [SimpleNamespace(
+                fd=4, family='AF_INET', type='SOCK_STREAM',
+                laddr=('127.0.0.1', 8000), raddr=('127.0.0.1', 9000),
+                status='ESTABLISHED')]
+
+        def memory_full_info(self):
+            return FullMemory(rss=1024, vms=2048, uss=512, pss=600)
+
+        def memory_maps(self):
+            return [MemoryMap(path='/tmp/lib.so', rss=256, size=512, pss=300)]
+
+    root = FakeProcess()
+    monkeypatch.setattr(statisticsAPI.psutil, 'Process', lambda pid: root)
+    monitor = make_statistics_monitor()
+    detail = monitor.process_detail_snapshot(100, create_time=100.0)
+    assert detail['available'] is True
+    assert detail['open_files']['count'] == 101
+    assert len(detail['open_files']['items']) == statisticsAPI.PROCESS_DETAIL_ITEMS_LIMIT
+    assert detail['open_files']['truncated'] is True
+    assert detail['open_files']['items'][0]['path'] == '/tmp/file-0.log'
+    assert detail['connections']['items'][0]['status'] == 'ESTABLISHED'
+    assert detail['connections']['items'][0]['laddr'] == {'ip': '127.0.0.1', 'port': 8000}
+    assert detail['memory_full'] == {'rss': 1024, 'vms': 2048, 'uss': 512, 'pss': 600}
+    assert detail['memory_maps']['items'][0]['path'] == '/tmp/lib.so'
+    assert detail['memory_maps']['items'][0]['metrics']['rss'] == 256
+    assert detail['errors'] == []
+
+    changed = monitor.process_detail_snapshot(100, create_time=99.0)
+    assert changed['available'] is False
+    assert changed['reason'] == 'process_changed'
+    missing = monitor.process_detail_snapshot(101)
+    assert missing['available'] is False
+    assert missing['reason'] == 'process_not_found'
+
+
+def test_linux_thread_stat_parser_extracts_state_priority_and_processor():
+    # Linux 线程 stat 的 comm 可以包含空格，解析时必须从最后一个右括号后开始取字段。
+    fields = ['0'] * 40
+    fields[0] = 'S'
+    fields[15] = '20'
+    fields[16] = '0'
+    fields[36] = '3'
+    parsed = statisticsAPI._parse_linux_thread_stat(
+        '123 (worker name) ' + ' '.join(fields)
+    )
+    assert parsed == {'state': 'S', 'priority': 20, 'nice': 0, 'processor': 3}
