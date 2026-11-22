@@ -107,6 +107,7 @@ sdkSubSelfOpenInfo = {}
 sdkSubSelfOpenInfoLock = threading.RLock()
 sdkSubSelfOpenInfoRetryAt = {}
 sdkSubSelfOpenInfoRequestHistory = {}
+# 兼容保留：11253 禁用状态已收编到 sdkQQGroupApiDenied[(bot_hash, 'group_bot_state')]。
 sdkSubSelfOpenInfoDisabled = set()
 sdkSubSelfOpenInfoInFlight = set()
 sdkSubSelfOpenInfoRetryCooldown = 60.0
@@ -348,18 +349,69 @@ qqUserInfoNoFriendCode = 40184001
 qqUserInfoMinorModeCodes = {40011033}
 sdkQQUserInfoMinorLogged = {}
 sdkQQUserInfoMinorLogLock = threading.Lock()
-# 11253 按接口在本进程永久禁用；其他权限/频控错误按群退避。
+# 11253 按 (bot_hash, op_key) 在本进程永久禁用；其他权限/频控错误按群退避。
 sdkQQGroupApiDenied = set()
 sdkQQGroupApiBackoff = {}
+sdkQQGroupApiBackoffMaxSize = 2000
 qqGroupApiDeniedCode = 11253
-# Tier 2 定期全量错峰校准:低频兜底从不发言的潜水成员。
+# 11255 降级为 suspect 后的复核状态（按 (bot_hash, group_openid) 隔离，单后台线程消费）。
+sdkQQGroupSuspectState = {}
+sdkQQGroupSuspectDue = []
+sdkQQGroupSuspectGeneration = {}
+sdkQQGroupSuspectPending = {}
+sdkQQGroupSuspectVerifying = set()
+sdkQQGroupSuspectLock = threading.Lock()
+sdkQQGroupSuspectThread = None
+sdkQQGroupSuspectEvent = threading.Event()
+sdkQQGroupSuspectVerifyDelay = 600.0
+sdkQQGroupSuspectQueueMaxSize = 2000
+sdkQQGroupSuspectMaxReschedules = 3
+sdkQQGroupSuspectStateTTL = 86400.0
+# Tier 2 定期全量错峰校准:优先队列 + SQL 巡检，统一投递后台续翻 worker。
 sdkQQGroupCalibrationGroups = {}
 sdkQQGroupCalibrationBotInfo = {}
 sdkQQGroupCalibrationLock = threading.Lock()
 sdkQQGroupCalibrationThread = None
 sdkQQGroupCalibrationCheckInterval = 1800.0
-sdkQQGroupCalibrateMaxAge = 24 * 3600.0
-sdkQQGroupCalibrateGroupSpacing = 2.0
+sdkQQGroupCalibrationPerTick = 50
+sdkQQGroupCalibrationActiveWindow = 14 * 86400
+sdkQQGroupCalibrationStaleAge = 7 * 86400
+# 群成员后台续翻队列：统一层首屏仅拉 1 页，剩余页由单线程后台匀速补全。
+sdkQQGroupWarmQueue = deque()
+sdkQQGroupWarmPending = set()
+sdkQQGroupWarmSeen = {}
+sdkQQGroupWarmStartedAt = {}
+sdkQQGroupWarmFailCooldown = {}
+sdkQQGroupWarmFailCooldownSeconds = 300.0
+sdkQQGroupWarmLock = threading.Lock()
+sdkQQGroupWarmThread = None
+sdkQQGroupWarmEvent = threading.Event()
+sdkQQGroupWarmSpacing = 3.0
+sdkQQGroupWarmRateLimitWait = 30.0
+sdkQQGroupWarmMaxRateWaits = 10
+sdkQQGroupWarmRateLimitUntilByBot = {}
+sdkQQGroupWarmPageBatch = 10
+sdkQQGroupWarmMaxRounds = 20
+sdkQQGroupWarmQueueMaxSize = 500
+# 手动全量刷新群成员冷却：同一 (bot_hash, group_openid) 60 秒内不重复触发全量翻页。
+sdkQQGroupRefreshCooldown = {}
+sdkQQGroupRefreshCooldownLock = threading.Lock()
+sdkQQGroupRefreshCooldownSeconds = 60.0
+# 后台续翻每日页预算（按 (bot_hash, 'YYYY-MM-DD') 隔离），防止大号无限消耗配额。
+sdkQQGroupWarmDailyPages = {}
+sdkQQGroupWarmDailyPageLimit = 3000
+sdkQQGroupWarmDailyLock = threading.Lock()
+sdkQQGroupWarmDailyWaitTimeout = 60.0
+# Tier 1 单成员补全队列：入群事件触发，单线程消费 + 有界延迟重试。
+sdkQQGroupTier1Queue = deque()
+sdkQQGroupTier1Delayed = []
+sdkQQGroupTier1Pending = set()
+sdkQQGroupTier1Lock = threading.Lock()
+sdkQQGroupTier1Thread = None
+sdkQQGroupTier1Event = threading.Event()
+sdkQQGroupTier1MaxSize = 2000
+sdkQQGroupTier1RetryDelays = (65.0, 300.0, 1800.0)
+sdkQQGroupTier1Spacing = 2.0
 
 
 class bot_info_T(object):
@@ -851,8 +903,9 @@ def getTokenNow(bot_info: bot_info_T):
                     tmp_Proc = OlivOS.bootAPI.gLoggerProc
                 if OlivOS.pluginAPI.gProc is not None:
                     tmp_Proc = OlivOS.pluginAPI.gProc
-                if tmp_Proc is not None:
-                    tmp_Proc.log(
+                log_func = getattr(tmp_Proc, 'log', None)
+                if callable(log_func):
+                    log_func(
                         2,
                         OlivOS.L10NAPI.getTrans(
                             'OlivOS qqGuildv2SDK bot [{0}] refresh TOKEN [{1}]',
@@ -1484,7 +1537,14 @@ def _get_qq_guild_sender_role(member):
     return 'member'
 
 
-def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_id=None):
+def _register_qq_user_info(
+    bot_hash,
+    user_obj,
+    role=None,
+    chat_type=None,
+    chat_id=None,
+    source=None
+):
     # 登记/合并用户信息:author、mentions 条目、频道 user 对象均可直接传入。
     # 同一用户的各类 OpenID/统一账号各建一条索引,指向同一记录。
     global sdkUserInfoLastCleanup
@@ -1588,16 +1648,40 @@ def _register_qq_user_info(bot_hash, user_obj, role=None, chat_type=None, chat_i
             username=username,
             member_role=member_role,
             bot=user_obj.get('bot', None),
+            joined_at=user_obj.get('joined_at', None),
             union_openid=user_obj.get('union_openid', None),
-            member_nickname=member_nickname
+            member_nickname=member_nickname,
+            source=source
         )
     return record
 
 
-def _register_qq_user_info_from_mentions(bot_hash, mentions, chat_type=None, chat_id=None):
+def _register_qq_user_info_from_mentions(
+    bot_hash,
+    mentions,
+    chat_type=None,
+    chat_id=None,
+    exclude_ids=None
+):
     if not isinstance(mentions, list):
         return
+    exclude_set = (
+        {str(item) for item in exclude_ids if item is not None}
+        if exclude_ids else set()
+    )
+    id_keys = (
+        'member_openid', 'user_openid', 'union_openid',
+        'union_user_account', 'id'
+    )
     for mention in mentions:
+        if exclude_set and isinstance(mention, dict):
+            mention_ids = {
+                str(mention[id_key])
+                for id_key in id_keys
+                if mention.get(id_key, None) is not None and str(mention[id_key]) != ''
+            }
+            if mention_ids & exclude_set:
+                continue
         _register_qq_user_info(
             bot_hash,
             mention,
@@ -1660,7 +1744,8 @@ def _qq_group_member_cache_record(
     joined_at=None,
     union_openid=None,
     member_nickname=None,
-    flag_full_sync=False
+    flag_full_sync=False,
+    source=None
 ):
     if group_openid is None or str(group_openid) == '':
         return
@@ -1674,13 +1759,15 @@ def _qq_group_member_cache_record(
         member_nickname = None
     else:
         member_nickname = member_nickname.strip()
+    actual_source = source if source is not None else ('sync' if flag_full_sync else 'event')
     qqStore.touch_group(str(bot_hash), str(group_openid))
+    _clear_qq_group_suspect_state(bot_hash, group_openid)
     qqStore.upsert_member(
         str(bot_hash), str(group_openid), str(member_openid),
         username=username, member_role=member_role, bot=bot,
         joined_at=joined_at, union_openid=union_openid,
         member_nickname=member_nickname,
-        source='sync' if flag_full_sync else 'event'
+        source=actual_source
     )
 
 
@@ -1707,13 +1794,25 @@ def _qq_group_member_cache_remove_member(bot_hash, group_openid, member_openid):
     if group_openid is None or member_openid is None:
         return
     qqStore.touch_group(str(bot_hash), str(group_openid))
+    _clear_qq_group_suspect_state(bot_hash, group_openid)
     qqStore.remove_member(str(bot_hash), str(group_openid), str(member_openid))
 
 
 def _qq_group_member_cache_clear_group(bot_hash, group_openid):
     if group_openid is None or str(group_openid) == '':
         return
-    qqStore.remove_group(str(bot_hash), str(group_openid))
+    bot_hash_str = str(bot_hash)
+    gid = str(group_openid)
+    qqStore.remove_group(bot_hash_str, gid)
+    _clear_qq_group_suspect_state(bot_hash_str, gid)
+    _clear_qq_group_backoff_for_group(bot_hash_str, gid)
+    _clear_qq_group_warm_for_group(bot_hash_str, gid)
+    with sdkQQGroupCalibrationLock:
+        groups_map = sdkQQGroupCalibrationGroups.get(bot_hash_str, None)
+        if isinstance(groups_map, dict):
+            groups_map.pop(gid, None)
+            if not groups_map:
+                sdkQQGroupCalibrationGroups.pop(bot_hash_str, None)
 
 
 def _get_qq_group_member_cache_members(bot_hash, group_openid):
@@ -1722,16 +1821,72 @@ def _get_qq_group_member_cache_members(bot_hash, group_openid):
     return qqStore.get_members(str(bot_hash), str(group_openid))
 
 
+def _build_qq_group_member_list_result(bot_hash, group_openid, members=None):
+    """把本地群成员缓存组装为与统一层 get_group_member_list 一致的返回结构。"""
+    res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+    bot_hash = str(bot_hash)
+    group_openid = None if group_openid is None else str(group_openid)
+    if members is None:
+        members = _get_qq_group_member_cache_members(bot_hash, group_openid)
+    group_row = (
+        qqStore.get_group(bot_hash, group_openid)
+        if group_openid is not None and group_openid != ''
+        else None
+    )
+    m_state = (group_row or {}).get('members_state', 'active')
+    res_data['extra'] = {
+        'source': 'cache',
+        'members_state': m_state,
+        'verified_at': (group_row or {}).get('verified_at', None),
+        'complete': m_state == 'complete',
+        'partial': m_state != 'complete',
+        'api_denied': _check_qq_group_api_denied(bot_hash, 'group_member_list'),
+        'stale_count': sum(1 for r in members.values() if r.get('stale')),
+        'placeholder_count': sum(
+            1 for r in members.values()
+            if not r.get('username') and not r.get('member_nickname')
+        )
+    }
+    if len(members) == 0:
+        return res_data
+    res_data['active'] = True
+    for member_id in sorted(members.keys()):
+        record = members[member_id]
+        member = OlivOS.contentAPI.api_result_data_template.get_group_member_info_strip()
+        member['id'] = str(member_id)
+        member['user_id'] = str(member_id)
+        member['group_id'] = group_openid
+        # username=None 表示「待补全」,调用方可据此区分已知昵称与占位成员。
+        member['name'] = record.get('username', None)
+        member['card'] = record.get('member_nickname') or record.get('username')
+        member['role'] = record.get('member_role', None)
+        member['times']['join_time'] = _parse_qq_message_timestamp(
+            record.get('joined_at', None),
+            default=0
+        )
+        member['extra'] = {
+            'cached': True,
+            'bot': record.get('bot', None),
+            'union_openid': record.get('union_openid', None),
+            'updated_at': record.get('updated_at', 0),
+            'stale': record.get('stale', False),
+            'source': record.get('source', None)
+        }
+        res_data['data'].append(member)
+    return res_data
+
+
 # ============ 群管理接口滑动窗口限流与 11253 降级 ============
-def _acquire_qq_group_api_rate(op_key, wait=False, wait_timeout=90.0):
-    # 每个接口独立滑动窗口;wait=True 时短暂阻塞等额(全量翻页场景),超时放弃。
+def _acquire_qq_group_api_rate(bot_hash, op_key, wait=False, wait_timeout=90.0):
+    # 每个 bot 的每个接口独立滑动窗口;wait=True 时短暂阻塞等额(全量翻页场景),超时放弃。
     limit = qqGroupApiRateLimitMap.get(op_key, 30)
     window = qqGroupApiRateWindow
+    rate_key = (str(bot_hash), str(op_key))
     deadline = time.monotonic() + wait_timeout
     while True:
         now = time.monotonic()
         with sdkQQGroupApiRateInfoLock:
-            history = sdkQQGroupApiRateInfo.setdefault(op_key, deque())
+            history = sdkQQGroupApiRateInfo.setdefault(rate_key, deque())
             while history and now - history[0] >= window:
                 history.popleft()
             if len(history) < limit:
@@ -1743,60 +1898,378 @@ def _acquire_qq_group_api_rate(op_key, wait=False, wait_timeout=90.0):
         time.sleep(min(max(wait_time, 0.05), 1.0))
 
 
-def _mark_qq_group_api_denied(op_key):
+def _mark_qq_group_api_denied(bot_hash, op_key):
+    bot_hash = str(bot_hash)
+    op_key = str(op_key)
+    denied_key = (bot_hash, op_key)
     with sdkQQGroupApiRateInfoLock:
-        if op_key in sdkQQGroupApiDenied:
+        if denied_key in sdkQQGroupApiDenied:
             return
-        sdkQQGroupApiDenied.add(op_key)
+        sdkQQGroupApiDenied.add(denied_key)
     if op_key == 'group_member_list':
         with sdkQQGroupCalibrationLock:
-            sdkQQGroupCalibrationGroups.clear()
+            sdkQQGroupCalibrationGroups.pop(bot_hash, None)
+        _clear_qq_group_warm_for_bot(bot_hash)
+    elif op_key == 'group_member_info':
+        _clear_qq_group_tier1_for_bot(bot_hash)
     proc = getattr(OlivOS.pluginAPI, 'gProc', None)
-    if proc is not None:
-        proc.log(3, 'QQ 群接口 %s 返回 11253，本进程停止请求该接口' % op_key,
-                 [(modelName, 'default')])
+    log_func = getattr(proc, 'log', None)
+    if callable(log_func):
+        log_func(
+            3,
+            'QQ 群接口 %s 返回 11253，当前 bot(%s) 停止请求该接口' % (op_key, bot_hash),
+            [(modelName, 'default')]
+        )
 
 
-def _check_qq_group_api_denied(op_key):
+def _check_qq_group_api_denied(bot_hash, op_key):
     with sdkQQGroupApiRateInfoLock:
-        return op_key in sdkQQGroupApiDenied
+        return (str(bot_hash), str(op_key)) in sdkQQGroupApiDenied
+
+
+def _set_qq_group_api_backoff(bot_hash, op_key, group_openid, duration, now=None):
+    now_mono = time.monotonic() if now is None else now
+    backoff_key = (str(bot_hash), str(op_key), str(group_openid))
+    with sdkQQGroupApiRateInfoLock:
+        sdkQQGroupApiBackoff[backoff_key] = now_mono + float(duration)
+        if len(sdkQQGroupApiBackoff) > sdkQQGroupApiBackoffMaxSize:
+            expired = [
+                item_key for item_key, until in sdkQQGroupApiBackoff.items()
+                if until <= now_mono
+            ]
+            for expired_key in expired:
+                sdkQQGroupApiBackoff.pop(expired_key, None)
+
+
+def _clear_qq_group_backoff_for_group(bot_hash, group_openid):
+    if group_openid is None or str(group_openid) == '':
+        return
+    bot_hash_str = str(bot_hash)
+    gid = str(group_openid)
+    with sdkQQGroupApiRateInfoLock:
+        to_remove = [
+            item_key for item_key in sdkQQGroupApiBackoff
+            if len(item_key) == 3 and item_key[0] == bot_hash_str and item_key[2] == gid
+        ]
+        for item_key in to_remove:
+            sdkQQGroupApiBackoff.pop(item_key, None)
+
+
+def _clear_qq_group_suspect_state(bot_hash, group_openid):
+    if group_openid is None or str(group_openid) == '':
+        return
+    key = (str(bot_hash), str(group_openid))
+    # 热路径无锁快查，命中时再进锁清理 suspect 内存计数并使旧代次复核作废。
+    if (
+        key not in sdkQQGroupSuspectState
+        and key not in sdkQQGroupSuspectPending
+        and key not in sdkQQGroupSuspectVerifying
+    ):
+        return
+    cleared = False
+    with sdkQQGroupSuspectLock:
+        if sdkQQGroupSuspectState.pop(key, None) is not None:
+            cleared = True
+        if sdkQQGroupSuspectPending.pop(key, None) is not None:
+            cleared = True
+        if cleared or key in sdkQQGroupSuspectVerifying:
+            sdkQQGroupSuspectGeneration[key] = sdkQQGroupSuspectGeneration.get(key, 0) + 1
+            cleared = True
+    if cleared:
+        _clear_qq_group_backoff_for_group(key[0], key[1])
+
+
+def _mark_qq_group_suspect(bot_hash, bot_info, group_openid, op_key=None):
+    # 11255 不直接删群：先降级为 suspect 并设 24h 群级退避，后台延迟复核后再决定。
+    if group_openid is None or str(group_openid) == '':
+        return
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    key = (bot_hash, gid)
+    with sdkQQGroupSuspectLock:
+        if key in sdkQQGroupSuspectVerifying:
+            # 复核请求在途时触发 11255：由复核逻辑校验代次后再写状态与退避，避免污染已恢复群。
+            return
+    now = time.monotonic()
+    if op_key is not None and str(op_key) != '':
+        _set_qq_group_api_backoff(bot_hash, str(op_key), gid, 86400.0, now=now)
+    if not qqStore.mark_group_suspect(bot_hash, gid):
+        # 群已从库中删除时只保留接口退避，避免复活已删群行。
+        return
+    with sdkQQGroupSuspectLock:
+        if key in sdkQQGroupSuspectVerifying:
+            return
+        state = sdkQQGroupSuspectState.get(key, None)
+        if state is None:
+            sdkQQGroupSuspectState[key] = {
+                'count': 1, 'last_at': now, 'reschedules': 0
+            }
+        elif key not in sdkQQGroupSuspectPending:
+            state['count'] = state.get('count', 0) + 1
+            state['last_at'] = now
+    _schedule_qq_group_suspect_verify(bot_hash, bot_info, gid)
+
+
+def _schedule_qq_group_suspect_verify(
+    bot_hash, bot_info, group_openid, delay=None, generation=None
+):
+    if bot_info is None or group_openid is None or str(group_openid) == '':
+        return False
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    key = (bot_hash, gid)
+    wait_delay = sdkQQGroupSuspectVerifyDelay if delay is None else max(0.0, float(delay))
+    due_at = time.monotonic() + wait_delay
+    with sdkQQGroupSuspectLock:
+        current_gen = sdkQQGroupSuspectGeneration.get(key, 0)
+        if generation is not None and generation != current_gen:
+            return False
+        target_gen = current_gen
+        if sdkQQGroupSuspectPending.get(key) == target_gen:
+            return False
+        while len(sdkQQGroupSuspectDue) >= sdkQQGroupSuspectQueueMaxSize:
+            old_item = sdkQQGroupSuspectDue.pop(0)
+            old_key = (old_item[1], old_item[3])
+            if sdkQQGroupSuspectPending.get(old_key) == old_item[4]:
+                sdkQQGroupSuspectPending.pop(old_key, None)
+        sdkQQGroupSuspectPending[key] = target_gen
+        sdkQQGroupSuspectDue.append((due_at, bot_hash, bot_info, gid, target_gen))
+        sdkQQGroupSuspectDue.sort(key=lambda item: item[0])
+    sdkQQGroupSuspectEvent.set()
+    _ensure_qq_group_suspect_thread()
+    return True
+
+
+def _cleanup_expired_suspect_state_locked(now):
+    cutoff = now - sdkQQGroupSuspectStateTTL
+    expired = [
+        item_key for item_key, state in sdkQQGroupSuspectState.items()
+        if state.get('last_at', 0.0) < cutoff
+        and item_key not in sdkQQGroupSuspectPending
+        and item_key not in sdkQQGroupSuspectVerifying
+    ]
+    for item_key in expired:
+        sdkQQGroupSuspectState.pop(item_key, None)
+    if len(sdkQQGroupSuspectGeneration) > sdkQQGroupSuspectQueueMaxSize * 2:
+        in_due = {(item[1], item[3]) for item in sdkQQGroupSuspectDue}
+        stale_gens = [
+            item_key for item_key in sdkQQGroupSuspectGeneration
+            if item_key not in sdkQQGroupSuspectState
+            and item_key not in sdkQQGroupSuspectPending
+            and item_key not in sdkQQGroupSuspectVerifying
+            and item_key not in in_due
+        ]
+        for item_key in stale_gens:
+            sdkQQGroupSuspectGeneration.pop(item_key, None)
+
+
+def _qq_group_suspect_step():
+    now = time.monotonic()
+    item = None
+    next_wait = None
+    with sdkQQGroupSuspectLock:
+        _cleanup_expired_suspect_state_locked(now)
+        while sdkQQGroupSuspectDue and sdkQQGroupSuspectDue[0][0] <= now:
+            candidate = sdkQQGroupSuspectDue.pop(0)
+            c_key = (candidate[1], candidate[3])
+            c_gen = candidate[4]
+            if sdkQQGroupSuspectPending.get(c_key) == c_gen:
+                sdkQQGroupSuspectPending.pop(c_key, None)
+            if sdkQQGroupSuspectGeneration.get(c_key, 0) != c_gen:
+                # 代次已失效（期间群已恢复或被删除），直接丢弃旧任务。
+                continue
+            item = candidate
+            break
+        if item is None and sdkQQGroupSuspectDue:
+            next_wait = max(0.0, sdkQQGroupSuspectDue[0][0] - now)
+    if item is None:
+        return False, next_wait
+    _, bot_hash, bot_info, gid, gen = item
+    _verify_qq_group_suspect(bot_hash, bot_info, gid, expected_generation=gen)
+    return True, 0.0
+
+
+def _qq_group_suspect_worker():
+    current = threading.current_thread()
+    while True:
+        if sdkQQGroupSuspectThread is not current:
+            return
+        sdkQQGroupSuspectEvent.clear()
+        try:
+            processed, next_wait = _qq_group_suspect_step()
+        except Exception:
+            traceback.print_exc()
+            processed, next_wait = False, 1.0
+        if not processed:
+            timeout = 1.0 if next_wait is None else min(1.0, next_wait)
+            if timeout > 0.0:
+                sdkQQGroupSuspectEvent.wait(timeout=timeout)
+
+
+def _ensure_qq_group_suspect_thread():
+    global sdkQQGroupSuspectThread
+    if sdkQQGroupSuspectThread is not None and sdkQQGroupSuspectThread.is_alive():
+        return
+    with sdkQQGroupSuspectLock:
+        if sdkQQGroupSuspectThread is not None and sdkQQGroupSuspectThread.is_alive():
+            return
+        thread = threading.Thread(
+            target=_qq_group_suspect_worker,
+            daemon=True,
+            name='qqguildv2-suspect-verify'
+        )
+        sdkQQGroupSuspectThread = thread
+        thread.start()
+
+
+def _verify_qq_group_suspect(
+    bot_hash, bot_info, group_openid, expected_generation=None
+):
+    if bot_info is None or group_openid is None or str(group_openid) == '':
+        return
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    key = (bot_hash, gid)
+    with sdkQQGroupSuspectLock:
+        current_gen = sdkQQGroupSuspectGeneration.get(key, 0)
+        if expected_generation is not None and current_gen != expected_generation:
+            return
+        verify_gen = current_gen
+    row = qqStore.get_group(bot_hash, gid)
+    if row is None or row.get('state') != 'suspect':
+        _clear_qq_group_suspect_state(bot_hash, gid)
+        return
+    with sdkQQGroupSuspectLock:
+        if sdkQQGroupSuspectGeneration.get(key, 0) != verify_gen:
+            return
+        sdkQQGroupSuspectVerifying.add(key)
+    try:
+        # 复核前只清除当前群的 group_bot_state 退避，避免被自身 24h 退避短路。
+        with sdkQQGroupApiRateInfoLock:
+            sdkQQGroupApiBackoff.pop((bot_hash, 'group_bot_state', gid), None)
+        api_obj = API.getQQGroupBotState(bot_info)
+        api_obj.metadata.group_openid = gid
+        api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_bot_state')
+    except Exception:
+        traceback.print_exc()
+        return
+    finally:
+        with sdkQQGroupSuspectLock:
+            sdkQQGroupSuspectVerifying.discard(key)
+    with sdkQQGroupSuspectLock:
+        if sdkQQGroupSuspectGeneration.get(key, 0) != verify_gen:
+            return
+    if (
+        api_res.get('active', False)
+        and api_res.get('http_status', None) == 200
+        and isinstance(api_res.get('response', None), dict)
+    ):
+        qqStore.restore_group_active_if_suspect(bot_hash, gid)
+        _clear_qq_group_suspect_state(bot_hash, gid)
+        _clear_qq_group_backoff_for_group(bot_hash, gid)
+        return
+    if api_res.get('error_code', None) == 11255:
+        now = time.monotonic()
+        should_remove = False
+        reschedule_delay = None
+        with sdkQQGroupSuspectLock:
+            if sdkQQGroupSuspectGeneration.get(key, 0) != verify_gen:
+                return
+            state = sdkQQGroupSuspectState.get(key, None)
+            if state is None:
+                sdkQQGroupSuspectState[key] = {
+                    'count': 1, 'last_at': now, 'reschedules': 0
+                }
+                reschedule_delay = sdkQQGroupSuspectVerifyDelay
+            else:
+                prev_at = state.get('last_at', now)
+                elapsed = now - prev_at
+                new_count = state.get('count', 0) + 1
+                state['count'] = new_count
+                if new_count >= 2 and elapsed >= sdkQQGroupSuspectVerifyDelay:
+                    should_remove = True
+                    sdkQQGroupSuspectState.pop(key, None)
+                    sdkQQGroupSuspectPending.pop(key, None)
+                    sdkQQGroupSuspectGeneration[key] = verify_gen + 1
+                else:
+                    # 间隔不足 600 秒：保留 prev_at，按剩余时间重排复核（最多 3 次）。
+                    reschedules = state.get('reschedules', 0)
+                    if reschedules < sdkQQGroupSuspectMaxReschedules:
+                        state['reschedules'] = reschedules + 1
+                        remaining = max(0.0, sdkQQGroupSuspectVerifyDelay - elapsed)
+                        reschedule_delay = (
+                            remaining if remaining > 0.0 else sdkQQGroupSuspectVerifyDelay
+                        )
+                    else:
+                        state['last_at'] = now
+        # 代次一致且复核确认 11255 后再写 group_bot_state 24h 退避。
+        _set_qq_group_api_backoff(bot_hash, 'group_bot_state', gid, 86400.0, now=now)
+        if should_remove:
+            qqStore.remove_group_if_suspect(bot_hash, gid)
+        elif reschedule_delay is not None:
+            _schedule_qq_group_suspect_verify(
+                bot_hash, bot_info, gid, delay=reschedule_delay, generation=verify_gen
+            )
+        return
+    # 11253 / 网络失败 / 限流 / 退避：保持 suspect，什么都不删。
+    proc = getattr(OlivOS.pluginAPI, 'gProc', None)
+    log_func = getattr(proc, 'log', None)
+    if callable(log_func):
+        log_func(
+            2,
+            'QQ 群 %s suspect 复核未完成，保持 suspect 状态（error_code=%s, error=%s）' % (
+                gid,
+                api_res.get('error_code', None),
+                api_res.get('error', None)
+            ),
+            [(modelName, 'default')]
+        )
 
 
 def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
-    # 统一请求入口:进程级权限禁用、群级退避与接口滑动窗口。
-    if _check_qq_group_api_denied(op_key):
+    # 统一请求入口:按 bot 隔离的权限禁用、群级退避与接口滑动窗口。
+    group_openid = getattr(getattr(api_obj, 'metadata', None), 'group_openid', None)
+    bot_hash = str(OlivOS.API.getBotHash(
+        bot_id=bot_info.id, platform_sdk='qqGuildv2_link', platform_platform='qqGuild',
+        platform_model=bot_info.model
+    ))
+    if _check_qq_group_api_denied(bot_hash, op_key):
         return {
             'active': False,
             'http_status': None,
             'error_code': qqGroupApiDeniedCode,
-            'error': 'QQ official API %d denied for this process' % qqGroupApiDeniedCode,
+            'error': 'QQ official API %d denied for this bot' % qqGroupApiDeniedCode,
             'response': None,
+            'raw_response': None,
             'denied': True,
-            'rate_limited': False
+            'rate_limited': False,
+            'backed_off': False
         }
-    group_openid = getattr(getattr(api_obj, 'metadata', None), 'group_openid', None)
-    bot_hash = OlivOS.API.getBotHash(
-        bot_id=bot_info.id, platform_sdk='qqGuildv2_link', platform_platform='qqGuild',
-        platform_model=bot_info.model
-    )
     backoff_key = (bot_hash, op_key, str(group_openid))
+    now_mono = time.monotonic()
     with sdkQQGroupApiRateInfoLock:
         backoff_until = sdkQQGroupApiBackoff.get(backoff_key, 0.0)
-    if backoff_until > time.monotonic():
+        if backoff_until > 0.0 and backoff_until <= now_mono:
+            sdkQQGroupApiBackoff.pop(backoff_key, None)
+            backoff_until = 0.0
+    if backoff_until > now_mono:
         return {
             'active': False, 'http_status': None, 'error_code': None,
             'error': 'QQ group API backoff (%s)' % op_key, 'response': None,
-            'denied': False, 'rate_limited': True
+            'raw_response': None,
+            'denied': False, 'rate_limited': False, 'backed_off': True
         }
-    if not _acquire_qq_group_api_rate(op_key, wait=wait):
+    if not _acquire_qq_group_api_rate(bot_hash, op_key, wait=wait):
         return {
             'active': False,
             'http_status': None,
             'error_code': None,
             'error': 'QQ group API rate limit reached (%s)' % op_key,
             'response': None,
+            'raw_response': None,
             'denied': False,
-            'rate_limited': True
+            'rate_limited': True,
+            'backed_off': False
         }
     api_obj.do_api(req_type)
     raw_obj = None
@@ -1821,24 +2294,25 @@ def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
         and api_code in [None, 0]
     )
     if api_code == qqGroupApiDeniedCode:
-        _mark_qq_group_api_denied(op_key)
+        _mark_qq_group_api_denied(bot_hash, op_key)
         error_message = (
             'QQ official API %d: application has no access permission '
             '(invitation whitelist required)' % qqGroupApiDeniedCode
         )
     elif api_code == 11255 and group_openid is not None:
-        qqStore.remove_group(bot_hash, str(group_openid))
+        _mark_qq_group_suspect(bot_hash, bot_info, str(group_openid), op_key)
     elif api_code in (100017, 40023001):
-        with sdkQQGroupApiRateInfoLock:
-            sdkQQGroupApiBackoff[backoff_key] = time.monotonic() + 3600.0
+        _set_qq_group_api_backoff(bot_hash, op_key, str(group_openid), 3600.0)
     return {
         'active': flag_success,
         'http_status': api_obj.res_code,
         'error_code': api_code,
         'error': None if flag_success else error_message,
         'response': raw_obj,
+        'raw_response': api_obj.res,
         'denied': api_code == qqGroupApiDeniedCode,
-        'rate_limited': False
+        'rate_limited': False,
+        'backed_off': False
     }
 
 
@@ -1915,14 +2389,35 @@ def get_qq_group_passive_limit(bot_info, group_openid, no_cache=False):
 
 
 # ============ Tier 2:定期全量错峰校准 ============
-def _register_qq_group_for_calibration(bot_hash, bot_info, group_openid):
-    if group_openid is None or str(group_openid) == '' or _check_qq_group_api_denied('group_member_list'):
+def _register_qq_group_bot_for_calibration(bot_hash, bot_info):
+    if bot_info is None or _check_qq_group_api_denied(bot_hash, 'group_member_list'):
         return
     bot_hash = str(bot_hash)
     with sdkQQGroupCalibrationLock:
         sdkQQGroupCalibrationBotInfo[bot_hash] = bot_info
-        sdkQQGroupCalibrationGroups.setdefault(bot_hash, {})
-        sdkQQGroupCalibrationGroups[bot_hash].setdefault(str(group_openid), 0.0)
+    _ensure_qq_group_calibration_thread()
+
+
+def _register_qq_group_calibration_bot(bot_hash, bot_info):
+    _register_qq_group_bot_for_calibration(bot_hash, bot_info)
+
+
+def _register_qq_group_for_calibration(bot_hash, bot_info, group_openid):
+    if (
+        bot_info is None
+        or group_openid is None
+        or str(group_openid) == ''
+        or _check_qq_group_api_denied(bot_hash, 'group_member_list')
+        or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+    ):
+        return
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    with sdkQQGroupCalibrationLock:
+        sdkQQGroupCalibrationBotInfo[bot_hash] = bot_info
+        groups_map = sdkQQGroupCalibrationGroups.setdefault(bot_hash, {})
+        if gid not in groups_map and len(groups_map) < 2000:
+            groups_map[gid] = 0.0
     _ensure_qq_group_calibration_thread()
 
 
@@ -1931,16 +2426,30 @@ def _qq_group_fetch_member_pages(
     group_openid,
     bot_hash=None,
     wait=True,
-    max_pages=500
+    max_pages=500,
+    start_cursor=None,
+    reconcile=False,
+    seen=None,
+    sync_started_at=None
 ):
     # 全量翻页拉取(每页≤30,cursor 分页),逐页写入持久化缓存。
+    initial_cursor = start_cursor if isinstance(start_cursor, str) else ''
+    cursor = initial_cursor
+    sync_started_at = int(time.time()) if sync_started_at is None else int(sync_started_at)
+    external_seen = isinstance(seen, set)
+    seen_set = seen if external_seen else set()
     result = {
         'ok': False,
         'error': None,
+        'error_code': None,
         'denied': False,
         'rate_limited': False,
+        'backed_off': False,
         'pages': 0,
-        'members': 0
+        'members': 0,
+        'next_cursor': cursor,
+        'complete': False,
+        'truncated': False
     }
     if bot_info is None or group_openid is None or str(group_openid) == '':
         result['error'] = 'invalid bot_info or group_openid'
@@ -1952,116 +2461,796 @@ def _qq_group_fetch_member_pages(
             platform_platform='qqGuild',
             platform_model=bot_info.model
         )
-    cursor = ''
     while result['pages'] < max_pages:
         api_obj = API.getQQGroupMembers(bot_info)
         api_obj.metadata.group_openid = str(group_openid)
         api_obj.query = {'cursor': cursor} if cursor != '' else None
         api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_member_list', wait=wait)
-        result['pages'] += 1
+        # 只有实际发出了 HTTP 请求才计入页数，避免本地限流/禁用虚增预算消耗。
+        if api_res.get('http_status') is not None:
+            result['pages'] += 1
         if not api_res.get('active', False):
             result['error'] = api_res.get('error', 'api request failed')
+            result['error_code'] = api_res.get('error_code', None)
             result['denied'] = api_res.get('denied', False)
             result['rate_limited'] = api_res.get('rate_limited', False)
+            result['backed_off'] = api_res.get('backed_off', False)
+            result['next_cursor'] = cursor
             return result
         response = api_res.get('response', None)
         member_list = response.get('members', None) if isinstance(response, dict) else None
         if isinstance(member_list, list) and len(member_list) > 0:
+            for member_data in member_list:
+                if isinstance(member_data, dict):
+                    member_openid = member_data.get('member_openid', None)
+                    if member_openid is not None and str(member_openid) != '':
+                        seen_set.add(str(member_openid))
             _qq_group_member_cache_record_members(bot_hash, group_openid, member_list)
             result['members'] += len(member_list)
         next_cursor = response.get('next_cursor', '') if isinstance(response, dict) else ''
         if not isinstance(next_cursor, str) or next_cursor == '':
             result['ok'] = True
-            qqStore.upsert_group(str(bot_hash), str(group_openid),
-                                 verified_at=int(time.time()), members_state='complete')
+            result['next_cursor'] = ''
+            result['complete'] = True
+            result['truncated'] = False
+            qqStore.upsert_group(
+                str(bot_hash), str(group_openid),
+                verified_at=int(time.time()), members_state='complete'
+            )
+            with sdkQQGroupWarmLock:
+                sdkQQGroupWarmFailCooldown.pop((str(bot_hash), str(group_openid)), None)
+            # 传入外部 seen 时支持跨轮累计后的全量差集；未传时仅单次从首页翻完才对账。
+            if reconcile and seen_set and (external_seen or initial_cursor == ''):
+                qqStore.reconcile_group_members(
+                    str(bot_hash), str(group_openid), seen_set, sync_started_at
+                )
             return result
         cursor = next_cursor
-    # 达到页数保护上限:已拉到的部分仍然有效。
+        result['next_cursor'] = cursor
+    # 达到页数保护上限:已拉到的部分仍然有效,保留最后一次非空游标供后续续翻。
     result['ok'] = True
+    result['next_cursor'] = cursor
+    result['complete'] = False
+    result['truncated'] = True
     return result
+
+
+def _qq_group_calibration_tick(now=None, per_tick=None):
+    """执行单轮两段式校准入队：优先队列 -> SQL 巡检，具体节流交给后台续翻 worker。"""
+    now_ts = int(time.time()) if now is None else int(now)
+    limit = max(0, sdkQQGroupCalibrationPerTick if per_tick is None else int(per_tick))
+    if limit == 0:
+        return 0
+    active_since = now_ts - sdkQQGroupCalibrationActiveWindow
+    stale_before = now_ts - sdkQQGroupCalibrationStaleAge
+    enqueued = 0
+    stage1_by_bot = {}
+    with sdkQQGroupCalibrationLock:
+        bot_items = list(sdkQQGroupCalibrationBotInfo.items())
+    # 第一段：优先队列（_register_qq_group_for_calibration 登记的刚需群），受 per_tick 限制。
+    for bot_hash, bot_info in bot_items:
+        if (
+            bot_info is None
+            or _check_qq_group_api_denied(bot_hash, 'group_member_list')
+            or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+        ):
+            continue
+        with sdkQQGroupCalibrationLock:
+            priority_groups = sdkQQGroupCalibrationGroups.pop(bot_hash, None)
+        if not priority_groups:
+            continue
+        bot_enqueued = 0
+        remaining = {}
+        group_keys = list(priority_groups)
+        for idx, group_openid in enumerate(group_keys):
+            if bot_enqueued >= limit:
+                for rest_gid in group_keys[idx:]:
+                    remaining[rest_gid] = priority_groups[rest_gid]
+                break
+            if (
+                _check_qq_group_api_denied(bot_hash, 'group_member_list')
+                or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+            ):
+                break
+            row = qqStore.get_group(bot_hash, group_openid)
+            if row is None or row.get('state') != 'active':
+                continue
+            verified_at = row.get('verified_at', None)
+            if (
+                row.get('members_state') == 'complete'
+                and verified_at is not None
+                and verified_at >= stale_before
+            ):
+                continue
+            if _enqueue_qq_group_warm(
+                bot_hash, bot_info, group_openid, start_cursor='', allow_complete=True
+            ):
+                enqueued += 1
+                bot_enqueued += 1
+        stage1_by_bot[bot_hash] = bot_enqueued
+        if (
+            remaining
+            and not _check_qq_group_api_denied(bot_hash, 'group_member_list')
+            and not _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+        ):
+            with sdkQQGroupCalibrationLock:
+                existing = sdkQQGroupCalibrationGroups.setdefault(bot_hash, {})
+                for rest_gid, ts in remaining.items():
+                    if rest_gid not in existing and len(existing) < 2000:
+                        existing[rest_gid] = ts
+    # 第二段：SQL 巡检，为每个未禁用且预算未耗尽的 bot 拉取 14 天内活跃且未完整/超 7 天未校准的群。
+    for bot_hash, bot_info in bot_items:
+        if (
+            bot_info is None
+            or _check_qq_group_api_denied(bot_hash, 'group_member_list')
+            or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+        ):
+            continue
+        bot_remaining = max(0, limit - stage1_by_bot.get(bot_hash, 0))
+        if bot_remaining == 0:
+            continue
+        sql_groups = qqStore.list_groups_for_calibration(
+            bot_hash, active_since, stale_before, bot_remaining
+        )
+        for group_openid in sql_groups:
+            if (
+                _check_qq_group_api_denied(bot_hash, 'group_member_list')
+                or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+            ):
+                break
+            if _enqueue_qq_group_warm(
+                bot_hash, bot_info, group_openid, start_cursor='', allow_complete=True
+            ):
+                enqueued += 1
+    return enqueued
 
 
 def _qq_group_calibration_loop():
     while True:
         time.sleep(sdkQQGroupCalibrationCheckInterval)
         try:
-            if _check_qq_group_api_denied('group_member_list'):
-                continue
-            now = time.monotonic()
-            with sdkQQGroupCalibrationLock:
-                task_list = []
-                for bot_hash, groups in sdkQQGroupCalibrationGroups.items():
-                    bot_info = sdkQQGroupCalibrationBotInfo.get(bot_hash, None)
-                    if bot_info is None:
-                        continue
-                    for group_openid, last_sync in list(groups.items()):
-                        if now - last_sync < sdkQQGroupCalibrateMaxAge:
-                            continue
-                        groups[group_openid] = now
-                        task_list.append((bot_hash, bot_info, group_openid))
-            for bot_hash, bot_info, group_openid in task_list:
-                if _check_qq_group_api_denied('group_member_list'):
-                    break
-                # 错峰:群与群之间留间隔,翻页内部再由限流器按 60 QPM 匀速。
-                time.sleep(sdkQQGroupCalibrateGroupSpacing)
-                _qq_group_fetch_member_pages(bot_info, group_openid, bot_hash=bot_hash)
+            _qq_group_calibration_tick()
         except Exception:
             traceback.print_exc()
 
 
 def _ensure_qq_group_calibration_thread():
     global sdkQQGroupCalibrationThread
-    if sdkQQGroupCalibrationThread is not None:
+    if sdkQQGroupCalibrationThread is not None and sdkQQGroupCalibrationThread.is_alive():
         return
     with sdkQQGroupCalibrationLock:
-        if sdkQQGroupCalibrationThread is not None:
+        if sdkQQGroupCalibrationThread is not None and sdkQQGroupCalibrationThread.is_alive():
             return
         sdkQQGroupCalibrationThread = threading.Thread(
             target=_qq_group_calibration_loop,
-            daemon=True
+            daemon=True,
+            name='qqguildv2-calibration'
         )
         sdkQQGroupCalibrationThread.start()
 
 
-def _qq_group_member_tier1_complete(bot_hash, bot_info, group_openid, member_openid):
-    # Tier 1 补全:调一次单成员接口(30 QPM,不等待),成功后回填昵称/角色。
-    if _check_qq_group_api_denied('group_member_info'):
+def _reset_qq_group_warming_state(bot_hash, group_openid):
+    # 原子把处于 warming 的群回退为 active，防止复活已删群或降级已 complete 群。
+    if group_openid is None or str(group_openid) == '':
+        return False
+    return qqStore.reset_group_warming(str(bot_hash), str(group_openid))
+
+
+def _reset_dropped_warm_groups(dropped_keys):
+    # 只负责锁外复位被淘汰群的 warming 状态；Pending 占位由调用方在复位完成后释放。
+    if not dropped_keys:
+        return
+    for old_key in dropped_keys:
+        _reset_qq_group_warming_state(old_key[0], old_key[1])
+
+
+def _evict_warm_queue_for_slot_locked():
+    # 持 sdkQQGroupWarmLock 淘汰满队旧任务：不提前释放 Pending，阻止复位前并发重入。
+    dropped_keys = []
+    while len(sdkQQGroupWarmQueue) >= sdkQQGroupWarmQueueMaxSize and sdkQQGroupWarmQueue:
+        old_task = _pop_warm_queue_victim_locked()
+        old_key = (old_task[0], old_task[2])
+        sdkQQGroupWarmSeen.pop(old_key, None)
+        sdkQQGroupWarmStartedAt.pop(old_key, None)
+        dropped_keys.append(old_key)
+    return dropped_keys
+
+
+def _finalize_dropped_warm_groups(dropped_keys):
+    # 锁外完成 DB warming 复位，再在 finally 里持锁释放 Pending 占位。
+    if not dropped_keys:
         return
     try:
-        _register_qq_group_for_calibration(bot_hash, bot_info, group_openid)
+        _reset_dropped_warm_groups(dropped_keys)
+    finally:
+        with sdkQQGroupWarmLock:
+            for old_key in dropped_keys:
+                sdkQQGroupWarmPending.discard(old_key)
+
+
+def _clear_qq_group_warm_for_group(bot_hash, group_openid):
+    if group_openid is None or str(group_openid) == '':
+        return
+    bot_hash_str = str(bot_hash)
+    gid = str(group_openid)
+    key = (bot_hash_str, gid)
+    with sdkQQGroupWarmLock:
+        kept_queue = deque()
+        removed_in_queue = False
+        while sdkQQGroupWarmQueue:
+            task = sdkQQGroupWarmQueue.popleft()
+            if task[0] == bot_hash_str and task[2] == gid:
+                removed_in_queue = True
+                continue
+            kept_queue.append(task)
+        sdkQQGroupWarmQueue.extend(kept_queue)
+        # 只有真正从队列里移除了该群任务，才清理 Pending/Seen/StartedAt；
+        # 若任务正被 worker 在途执行，保持这些状态由该任务自己的收尾路径释放，
+        # 避免破坏 Pending 的单一所有权。
+        if removed_in_queue:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+        sdkQQGroupWarmFailCooldown.pop(key, None)
+
+
+def _clear_qq_group_warm_for_bot(bot_hash):
+    bot_hash = str(bot_hash)
+    removed_keys = []
+    with sdkQQGroupWarmLock:
+        kept_queue = deque()
+        while sdkQQGroupWarmQueue:
+            task = sdkQQGroupWarmQueue.popleft()
+            if task[0] == bot_hash:
+                task_key = (task[0], task[2])
+                sdkQQGroupWarmPending.discard(task_key)
+                sdkQQGroupWarmSeen.pop(task_key, None)
+                sdkQQGroupWarmStartedAt.pop(task_key, None)
+                removed_keys.append(task_key)
+            else:
+                kept_queue.append(task)
+        sdkQQGroupWarmQueue.extend(kept_queue)
+        sdkQQGroupWarmRateLimitUntilByBot.pop(bot_hash, None)
+    for old_bh, old_gid in removed_keys:
+        _reset_qq_group_warming_state(old_bh, old_gid)
+
+
+def _get_qq_group_warm_daily_key(bot_hash, day_str=None):
+    today = time.strftime('%Y-%m-%d') if day_str is None else str(day_str)
+    return (str(bot_hash), today)
+
+
+def _get_qq_group_warm_daily_remaining(bot_hash, day_str=None):
+    key = _get_qq_group_warm_daily_key(bot_hash, day_str=day_str)
+    with sdkQQGroupWarmDailyLock:
+        used = sdkQQGroupWarmDailyPages.get(key, 0)
+    return max(0, int(sdkQQGroupWarmDailyPageLimit) - int(used))
+
+
+def _is_qq_group_warm_daily_budget_exhausted(bot_hash, day_str=None):
+    key = _get_qq_group_warm_daily_key(bot_hash, day_str=day_str)
+    with sdkQQGroupWarmDailyLock:
+        return sdkQQGroupWarmDailyPages.get(key, 0) >= sdkQQGroupWarmDailyPageLimit
+
+
+def _add_qq_group_warm_daily_pages(bot_hash, pages, day_str=None):
+    pages = int(pages or 0)
+    if pages <= 0:
+        return 0
+    today = time.strftime('%Y-%m-%d') if day_str is None else str(day_str)
+    key = (str(bot_hash), today)
+    with sdkQQGroupWarmDailyLock:
+        stale_keys = [item_key for item_key in sdkQQGroupWarmDailyPages if item_key[1] != today]
+        for stale_key in stale_keys:
+            sdkQQGroupWarmDailyPages.pop(stale_key, None)
+        total = sdkQQGroupWarmDailyPages.get(key, 0) + pages
+        sdkQQGroupWarmDailyPages[key] = total
+        return total
+
+
+def _pop_warm_queue_victim_locked():
+    # 队列满时优先淘汰当日预算已耗尽 bot 的排队任务，否则淘汰队头最旧任务。
+    for idx, queued_task in enumerate(sdkQQGroupWarmQueue):
+        if _is_qq_group_warm_daily_budget_exhausted(queued_task[0]):
+            del sdkQQGroupWarmQueue[idx]
+            return queued_task
+    return sdkQQGroupWarmQueue.popleft()
+
+
+def _set_qq_group_warm_fail_cooldown_locked(key):
+    now_mono = time.monotonic()
+    if len(sdkQQGroupWarmFailCooldown) >= 1000:
+        expired = [k for k, v in sdkQQGroupWarmFailCooldown.items() if v <= now_mono]
+        for expired_key in expired:
+            sdkQQGroupWarmFailCooldown.pop(expired_key, None)
+    sdkQQGroupWarmFailCooldown[key] = now_mono + sdkQQGroupWarmFailCooldownSeconds
+
+
+def _enqueue_qq_group_warm(
+    bot_hash,
+    bot_info,
+    group_openid,
+    start_cursor='',
+    initial_seen=None,
+    scan_started_at=None,
+    allow_complete=False
+):
+    if (
+        bot_info is None
+        or group_openid is None
+        or str(group_openid) == ''
+        or _check_qq_group_api_denied(bot_hash, 'group_member_list')
+        or _is_qq_group_warm_daily_budget_exhausted(bot_hash)
+    ):
+        return False
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    cursor = start_cursor if isinstance(start_cursor, str) else ''
+    key = (bot_hash, gid)
+    started_at = int(time.time()) if scan_started_at is None else int(scan_started_at)
+    # 先在锁内检查 pending 与失败冷却并占位，释放锁后再执行 store 原子置 warming，避免锁嵌套。
+    with sdkQQGroupWarmLock:
+        if key in sdkQQGroupWarmPending:
+            return False
+        now_mono = time.monotonic()
+        cooldown_until = sdkQQGroupWarmFailCooldown.get(key, 0.0)
+        if cooldown_until > now_mono:
+            return False
+        if cooldown_until > 0.0:
+            sdkQQGroupWarmFailCooldown.pop(key, None)
+        sdkQQGroupWarmPending.add(key)
+    marked_warming = False
+    can_enqueue = False
+    try:
+        marked_warming = qqStore.mark_group_warming(bot_hash, gid)
+        if marked_warming:
+            can_enqueue = True
+        elif allow_complete:
+            row = qqStore.get_group(bot_hash, gid)
+            if (
+                row is not None
+                and row.get('state') == 'active'
+                and row.get('members_state') == 'complete'
+            ):
+                can_enqueue = True
+    except Exception:
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+        raise
+    if not can_enqueue:
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+        return False
+    dropped_keys = []
+    aborted = False
+    with sdkQQGroupWarmLock:
+        if _check_qq_group_api_denied(bot_hash, 'group_member_list'):
+            aborted = True
+        else:
+            dropped_keys = _evict_warm_queue_for_slot_locked()
+            if cursor == '':
+                sdkQQGroupWarmSeen[key] = set(initial_seen) if initial_seen else set()
+                sdkQQGroupWarmStartedAt[key] = started_at
+            elif initial_seen is not None:
+                sdkQQGroupWarmSeen[key] = set(initial_seen)
+                sdkQQGroupWarmStartedAt[key] = started_at
+            else:
+                sdkQQGroupWarmSeen.pop(key, None)
+                sdkQQGroupWarmStartedAt.pop(key, None)
+            sdkQQGroupWarmQueue.append((bot_hash, bot_info, gid, cursor, 0, 0))
+    if aborted:
+        try:
+            if marked_warming:
+                _reset_qq_group_warming_state(bot_hash, gid)
+        finally:
+            with sdkQQGroupWarmLock:
+                sdkQQGroupWarmPending.discard(key)
+        return False
+    try:
+        _finalize_dropped_warm_groups(dropped_keys)
+    finally:
+        # 即使复位被淘汰群时抛异常，也要保证新任务能被唤醒调度。
+        sdkQQGroupWarmEvent.set()
+        _ensure_qq_group_warm_thread()
+    return True
+
+
+def _qq_group_warm_step_with_wait():
+    task = None
+    min_wait = None
+    now_mono = time.monotonic()
+    with sdkQQGroupWarmLock:
+        expired_bots = [
+            bh for bh, until in sdkQQGroupWarmRateLimitUntilByBot.items()
+            if until <= now_mono
+        ]
+        for bh in expired_bots:
+            sdkQQGroupWarmRateLimitUntilByBot.pop(bh, None)
+        queue_len = len(sdkQQGroupWarmQueue)
+        if queue_len == 0:
+            return False, None
+        for _ in range(queue_len):
+            candidate = sdkQQGroupWarmQueue.popleft()
+            c_bot_hash = candidate[0]
+            if _check_qq_group_api_denied(c_bot_hash, 'group_member_list'):
+                task = candidate
+                break
+            if _is_qq_group_warm_daily_budget_exhausted(c_bot_hash):
+                # 每日页预算达上限：保留任务放回队尾，不出队、不消耗接口配额。
+                sdkQQGroupWarmQueue.append(candidate)
+                wait_sec = sdkQQGroupWarmDailyWaitTimeout
+                min_wait = wait_sec if min_wait is None else min(min_wait, wait_sec)
+                continue
+            rl_until = sdkQQGroupWarmRateLimitUntilByBot.get(c_bot_hash, 0.0)
+            if rl_until > now_mono:
+                # 该 bot 仍在限流冷却期：放回队尾，继续尝试执行其它 bot 的任务。
+                sdkQQGroupWarmQueue.append(candidate)
+                wait_sec = max(0.0, rl_until - now_mono)
+                min_wait = wait_sec if min_wait is None else min(min_wait, wait_sec)
+                continue
+            task = candidate
+            break
+    if task is None:
+        return False, min_wait
+    if len(task) >= 6:
+        bot_hash, bot_info, gid, cursor, rounds, rate_waits = task[:6]
+    else:
+        bot_hash, bot_info, gid, cursor, rounds = task
+        rate_waits = 0
+    key = (bot_hash, gid)
+    if _check_qq_group_api_denied(bot_hash, 'group_member_list'):
+        _reset_qq_group_warming_state(bot_hash, gid)
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+        return True, 0.0
+    row = qqStore.get_group(bot_hash, gid)
+    if row is None or row.get('state') != 'active':
+        if row is not None:
+            _reset_qq_group_warming_state(bot_hash, gid)
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+        return True, 0.0
+    with sdkQQGroupWarmLock:
+        seen_set = sdkQQGroupWarmSeen.get(key, None)
+        scan_started_at = sdkQQGroupWarmStartedAt.get(key, None)
+        if seen_set is None and cursor == '' and rounds == 0:
+            seen_set = set()
+            sdkQQGroupWarmSeen[key] = seen_set
+        if seen_set is not None and scan_started_at is None:
+            scan_started_at = int(time.time())
+            sdkQQGroupWarmStartedAt[key] = scan_started_at
+    try:
+        fetch_result = _qq_group_fetch_member_pages(
+            bot_info,
+            gid,
+            bot_hash=bot_hash,
+            wait=False,
+            max_pages=sdkQQGroupWarmPageBatch,
+            start_cursor=cursor,
+            reconcile=True,
+            seen=seen_set,
+            sync_started_at=scan_started_at
+        )
+    except Exception:
+        traceback.print_exc()
+        _reset_qq_group_warming_state(bot_hash, gid)
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+            _set_qq_group_warm_fail_cooldown_locked(key)
+        return True, 0.0
+    _add_qq_group_warm_daily_pages(bot_hash, fetch_result.get('pages', 0))
+    if fetch_result.get('complete', False):
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+            sdkQQGroupWarmFailCooldown.pop(key, None)
+        return True, 0.0
+    if fetch_result.get('ok', False):
+        next_cursor = fetch_result.get('next_cursor', '')
+        next_round = rounds + 1
+        if (
+            isinstance(next_cursor, str)
+            and next_cursor != ''
+            and next_round < sdkQQGroupWarmMaxRounds
+        ):
+            with sdkQQGroupWarmLock:
+                dropped_keys = _evict_warm_queue_for_slot_locked()
+                sdkQQGroupWarmPending.add(key)
+                sdkQQGroupWarmQueue.append((bot_hash, bot_info, gid, next_cursor, next_round, 0))
+            _finalize_dropped_warm_groups(dropped_keys)
+            return True, 0.0
+        _reset_qq_group_warming_state(bot_hash, gid)
+        with sdkQQGroupWarmLock:
+            sdkQQGroupWarmPending.discard(key)
+            sdkQQGroupWarmSeen.pop(key, None)
+            sdkQQGroupWarmStartedAt.pop(key, None)
+            _set_qq_group_warm_fail_cooldown_locked(key)
+        proc = getattr(OlivOS.pluginAPI, 'gProc', None)
+        log_func = getattr(proc, 'log', None)
+        if callable(log_func):
+            log_func(
+                2,
+                'QQ 群 %s 成员后台续翻达到轮次上限(%d)，恢复为增量缓存' % (
+                    gid,
+                    sdkQQGroupWarmMaxRounds
+                ),
+                [(modelName, 'default')]
+            )
+        return True, 0.0
+    if (
+        fetch_result.get('rate_limited', False)
+        and not fetch_result.get('denied', False)
+        and not fetch_result.get('backed_off', False)
+    ):
+        next_rate_waits = rate_waits + 1
+        if next_rate_waits < sdkQQGroupWarmMaxRateWaits:
+            resume_cursor = fetch_result.get('next_cursor', cursor)
+            with sdkQQGroupWarmLock:
+                dropped_keys = _evict_warm_queue_for_slot_locked()
+                sdkQQGroupWarmPending.add(key)
+                sdkQQGroupWarmQueue.append(
+                    (bot_hash, bot_info, gid, resume_cursor, rounds, next_rate_waits)
+                )
+                prev_until = sdkQQGroupWarmRateLimitUntilByBot.get(bot_hash, 0.0)
+                sdkQQGroupWarmRateLimitUntilByBot[bot_hash] = max(
+                    prev_until,
+                    time.monotonic() + sdkQQGroupWarmRateLimitWait
+                )
+            _finalize_dropped_warm_groups(dropped_keys)
+            return True, 0.0
+    # 失败（denied / backed_off / 连续限流超限 / 其它错误）回退 warming 状态并写入群级失败冷却。
+    _reset_qq_group_warming_state(bot_hash, gid)
+    with sdkQQGroupWarmLock:
+        sdkQQGroupWarmPending.discard(key)
+        sdkQQGroupWarmSeen.pop(key, None)
+        sdkQQGroupWarmStartedAt.pop(key, None)
+        _set_qq_group_warm_fail_cooldown_locked(key)
+    proc = getattr(OlivOS.pluginAPI, 'gProc', None)
+    log_func = getattr(proc, 'log', None)
+    if callable(log_func):
+        log_func(
+            2,
+            'QQ 群 %s 成员后台续翻中止，恢复为增量缓存（denied=%s, rate_limited=%s, backed_off=%s, error=%s）' % (
+                gid,
+                fetch_result.get('denied', False),
+                fetch_result.get('rate_limited', False),
+                fetch_result.get('backed_off', False),
+                fetch_result.get('error', None)
+            ),
+            [(modelName, 'default')]
+        )
+    return True, 0.0
+
+
+def _qq_group_warm_step():
+    processed, _ = _qq_group_warm_step_with_wait()
+    return processed
+
+
+def _qq_group_warm_worker():
+    current = threading.current_thread()
+    while True:
+        if sdkQQGroupWarmThread is not current:
+            return
+        sdkQQGroupWarmEvent.clear()
+        try:
+            processed, next_wait = _qq_group_warm_step_with_wait()
+        except Exception:
+            traceback.print_exc()
+            processed, next_wait = False, 1.0
+        if processed:
+            if sdkQQGroupWarmSpacing > 0.0:
+                sdkQQGroupWarmEvent.wait(timeout=sdkQQGroupWarmSpacing)
+        else:
+            wait_timeout = 1.0 if next_wait is None else next_wait
+            if wait_timeout > 0.0:
+                sdkQQGroupWarmEvent.wait(timeout=wait_timeout)
+
+
+def _ensure_qq_group_warm_thread():
+    global sdkQQGroupWarmThread
+    if sdkQQGroupWarmThread is not None and sdkQQGroupWarmThread.is_alive():
+        return
+    with sdkQQGroupWarmLock:
+        if sdkQQGroupWarmThread is not None and sdkQQGroupWarmThread.is_alive():
+            return
+        thread = threading.Thread(
+            target=_qq_group_warm_worker,
+            daemon=True,
+            name='qqguildv2-member-warm'
+        )
+        sdkQQGroupWarmThread = thread
+        thread.start()
+
+
+def _clear_qq_group_tier1_for_bot(bot_hash):
+    bot_hash = str(bot_hash)
+    with sdkQQGroupTier1Lock:
+        kept_queue = deque()
+        while sdkQQGroupTier1Queue:
+            task = sdkQQGroupTier1Queue.popleft()
+            if task[0] == bot_hash:
+                sdkQQGroupTier1Pending.discard((task[0], task[2], task[3]))
+            else:
+                kept_queue.append(task)
+        sdkQQGroupTier1Queue.extend(kept_queue)
+        kept_delayed = []
+        for due_at, task in sdkQQGroupTier1Delayed:
+            if task[0] == bot_hash:
+                sdkQQGroupTier1Pending.discard((task[0], task[2], task[3]))
+            else:
+                kept_delayed.append((due_at, task))
+        sdkQQGroupTier1Delayed[:] = kept_delayed
+
+
+def _enqueue_qq_group_tier1(bot_hash, bot_info, group_openid, member_openid, attempt=0):
+    if (
+        bot_info is None
+        or group_openid is None
+        or str(group_openid) == ''
+        or member_openid is None
+        or str(member_openid) == ''
+        or _check_qq_group_api_denied(bot_hash, 'group_member_info')
+    ):
+        return False
+    bot_hash = str(bot_hash)
+    gid = str(group_openid)
+    mid = str(member_openid)
+    key = (bot_hash, gid, mid)
+    with sdkQQGroupTier1Lock:
+        if key in sdkQQGroupTier1Pending:
+            return False
+        while len(sdkQQGroupTier1Queue) + len(sdkQQGroupTier1Delayed) >= sdkQQGroupTier1MaxSize:
+            if sdkQQGroupTier1Queue:
+                old_task = sdkQQGroupTier1Queue.popleft()
+            elif sdkQQGroupTier1Delayed:
+                _, old_task = sdkQQGroupTier1Delayed.pop(0)
+            else:
+                break
+            sdkQQGroupTier1Pending.discard((old_task[0], old_task[2], old_task[3]))
+        sdkQQGroupTier1Pending.add(key)
+        sdkQQGroupTier1Queue.append((bot_hash, bot_info, gid, mid, int(attempt)))
+    sdkQQGroupTier1Event.set()
+    _ensure_qq_group_tier1_thread()
+    return True
+
+
+def _qq_group_member_tier1_complete(bot_hash, bot_info, group_openid, member_openid):
+    # Tier 1 补全:调一次单成员接口(30 QPM,不等待),返回执行状态供 worker 决定是否重试。
+    if _check_qq_group_api_denied(bot_hash, 'group_member_info'):
+        return 'denied'
+    try:
+        _register_qq_group_calibration_bot(bot_hash, bot_info)
         api_obj = API.getQQGroupMemberInfo(bot_info)
         api_obj.metadata.group_openid = str(group_openid)
         api_obj.metadata.member_openid = str(member_openid)
         api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_member_info')
+        if (
+            api_res.get('denied', False)
+            or api_res.get('error_code', None) == qqGroupApiDeniedCode
+        ):
+            return 'denied'
+        if api_res.get('backed_off', False):
+            return 'failed'
+        if api_res.get('error_code', None) == 11255:
+            # 11255 群异常已交给 suspect 流程，单成员不再重试。
+            return 'suspect'
+        if api_res.get('rate_limited', False):
+            return 'retry'
         response = api_res.get('response', None)
         if not api_res.get('active', False) or not isinstance(response, dict):
-            # 无权限/限流/失败时保持占位记录,等待 Tier 2 校准兜底。
-            return
+            http_status = api_res.get('http_status', None)
+            if http_status is None or (isinstance(http_status, int) and http_status >= 500):
+                return 'retry'
+            return 'failed'
         member_role = response.get('member_role', None)
-        _qq_group_member_cache_record(
-            bot_hash,
-            group_openid,
-            response.get('member_openid', member_openid),
-            username=response.get('username', None),
-            member_role=member_role,
-            bot=response.get('bot', None),
-            joined_at=response.get('joined_at', None),
-            union_openid=response.get('union_openid', None)
-        )
         _register_qq_user_info(
             bot_hash,
             {
                 'member_openid': response.get('member_openid', member_openid),
                 'username': response.get('username', None),
                 'bot': response.get('bot', None),
-                'union_openid': response.get('union_openid', None)
+                'joined_at': response.get('joined_at', None),
+                'union_openid': response.get('union_openid', None),
+                'member_nickname': response.get('member_nickname', None)
             },
             role=member_role,
             chat_type='qq_group',
-            chat_id=str(group_openid)
+            chat_id=str(group_openid),
+            source='api'
         )
+        return 'ok'
     except Exception:
         traceback.print_exc()
+        return 'retry'
+
+
+def _qq_group_tier1_step():
+    now = time.monotonic()
+    task = None
+    next_wait = None
+    with sdkQQGroupTier1Lock:
+        while sdkQQGroupTier1Delayed and sdkQQGroupTier1Delayed[0][0] <= now:
+            _, due_task = sdkQQGroupTier1Delayed.pop(0)
+            sdkQQGroupTier1Queue.append(due_task)
+        if sdkQQGroupTier1Queue:
+            task = sdkQQGroupTier1Queue.popleft()
+        elif sdkQQGroupTier1Delayed:
+            next_wait = max(0.0, sdkQQGroupTier1Delayed[0][0] - now)
+    if task is None:
+        return False, next_wait
+    bot_hash, bot_info, gid, mid, attempt = task
+    key = (bot_hash, gid, mid)
+    if _check_qq_group_api_denied(bot_hash, 'group_member_info'):
+        with sdkQQGroupTier1Lock:
+            sdkQQGroupTier1Pending.discard(key)
+        _clear_qq_group_tier1_for_bot(bot_hash)
+        return True, 0.0
+    status = _qq_group_member_tier1_complete(bot_hash, bot_info, gid, mid)
+    if status == 'denied':
+        with sdkQQGroupTier1Lock:
+            sdkQQGroupTier1Pending.discard(key)
+        _clear_qq_group_tier1_for_bot(bot_hash)
+        return True, 0.0
+    if status == 'retry' and attempt < len(sdkQQGroupTier1RetryDelays):
+        delay = sdkQQGroupTier1RetryDelays[attempt]
+        due_at = time.monotonic() + delay
+        next_task = (bot_hash, bot_info, gid, mid, attempt + 1)
+        with sdkQQGroupTier1Lock:
+            if _check_qq_group_api_denied(bot_hash, 'group_member_info'):
+                sdkQQGroupTier1Pending.discard(key)
+                return True, 0.0
+            # 重排任务留在 pending 集合防重复入队，按到期时间有序放进延迟表。
+            sdkQQGroupTier1Delayed.append((due_at, next_task))
+            sdkQQGroupTier1Delayed.sort(key=lambda item: item[0])
+        sdkQQGroupTier1Event.set()
+        return True, 0.0
+    with sdkQQGroupTier1Lock:
+        sdkQQGroupTier1Pending.discard(key)
+    return True, 0.0
+
+
+def _qq_group_tier1_worker():
+    current = threading.current_thread()
+    while True:
+        if sdkQQGroupTier1Thread is not current:
+            return
+        sdkQQGroupTier1Event.clear()
+        try:
+            processed, next_wait = _qq_group_tier1_step()
+        except Exception:
+            traceback.print_exc()
+            processed, next_wait = False, 1.0
+        if processed:
+            if sdkQQGroupTier1Spacing > 0.0:
+                time.sleep(sdkQQGroupTier1Spacing)
+        else:
+            timeout = 1.0 if next_wait is None else min(1.0, next_wait)
+            if timeout > 0.0:
+                sdkQQGroupTier1Event.wait(timeout=timeout)
+
+
+def _ensure_qq_group_tier1_thread():
+    global sdkQQGroupTier1Thread
+    if sdkQQGroupTier1Thread is not None and sdkQQGroupTier1Thread.is_alive():
+        return
+    with sdkQQGroupTier1Lock:
+        if sdkQQGroupTier1Thread is not None and sdkQQGroupTier1Thread.is_alive():
+            return
+        thread = threading.Thread(
+            target=_qq_group_tier1_worker,
+            daemon=True,
+            name='qqguildv2-member-tier1'
+        )
+        sdkQQGroupTier1Thread = thread
+        thread.start()
 
 
 def _parse_qq_message_scene_ext(message_scene):
@@ -2456,6 +3645,14 @@ def _set_qq_bot_self_open_id(bot_hash, openid):
 
 def _get_qq_group_self_open_id(bot_hash, group_openid, bot_info, now=None):
     bot_hash = str(bot_hash)
+    api_bot_hash = None
+    if bot_info is not None:
+        api_bot_hash = str(OlivOS.API.getBotHash(
+            bot_id=bot_info.id,
+            platform_sdk='qqGuildv2_link',
+            platform_platform='qqGuild',
+            platform_model=bot_info.model
+        ))
     with sdkSubSelfOpenInfoLock:
         openid = sdkSubSelfOpenInfo.get(bot_hash)
         if openid:
@@ -2466,7 +3663,14 @@ def _get_qq_group_self_open_id(bot_hash, group_openid, bot_info, now=None):
             openid = str(saved['openid'])
             _set_qq_bot_self_open_id(bot_hash, openid)
             return openid
-        if bot_hash in sdkSubSelfOpenInfoDisabled or bot_hash in sdkSubSelfOpenInfoInFlight:
+        if (
+            _check_qq_group_api_denied(bot_hash, 'group_bot_state')
+            or (
+                api_bot_hash is not None
+                and _check_qq_group_api_denied(api_bot_hash, 'group_bot_state')
+            )
+            or bot_hash in sdkSubSelfOpenInfoInFlight
+        ):
             return None
         sdkSubSelfOpenInfoInFlight.add(bot_hash)
     try:
@@ -2490,34 +3694,32 @@ def _get_qq_group_self_open_id(bot_hash, group_openid, bot_info, now=None):
                 sdkSubSelfOpenInfoRetryAt[cache_key] = request_time + sdkSubSelfOpenInfoRetryCooldown
             api_msg_obj = API.getQQGroupBotState(bot_info)
             api_msg_obj.metadata.group_openid = candidate
-            api_msg_obj.do_api('GET')
-            try:
-                response = json.loads(api_msg_obj.res)
-            except (TypeError, ValueError):
-                continue
-            if not isinstance(response, dict):
-                continue
-            try:
-                code = int(response.get('err_code', response.get('code', 0)))
-            except (TypeError, ValueError):
-                code = None
-            if code == 11253:
-                with sdkSubSelfOpenInfoLock:
-                    sdkSubSelfOpenInfoDisabled.add(bot_hash)
+            api_res = _do_qq_group_api_request(
+                bot_info, api_msg_obj, 'GET', 'group_bot_state'
+            )
+            if api_res.get('denied', False):
                 return None
+            code = api_res.get('error_code', None)
             if code == 11255:
-                qqStore.remove_group(bot_hash, candidate)
+                # 11255 语义未公开：不在这里删库，只标 suspect 并换下一个种子群。
+                qqStore.mark_group_suspect(bot_hash, candidate)
                 continue
             if code in (100017, 40023001):
                 with sdkSubSelfOpenInfoLock:
                     sdkSubSelfOpenInfoRetryAt[cache_key] = request_time + 3600.0
                 continue
+            if not api_res.get('active', False):
+                continue
+            response = api_res.get('response', None)
+            if not isinstance(response, dict):
+                continue
             openid = response.get('member_openid')
-            if (api_msg_obj.res_code is None or not 200 <= api_msg_obj.res_code < 300
-                    or code not in (None, 0) or openid is None or str(openid) == ''):
+            if openid is None or str(openid) == '':
                 continue
             openid = str(openid)
             qqStore.touch_group(bot_hash, candidate)
+            _clear_qq_group_suspect_state(bot_hash, candidate)
+            _clear_qq_group_backoff_for_group(bot_hash, candidate)
             seeds = qqStore.list_seed_groups(bot_hash, 3)
             with sdkSubSelfOpenInfoLock:
                 data = _read_qq_bot_self()
@@ -3069,6 +4271,8 @@ def get_Event_from_SDK(target_event):
         flag_increase = target_event.sdk_event.payload.data.t == 'GROUP_ADD_ROBOT'
         if flag_increase and event_data.get('group_openid'):
             qqStore.touch_group(plugin_event_bot_hash, str(event_data['group_openid']))
+            _clear_qq_group_suspect_state(plugin_event_bot_hash, event_data['group_openid'])
+            _clear_qq_group_backoff_for_group(plugin_event_bot_hash, event_data['group_openid'])
         if not flag_increase:
             # 机器人退群/被移出群:清掉整个群的成员缓存(零成本)。
             _qq_group_member_cache_clear_group(
@@ -3101,21 +4305,17 @@ def get_Event_from_SDK(target_event):
                 union_openid=event_data.get('union_openid', None)
             )
             if (member_openid != '' and tmp_group_openid is not None
-                    and not _check_qq_group_api_denied('group_member_info')):
-                threading.Thread(
-                    target=_qq_group_member_tier1_complete,
-                    args=(
-                        plugin_event_bot_hash,
-                        bot_info_T(
-                            id=target_event.sdk_event.base_info['self_id'],
-                            access_token=target_event.sdk_event.base_info['token'],
-                            model=target_event.platform.get('model', 'default')
-                        ),
-                        tmp_group_openid,
-                        member_openid
+                    and not _check_qq_group_api_denied(plugin_event_bot_hash, 'group_member_info')):
+                _enqueue_qq_group_tier1(
+                    plugin_event_bot_hash,
+                    bot_info_T(
+                        id=target_event.sdk_event.base_info['self_id'],
+                        access_token=target_event.sdk_event.base_info['token'],
+                        model=target_event.platform.get('model', 'default')
                     ),
-                    daemon=True
-                ).start()
+                    tmp_group_openid,
+                    member_openid
+                )
         else:
             # GROUP_MEMBER_REMOVE 直接删缓存即可,不需要补全(零成本)。
             _qq_group_member_cache_remove_member(
@@ -3149,7 +4349,7 @@ def get_Event_from_SDK(target_event):
                     'username': event_data.get('username', None),
                     'bot': event_data.get('bot', None)
                 },
-                chat_type='qq_group',
+                chat_type='qq_join_request',
                 chat_id=group_openid
             )
             target_event.active = True
@@ -3226,6 +4426,20 @@ def get_Event_from_SDK(target_event):
                 qqStore.touch_group(
                     plugin_event_bot_hash, str(group_openid), **group_fields
                 )
+                _clear_qq_group_suspect_state(plugin_event_bot_hash, group_openid)
+                tmp_bot_hash_str = str(plugin_event_bot_hash)
+                if (
+                    tmp_bot_hash_str not in sdkQQGroupCalibrationBotInfo
+                    and not _check_qq_group_api_denied(tmp_bot_hash_str, 'group_member_list')
+                ):
+                    _register_qq_group_bot_for_calibration(
+                        tmp_bot_hash_str,
+                        bot_info_T(
+                            id=target_event.sdk_event.base_info['self_id'],
+                            access_token=target_event.sdk_event.base_info['token'],
+                            model=target_event.platform.get('model', 'default')
+                        )
+                    )
             # 解析机器人自身 openid,供 mentions 回填时排除自身条目。
             sub_self_open_id = _get_qq_group_self_open_id(
                 plugin_event_bot_hash,
@@ -3257,7 +4471,8 @@ def get_Event_from_SDK(target_event):
                 plugin_event_bot_hash,
                 event_data.get('mentions', None),
                 chat_type='qq_group',
-                chat_id=group_openid
+                chat_id=group_openid,
+                exclude_ids=tmp_self_ids
             )
             _apply_qq_message_mentions(
                 message_obj,
@@ -3853,8 +5068,9 @@ def _log_qq_user_info_minor_mode(openid):
             return
         sdkQQUserInfoMinorLogged[key] = now
     proc = getattr(OlivOS.pluginAPI, 'gProc', None)
-    if proc is not None:
-        proc.log(1, '获取用户基本信息返回 40011033(未成年人模式),已按缺少资料处理',
+    log_func = getattr(proc, 'log', None)
+    if callable(log_func):
+        log_func(1, '获取用户基本信息返回 40011033(未成年人模式),已按缺少资料处理',
                  [(modelName, 'default')])
 
 
@@ -3932,11 +5148,11 @@ def _apply_qq_user_basic_info(bot_hash, user_id, fetched):
 
 
 def _take_qq_group_member_profile(target_event, group_id, user_id):
-    # 群成员详情未开放时，请求入口会把 11253 记在本进程内存里，这里直接跳过。
+    # 群成员详情未开放时，请求入口会把 11253 记在当前 bot 内存里，这里直接跳过。
     # 其它失败不当成永久禁用，交给调用方改打获取用户基本信息。
     if group_id is None or str(group_id) == '' or user_id is None or str(user_id) == '':
         return None
-    if _check_qq_group_api_denied('group_member_info') or event_action is None:
+    if _check_qq_group_api_denied(target_event.bot_info.hash, 'group_member_info') or event_action is None:
         return None
     raw_result = event_action._request_qq_group_member_info(
         target_event, group_id, user_id
@@ -3956,11 +5172,14 @@ def _take_qq_group_member_profile(target_event, group_id, user_id):
             'member_openid': response.get('member_openid', user_id),
             'username': username,
             'bot': response.get('bot', None),
-            'union_openid': response.get('union_openid', None)
+            'joined_at': response.get('joined_at', None),
+            'union_openid': response.get('union_openid', None),
+            'member_nickname': response.get('member_nickname', None)
         },
         role=member_role,
         chat_type='qq_group',
-        chat_id=str(group_id)
+        chat_id=str(group_id),
+        source='api'
     )
     return {
         'name': username,
@@ -4748,6 +5967,38 @@ class event_action_common(object):
         )
         return fallback_result
 
+    def _mark_qq_group_suspect_from_event(target_event, chat_id, op_key):
+        if target_event is None or chat_id is None or str(chat_id) == '':
+            return
+        bot_info = getattr(target_event, 'bot_info', None)
+        if bot_info is None:
+            return
+        bot_hash = getattr(bot_info, 'hash', None)
+        if bot_hash is None or str(bot_hash) == '':
+            return
+        try:
+            sdk_bot_info = get_SDK_bot_info_from_Event(target_event)
+        except Exception:
+            sdk_bot_info = None
+        _mark_qq_group_suspect(bot_hash, sdk_bot_info, str(chat_id), op_key)
+
+    def _check_qq_group_send_result_suspect(target_event, chat_type, chat_id, result):
+        if chat_type != 'qq_group' or not isinstance(result, dict):
+            return
+        if result.get('data', {}).get('error_code', None) == 11255:
+            event_action._mark_qq_group_suspect_from_event(
+                target_event, chat_id, 'send_message'
+            )
+
+    def _check_qq_group_api_obj_suspect(target_event, type_chat, chat_id, api_obj, op_key):
+        if type_chat != 'qq_groups' or api_obj is None:
+            return
+        raw_obj = init_api_json(getattr(api_obj, 'res', None))
+        if event_action._get_api_error_code(raw_obj) == 11255:
+            event_action._mark_qq_group_suspect_from_event(
+                target_event, chat_id, op_key
+            )
+
     def _send_qq_api(
         target_event,
         api_obj,
@@ -4821,6 +6072,9 @@ class event_action_common(object):
                         None,
                         active_result
                     )
+                event_action._check_qq_group_send_result_suspect(
+                    target_event, chat_type, chat_id, active_result
+                )
                 return active_result
             return passive_error
 
@@ -4880,19 +6134,27 @@ class event_action_common(object):
                     None,
                     active_result
                 )
+            event_action._check_qq_group_send_result_suspect(
+                target_event, chat_type, chat_id, active_result
+            )
             return active_result
         # 长度类错误重试仍失败时降级发送，避免整条回复静默消失。
         if not allow_length_fallback:
-            return passive_result
-        return event_action._fallback_qq_length_send(
-            target_event,
-            api_obj,
-            chat_type,
-            chat_id,
-            msg_id,
-            event_id,
-            passive_result
+            final_result = passive_result
+        else:
+            final_result = event_action._fallback_qq_length_send(
+                target_event,
+                api_obj,
+                chat_type,
+                chat_id,
+                msg_id,
+                event_id,
+                passive_result
+            )
+        event_action._check_qq_group_send_result_suspect(
+            target_event, chat_type, chat_id, final_result
         )
+        return final_result
 
     def _merge_send_results(chat_type, chat_id, results):
         if len(results) == 0:
@@ -7063,6 +8325,10 @@ class event_action_common(object):
             msg_upload_api.data.file_data = base64.b64encode(file_data).decode('ascii')
         msg_upload_api.do_api('POST')
         file_info, ttl = event_action._parse_resource_upload_result(msg_upload_api)
+        if file_info is None:
+            event_action._check_qq_group_api_obj_suspect(
+                target_event, type_chat, chat_id, msg_upload_api, 'resource_upload'
+            )
         event_action._log_qq_upload(
             target_event,
             'direct',
@@ -7105,6 +8371,10 @@ class event_action_common(object):
         upload_id = None
         if flag_prepare_ok:
             upload_id = prepare_obj.get('upload_id', None)
+        else:
+            event_action._check_qq_group_api_obj_suspect(
+                target_event, type_chat, chat_id, prepare_api, 'resource_upload'
+            )
         event_action._log_qq_upload(
             target_event,
             'upload_prepare',
@@ -7193,6 +8463,10 @@ class event_action_common(object):
         merge_api.data.srv_send_msg = flag_send_msg
         merge_api.do_api('POST')
         file_info, ttl = event_action._parse_resource_upload_result(merge_api)
+        if file_info is None:
+            event_action._check_qq_group_api_obj_suspect(
+                target_event, type_chat, chat_id, merge_api, 'resource_upload'
+            )
         event_action._log_qq_upload(
             target_event,
             'chunk_merge',
@@ -7287,6 +8561,9 @@ class event_action_common(object):
                 )
                 if flag_finish_ok:
                     return True
+                event_action._check_qq_group_api_obj_suspect(
+                    target_event, type_chat, chat_id, finish_api, 'resource_upload'
+                )
             if (
                 attempt_count >= sdkResourceUploadPartRetryMax
                 or time.monotonic() + retry_delay >= retry_deadline
@@ -7809,6 +9086,123 @@ class inde_interface(OlivOS.API.inde_interface_T):
             (group_openid, members),
             flag_log=flag_log,
             remote=remote
+        )
+
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:get_qq_group_member_cache'
+    )
+    def __get_qq_group_member_cache(target_event, group_openid, flag_log=False):
+        bot_info = getattr(target_event, 'bot_info', None)
+        bot_hash = getattr(bot_info, 'hash', None)
+        if bot_hash is None or str(bot_hash) == '':
+            res_data = OlivOS.contentAPI.api_result_data_template.get_group_member_list()
+            res_data['extra'] = {
+                'source': 'cache',
+                'members_state': 'active',
+                'verified_at': None,
+                'complete': False,
+                'partial': True,
+                'api_denied': False,
+                'stale_count': 0,
+                'placeholder_count': 0
+            }
+            return res_data
+        return _build_qq_group_member_list_result(str(bot_hash), group_openid)
+
+    def get_qq_group_member_cache(
+        self,
+        group_openid,
+        flag_log=False,
+        remote=False
+    ):
+        """只读本地成员缓存(不发网络请求)，返回 {active, data, extra} 结构。
+
+        返回结构与统一层 get_group_member_list 一致，方便插件复用同一套解析代码；
+        不会发起网络请求，也不会触发后台续翻；默认关闭 2 级回调日志（可传 flag_log=True 开启）。
+        """
+        if remote:
+            return None
+        return inde_interface.__get_qq_group_member_cache(
+            self.event,
+            group_openid,
+            flag_log=flag_log
+        )
+
+    @OlivOS.API.Event.callbackLogger(
+        'qqGuildv2:refresh_qq_group_member_list',
+        ['operation', 'pages', 'member_count']
+    )
+    def __refresh_qq_group_member_list(target_event, group_openid, flag_log=True):
+        bot_info = getattr(target_event, 'bot_info', None)
+        bot_hash = getattr(bot_info, 'hash', None)
+        if bot_hash is None or str(bot_hash) == '':
+            return OlivOS.qqGuildv2SDK.event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'refresh_qq_group_member_list',
+                'bot_info is required'
+            )
+        bot_hash = str(bot_hash)
+        gid = None if group_openid is None else str(group_openid)
+        if gid is None or gid == '':
+            return OlivOS.qqGuildv2SDK.event_action._make_local_result(
+                'qq_group',
+                group_openid,
+                'refresh_qq_group_member_list',
+                'group_openid is required'
+            )
+        remaining_pages = _get_qq_group_warm_daily_remaining(bot_hash)
+        if remaining_pages <= 0:
+            return OlivOS.qqGuildv2SDK.event_action._make_local_result(
+                'qq_group',
+                gid,
+                'refresh_qq_group_member_list',
+                'daily page budget exhausted'
+            )
+        cooldown_key = (bot_hash, gid)
+        now = time.monotonic()
+        with sdkQQGroupRefreshCooldownLock:
+            until = sdkQQGroupRefreshCooldown.get(cooldown_key, 0.0)
+            if until > now:
+                return OlivOS.qqGuildv2SDK.event_action._make_local_result(
+                    'qq_group',
+                    gid,
+                    'refresh_qq_group_member_list',
+                    'refresh cooldown'
+                )
+            expired = [k for k, v in sdkQQGroupRefreshCooldown.items() if v <= now]
+            for expired_key in expired:
+                sdkQQGroupRefreshCooldown.pop(expired_key, None)
+            sdkQQGroupRefreshCooldown[cooldown_key] = (
+                now + sdkQQGroupRefreshCooldownSeconds
+            )
+        res_data = OlivOS.qqGuildv2SDK.event_action.refresh_qq_group_member_list(
+            target_event,
+            gid,
+            max_pages=min(500, remaining_pages)
+        )
+        pages = res_data.get('data', {}).get('pages', 0) if isinstance(res_data, dict) else 0
+        if pages > 0:
+            _add_qq_group_warm_daily_pages(bot_hash, pages)
+        return res_data
+
+    def refresh_qq_group_member_list(
+        self,
+        group_openid,
+        flag_log=True,
+        remote=False
+    ):
+        """显式触发一次全量刷新(走限流与预算)，返回 universal_result。
+
+        本方法为同步全量翻页，会阻塞当前调用线程，不要在消息回调里直接调；
+        仅适合在定时任务或后台线程中按需触发，同一群 60 秒内冷却防重入。
+        """
+        if remote:
+            return None
+        return inde_interface.__refresh_qq_group_member_list(
+            self.event,
+            group_openid,
+            flag_log=flag_log
         )
 
     def get_qq_group_join_request_list(

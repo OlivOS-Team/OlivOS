@@ -136,3 +136,42 @@ def test_qqguild_v2_modules_can_see_all_common_private_helpers():
         if lack:
             missing[module.__name__] = lack
     assert missing == {}
+
+
+def test_group_join_request_does_not_write_members_but_caches_nickname(tmp_path, monkeypatch):
+    import OlivOS
+    from OlivOS.adapter.qqGuild import qqGuildv2Store as store
+
+    monkeypatch.chdir(tmp_path)
+    store.close_db()
+    store.open_db(tmp_path / 'cache.sqlite3')
+    monkeypatch.setattr(common, 'sdkUserInfo', {})
+    monkeypatch.setattr(common, 'qqEventDedupeCache', {})
+    try:
+        account = OlivOS.API.bot_info_T(
+            id='190001',
+            platform_sdk='qqGuildv2_link',
+            platform_platform='qqGuild',
+            platform_model='public'
+        )
+        payload = OlivOS.qqGuildv2SDK.PAYLOAD.rxPacket({
+            'op': 0,
+            's': 1,
+            't': 'GROUP_JOIN_REQUEST',
+            'd': {
+                'group_openid': 'G-JOIN-REQ',
+                'member_openid': 'M-APPLICANT',
+                'join_request_id': 'REQ-100',
+                'username': '申请者昵称',
+                'comment': '求通过'
+            }
+        })
+        event = OlivOS.API.Event(OlivOS.qqGuildv2SDK.event(payload, account))
+        assert event.active is True
+        assert event.plugin_info['func_type'] == 'group_add_request'
+        # 尚未审批的申请人不能写进群成员表，但内存缓存保留昵称供审批展示。
+        assert store.get_member(account.hash, 'G-JOIN-REQ', 'M-APPLICANT') is None
+        assert store.get_members(account.hash, 'G-JOIN-REQ') == {}
+        assert common._get_qq_user_name_from_cache(account.hash, 'M-APPLICANT') == '申请者昵称'
+    finally:
+        store.close_db()
