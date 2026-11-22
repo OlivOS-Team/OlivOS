@@ -253,7 +253,11 @@ def test_statistics_swap_io_uses_counter_delta(monkeypatch):
     monkeypatch.setattr(statisticsAPI.psutil, 'swap_memory', lambda: readings.pop(0))
     monitor = make_statistics_monitor()
     monitor._memory_io.disabled = True
+    # 固定单调时钟，避免 CI 上两次采样落在同一个低分辨率时间点而跳过速率计算。
+    clock = {'now': 100.0}
+    monkeypatch.setattr(statisticsAPI.time, 'monotonic', lambda: clock['now'])
     first = monitor._sample_performance()
+    clock['now'] = 101.0
     second = monitor._sample_performance()
     assert first['memory']['swap_in_bps'] == 0.0
     assert second['memory']['swap_in_bps'] > 0.0
