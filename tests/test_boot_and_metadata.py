@@ -36,6 +36,45 @@ def test_webui_is_created_before_initial_plugin_broadcast():
     assert steps.index('OlivOS_webUI') < steps.index('OlivOS_plugin')
 
 
+def test_boot_adds_statistics_model_to_legacy_config():
+    # 旧版 basic.json 没有统计模型时，启动前应补全组件并放在 WebUI 之前。
+    config = copy.deepcopy(OlivOS.bootDataAPI.default_Conf)
+    config['models'].pop('OlivOS_statistics')
+    config['system']['init'].remove('OlivOS_statistics')
+    OlivOS.bootAPI.ensure_statistics_model(config)
+    assert 'OlivOS_statistics' in config['models']
+    assert config['system']['init'].index('OlivOS_statistics') < config['system']['init'].index('OlivOS_webUI')
+    assert 'OlivOS_statistics' in OlivOS.bootDataAPI.default_Conf['models']
+
+
+def test_boot_statistics_compat_uses_existing_logger():
+    # 自定义 logger 与 WebUI 名称的旧配置不能被默认名称覆盖，统计组件仍要插到 WebUI 之前。
+    config = {
+        'system': {'init': ['my_logger', 'my_webui']},
+        'models': {
+            'my_logger': {'type': 'logger'},
+            'my_webui': {'type': 'webUI'},
+        },
+    }
+    OlivOS.bootAPI.ensure_statistics_model(config)
+    assert config['models']['OlivOS_statistics']['logger_proc'] == 'my_logger'
+    assert config['system']['init'] == ['my_logger', 'OlivOS_statistics', 'my_webui']
+
+
+def test_boot_statistics_compat_restores_missing_init_entry():
+    # 即使模型定义已存在，只要初始化顺序漏了统计组件，也要补回 WebUI 之前。
+    config = {
+        'system': {'init': ['logger', 'webui']},
+        'models': {
+            'logger': {'type': 'logger'},
+            'webui': {'type': 'webUI'},
+            'OlivOS_statistics': {'type': 'statistics', 'logger_proc': 'logger'},
+        },
+    }
+    OlivOS.bootAPI.ensure_statistics_model(config)
+    assert config['system']['init'] == ['logger', 'OlivOS_statistics', 'webui']
+
+
 def test_metadata_format_uses_defaults_without_mutating_patch():
     patch = {'user_id': '42'}
     assert OlivOS.metadataAPI.getTextByMetaTableFormat(

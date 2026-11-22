@@ -32,6 +32,7 @@ from .core.core import contentAPI
 from .core.core import messageAPI
 from .core.core import metadataAPI
 from .core.core import API
+from .core.core import statisticsAPI
 from .core.core import accountAPI
 from .core.core import accountMetadataAPI
 from .core.core import diagnoseAPI

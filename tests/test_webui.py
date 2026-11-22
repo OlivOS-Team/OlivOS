@@ -240,10 +240,13 @@ def test_pwa_icon_dimensions(name, size):
 
 
 def test_all_rest_routes(client, host):
-    for endpoint in ['/api/status', '/api/accounts', '/api/accounts/schema', '/api/logs', '/api/plugins',
-                     '/api/terminals', '/api/accounts/webhook?id=10001']:
+    for endpoint in ['/api/status', '/api/accounts', '/api/accounts/schema',
+                     '/api/logs', '/api/plugins', '/api/terminals',
+                     '/api/accounts/webhook?id=10001']:
         response = client.get(endpoint)
         assert response.status_code == 200, endpoint
+    # 统计已并入 /api/status，不再保留独立统计路由。
+    assert client.get('/api/statistics').status_code == 404
     status = client.get('/api/status').json
     assert status['accounts'] == 1
     assert status['online'] == 0  # 启用不能冒充在线。
@@ -251,6 +254,43 @@ def test_all_rest_routes(client, host):
                              ('/api/exit', 'exit_total')]:
         assert client.post(endpoint).status_code == 202
         assert host.Proc_info.control_queue.get_nowait().action == action
+
+
+def test_status_returns_statistics_snapshot_and_degrades_without_monitor(client, host):
+    # 统计组件未启动时 /api/status 仍返回 200，前端据此显示提示而不是中断仪表盘。
+    missing = client.get('/api/status').json['statistics']
+    assert missing['available'] is False
+    assert missing['reason'] == 'statistics_unavailable'
+
+    from types import SimpleNamespace
+    snapshot = {'available': True, 'sampled_at': 123.0, 'performance': {'cpu': {'percent': 12.5}},
+                'traffic': {'inbound_total': 3}}
+    host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=lambda: snapshot)
+    assert client.get('/api/status').json['statistics'] == snapshot
+
+
+def test_status_statistics_degrades_when_monitor_raises(client, host):
+    # 统计组件自身异常时 /api/status 仍须返回 200 和降级结构，避免仪表盘整体失败。
+    from types import SimpleNamespace
+
+    def fail():
+        raise RuntimeError('fixture statistics failure')
+
+    host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=fail)
+    response = client.get('/api/status')
+    assert response.status_code == 200
+    assert response.json['statistics']['available'] is False
+    assert response.json['statistics']['reason'] == 'statistics_unavailable'
+
+
+def test_status_keeps_existing_contract_with_statistics(client, host):
+    # 新增 statistics 只能是附加字段，原有状态字段和 uptime 秒数语义保持不变。
+    status = client.get('/api/status').json
+    for key in ('version', 'version_slogan', 'accounts', 'enabled', 'online', 'unknown',
+                'unknown_accounts', 'account_connections', 'uptime', 'update_available',
+                'plugin_page_cache', 'statistics'):
+        assert key in status
+    assert isinstance(status['uptime'], int)
 
 
 def test_plugin_schedule_rejects_invalid_zone_and_stale_revision(client, host):

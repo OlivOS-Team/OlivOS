@@ -906,7 +906,8 @@ class Event(object):
                 target_id,
                 message_chunk,
                 host_id=host_id,
-                flag_log=flag_log
+                flag_log=flag_log,
+                flag_count=False
             )
             message_buffer.clear()
 
@@ -1067,7 +1068,7 @@ class Event(object):
             return None
         return self.__reply(message, flag_log=flag_log)
 
-    def __send(self, send_type, target_id, message, host_id=None, flag_log=True, force_active=False):
+    def __send(self, send_type, target_id, message, host_id=None, flag_log=True, force_active=False, flag_count=True):
         flag_type = send_type
         res_data = None
         tmp_message = None
@@ -1076,13 +1077,20 @@ class Event(object):
         [tmp_message, tmp_message_obj] = self.__message_router(message)
         if tmp_message is None:
             return
-        if self.__send_file_segments(
+        flag_file_segments = self.__send_file_segments(
             flag_type,
             target_id,
             tmp_message_obj,
             host_id=host_id,
             flag_log=flag_log
-        ):
+        )
+        if flag_count:
+            try:
+                OlivOS.statisticsAPI.record_outbound()
+            except Exception:
+                # 统计失败不能阻断已经校验通过的消息发送。
+                pass
+        if flag_file_segments:
             return
         if self.platform['sdk'] == 'terminal_link':
             OlivOS.virtualTerminalSDK.event_action.send_msg(

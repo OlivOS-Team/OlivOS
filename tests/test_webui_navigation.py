@@ -3,6 +3,7 @@
 import json
 import queue
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -1366,7 +1367,7 @@ def test_dashboard_version_card_keeps_slogan_within_viewport(browser, width):
 
 
 @pytest.mark.browser
-def test_dashboard_uptime_advances_between_status_refreshes(browser):
+def test_dashboard_uptime_advances_smoothly_between_status_refreshes(browser):
     driver = browser.driver
     browser.open_sidebar()
     browser.click('[data-page="dashboard"]')
@@ -1374,32 +1375,214 @@ def test_dashboard_uptime_advances_between_status_refreshes(browser):
         return state.page === 'dashboard' && !!state.uptimeSnapshot &&
           document.getElementById('runtime').textContent.startsWith('运行时长：');
     """))
-    # 状态心跳每 10 秒一次：只要在两次心跳之间看到文本推进，就说明本地计时器在走。
-    # 机器慢时等待窗口里可能正好收到新心跳，此时用新锚点重新开始观察，避免偶发超时。
+    # 状态每 3 秒刷新；显示只到秒，时分秒固定两位，任何一次校准都不能让文本回退或跨越超过一秒。
     driver.set_script_timeout(30)
-    assert driver.execute_async_script("""
+    result = driver.execute_async_script("""
         const done = arguments[arguments.length - 1];
         const runtime = document.getElementById('runtime');
-        const deadline = performance.now() + 15000;
-        let anchor = state.uptimeSnapshot.receivedAt;
-        let text = runtime.textContent;
+        const values = [];
+        function parse(text) {
+          const match = text.match(/^运行时长：(\\d+) 天 (\\d{2}) 时 (\\d{2}) 分 (\\d{2}) 秒$/);
+          if (!match) return null;
+          return (((Number(match[1]) * 24 + Number(match[2])) * 60 + Number(match[3])) * 60 +
+            Number(match[4]));
+        }
+        let count = 0;
         function step() {
-          const current = runtime.textContent;
-          if (state.uptimeSnapshot.receivedAt !== anchor) {
-            anchor = state.uptimeSnapshot.receivedAt;
-            text = current;
-          } else if (current !== text) {
-            done(true);
+          const value = parse(runtime.textContent);
+          if (value === null) {
+            done({error: runtime.textContent});
             return;
           }
-          if (performance.now() > deadline) {
-            done(false);
+          values.push(value);
+          count += 1;
+          if (count >= 25) {
+            done({values});
             return;
           }
-          setTimeout(step, 100);
+          setTimeout(step, 50);
         }
         step();
     """)
+    assert 'error' not in result, result.get('error')
+    deltas = [later - earlier for earlier, later in zip(result['values'], result['values'][1:])]
+    assert all(delta >= 0 for delta in deltas), deltas
+    assert all(delta <= 1 for delta in deltas), deltas
+    assert any(delta > 0 for delta in deltas), deltas
+
+
+def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0):
+    # 仪表盘浏览器用例使用的完整快照，字段与 statisticsAPI.server.snapshot() 保持一致。
+    now = time.time()
+    return {
+        'available': True,
+        'sampled_at': now,
+        'performance': {
+            'sampled_at': now,
+            'cpu': {'percent': 32.5, 'count': 8, 'load_1': 1.25, 'load_5': 1.0, 'load_15': 0.8},
+            'memory': {'total': 16 * 1024 ** 3, 'used': 6 * 1024 ** 3,
+                       'available': 10 * 1024 ** 3, 'percent': 37.5, 'swap_percent': 0.0},
+            'disk': {'path': 'D:/fixture', 'total': 512 * 1024 ** 3, 'used': 128 * 1024 ** 3,
+                     'percent': 25.0, 'volume_count': 2,
+                     'volumes': [{'device': 'C:', 'mountpoint': 'C:\\', 'total': 256 * 1024 ** 3,
+                                  'used': 64 * 1024 ** 3, 'percent': 25.0},
+                                 {'device': 'D:', 'mountpoint': 'D:\\', 'total': 256 * 1024 ** 3,
+                                  'used': 64 * 1024 ** 3, 'percent': 25.0}],
+                     'read_bps': 1024, 'write_bps': 2048},
+            'network': {'sent_bps': 4096, 'recv_bps': 8192,
+                        'packets_sent_per_second': 10, 'packets_recv_per_second': 20},
+            'process': {'count': 3, 'rss': 256 * 1024 ** 2, 'cpu_percent': 12.5,
+                        'threads': 18, 'handles': 400},
+            'history': {
+                'interval': 1.0,
+                'cpu_percent': [10.0, 20.0, 30.0, 32.5],
+                'memory_percent': [34.0, 35.0, 36.0, 37.5],
+                'network_recv_bps': [1000, 2000, 4000, 8192],
+                'network_sent_bps': [500, 1000, 2000, 4096],
+            },
+        },
+        'traffic': {
+            'inbound_total': inbound,
+            'outbound_total': outbound,
+            'event_total': inbound + 10,
+            'failed_total': 2,
+            'inbound_per_minute': inbound_per_minute,
+            'outbound_per_minute': 3.0,
+            'event_per_minute': 6.0,
+            'failed_per_minute': 1.0,
+            'history': [
+                {'ts': now - 10, 'inbound': 10, 'outbound': 4, 'events': 11, 'failed': 0},
+                {'ts': now - 5, 'inbound': 12, 'outbound': 5, 'events': 13, 'failed': 1},
+                {'ts': now, 'inbound': 8, 'outbound': 3, 'events': 9, 'failed': 1},
+            ],
+        },
+    }
+
+
+@pytest.mark.browser
+def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
+    driver = browser.driver
+    counts = {'inbound': 120, 'inbound_per_minute': 5.0}
+
+    def snapshot():
+        return statistics_snapshot(
+            inbound=counts['inbound'], inbound_per_minute=counts['inbound_per_minute'])
+
+    browser.host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="dashboard"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('statistics-content').hidden"))
+    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 10
+    assert 'CPU 使用率' in browser.find('#performance-metrics').text
+    assert '入站消息' in browser.find('#traffic-metrics').text
+    assert driver.execute_script(
+        "return document.querySelector('#traffic-metrics .metric-value').textContent") == '5 条/分钟'
+    assert '2 个卷' in browser.find('#performance-metrics').text
+
+    # 修改快照后主动刷新，确认轮询会把累计值更新到现有卡片，而不是重复堆叠。
+    counts['inbound'] = 140
+    counts['inbound_per_minute'] = 6.0
+    driver.execute_async_script("""
+        const done = arguments[0];
+        refreshStatus().then(() => done(true), (error) => done(String(error)));
+    """)
+    assert driver.execute_script(
+        "return document.querySelector('#traffic-metrics .metric-value').textContent") == '6 条/分钟'
+    assert '累计 140 条' in browser.find('#traffic-metrics').text
+    assert driver.execute_script("return document.querySelectorAll('.metric-card').length") == 10
+
+    # 宽屏保持 3 列，中等屏先收为单栏统计面板，手机屏再逐步降到 2 列和 1 列。
+    def metric_rows(selector):
+        return driver.execute_script("""
+            const tops = [...document.querySelectorAll(arguments[0])].map(
+              (card) => Math.round(card.getBoundingClientRect().top));
+            const rows = [];
+            for (const top of tops) {
+              if (!rows.length || rows[rows.length - 1].top !== top) rows.push({top, count: 0});
+              rows[rows.length - 1].count += 1;
+            }
+            return rows.map((row) => row.count);
+        """, selector)
+
+    assert metric_rows('#performance-metrics .metric-card') == [3, 3]
+
+    set_viewport(browser, 900, 720, mobile_device=True)
+    panel_tops = driver.execute_script("""
+        return [...document.querySelectorAll('.dashboard-panel')].map(
+          (panel) => Math.round(panel.getBoundingClientRect().top));
+    """)
+    assert panel_tops[1] > panel_tops[0]
+
+    # 320px 是最窄的验收宽度；同时检查深浅主题下指标文字与卡片背景有足够对比度。
+    set_viewport(browser, 390, 640, mobile_device=True)
+    assert metric_rows('#performance-metrics .metric-card') == [2, 2, 2]
+    assert metric_rows('#traffic-metrics .metric-card') == [2, 2]
+
+    set_viewport(browser, 320, 640, mobile_device=True)
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.documentElement.scrollWidth <= innerWidth"))
+    assert metric_rows('#performance-metrics .metric-card') == [1, 1, 1, 1, 1, 1]
+    assert metric_rows('#traffic-metrics .metric-card') == [1, 1, 1, 1]
+    contrasts = driver.execute_script("""
+        function channels(color) {
+          return (color.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
+        }
+        function luminance(color) {
+          const values = channels(color).map((value) => {
+            value /= 255;
+            return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+          });
+          return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+        }
+        function contrast(theme) {
+          document.documentElement.dataset.theme = theme;
+          const card = document.querySelector('.metric-card');
+          const value = card.querySelector('.metric-value');
+          const first = luminance(getComputedStyle(card).backgroundColor);
+          const second = luminance(getComputedStyle(value).color);
+          return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+        }
+        return {light: contrast('light'), dark: contrast('dark')};
+    """)
+    assert contrasts['light'] >= 7
+    assert contrasts['dark'] >= 7
+    assert driver.execute_script("return document.documentElement.scrollWidth <= innerWidth")
+
+    # 移动端必须按工具栏、更新通知、运行时长、系统性能、消息流量依次纵向排列。
+    tops = driver.execute_script("""
+        const selectors = [
+          '#dashboard .runtime-summary .toolbar',
+          '#update-status',
+          '#runtime',
+          '#performance-title',
+          '#traffic-title',
+        ];
+        return selectors.map((selector) => Math.round(
+          document.querySelector(selector).getBoundingClientRect().top));
+    """)
+    assert all(later > earlier for earlier, later in zip(tops, tops[1:])), tops
+    # 仪表盘只能通过 /api/status 获取统计，不能再请求旧路由。
+    assert not driver.execute_script("""
+        return performance.getEntriesByType('resource')
+          .some((entry) => entry.name.includes('/api/statistics'));
+    """)
+
+
+@pytest.mark.browser
+def test_dashboard_statistics_failure_degrades_without_blocking_page(browser):
+    driver = browser.driver
+
+    def fail():
+        raise RuntimeError('fixture statistics failure')
+
+    browser.host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=fail)
+    browser.open_sidebar()
+    browser.click('[data-page="dashboard"]')
+    browser.wait.until(lambda _: '暂不可用' in browser.find('#statistics-note').text)
+    assert driver.execute_script("return document.getElementById('statistics-content').hidden")
+    assert browser.find('[data-page="dashboard"]').is_displayed()
+    assert browser.find('#runtime').is_displayed()
 
 
 @pytest.mark.browser

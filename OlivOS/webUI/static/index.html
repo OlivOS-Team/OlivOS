@@ -205,14 +205,10 @@
         </div>
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
-          <div class="runtime-summary">
-            <h2>运行状态</h2>
-            <p id="runtime"></p>
-            <div id="unknown-status" hidden>
-              <p id="online-note"></p>
-              <ul id="unknown-accounts" class="account-status-list"></ul>
+          <section class="runtime-summary" aria-labelledby="runtime-title">
+            <div class="section-heading">
+              <h2 id="runtime-title">运行状态</h2>
             </div>
-            <p id="update-status"></p>
             <div class="toolbar">
               <button id="check-update">检查更新</button>
               <button id="dashboard-reload-plugins">重载插件</button>
@@ -227,7 +223,41 @@
               </a>
               <button id="exit" class="danger">退出 OlivOS</button>
             </div>
-          </div>
+            <p id="update-status"></p>
+            <p id="runtime"></p>
+            <div id="unknown-status" hidden>
+              <p id="online-note"></p>
+              <ul id="unknown-accounts" class="account-status-list"></ul>
+            </div>
+            <p id="statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
+            <div id="statistics-content" class="dashboard-statistics" hidden>
+              <section class="panel dashboard-panel" aria-labelledby="performance-title">
+                <div class="panel-heading">
+                  <h3 id="performance-title">系统性能</h3>
+                  <span id="statistics-sampled" class="statistics-sampled"></span>
+                </div>
+                <div id="performance-metrics" class="metric-grid"></div>
+                <div id="performance-chart" class="statistics-chart" role="img"
+                     aria-label="CPU 与内存使用率趋势"></div>
+                <div class="chart-legend">
+                  <span><i class="legend-dot legend-cpu"></i>CPU</span>
+                  <span><i class="legend-dot legend-memory"></i>内存</span>
+                </div>
+              </section>
+              <section class="panel dashboard-panel" aria-labelledby="traffic-title">
+                <div class="panel-heading">
+                  <h3 id="traffic-title">消息流量</h3>
+                </div>
+                <div id="traffic-metrics" class="metric-grid"></div>
+                <div id="traffic-chart" class="statistics-chart" role="img"
+                     aria-label="入站与出站消息流量趋势"></div>
+                <div class="chart-legend">
+                  <span><i class="legend-dot legend-inbound"></i>入站</span>
+                  <span><i class="legend-dot legend-outbound"></i>出站</span>
+                </div>
+              </section>
+            </div>
+          </section>
         </section>
         <section id="accounts" class="page" hidden>
           <div class="toolbar">

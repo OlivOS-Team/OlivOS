@@ -103,8 +103,11 @@ const state = {
   seenEvents: new Set(),
   qrURL: null,
   timer: null,
-  uptimeTimer: null,
+  uptimeFrame: null,
   uptimeSnapshot: null,
+  uptimeClock: null,
+  statistics: null,
+  dashboardTimer: null,
   authGeneration: 0,
   cachedLogin: false,
   checkingAuth: false,
@@ -416,9 +419,7 @@ async function login(ev, token = null, ticket = null) {
     startEventStream(result.cursor);
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (state.page === 'dashboard') {
-        refreshStatus().then(() => ensureSession()).catch(notifyError);
-      } else {
+      if (state.page !== 'dashboard') {
         checkAuthentication();
         if (state.page === 'logs') loadLogDisplay().catch(notifyError);
         // 账号页要跟着连接状态变，不能只在进入页面那一刻刷一次。
@@ -426,14 +427,21 @@ async function login(ev, token = null, ticket = null) {
       }
       checkCachedLogin();
     }, 10000);
-    clearInterval(state.uptimeTimer);
-    state.uptimeTimer = setInterval(updateUptime, 1000);
+    clearInterval(state.dashboardTimer);
+    state.dashboardTimer = setInterval(() => {
+      if (state.page === 'dashboard' && !document.hidden) {
+        refreshStatus().then(() => ensureSession()).catch(notifyError);
+      }
+    }, 3000);
+    if (state.page === 'dashboard') startUptimeLoop();
   } catch (error) {
     if (error.authHandled || error.authObsolete) return;
     for (const name of [...state.streams.keys()]) closeStream(name);
     clearInterval(state.timer);
-    clearInterval(state.uptimeTimer);
+    clearInterval(state.dashboardTimer);
+    stopUptimeLoop();
     state.uptimeSnapshot = null;
+    state.uptimeClock = null;
     state.token = '';
     state.session = '';
     $('shell').hidden = true;
@@ -462,8 +470,11 @@ function resetLogin(message = '') {
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
-  clearInterval(state.uptimeTimer);
+  clearInterval(state.dashboardTimer);
+  stopUptimeLoop();
   state.uptimeSnapshot = null;
+  state.uptimeClock = null;
+  state.statistics = null;
   state.token = '';
   state.session = '';
   state.sessionRefresh = null;
@@ -627,6 +638,8 @@ async function navigate(page) {
   if (page !== 'logs') closeStream('logs');
   if (page !== 'terminals') closeStream('terminal');
   if (page !== 'plugin-page') rememberPage();
+  if (page === 'dashboard') startUptimeLoop();
+  else stopUptimeLoop();
   if (page === 'dashboard') await refreshStatus();
   if (page === 'accounts') {
     if (!state.dirty) await loadAccounts();
@@ -648,23 +661,228 @@ function versionCard(version, slogan) {
   if (slogan) card.append(element('span', slogan, { class: 'version-slogan', title: slogan }));
   return card;
 }
-function uptimeText(seconds) {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor(seconds / 3600) % 24;
-  const minutes = Math.floor(seconds / 60) % 60;
-  return `运行时长：${days} 天 ${hours} 时 ${minutes} 分 ${seconds % 60} 秒`;
+function formatCount(value) {
+  const number = Number(value);
+  return (Number.isFinite(number) ? Math.max(0, number) : 0).toLocaleString('zh-CN');
 }
-// 服务端心跳是间断的，页面以最近一次 uptime 为锚点按本地单调时钟推进；
-// 下一次心跳到达时再校准，页面被浏览器节流后恢复也不会丢失经过的时间。
-function updateUptime() {
-  if (state.page !== 'dashboard' || !state.uptimeSnapshot) return;
-  const elapsed = Math.floor((performance.now() - state.uptimeSnapshot.receivedAt) / 1000);
-  $('runtime').textContent = uptimeText(state.uptimeSnapshot.seconds + elapsed);
+function formatBytes(value) {
+  let number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return '0 B';
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  let unit = 0;
+  while (number >= 1024 && unit < units.length - 1) {
+    number /= 1024;
+    unit += 1;
+  }
+  return `${number.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+function formatRate(value) {
+  return `${formatBytes(value)}/s`;
+}
+function formatPercent(value) {
+  const number = Number(value);
+  return `${(Number.isFinite(number) ? Math.max(0, number) : 0).toFixed(1)}%`;
+}
+function sampledAtText(timestamp) {
+  const date = new Date(Number(timestamp) * 1000);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `更新于 ${date.toLocaleTimeString('zh-CN', { hour12: false })}`;
+}
+function metricCard(label, value, detail) {
+  const card = element('div', null, { class: 'metric-card' });
+  card.append(
+    element('span', label, { class: 'metric-label' }),
+    element('strong', value, { class: 'metric-value' }),
+    element('span', detail, { class: 'metric-detail' }),
+  );
+  return card;
+}
+function setMetrics(container, items) {
+  container.replaceChildren(...items.map(([label, value, detail]) => metricCard(label, value, detail)));
+}
+function renderTrend(container, series, fixedMaximum = null) {
+  const width = 100;
+  const height = 40;
+  const padding = 2;
+  const cleaned = series.map((item) => ({
+    className: item.className,
+    values: (item.values || []).map((value) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? Math.max(0, number) : 0;
+    }),
+  }));
+  const allValues = cleaned.flatMap((item) => item.values);
+  const maximum = fixedMaximum === null ? Math.max(1, ...allValues) : fixedMaximum;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const y of [padding, height / 2, height - padding]) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', 'chart-grid');
+    line.setAttribute('x1', '0');
+    line.setAttribute('x2', String(width));
+    line.setAttribute('y1', String(y));
+    line.setAttribute('y2', String(y));
+    svg.append(line);
+  }
+  for (const item of cleaned) {
+    if (!item.values.length) continue;
+    const denominator = Math.max(1, item.values.length - 1);
+    const points = item.values.map((value, index) => {
+      const x = padding + (width - padding * 2) * (item.values.length === 1 ? 1 : index / denominator);
+      const y = height - padding - (height - padding * 2) * Math.min(1, value / maximum);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    });
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('class', `chart-series ${item.className}`);
+    polyline.setAttribute('points', points.join(' '));
+    svg.append(polyline);
+  }
+  container.replaceChildren(svg);
+}
+function showStatisticsUnavailable(reason) {
+  state.statistics = null;
+  $('statistics-content').hidden = true;
+  $('statistics-note').hidden = false;
+  $('statistics-note').textContent = reason === 'statistics_warming_up'
+    ? '监测组件正在启动，稍后自动重试。'
+    : '性能与流量统计暂不可用，不影响其他功能。';
+  $('statistics-sampled').textContent = '';
+}
+function renderStatistics(data) {
+  if (!data?.available || !data.performance || !data.traffic) {
+    showStatisticsUnavailable(data?.reason);
+    return;
+  }
+  state.statistics = data;
+  $('statistics-content').hidden = false;
+  $('statistics-note').hidden = true;
+  $('statistics-note').textContent = '';
+  $('statistics-sampled').textContent = sampledAtText(data.sampled_at);
+
+  const performance = data.performance;
+  const traffic = data.traffic;
+  const cpu = performance.cpu || {};
+  const memory = performance.memory || {};
+  const disk = performance.disk || {};
+  const network = performance.network || {};
+  const process = performance.process || {};
+  const diskDetail = [
+    `${formatBytes(disk.used)} / ${formatBytes(disk.total)}`,
+    Number.isFinite(Number(disk.volume_count)) && Number(disk.volume_count) > 0
+      ? `${formatCount(disk.volume_count)} 个卷`
+      : '',
+  ].filter(Boolean).join(' · ');
+  const load = cpu.load_1 === null || cpu.load_1 === undefined
+    ? ''
+    : ` · 负载 ${Number(cpu.load_1).toFixed(2)}`;
+  const processDetail = [
+    formatBytes(process.rss),
+    `CPU ${formatPercent(process.cpu_percent)}`,
+    Number.isFinite(Number(process.threads)) ? `${formatCount(process.threads)} 线程` : '',
+  ].filter(Boolean).join(' · ');
+  setMetrics($('performance-metrics'), [
+    ['CPU 使用率', formatPercent(cpu.percent), `${formatCount(cpu.count)} 逻辑核心${load}`],
+    ['内存占用', formatPercent(memory.percent), `${formatBytes(memory.used)} / ${formatBytes(memory.total)}`],
+    ['磁盘占用', formatPercent(disk.percent), diskDetail],
+    ['网络下行', formatRate(network.recv_bps), `${formatCount(network.packets_recv_per_second)} 包/秒`],
+    ['网络上行', formatRate(network.sent_bps), `${formatCount(network.packets_sent_per_second)} 包/秒`],
+    ['OlivOS 进程', `${formatCount(process.count)} 个`, processDetail || '暂无进程树数据'],
+  ]);
+  setMetrics($('traffic-metrics'), [
+    ['入站消息', `${formatCount(traffic.inbound_per_minute)} 条/分钟`,
+      `累计 ${formatCount(traffic.inbound_total)} 条`],
+    ['出站消息', `${formatCount(traffic.outbound_per_minute)} 条/分钟`,
+      `累计 ${formatCount(traffic.outbound_total)} 条`],
+    ['事件总量', `${formatCount(traffic.event_per_minute)} 条/分钟`,
+      `累计 ${formatCount(traffic.event_total)} 条`],
+    ['失败事件', `${formatCount(traffic.failed_per_minute)} 条/分钟`,
+      `累计 ${formatCount(traffic.failed_total)} 条`],
+  ]);
+  const history = performance.history || {};
+  renderTrend($('performance-chart'), [
+    { className: 'chart-series-cpu', values: history.cpu_percent || [] },
+    { className: 'chart-series-memory', values: history.memory_percent || [] },
+  ], 100);
+  const trafficHistory = traffic.history || [];
+  renderTrend($('traffic-chart'), [
+    { className: 'chart-series-inbound', values: trafficHistory.map((item) => item.inbound) },
+    { className: 'chart-series-outbound', values: trafficHistory.map((item) => item.outbound) },
+  ]);
+}
+function uptimeText(milliseconds) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(total / 86400000);
+  const hours = Math.floor(total / 3600000) % 24;
+  const minutes = Math.floor(total / 60000) % 60;
+  const seconds = total % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return `运行时长：${days} 天 ${pad(hours)} 时 ${pad(minutes)} 分 ${pad(seconds)} 秒`;
+}
+// 服务端 uptime 只有整数秒，把它视为区间下界；本地用 performance.now() 推进，
+// 新心跳只收紧区间，超出区间时以有界速率追赶，避免回退、跳秒和抖动。
+function applyUptimeStatus(status, startedAt, receivedAt) {
+  const seconds = Math.max(0, Math.floor(Number(status.uptime) || 0));
+  const rtt = Math.max(0, receivedAt - startedAt);
+  const lower = seconds * 1000 + rtt / 2;
+  const upper = (seconds + 1) * 1000 + rtt / 2;
+  const previous = state.uptimeSnapshot;
+  const reset = state.uptimeClock === null || (
+    previous && (
+      seconds + 3 < previous.seconds
+      || state.uptimeClock.valueMs > upper + 2000
+    )
+  );
+  state.uptimeSnapshot = { seconds, receivedAt, rtt, lower, upper };
+  if (reset) {
+    state.uptimeClock = {
+      valueMs: lower + 500,
+      updatedAt: receivedAt,
+      sampleAt: receivedAt,
+      lower,
+      upper,
+    };
+  } else {
+    state.uptimeClock.sampleAt = receivedAt;
+    state.uptimeClock.lower = lower;
+    state.uptimeClock.upper = upper;
+  }
+}
+function updateUptime(now = performance.now()) {
+  if (state.page !== 'dashboard' || !state.uptimeClock) return;
+  const clock = state.uptimeClock;
+  const delta = Math.max(0, now - clock.updatedAt);
+  clock.updatedAt = now;
+  const elapsed = Math.max(0, now - clock.sampleAt);
+  const lower = clock.lower + elapsed;
+  const upper = clock.upper + elapsed;
+  const rate = clock.valueMs < lower ? 1.08 : clock.valueMs > upper ? 0.92 : 1;
+  clock.valueMs += delta * rate;
+  const text = uptimeText(clock.valueMs);
+  if ($('runtime').textContent !== text) $('runtime').textContent = text;
+}
+function startUptimeLoop() {
+  if (state.uptimeFrame !== null) return;
+  const step = () => {
+    state.uptimeFrame = null;
+    if (!state.token || state.page !== 'dashboard') return;
+    updateUptime(performance.now());
+    state.uptimeFrame = requestAnimationFrame(step);
+  };
+  state.uptimeFrame = requestAnimationFrame(step);
+}
+function stopUptimeLoop() {
+  if (state.uptimeFrame === null) return;
+  cancelAnimationFrame(state.uptimeFrame);
+  state.uptimeFrame = null;
 }
 let statusRequestId = 0;
 async function refreshStatus() {
   const requestId = ++statusRequestId;
+  const startedAt = performance.now();
   const status = await api('/api/status');
+  const receivedAt = performance.now();
   // 请求可能重叠：先发的后到会覆盖更新的状态，晚到的旧响应直接丢弃。
   if (requestId !== statusRequestId) return;
   if (Number.isInteger(status.plugin_page_cache)) {
@@ -683,8 +901,8 @@ async function refreshStatus() {
     card.append(element('span', label), element('strong', value));
     cards.append(card);
   }
-  state.uptimeSnapshot = { seconds: Number(status.uptime) || 0, receivedAt: performance.now() };
-  updateUptime();
+  applyUptimeStatus(status, startedAt, receivedAt);
+  updateUptime(receivedAt);
   $('online-note').textContent = status.unknown
     ? `${status.unknown} 个启用账号尚无可用的连接状态：`
     : '';
@@ -701,6 +919,7 @@ async function refreshStatus() {
   $('update-status').textContent = status.update_available
     ? '发现可用更新。'
     : '当前未收到新版本通知。';
+  renderStatistics(status.statistics);
   state.accountConnections = status.account_connections || {};
   if (state.page === 'accounts') renderAccounts();
 }
@@ -2929,7 +3148,15 @@ bind('tk-bridge-dialog', () => {
   if (!$('tk-bridge-dialog').open) finishTkPreview();
 }, 'close');
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.tkBridge?.id) refreshTkPreview(state.tkBridge);
+  if (document.hidden) {
+    stopUptimeLoop();
+    return;
+  }
+  if (state.tkBridge?.id) refreshTkPreview(state.tkBridge);
+  if (state.token && state.page === 'dashboard') {
+    startUptimeLoop();
+    refreshStatus().then(() => ensureSession()).catch(notifyError);
+  }
 });
 for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
   bind(id, async () => {
@@ -2956,7 +3183,8 @@ window.addEventListener('beforeunload', (ev) => {
 window.addEventListener('pagehide', () => {
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
-  clearInterval(state.uptimeTimer);
+  clearInterval(state.dashboardTimer);
+  stopUptimeLoop();
 });
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted && state.token) login(null, state.token);

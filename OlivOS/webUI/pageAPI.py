@@ -433,13 +433,36 @@ def runtime_status(host):
               else 'offline' if key in known else 'unknown')
         for key, bot in accounts.items()
     }
-    return {'version': OlivOS.infoAPI.OlivOS_Version_Short,
-            'version_slogan': OlivOS.infoAPI.OlivOS_Version_Slogan,
-            'accounts': len(accounts), 'enabled': len(enabled),
-            'online': len(online & enabled), 'unknown': len(unknown),
-            'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
-            'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
-            'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
+    status = {'version': OlivOS.infoAPI.OlivOS_Version_Short,
+              'version_slogan': OlivOS.infoAPI.OlivOS_Version_Slogan,
+              'accounts': len(accounts), 'enabled': len(enabled),
+              'online': len(online & enabled), 'unknown': len(unknown),
+              'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
+              'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
+              'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
+    status['statistics'] = statistics_snapshot(host)
+    return status
+
+
+def statistics_snapshot(host):
+    """读取统计组件的线程内快照；组件缺失或采样失败时返回可渲染的降级结构。"""
+    for proc in list(getattr(host, 'runtime', {}).values()):
+        if getattr(proc, 'Proc_type', None) != 'statistics':
+            continue
+        snapshot = getattr(proc, 'snapshot', None)
+        if not callable(snapshot):
+            break
+        try:
+            data = snapshot()
+        except Exception:
+            break
+        if isinstance(data, dict):
+            return data
+    try:
+        return OlivOS.statisticsAPI.unavailable_snapshot()
+    except Exception:
+        return {'available': False, 'reason': 'statistics_unavailable', 'sampled_at': 0,
+                'performance': None, 'traffic': None}
 
 
 PLUGIN_PRIORITY_PATH = 'conf/plugin_priority.json'

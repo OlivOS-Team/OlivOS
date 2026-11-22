@@ -1136,7 +1136,151 @@ header h1 {
   margin: 10px 0;
 }
 .runtime-summary .toolbar {
-  margin: 18px 0 0;
+  margin: 12px 0 8px;
+}
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.section-heading h2 {
+  margin: 0;
+}
+.statistics-sampled {
+  color: var(--muted);
+  font-size: 13px;
+}
+.statistics-note {
+  margin: 8px 0 16px;
+}
+.dashboard-statistics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+}
+.dashboard-panel {
+  flex: 1 1 calc(50% - 6px);
+  min-width: min(100%, 400px);
+}
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.panel-heading h3 {
+  margin: 0;
+}
+.metric-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.metric-card {
+  flex: 1 1 calc((100% - 16px) / 3);
+  min-width: 150px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.metric-card .metric-label,
+.metric-card .metric-detail {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.metric-card .metric-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.metric-card .metric-value {
+  display: block;
+  margin: 2px 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.metric-card .metric-detail {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.statistics-chart {
+  width: 100%;
+  height: 112px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--bg);
+}
+.statistics-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+.chart-series {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.chart-series-cpu {
+  stroke: var(--accent);
+}
+.chart-series-memory {
+  stroke: var(--brand);
+}
+.chart-series-inbound {
+  stroke: var(--accent);
+}
+.chart-series-outbound {
+  stroke: var(--danger);
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.legend-cpu,
+.legend-inbound {
+  color: var(--accent);
+}
+.legend-memory {
+  color: var(--brand);
+}
+.legend-outbound {
+  color: var(--danger);
 }
 .account-status-list {
   margin: 6px 0 12px;
@@ -1743,6 +1887,9 @@ dialog::backdrop {
   }
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metric-card .metric-value {
+    font-size: 18px;
   }
   .card {
     padding: 12px;
