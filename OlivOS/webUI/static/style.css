@@ -1869,14 +1869,19 @@ header h1 {
   background: var(--hover);
 }
 .process-name {
+  min-width: 0;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .process-pid {
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .process-meta {
+  min-width: 0;
+  max-width: 100%;
   margin-left: auto;
   color: var(--muted);
   font-size: 12px;
@@ -1900,6 +1905,8 @@ header h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
+  min-width: 0;
+  max-width: 100%;
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -1908,18 +1915,24 @@ header h1 {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 3px;
+  min-width: 0;
+  max-width: 100%;
 }
 .process-fact-label {
   color: var(--muted);
 }
 .process-fact-value {
+  min-width: 0;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .process-command {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
@@ -1939,6 +1952,8 @@ header h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
+  min-width: 0;
+  max-width: 100%;
   padding: 3px 8px;
   border-left: 1px dashed var(--line);
   border-radius: 4px;
@@ -1951,11 +1966,15 @@ header h1 {
   color: var(--text);
 }
 .process-thread-id {
+  min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
 }
 .process-thread-cpu {
+  min-width: 0;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .process-thread-state {
   color: var(--brand);
@@ -1982,9 +2001,11 @@ header h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
+  min-width: 0;
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .process-detail-facts {
   padding: 6px 8px;
@@ -1999,6 +2020,7 @@ header h1 {
 .process-detail-group > summary {
   color: var(--brand);
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 .process-detail-list {
   margin: 4px 0 0;
@@ -2023,7 +2045,7 @@ header h1 {
     display: none;
   }
 }
-@media (max-width: 800px) {
+@media (max-width: 1100px) {
   .performance-workbench {
     grid-template-columns: minmax(0, 1fr);
     height: auto;
@@ -2035,6 +2057,9 @@ header h1 {
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
+    position: sticky;
+    top: env(safe-area-inset-top, 0);
+    z-index: 3;
   }
   .performance-detail {
     overflow: visible;
@@ -2050,6 +2075,130 @@ header h1 {
   }
   .performance-category-spark {
     grid-column: 1 / -1;
+  }
+  .performance-view-heading-processes {
+    display: grid;
+    gap: 2px;
+  }
+  .performance-view-heading-processes .performance-view-value-processes {
+    font-size: 20px;
+    line-height: 1.35;
+    text-align: left;
+  }
+  .performance-process-panel.panel {
+    padding: 10px;
+  }
+  .process-tree-list {
+    gap: 10px;
+  }
+  .process-tree-list > .process-node > .process-branch {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .process-tree-list > .process-node > .process-branch > .process-row {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .process-tree-list > .process-node > .process-branch:not([open]) > .process-row {
+    border-bottom: 0;
+  }
+  .process-tree-list > .process-node > .process-branch > .process-body {
+    padding: 10px 12px 12px;
+  }
+  .process-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 2px 8px;
+  }
+  .process-row::before {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+  }
+  .process-name {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .process-root-badge {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .process-pid {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .process-meta {
+    grid-column: 2 / -1;
+    grid-row: 3;
+    width: auto;
+    margin-left: 0;
+  }
+  .process-body {
+    gap: 8px;
+    padding-left: 0;
+  }
+  .process-children {
+    gap: 8px;
+  }
+  .process-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 6px;
+  }
+  .process-fact {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--control-bg);
+  }
+  .process-detail-facts .process-fact {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .process-fact-value,
+  .process-command-value,
+  .process-thread-cpu,
+  .process-thread-id {
+    overflow-wrap: anywhere;
+  }
+  .process-command {
+    display: grid;
+    gap: 2px;
+  }
+  .process-thread {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    padding: 6px 8px;
+    border-left-width: 3px;
+    background: var(--control-bg);
+  }
+  .process-thread-id {
+    min-width: 0;
+  }
+  .process-thread-state {
+    justify-self: end;
+  }
+  .process-thread-cpu {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+  .process-detail-summary {
+    gap: 4px 10px;
+  }
+  .process-refresh-button,
+  .process-detail-button {
+    min-height: 44px;
+    padding: 6px 12px;
   }
   .performance-chart-hero {
     height: clamp(150px, 28vh, 210px);

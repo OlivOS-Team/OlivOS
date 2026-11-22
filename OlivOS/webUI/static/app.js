@@ -1245,6 +1245,13 @@ function setPerformanceCategory(category, refreshProcesses = false) {
     button.setAttribute('aria-selected', active ? 'true' : 'false');
     button.tabIndex = active ? 0 : -1;
   });
+  const activeButton = document.querySelector(`[data-performance-category="${selected}"]`);
+  const categories = activeButton && activeButton.closest('.performance-categories');
+  if (activeButton && categories && categories.scrollWidth > categories.clientWidth) {
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'auto' : 'smooth';
+    activeButton.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+  }
   document.querySelectorAll('[data-performance-view]').forEach((view) => {
     view.hidden = view.dataset.performanceView !== selected;
   });

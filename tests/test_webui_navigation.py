@@ -2064,6 +2064,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
     assert browser.find('#page-title').text == '性能'
     assert browser.find('[data-page="performance"]').get_attribute('aria-current') == 'page'
+    time.sleep(0.2)
     # 性能分类复用主页面导航的选中态：主题背景、主色边框与左侧强调条应与导航基准一致。
     assert driver.execute_script("""
         const navigation = getComputedStyle(
@@ -2193,16 +2194,16 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '起始 python311.dll+0x4A2C' in first_thread
 
     # 线程行悬停时整行高亮，便于在长线程列表中横向对齐各列字段。
-    thread_row = browser.find('#performance-process-tree .process-thread')
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", thread_row)
-    background_script = "return getComputedStyle(arguments[0]).backgroundColor;"
-    background_before = driver.execute_script(background_script, thread_row)
-    ActionChains(driver).move_to_element(thread_row).perform()
-    browser.wait.until(lambda _: driver.execute_script(
-        "return getComputedStyle(arguments[0]).backgroundColor !== arguments[1];",
-        thread_row, background_before))
-    assert driver.execute_script(background_script, thread_row) not in {
-        'rgba(0, 0, 0, 0)', 'transparent'}
+    driver.execute_script(
+        "document.querySelector('#performance-process-tree .process-thread')"
+        ".scrollIntoView({block: 'center'});")
+    ActionChains(driver).move_to_element(
+        browser.find('#performance-process-tree .process-thread')).perform()
+    browser.wait.until(lambda _: driver.execute_script("""
+        const row = document.querySelector('#performance-process-tree .process-thread');
+        const background = getComputedStyle(row).backgroundColor;
+        return background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent';
+    """))
 
     # 文件、连接与内存详情只在用户点击后按需请求，并限制展示条目数。
     browser.click('#performance-process-tree .process-detail-button')
@@ -2454,6 +2455,148 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
               panel.getBoundingClientRect().right <= document.documentElement.clientWidth + 1
             )) && document.documentElement.scrollWidth <= innerWidth;
         """)
+
+    # 进程页在移动端使用卡片、字段网格与分行线程，当前分类应自动滚入横向导航。
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: updated,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    driver.execute_script(
+        "document.querySelector('[data-performance-category=\"processes\"]').click()")
+    browser.wait.until(lambda _: driver.execute_script("""
+        return !document.getElementById('performance-view-processes').hidden &&
+          document.querySelectorAll('#performance-process-tree .process-row').length === 2;
+    """))
+    browser.wait.until(lambda _: driver.execute_script("""
+        const button = document.querySelector('[data-performance-category="processes"]');
+        const bar = document.querySelector('.performance-categories');
+        const buttonRect = button.getBoundingClientRect();
+        const barRect = bar.getBoundingClientRect();
+        return buttonRect.left >= barRect.left - 1 && buttonRect.right <= barRect.right + 1;
+    """))
+    process_layout = driver.execute_script("""
+        const row = document.querySelector('#performance-process-tree .process-row');
+        const name = row.querySelector('.process-name');
+        const pid = row.querySelector('.process-pid');
+        const meta = row.querySelector('.process-meta');
+        const thread = document.querySelector('#performance-process-tree .process-thread');
+        const threadId = thread.querySelector('.process-thread-id');
+        const threadMeta = thread.querySelector('.process-thread-cpu');
+        const facts = row.closest('.process-branch').querySelector('.process-facts');
+        const refresh = document.getElementById('performance-processes-refresh');
+        const heading = document.querySelector('.performance-view-heading-processes');
+        const headingValue = document.querySelector('.performance-view-value-processes');
+        const categories = document.querySelector('.performance-categories');
+        return {
+          rowDisplay: getComputedStyle(row).display,
+          rowColumns: getComputedStyle(row).gridTemplateColumns.split(' ').filter(Boolean).length,
+          pidBelowName: pid.getBoundingClientRect().top >= name.getBoundingClientRect().bottom,
+          metaBelowName: meta.getBoundingClientRect().top >= name.getBoundingClientRect().bottom,
+          threadDisplay: getComputedStyle(thread).display,
+          threadMetaBelow: threadMeta.getBoundingClientRect().top >=
+            threadId.getBoundingClientRect().bottom,
+          factsDisplay: getComputedStyle(facts).display,
+          factsColumns: getComputedStyle(facts).gridTemplateColumns.split(' ').filter(Boolean).length,
+          refreshHeight: refresh.getBoundingClientRect().height,
+          headingDisplay: getComputedStyle(heading).display,
+          headingAlign: getComputedStyle(headingValue).textAlign,
+          categoriesPosition: getComputedStyle(categories).position,
+          fits: document.documentElement.scrollWidth <= innerWidth,
+        };
+    """)
+    assert process_layout['rowDisplay'] == 'grid'
+    assert process_layout['rowColumns'] == 3
+    assert process_layout['pidBelowName']
+    assert process_layout['metaBelowName']
+    assert process_layout['threadDisplay'] == 'grid'
+    assert process_layout['threadMetaBelow']
+    assert process_layout['factsDisplay'] == 'grid'
+    assert process_layout['factsColumns'] >= 2
+    assert process_layout['refreshHeight'] >= 40
+    assert process_layout['headingDisplay'] == 'grid'
+    assert process_layout['headingAlign'] == 'left'
+    assert process_layout['categoriesPosition'] == 'sticky'
+    assert process_layout['fits']
+
+
+@pytest.mark.browser
+def test_performance_process_page_avoids_horizontal_overflow_across_widths(browser):
+    # 进程树在手机、平板和窄桌面断点下都不能产生页面或详情栏级横向滚动条。
+    driver = browser.driver
+    # 用无空格长字符串模拟真实进程名、线程名和路径，覆盖最小内容宽度撑破布局的情况。
+    long_name = 'OlivOSProcessNameWithoutBreak' * 8
+    process_tree = process_tree_snapshot()
+    process_tree['roots'][0]['name'] = long_name
+    process_tree['roots'][0]['cmdline'] = 'C:/' + 'very-long-directory/' * 12 + 'runner.exe'
+    process_tree['roots'][0]['threads'][0]['name'] = long_name
+    process_tree['roots'][0]['threads'][0]['python_name'] = long_name
+    process_tree['roots'][0]['children'][0]['name'] = long_name
+    process_detail = process_detail_snapshot(1000, PROCESS_ROOT_CREATED_AT)
+    process_detail['open_files']['items'][0]['path'] = 'C:/' + 'very-long-directory/' * 12 + 'a.log'
+
+    def tree_snapshot():
+        return process_tree
+
+    def detail_snapshot(pid, create_time=None):
+        return process_detail
+
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=tree_snapshot,
+        process_detail_snapshot=detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+    browser.click('[data-performance-category="processes"]')
+    browser.wait.until(lambda _: driver.execute_script("""
+        return !document.getElementById('performance-view-processes').hidden &&
+          document.querySelectorAll('#performance-process-tree .process-row').length === 2;
+    """))
+    browser.click('#performance-process-tree .process-detail-button')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.querySelector('.process-detail-summary') !== null"))
+
+    for width in (320, 360, 390, 480, 640, 768, 800, 801, 900, 1024, 1030, 1031, 1100, 1101, 1280):
+        set_viewport(browser, width, 700, mobile_device=width <= 800)
+        browser.wait.until(lambda _, expected=width: driver.execute_script(
+            "return innerWidth === arguments[0]", expected))
+        layout = driver.execute_script("""
+            const root = document.getElementById('performance-view-processes');
+            const detail = document.querySelector('.performance-detail');
+            const categories = document.querySelector('.performance-categories');
+            const workbench = document.querySelector('.performance-workbench');
+            const viewport = document.documentElement.clientWidth;
+            const overflow = [...root.querySelectorAll('*')].filter((node) => {
+              const rect = node.getBoundingClientRect();
+              if (!rect.width && !rect.height) return false;
+              return rect.left < -1 || rect.right > viewport + 1;
+            }).slice(0, 8).map((node) => ({
+              tag: node.tagName.toLowerCase(),
+              className: String(node.className || ''),
+              left: Math.round(node.getBoundingClientRect().left),
+              right: Math.round(node.getBoundingClientRect().right),
+            }));
+            return {
+              viewport,
+              documentWidth: document.documentElement.scrollWidth,
+              workbenchColumns: getComputedStyle(workbench).gridTemplateColumns
+                .split(' ').filter(Boolean).length,
+              categoriesDirection: getComputedStyle(categories).flexDirection,
+              detailWidth: detail.clientWidth,
+              detailScrollWidth: detail.scrollWidth,
+              categoriesWidth: categories.clientWidth,
+              categoriesScrollWidth: categories.scrollWidth,
+              overflow,
+            };
+        """)
+        assert layout['documentWidth'] <= layout['viewport'] + 1, (width, layout)
+        assert layout['workbenchColumns'] == (1 if width <= 1100 else 2), (width, layout)
+        assert layout['categoriesDirection'] == ('row' if width <= 1100 else 'column'), (width, layout)
+        assert layout['detailScrollWidth'] <= layout['detailWidth'] + 1, (width, layout['overflow'])
+        if width > 1100:
+            assert layout['categoriesScrollWidth'] <= layout['categoriesWidth'] + 1, (width, layout)
+        assert layout['overflow'] == [], (width, layout)
 
 
 @pytest.mark.browser
