@@ -1882,8 +1882,16 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
     assert browser.find('#page-title').text == '性能'
     assert browser.find('[data-page="performance"]').get_attribute('aria-current') == 'page'
-    assert browser.find('#performance-load-chart-title').text == 'OlivOS 负载'
-    assert 'OlivOS 负载 1.25' in browser.find('#performance-load-readout').text
+    assert driver.execute_script("""
+        return ['performance-cpu-chart-title', 'performance-memory-chart-title',
+          'performance-disk-usage-chart-title', 'performance-network-chart-title',
+          'performance-load-chart-title', 'performance-traffic-chart-title'].map(
+          (id) => document.getElementById(id).textContent);
+    """) == ['CPU', '内存', '磁盘', '网络', 'OlivOS 负载', '消息']
+    assert '负载 1.25' in browser.find('#performance-cpu-readout').text
+    assert 'OlivOS 负载 0.13 核心' in browser.find('#performance-load-readout').text
+    assert browser.find('[data-performance-stat="cpu-machine-load"]').text == '1.25'
+    assert browser.find('[data-performance-stat="cpu-load"]').text == '0.13 核心'
     assert '正在读取监测数据' not in browser.find('#performance-statistics-note').text
 
     # 左侧分类导航按任务管理器风格排列，默认选中 CPU，并显示每类的小型趋势图。
@@ -1920,7 +1928,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
 
     # 8 张图表仍全部渲染，且容量、序列数和标尺保持原有约束。
     expected = {
-        '#performance-cpu-chart': (120, 1),
+        '#performance-cpu-chart': (120, 2),
         '#performance-memory-chart': (120, 4),
         '#performance-disk-usage-chart': (120, 1),
         '#performance-disk-io-chart': (120, 2),
@@ -1978,8 +1986,8 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     # 切换左侧分类后，右侧只展示对应详情，悬停提示使用该分类的图表。
     tooltip_cases = {
         'cpu': [
-            ('#performance-cpu-chart', ['CPU 使用率', '32.5%']),
-            ('#performance-load-chart', ['OlivOS 负载', '1.25']),
+            ('#performance-cpu-chart', ['CPU 使用率', '32.5%', '负载', '1.25']),
+            ('#performance-load-chart', ['OlivOS 负载', '0.13 核心']),
         ],
         'memory': [
             ('#performance-memory-chart',

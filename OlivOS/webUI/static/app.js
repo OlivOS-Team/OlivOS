@@ -796,6 +796,11 @@ function formatLoad(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(2) : '—';
 }
+function formatCpuCores(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${(Math.max(0, number) / 100).toFixed(2)} 核心` : '—';
+}
 function trafficBucketValues(traffic, key) {
   return (traffic?.history || []).map((item) => {
     const number = Number(item?.[key]);
@@ -1081,7 +1086,7 @@ function renderStatistics(data) {
     : null;
   const processCpu = process.cpu_percent === null || process.cpu_percent === undefined
     ? ''
-    : ` · ${(Math.max(0, processCpuValue) / 100).toFixed(2)} 核心`;
+    : ` · ${formatCpuCores(processCpuValue)}`;
   const cpuDetail = `${formatCount(cpu.count)} 逻辑核心${load} | ` +
     `OlivOS ${formatOptionalCount(process.count)} 进程 · ${threadDetail}${processCpu}`;
   const memoryTotal = Number(memory.total);
@@ -1282,7 +1287,8 @@ function renderPerformanceStatistics(data) {
   const history = performance.history || {};
   const timestamps = history.timestamps || [];
   const loadValue = formatLoad(cpu.load_1);
-  const load = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const systemLoad = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const processCpu = formatCpuCores(process.cpu_percent);
   const swap = memory.swap_percent === null || memory.swap_percent === undefined
     ? '—'
     : formatPercent(memory.swap_percent);
@@ -1293,7 +1299,7 @@ function renderPerformanceStatistics(data) {
   ].join(' · ');
 
   setPerformanceReadout('performance-cpu-readout',
-    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${load}`);
+    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${systemLoad}`);
   setPerformanceReadout('performance-memory-readout',
     `${formatPercent(memory.percent)} · ${formatBytes(memory.used)} / ${formatBytes(memory.total)} · Swap ${swap}`);
   setPerformanceReadout('performance-disk-usage-readout',
@@ -1304,7 +1310,7 @@ function renderPerformanceStatistics(data) {
   setPerformanceReadout('performance-network-readout',
     `下行 ${formatRate(network.recv_bps)} · 上行 ${formatRate(network.sent_bps)}`);
   setPerformanceReadout('performance-load-readout',
-    `OlivOS 负载 ${loadValue} · ${processScale}`);
+    `OlivOS 负载 ${processCpu} · ${processScale}`);
   setPerformanceReadout('performance-process-memory-readout',
     `${formatBytes(process.rss)} · ${processScale}`);
   setPerformanceReadout('performance-traffic-readout',
@@ -1318,9 +1324,9 @@ function renderPerformanceStatistics(data) {
   setPerformanceSummary('traffic',
     `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
 
-  setPerformanceStat('cpu-utilization', formatPercent(cpu.percent));
   setPerformanceStat('cpu-logical', formatCount(cpu.count));
-  setPerformanceStat('cpu-load', loadValue);
+  setPerformanceStat('cpu-machine-load', loadValue);
+  setPerformanceStat('cpu-load', processCpu);
   setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
   setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
   setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
@@ -1364,7 +1370,11 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
       formatValue: formatPercent, values: history.cpu_percent || [],
     },
-  ], 100, history.capacity, { timestamps });
+    {
+      className: 'chart-series-machine-load', legendClass: 'legend-machine-load', label: '负载',
+      formatValue: formatLoad, values: history.load_1 || [],
+    },
+  ], null, history.capacity, { timestamps });
   renderTrend($('performance-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
@@ -1412,7 +1422,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-load-chart'), [
     {
       className: 'chart-series-load', legendClass: 'legend-load', label: 'OlivOS 负载',
-      formatValue: formatLoad, values: history.load_1 || [],
+      formatValue: formatCpuCores, values: history.process_cpu_percent || [],
     },
   ], null, history.capacity, { timestamps });
   renderTrend($('performance-process-memory-chart'), [

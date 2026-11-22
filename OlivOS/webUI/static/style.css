@@ -19,6 +19,7 @@
   --chart-disk: #c96a00;
   --chart-swap: #7355c8;
   --chart-swap-out: #b94884;
+  --chart-machine-load: #8a6d00;
   --chart-process-cpu: #187f69;
   --chart-process-memory: #8a55b8;
   --chart-disk-read: #c96a00;
@@ -64,6 +65,7 @@
   --chart-disk: #ffb45c;
   --chart-swap: #bba1ff;
   --chart-swap-out: #ff9ec7;
+  --chart-machine-load: #f2c94c;
   --chart-process-cpu: #5ee0be;
   --chart-process-memory: #dca6ff;
   --chart-disk-read: #ffb45c;
@@ -1405,6 +1407,9 @@ header h1 {
 .chart-series-load {
   stroke: var(--chart-process-cpu);
 }
+.chart-series-machine-load {
+  stroke: var(--chart-machine-load);
+}
 .chart-series-process-memory {
   stroke: var(--chart-process-memory);
 }
@@ -1572,6 +1577,9 @@ header h1 {
 }
 .legend-load {
   color: var(--chart-process-cpu);
+}
+.legend-machine-load {
+  color: var(--chart-machine-load);
 }
 .legend-process-memory {
   color: var(--chart-process-memory);
