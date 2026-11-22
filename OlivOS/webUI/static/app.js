@@ -110,6 +110,8 @@ const state = {
   performanceStatistics: null,
   performanceProcesses: null,
   performanceProcessDetails: {},
+  performanceProcessOpen: {},
+  performanceProcessDetailGroups: {},
   performanceCategory: 'cpu',
   dashboardTimer: null,
   authGeneration: 0,
@@ -486,6 +488,8 @@ function resetLogin(message = '') {
   state.performanceStatistics = null;
   state.performanceProcesses = null;
   state.performanceProcessDetails = {};
+  state.performanceProcessOpen = {};
+  state.performanceProcessDetailGroups = {};
   state.token = '';
   state.session = '';
   state.sessionRefresh = null;
@@ -1361,13 +1365,21 @@ function processThreadElement(thread) {
   return row;
 }
 function processNodeElement(process, level, rootPid, sampledAt) {
+  const processKey = processDetailKey(process);
   const node = element('li', null, {
     class: 'process-node',
     role: 'treeitem',
     'aria-level': String(level),
   });
-  const branch = element('details', null, { class: 'process-branch' });
-  branch.open = true;
+  const branch = element('details', null, {
+    class: 'process-branch',
+    'data-process-branch': processKey,
+  });
+  const branchOpen = state.performanceProcessOpen[processKey];
+  branch.open = branchOpen === undefined ? true : Boolean(branchOpen);
+  branch.addEventListener('toggle', () => {
+    state.performanceProcessOpen[processKey] = branch.open;
+  });
   const row = element('summary', null, { class: 'process-row' });
   row.append(element('span', process.name || `PID ${formatCount(process.pid)}`, {
     class: 'process-name',
@@ -1457,7 +1469,7 @@ function processNodeElement(process, level, rootPid, sampledAt) {
   }
   const detail = element('div', null, {
     class: 'process-detail',
-    'data-process-detail': processDetailKey(process),
+    'data-process-detail': processKey,
   });
   body.append(detail);
   renderProcessDetail(detail, process);
@@ -1480,8 +1492,18 @@ function formatProcessAddress(value) {
   if (!value || !value.ip) return '—';
   return `${value.ip}:${value.port === null || value.port === undefined ? '—' : value.port}`;
 }
-function processDetailList(title, collection, itemText) {
-  const group = element('details', null, { class: 'process-detail-group' });
+function processDetailList(process, groupKey, title, collection, itemText) {
+  const processKey = processDetailKey(process);
+  const groupStates = state.performanceProcessDetailGroups[processKey] || {};
+  const group = element('details', null, {
+    class: 'process-detail-group',
+    'data-process-detail-group': groupKey,
+  });
+  group.open = Boolean(groupStates[groupKey]);
+  group.addEventListener('toggle', () => {
+    groupStates[groupKey] = group.open;
+    state.performanceProcessDetailGroups[processKey] = groupStates;
+  });
   group.append(element('summary', `${title}（${formatCount(collection ? collection.count : 0)}）`));
   if (!collection) {
     group.append(element('p', '不可用', { class: 'process-empty' }));
@@ -1548,16 +1570,16 @@ function renderProcessDetail(container, process) {
     }
     if (facts.childElementCount) container.append(facts);
   }
-  container.append(processDetailList('打开的文件', data.open_files, (item) => {
+  container.append(processDetailList(process, 'files', '打开的文件', data.open_files, (item) => {
     const fd = item.fd === null || item.fd === undefined ? '' : ` · FD ${formatCount(item.fd)}`;
     const mode = item.mode ? ` · ${item.mode}` : '';
     return `${item.path || '—'}${fd}${mode}`;
   }));
-  container.append(processDetailList('网络连接', data.connections, (item) => {
+  container.append(processDetailList(process, 'connections', '网络连接', data.connections, (item) => {
     const status = item.status ? ` · ${item.status}` : '';
     return `${formatProcessAddress(item.laddr)} → ${formatProcessAddress(item.raddr)}${status}`;
   }));
-  container.append(processDetailList('内存映射', data.memory_maps, (item) => {
+  container.append(processDetailList(process, 'maps', '内存映射', data.memory_maps, (item) => {
     const metrics = item.metrics || {};
     const rss = metrics.rss === undefined ? '—' : formatBytes(metrics.rss);
     const size = metrics.size === undefined ? '—' : formatBytes(metrics.size);
@@ -1601,6 +1623,12 @@ function cleanupProcessDetails(data) {
   walk(data && data.roots);
   for (const key of Object.keys(state.performanceProcessDetails)) {
     if (!valid.has(key)) delete state.performanceProcessDetails[key];
+  }
+  for (const key of Object.keys(state.performanceProcessOpen)) {
+    if (!valid.has(key)) delete state.performanceProcessOpen[key];
+  }
+  for (const key of Object.keys(state.performanceProcessDetailGroups)) {
+    if (!valid.has(key)) delete state.performanceProcessDetailGroups[key];
   }
 }
 function renderProcessTree(data) {

@@ -1489,6 +1489,10 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
     }
 
 
+PROCESS_ROOT_CREATED_AT = time.time() - 60
+PROCESS_CHILD_CREATED_AT = time.time() - 30
+
+
 def process_tree_snapshot():
     # 进程标签使用按需接口，这里提供一棵包含父子进程和线程的最小树。
     now = time.time()
@@ -1504,7 +1508,7 @@ def process_tree_snapshot():
             'name': 'python.exe',
             'status': 'running',
             'username': 'tester',
-            'create_time': now - 60,
+            'create_time': PROCESS_ROOT_CREATED_AT,
             'cmdline': 'python.exe main.py --token ********',
             'exe': 'C:/OlivOS/python.exe',
             'memory_rss': 128 * 1024 ** 2,
@@ -1543,7 +1547,7 @@ def process_tree_snapshot():
                 'name': 'python.exe',
                 'status': 'sleeping',
                 'username': 'tester',
-                'create_time': now - 30,
+                'create_time': PROCESS_CHILD_CREATED_AT,
                 'cmdline': 'python.exe plugin_worker.py',
                 'exe': 'C:/OlivOS/python.exe',
                 'memory_rss': 64 * 1024 ** 2,
@@ -2102,6 +2106,26 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '127.0.0.1:8080' in detail_text
     assert 'ntdll.dll' in detail_text
     assert '独占' in detail_text
+
+    # 收起进程节点并展开详情分组后刷新，展开状态必须保留。
+    driver.execute_async_script("""
+        const done = arguments[0];
+        const branch = document.querySelector('[data-process-branch]');
+        branch.dataset.refreshMarker = 'old';
+        branch.open = false;
+        document.querySelector('[data-process-detail-group="files"]').open = true;
+        setTimeout(done, 0);
+    """)
+    browser.click('#performance-processes-refresh')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.querySelector('[data-process-branch]').dataset.refreshMarker"))
+    assert driver.execute_script("""
+        return {
+          branchOpen: document.querySelector('[data-process-branch]').open,
+          filesOpen: document.querySelector('[data-process-detail-group="files"]').open,
+          connectionsOpen: document.querySelector('[data-process-detail-group="connections"]').open,
+        };
+    """) == {'branchOpen': False, 'filesOpen': True, 'connectionsOpen': False}
     browser.click('[data-performance-category="cpu"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-cpu').hidden"))
