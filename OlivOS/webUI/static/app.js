@@ -1073,21 +1073,26 @@ function renderStatistics(data) {
   const threadDetail = process.threads === null || process.threads === undefined
     ? '— 线程'
     : `${formatCount(process.threads)} 线程`;
+  const cpuCount = Number(cpu.count);
+  const processCpuValue = Number(process.cpu_percent);
+  const processCpuShare = process.cpu_percent !== null && process.cpu_percent !== undefined &&
+    Number.isFinite(cpuCount) && cpuCount > 0 && Number.isFinite(processCpuValue)
+    ? Math.max(0, processCpuValue) / cpuCount
+    : null;
   const processCpu = process.cpu_percent === null || process.cpu_percent === undefined
     ? ''
-    : ` · ${(Math.max(0, Number(process.cpu_percent) || 0) / 100).toFixed(2)} 核心`;
+    : ` · ${(Math.max(0, processCpuValue) / 100).toFixed(2)} 核心`;
   const cpuDetail = `${formatCount(cpu.count)} 逻辑核心${load} | ` +
     `OlivOS ${formatOptionalCount(process.count)} 进程 · ${threadDetail}${processCpu}`;
   const memoryTotal = Number(memory.total);
   const processMemoryPercent = Number.isFinite(memoryTotal) && memoryTotal > 0
     ? Math.max(0, Number(process.rss) || 0) * 100 / memoryTotal
     : 0;
-  const memoryDetail = `${formatBytes(memory.used)} / ${formatBytes(memory.total)} · ` +
-    `换入 ${formatRate(memory.swap_in_bps)} · 换出 ${formatRate(memory.swap_out_bps)} | ` +
+  const memoryDetail = `${formatBytes(memory.used)} / ${formatBytes(memory.total)} | ` +
     `OlivOS ${formatBytes(process.rss)} (${formatPercent(processMemoryPercent)})`;
   setMetrics($('performance-metrics'), [
     ['CPU', cpu.percent, cpuDetail, {
-      ring: true, tone: 'cpu',
+      ring: true, tone: 'cpu', secondaryPercent: processCpuShare,
       chart: { id: 'dashboard-cpu-chart', label: 'CPU 使用率趋势' },
     }],
     ['内存', memory.percent, memoryDetail, {
@@ -1126,17 +1131,7 @@ function renderStatistics(data) {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
       formatValue: formatPercent, values: history.memory_percent || [],
     },
-    {
-      className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
-      formatValue: formatRate, values: history.swap_in_bps || [],
-    },
-    {
-      className: 'chart-series-swap-out', legendClass: 'legend-swap-out', label: '换出',
-      formatValue: formatRate, values: history.swap_out_bps || [],
-    },
-  ], null, history.capacity, {
-    timestamps: history.timestamps || [], area: true, scale: 'log',
-  });
+  ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
   renderTrend($('dashboard-disk-chart'), [
     {
       className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
@@ -1379,7 +1374,15 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-swap', legendClass: 'legend-swap', label: 'Swap 使用率',
       formatValue: formatPercent, values: history.swap_percent || [],
     },
-  ], 100, history.capacity, { timestamps });
+    {
+      className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
+      formatValue: formatRate, values: history.swap_in_bps || [],
+    },
+    {
+      className: 'chart-series-swap-out', legendClass: 'legend-swap-out', label: '换出',
+      formatValue: formatRate, values: history.swap_out_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
   renderTrend($('performance-disk-usage-chart'), [
     {
       className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',

@@ -386,13 +386,15 @@
                 <section class="panel performance-panel performance-panel-hero"
                          aria-labelledby="performance-memory-chart-title">
                   <div class="panel-heading">
-                    <h3 id="performance-memory-chart-title">内存与 Swap 使用率</h3>
+                    <h3 id="performance-memory-chart-title">内存、Swap 与换入换出</h3>
                   </div>
                   <div id="performance-memory-chart" class="statistics-chart performance-chart-hero" role="img"
-                       aria-label="内存与 Swap 使用率趋势"></div>
+                       aria-label="内存、Swap 与换入换出趋势"></div>
                   <div class="chart-legend">
                     <span><i class="legend-dot legend-memory"></i>内存使用率</span>
                     <span><i class="legend-dot legend-swap"></i>Swap 使用率</span>
+                    <span><i class="legend-dot legend-swap-in"></i>换入</span>
+                    <span><i class="legend-dot legend-swap-out"></i>换出</span>
                   </div>
                 </section>
                 <section class="panel performance-panel performance-panel-compact"
@@ -484,6 +486,8 @@
                   <div class="performance-fact"><dt>上行</dt><dd data-performance-stat="network-sent"></dd></div>
                   <div class="performance-fact"><dt>接收包/秒</dt><dd data-performance-stat="network-packets-recv"></dd></div>
                   <div class="performance-fact"><dt>发送包/秒</dt><dd data-performance-stat="network-packets-sent"></dd></div>
+                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
+                       aria-hidden="true"></div>
                 </dl>
               </section>
               <section id="performance-view-traffic" class="performance-view" data-performance-view="traffic"
@@ -512,6 +516,8 @@
                   <div class="performance-fact"><dt>出站/分钟</dt><dd data-performance-stat="traffic-out"></dd></div>
                   <div class="performance-fact"><dt>累计入站</dt><dd data-performance-stat="traffic-in-total"></dd></div>
                   <div class="performance-fact"><dt>累计出站</dt><dd data-performance-stat="traffic-out-total"></dd></div>
+                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
+                       aria-hidden="true"></div>
                 </dl>
               </section>
             </div>

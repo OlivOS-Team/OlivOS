@@ -1571,17 +1571,21 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     # 磁盘卡的环图表示占用率，小字同时展示读写瞬时速率。
     disk_text = metric_card_text(driver, '磁盘')
     assert '读取 1.0 KiB/s' in disk_text and '写入 2.0 KiB/s' in disk_text
-    # OlivOS 进程规模归入 CPU 卡，进程内存归入内存卡并画成环内副弧。
+    # OlivOS 进程规模归入 CPU 卡，进程 CPU/内存占整机的比例分别画成环内副弧。
     cpu_text = metric_card_text(driver, 'CPU')
     assert 'OlivOS 3 进程' in cpu_text and '18 线程' in cpu_text and '0.13 核心' in cpu_text
     assert '| OlivOS 3 进程' in cpu_text
+    cpu_ring = browser.find('.metric-ring-card[data-ring="cpu"] .metric-ring')
+    cpu_secondary_arc = cpu_ring.find_element('css selector', '.metric-ring-secondary')
+    assert abs(float(cpu_ring.get_attribute('data-secondary-percent')) - 1.5625) < 0.0001
+    assert abs(float(cpu_secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
     memory_text = metric_card_text(driver, '内存')
     assert 'OlivOS 256.0 MiB (1.6%)' in memory_text and '| OlivOS 256.0 MiB' in memory_text
-    assert '换入 512 B/s' in memory_text and '换出 256 B/s' in memory_text
+    assert '换入' not in memory_text and '换出' not in memory_text
     memory_ring = browser.find('.metric-ring-card[data-ring="memory"] .metric-ring')
-    secondary_arc = memory_ring.find_element('css selector', '.metric-ring-secondary')
+    memory_secondary_arc = memory_ring.find_element('css selector', '.metric-ring-secondary')
     assert abs(float(memory_ring.get_attribute('data-secondary-percent')) - 1.5625) < 0.0001
-    assert abs(float(secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
+    assert abs(float(memory_secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
     # CPU、内存、磁盘使用环形卡，网络和消息卡保留文字卡。
     rings = driver.execute_script("""
         return [...document.querySelectorAll('.metric-ring-card')].map((card) => ({
@@ -1622,19 +1626,19 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     assert chart_contract(driver, '#dashboard-cpu-chart') == {
         'capacity': 120, 'seriesCount': 1, 'pointCounts': [120]}
     assert chart_contract(driver, '#dashboard-memory-chart') == {
-        'capacity': 120, 'seriesCount': 3, 'pointCounts': [120, 120, 120]}
-    # 内存图同时绘制占用率与换入/换出速率。
+        'capacity': 120, 'seriesCount': 1, 'pointCounts': [120]}
+    # 内存图只绘制占用率；换入/换出改由性能页图表展示。
     assert driver.execute_script("""
         return [...document.querySelectorAll('#dashboard-memory-chart .chart-series')]
           .map((series) => series.dataset.series);
-    """) == ['chart-series-memory', 'chart-series-swap-in', 'chart-series-swap-out']
-    # 比例类图表保持线性，内存/磁盘 IO、网络使用对数标尺；收发消息和失败事件使用线性标尺。
+    """) == ['chart-series-memory']
+    # 比例类图表保持线性，磁盘 IO、网络使用对数标尺；收发消息和失败事件使用线性标尺。
     assert driver.execute_script("""
         return ['#dashboard-cpu-chart', '#dashboard-memory-chart', '#dashboard-disk-chart',
           '#dashboard-network-chart', '#dashboard-traffic-chart',
           '#dashboard-failure-chart'].map(
           (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
-    """) == ['linear', 'log', 'log', 'log', 'linear', 'linear']
+    """) == ['linear', 'linear', 'log', 'log', 'linear', 'linear']
     assert chart_contract(driver, '#dashboard-disk-chart') == {
         'capacity': 120, 'seriesCount': 2, 'pointCounts': [120, 120]}
     # 磁盘折线图必须绘制读取/写入速率，而不是磁盘占用率。
@@ -1672,7 +1676,7 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
           return [areas.length, areas.every(
             (area) => area.getAttribute('fill').startsWith('url(#'))];
         });
-    """) == [[1, True], [3, True], [2, True], [2, True], [2, True], [1, True]]
+    """) == [[1, True], [1, True], [2, True], [2, True], [2, True], [1, True]]
     assert driver.execute_script(
         "return document.querySelector('#dashboard-cpu-chart .chart-series-cpu')"
         ".getAttribute('points').split(' ')[0].endsWith(',38.00')")
@@ -1685,8 +1689,7 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     assert '写入' in disk_tip['text'] and '2.0 KiB/s' in disk_tip['text']
     memory_tip = hover_chart(driver, '#dashboard-memory-chart', 0.999)
     assert '内存使用率' in memory_tip['text'] and '37.5%' in memory_tip['text']
-    assert '换入' in memory_tip['text'] and '512 B/s' in memory_tip['text']
-    assert '换出' in memory_tip['text'] and '256 B/s' in memory_tip['text']
+    assert '换入' not in memory_tip['text'] and '换出' not in memory_tip['text']
     # 收发消息和失败事件的悬停值直接使用桶内实际条数，不再换算成条/分钟。
     traffic_tip = hover_chart(driver, '#dashboard-traffic-chart', 0.999)
     assert '收' in traffic_tip['text'] and '8 条' in traffic_tip['text']
@@ -1695,14 +1698,24 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     assert '失败' in failure_tip['text'] and '1 条' in failure_tip['text']
 
     # 悬停提示高于图表时必须能溢出显示，不能被子卡片裁掉底部。
+    # 内存图现在只绘制一条序列，临时补足提示行以稳定覆盖超高场景。
     tooltip_overflow = driver.execute_script("""
         const chart = document.querySelector('#dashboard-memory-chart');
         const tooltip = chart.querySelector('.chart-tooltip');
-        return {
+        const rows = [...tooltip.querySelectorAll('.chart-tooltip-row')];
+        const extraRows = [];
+        for (let index = 0; index < 4; index += 1) {
+          const row = rows[index % rows.length].cloneNode(true);
+          tooltip.append(row);
+          extraRows.push(row);
+        }
+        const result = {
           overflow: getComputedStyle(chart).overflow,
           tooltipBottom: tooltip.getBoundingClientRect().bottom,
           chartBottom: chart.getBoundingClientRect().bottom,
         };
+        extraRows.forEach((row) => row.remove());
+        return result;
     """)
     assert tooltip_overflow['overflow'] == 'visible'
     assert tooltip_overflow['tooltipBottom'] > tooltip_overflow['chartBottom']
@@ -1908,7 +1921,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     # 8 张图表仍全部渲染，且容量、序列数和标尺保持原有约束。
     expected = {
         '#performance-cpu-chart': (120, 1),
-        '#performance-memory-chart': (120, 2),
+        '#performance-memory-chart': (120, 4),
         '#performance-disk-usage-chart': (120, 1),
         '#performance-disk-io-chart': (120, 2),
         '#performance-network-chart': (120, 2),
@@ -1922,14 +1935,28 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         assert actual['seriesCount'] == series_count, selector
         assert actual['pointCounts'] == [capacity] * series_count, selector
 
-    # 比例类图表保持线性；内存/磁盘 IO、网络使用对数标尺；流量图使用线性标尺。
+    # CPU 与磁盘占用保持线性；内存（含换入/换出）、磁盘 IO、网络使用对数标尺；流量图使用线性标尺。
     assert driver.execute_script("""
         return ['#performance-cpu-chart', '#performance-memory-chart',
           '#performance-disk-usage-chart', '#performance-disk-io-chart',
           '#performance-network-chart', '#performance-load-chart',
           '#performance-process-memory-chart', '#performance-traffic-chart'].map(
           (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
-    """) == ['linear', 'linear', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
+    """) == ['linear', 'log', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
+
+    # 换出与 Swap 使用率使用不同颜色，且折线与图例颜色保持一致。
+    swap_colors = driver.execute_script("""
+        const chart = document.querySelector('#performance-memory-chart');
+        return [
+          getComputedStyle(chart.querySelector('.chart-series-swap')).stroke,
+          getComputedStyle(chart.querySelector('.chart-series-swap-out')).stroke,
+          getComputedStyle(document.querySelector('#performance-view-memory .legend-swap')).color,
+          getComputedStyle(document.querySelector('#performance-view-memory .legend-swap-out')).color,
+        ];
+    """)
+    assert swap_colors[0] != swap_colors[1]
+    assert swap_colors[2] != swap_colors[3]
+    assert swap_colors[0] == swap_colors[2] and swap_colors[1] == swap_colors[3]
 
     # 横线按数值刻度映射：线性标尺等距，对数标尺非等距。
     grid_contracts = driver.execute_script("""
@@ -1955,7 +1982,8 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             ('#performance-load-chart', ['OlivOS 负载', '1.25']),
         ],
         'memory': [
-            ('#performance-memory-chart', ['内存使用率', '37.5%', 'Swap 使用率', '0.0%']),
+            ('#performance-memory-chart',
+             ['内存使用率', '37.5%', 'Swap 使用率', '0.0%', '换入', '512 B/s', '换出', '256 B/s']),
             ('#performance-process-memory-chart', ['OlivOS 进程内存', 'MiB']),
         ],
         'disk': [
@@ -2007,6 +2035,77 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '— 句柄' in browser.find('#performance-process-memory-readout').text
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-content .performance-panel').length") == 8
+
+    # 网络与消息的 4 项事实表用占位单元补齐空位，占位底色必须与正常单元一致。
+    set_viewport(browser, 1280, 800)
+    empty_fact_styles = driver.execute_script("""
+        return ['network', 'traffic'].map((category) => {
+          const grid = document.querySelector(
+            `#performance-view-${category} .performance-fact-grid`);
+          const empty = grid.querySelector('.performance-fact-empty');
+          const fact = grid.querySelector('.performance-fact:not(.performance-fact-empty)');
+          return {
+            display: getComputedStyle(empty).display,
+            emptyBackground: getComputedStyle(empty).backgroundColor,
+            factBackground: getComputedStyle(fact).backgroundColor,
+          };
+        });
+    """)
+    assert all(item['display'] != 'none' for item in empty_fact_styles)
+    assert all(item['emptyBackground'] == item['factBackground'] for item in empty_fact_styles)
+    set_viewport(browser, 900, 800)
+    assert driver.execute_script("""
+        return ['network', 'traffic'].every((category) => {
+          const empty = document.querySelector(
+            `#performance-view-${category} .performance-fact-empty`);
+          return getComputedStyle(empty).display === 'none';
+        });
+    """)
+
+    # 桌面端左右两栏各自滚动，内容不足时不应占出滚动条。
+    set_viewport(browser, 1280, 420)
+    scroll_layout = driver.execute_script("""
+        const categories = document.querySelector('.performance-categories');
+        const detail = document.querySelector('.performance-detail');
+        const main = document.querySelector('main');
+        categories.scrollTop = categories.scrollHeight;
+        detail.scrollTop = 0;
+        return {
+          categoriesOverflow: getComputedStyle(categories).overflowY,
+          detailOverflow: getComputedStyle(detail).overflowY,
+          categoriesScrollTop: categories.scrollTop,
+          detailScrollTop: detail.scrollTop,
+          sameHeight: Math.abs(categories.offsetHeight - detail.offsetHeight) <= 1,
+          mainFits: main.scrollHeight <= main.clientHeight + 1,
+          bottomGap: Math.round(innerHeight -
+            document.getElementById('performance-content').getBoundingClientRect().bottom),
+          mainPaddingBottom: Math.round(parseFloat(getComputedStyle(main).paddingBottom)),
+        };
+    """)
+    assert scroll_layout['categoriesOverflow'] == 'auto'
+    assert scroll_layout['detailOverflow'] == 'auto'
+    assert scroll_layout['categoriesScrollTop'] > 0
+    assert scroll_layout['detailScrollTop'] == 0
+    assert scroll_layout['sameHeight']
+    assert scroll_layout['mainFits']
+    assert scroll_layout['bottomGap'] == scroll_layout['mainPaddingBottom']
+    detail_scroll = driver.execute_script("""
+        const categories = document.querySelector('.performance-categories');
+        const detail = document.querySelector('.performance-detail');
+        categories.scrollTop = 0;
+        detail.scrollTop = detail.scrollHeight;
+        return {categories: categories.scrollTop, detail: detail.scrollTop};
+    """)
+    assert detail_scroll['categories'] == 0
+    assert detail_scroll['detail'] > 0
+
+    set_viewport(browser, 1400, 1280)
+    assert driver.execute_script("""
+        const categories = document.querySelector('.performance-categories');
+        const detail = document.querySelector('.performance-detail');
+        return categories.scrollHeight <= categories.clientHeight &&
+          detail.scrollHeight <= detail.clientHeight;
+    """)
 
     # 移动端分类栏转为横向滚动，右侧详情单列显示且所有分类都不撑出视口。
     set_viewport(browser, 390, 844, mobile_device=True)
