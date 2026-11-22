@@ -2042,6 +2042,19 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
         return tops;
     """)
     assert all(later > earlier for earlier, later in zip(tops, tops[1:])), tops
+    # 检查更新工具栏与新版本通知都位于运行状态分割线之上。
+    divider_layout = driver.execute_script("""
+        const toolbar = document.querySelector('#dashboard .runtime-summary .toolbar');
+        const update = document.getElementById('update-status');
+        const divider = document.getElementById('runtime-details');
+        const dividerTop = divider.getBoundingClientRect().top;
+        return {
+          toolbarAbove: toolbar.getBoundingClientRect().bottom <= dividerTop + 1,
+          updateAbove: update.getBoundingClientRect().bottom <= dividerTop + 1,
+          hasBorder: parseFloat(getComputedStyle(divider).borderTopWidth) > 0,
+        };
+    """)
+    assert divider_layout == {'toolbarAbove': True, 'updateAbove': True, 'hasBorder': True}
     # 仪表盘只能通过 /api/status 获取统计，不能再请求旧路由。
     assert not driver.execute_script("""
         return performance.getEntriesByType('resource')

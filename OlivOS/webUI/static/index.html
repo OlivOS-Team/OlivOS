@@ -212,9 +212,6 @@
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
           <section class="runtime-summary" aria-labelledby="runtime-title">
-            <div class="section-heading">
-              <h2 id="runtime-title">运行状态</h2>
-            </div>
             <div class="toolbar">
               <button id="check-update">检查更新</button>
               <button id="dashboard-reload-plugins">重载插件</button>
@@ -230,20 +227,25 @@
               <button id="exit" class="danger">退出 OlivOS</button>
             </div>
             <p id="update-status"></p>
-            <p id="runtime"></p>
-            <div id="unknown-status" hidden>
-              <p id="online-note"></p>
-              <ul id="unknown-accounts" class="account-status-list"></ul>
-            </div>
-            <p id="statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
-            <div id="statistics-content" class="dashboard-statistics" hidden>
-              <section class="panel dashboard-panel" aria-labelledby="performance-title">
-                <div class="panel-heading">
-                  <h3 id="performance-title">性能</h3>
-                  <span id="statistics-sampled" class="statistics-sampled"></span>
-                </div>
-                <div id="performance-metrics" class="metric-grid"></div>
-              </section>
+            <div id="runtime-details" class="runtime-details">
+              <div class="section-heading">
+                <h2 id="runtime-title">运行状态</h2>
+              </div>
+              <p id="runtime"></p>
+              <div id="unknown-status" hidden>
+                <p id="online-note"></p>
+                <ul id="unknown-accounts" class="account-status-list"></ul>
+              </div>
+              <p id="statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
+              <div id="statistics-content" class="dashboard-statistics" hidden>
+                <section class="panel dashboard-panel" aria-labelledby="performance-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-title">性能</h3>
+                    <span id="statistics-sampled" class="statistics-sampled"></span>
+                  </div>
+                  <div id="performance-metrics" class="metric-grid"></div>
+                </section>
+              </div>
             </div>
           </section>
         </section>

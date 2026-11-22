@@ -1163,15 +1163,18 @@ header h1 {
   color: var(--muted);
   font-size: 13px;
 }
-.runtime-summary {
+.runtime-summary .toolbar {
+  margin: 0 0 8px;
+}
+.runtime-summary #update-status {
+  margin: 0 0 16px;
+}
+.runtime-details {
   border-top: 1px solid var(--line);
   padding-top: 20px;
 }
-.runtime-summary p {
+.runtime-details p {
   margin: 10px 0;
-}
-.runtime-summary .toolbar {
-  margin: 12px 0 8px;
 }
 .section-heading {
   display: flex;
