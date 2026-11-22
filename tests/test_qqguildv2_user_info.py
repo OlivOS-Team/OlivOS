@@ -127,8 +127,8 @@ def test_group_invalid_falls_back_to_basic_info(user_api):
 
 
 def test_11253_mark_skips_later_group_calls(user_api):
-    event, _, group_calls, basic_calls = user_api
-    common._mark_qq_group_api_denied('group_member_info')
+    event, bot, group_calls, basic_calls = user_api
+    common._mark_qq_group_api_denied(bot.hash, 'group_member_info')
     SDK.event_action.get_group_member_info(event, 'g1', 'm3', False)
     assert group_calls == []
     assert basic_calls == ['m3']

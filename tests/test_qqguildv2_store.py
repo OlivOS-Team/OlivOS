@@ -271,3 +271,356 @@ def test_flush_failure_keeps_dirty_records_for_retry(store):
     db.commit()
     store._commit_locked()
     assert db.execute('SELECT username FROM members').fetchone()[0] == 'retained'
+
+
+def test_list_seed_groups_skips_suspect_groups(store):
+    now = int(time.time())
+    store.upsert_group(_BOT, 'active_g', state='active', last_seen_at=now - 10)
+    store.upsert_group(_BOT, 'suspect_g', state='suspect', last_seen_at=now)
+    store.upsert_group(_BOT, 'dormant_g', state='dormant', last_seen_at=now + 10)
+    assert store.list_seed_groups(_BOT, limit=10) == ['active_g']
+
+
+def test_touch_group_restores_suspect_to_active(store):
+    store.touch_group(_BOT, 'g1')
+    store.upsert_group(_BOT, 'g1', state='suspect')
+    assert store.get_group(_BOT, 'g1')['state'] == 'suspect'
+    store.touch_group(_BOT, 'g1')
+    assert store.get_group(_BOT, 'g1')['state'] == 'active'
+
+
+def test_evict_suspect_groups_after_30_days(store):
+    now = int(time.time())
+    day = 86400
+    store.upsert_group(_BOT, 'old_suspect', state='suspect', last_seen_at=now - 31 * day)
+    store.upsert_member(_BOT, 'old_suspect', 'u1', username='old')
+    store.upsert_group(_BOT, 'recent_suspect', state='suspect', last_seen_at=now - 10 * day)
+    store.upsert_member(_BOT, 'recent_suspect', 'u2', username='recent')
+    store.upsert_group(_BOT, 'old_active', state='active', last_seen_at=now - 40 * day)
+    store.upsert_member(_BOT, 'old_active', 'u3', username='active')
+
+    assert store.evict_suspect_groups(now=now) == 1
+    evicted = store.get_group(_BOT, 'old_suspect')
+    assert evicted['state'] == 'dormant'
+    assert evicted['members_state'] == 'evicted'
+    assert store.get_members(_BOT, 'old_suspect') == {}
+    assert store.get_group(_BOT, 'recent_suspect')['state'] == 'suspect'
+    assert set(store.get_members(_BOT, 'recent_suspect')) == {'u2'}
+    assert store.get_group(_BOT, 'old_active')['state'] == 'active'
+    assert set(store.get_members(_BOT, 'old_active')) == {'u3'}
+
+
+def test_list_groups_for_calibration_filters_and_orders(store):
+    now = int(time.time())
+    day = 86400
+    other_bot = 'b' * 32
+    # 1. 未 complete 且从未校准（最高优先，按 last_seen_at 降序）
+    store.upsert_group(_BOT, 'g_incomp_new', state='active', members_state='active',
+                       verified_at=None, last_seen_at=now - 1 * day)
+    store.upsert_group(_BOT, 'g_incomp_old', state='active', members_state='warming',
+                       verified_at=None, last_seen_at=now - 5 * day)
+    # 2. 未 complete 但有旧 verified_at（仍排在 complete 之前）
+    store.upsert_group(_BOT, 'g_incomp_verified', state='active', members_state='active',
+                       verified_at=now - 2 * day, last_seen_at=now - 2 * day)
+    # 3. complete 但已超过 7 天未校准（按 verified_at 升序）
+    store.upsert_group(_BOT, 'g_stale_older', state='active', members_state='complete',
+                       verified_at=now - 10 * day, last_seen_at=now - 3 * day)
+    store.upsert_group(_BOT, 'g_stale_newer', state='active', members_state='complete',
+                       verified_at=now - 8 * day, last_seen_at=now - 1 * day)
+    # 应被排除的群：已 complete 且 7 天内校准 / 超过 14 天不活跃 / suspect / dormant / 其它 bot
+    store.upsert_group(_BOT, 'g_fresh_complete', state='active', members_state='complete',
+                       verified_at=now - 2 * day, last_seen_at=now - 1 * day)
+    store.upsert_group(_BOT, 'g_inactive_15d', state='active', members_state='active',
+                       verified_at=None, last_seen_at=now - 15 * day)
+    store.upsert_group(_BOT, 'g_suspect', state='suspect', members_state='active',
+                       verified_at=None, last_seen_at=now - 1 * day)
+    store.upsert_group(_BOT, 'g_dormant', state='dormant', members_state='evicted',
+                       verified_at=None, last_seen_at=now - 1 * day)
+    store.upsert_group(other_bot, 'g_other_bot', state='active', members_state='active',
+                       verified_at=None, last_seen_at=now - 1 * day)
+
+    result = store.list_groups_for_calibration(_BOT, now - 14 * day, now - 7 * day, 50)
+    assert result == [
+        'g_incomp_new',
+        'g_incomp_old',
+        'g_incomp_verified',
+        'g_stale_older',
+        'g_stale_newer',
+    ]
+    assert store.list_groups_for_calibration(_BOT, now - 14 * day, now - 7 * day, 2) == [
+        'g_incomp_new',
+        'g_incomp_old',
+    ]
+    assert store.list_groups_for_calibration(other_bot, now - 14 * day, now - 7 * day, 50) == [
+        'g_other_bot'
+    ]
+
+
+def test_reconcile_group_members_removes_departed_and_guards_new_and_empty(store):
+    sync_started_at = 10000
+    store.touch_group(_BOT, 'g_rec')
+    store.upsert_member(_BOT, 'g_rec', 'm_keep', username='留存', updated_at=sync_started_at - 100)
+    store.upsert_member(_BOT, 'g_rec', 'm_gone', username='离群', updated_at=sync_started_at - 50)
+    store.upsert_member(_BOT, 'g_rec', 'm_new_eq', username='并发新成员1', updated_at=sync_started_at)
+    store.upsert_member(_BOT, 'g_rec', 'm_new_gt', username='并发新成员2', updated_at=sync_started_at + 5)
+
+    # 空 keep 集合绝不删除任何成员（防上游异常清空整群）。
+    assert store.reconcile_group_members(_BOT, 'g_rec', set(), sync_started_at) == 0
+    assert set(store.get_members(_BOT, 'g_rec')) == {'m_keep', 'm_gone', 'm_new_eq', 'm_new_gt'}
+
+    # 正常差集：仅删除未出现且早于 sync_started_at 的 m_gone。
+    deleted = store.reconcile_group_members(_BOT, 'g_rec', {'m_keep'}, sync_started_at)
+    assert deleted == 1
+    assert set(store.get_members(_BOT, 'g_rec')) == {'m_keep', 'm_new_eq', 'm_new_gt'}
+
+    # 超过 500 个成员分批处理：不误删保留成员，正确清除离群者。
+    store.touch_group(_BOT, 'g_big')
+    keep_big = set()
+    for idx in range(600):
+        mid = 'keep_%d' % idx
+        keep_big.add(mid)
+        store.upsert_member(_BOT, 'g_big', mid, username=mid, updated_at=sync_started_at - 10)
+    for idx in range(520):
+        store.upsert_member(_BOT, 'g_big', 'gone_%d' % idx, username='gone', updated_at=sync_started_at - 10)
+    assert store.reconcile_group_members(_BOT, 'g_big', keep_big, sync_started_at) == 520
+    assert set(store.get_members(_BOT, 'g_big')) == keep_big
+
+
+def test_evict_member_placeholders_only_deletes_old_nameless_rows(store, tmp_path):
+    now = int(time.time())
+    day = 86400
+    store.touch_group(_BOT, 'g_ph')
+    store.upsert_member(_BOT, 'g_ph', 'm_old_ph', updated_at=now - 61 * day)
+    store.upsert_member(_BOT, 'g_ph', 'm_fresh_ph', updated_at=now - 10 * day)
+    store.upsert_member(_BOT, 'g_ph', 'm_old_user', username='有昵称', updated_at=now - 90 * day)
+    store.upsert_member(_BOT, 'g_ph', 'm_old_card', member_nickname='有名片', updated_at=now - 90 * day)
+
+    assert store.evict_member_placeholders(now=now) == 1
+    remaining = set(store.get_members(_BOT, 'g_ph'))
+    assert remaining == {'m_fresh_ph', 'm_old_user', 'm_old_card'}
+
+    # open_db 初始清扫同样只删 60 天纯占位，保留有昵称的旧成员。
+    store.upsert_member(_BOT, 'g_ph', 'm_boot_ph', updated_at=now - 70 * day)
+    store.close_db()
+    store.open_db(tmp_path / 'cache.sqlite3')
+    assert set(store.get_members(_BOT, 'g_ph')) == {'m_fresh_ph', 'm_old_user', 'm_old_card'}
+
+
+def test_eviction_and_touch_revival_clear_verified_at(store):
+    now = int(time.time())
+    day = 86400
+    # 1. 常规淘汰转 dormant 时清空 verified_at。
+    store.upsert_group(
+        _BOT, 'g_dormant', state='active', members_state='complete',
+        verified_at=now - 2 * day, last_seen_at=now - 130 * day
+    )
+    assert store.evict_members_by_age(now=now) == 1
+    dormant = store.get_group(_BOT, 'g_dormant')
+    assert dormant['state'] == 'dormant'
+    assert dormant['members_state'] == 'evicted'
+    assert dormant['verified_at'] is None
+
+    # 2. suspect 满 30 天淘汰时清空 verified_at。
+    store.upsert_group(
+        _BOT, 'g_sus', state='suspect', members_state='complete',
+        verified_at=now - 5 * day, last_seen_at=now - 35 * day
+    )
+    assert store.evict_suspect_groups(now=now) == 1
+    sus = store.get_group(_BOT, 'g_sus')
+    assert sus['state'] == 'dormant'
+    assert sus['members_state'] == 'evicted'
+    assert sus['verified_at'] is None
+
+    # 3. 即使历史库里 evicted 群还留着旧 verified_at，touch_group 复活时也会置空。
+    store.upsert_group(
+        _BOT, 'g_legacy_evicted', state='dormant', members_state='evicted',
+        verified_at=now - 3 * day, last_seen_at=now - 200 * day
+    )
+    store.touch_group(_BOT, 'g_legacy_evicted')
+    revived = store.get_group(_BOT, 'g_legacy_evicted')
+    assert revived['state'] == 'active'
+    assert revived['members_state'] == 'active'
+    assert revived['verified_at'] is None
+    store._commit_locked()
+    assert store.get_group(_BOT, 'g_legacy_evicted')['verified_at'] is None
+
+
+def test_reconcile_zero_deletes_releases_sqlite_write_lock(store, tmp_path):
+    sync_started_at = 10000
+    store.touch_group(_BOT, 'g_zero')
+    store.upsert_member(_BOT, 'g_zero', 'm1', username='留存', updated_at=sync_started_at - 10)
+    # 删除 0 行（所有成员都在 keep_openids 中），仍必须提交释放写锁。
+    assert store.reconcile_group_members(_BOT, 'g_zero', {'m1'}, sync_started_at) == 0
+
+    other = sqlite3.connect(tmp_path / 'cache.sqlite3', timeout=0.2)
+    try:
+        other.execute("INSERT INTO meta(key,value) VALUES('lock_check','ok')")
+        other.commit()
+    finally:
+        other.close()
+    assert store.get_meta('lock_check') == 'ok'
+
+
+def test_query_plans_and_legacy_schema_partial_index(store, tmp_path):
+    db = store.open_db()
+    # 验证 reconcile 走主键索引而不误选 idx_members_scan。
+    plan_rec = [
+        row['detail'] for row in db.execute(
+            'EXPLAIN QUERY PLAN DELETE FROM members '
+            'WHERE bot_hash=? AND group_openid=? '
+            'AND member_openid NOT IN (?) AND +updated_at<?',
+            (_BOT, 'g1', 'm1', 100)
+        ).fetchall()
+    ]
+    assert any('sqlite_autoindex_members_1' in line for line in plan_rec)
+    assert not any('idx_members_scan' in line for line in plan_rec)
+
+    # 验证占位清理走部分索引 idx_members_placeholders。
+    plan_ph = [
+        row['detail'] for row in db.execute(
+            'EXPLAIN QUERY PLAN SELECT bot_hash, group_openid, member_openid FROM members '
+            "WHERE (username IS NULL OR username='') "
+            "AND (member_nickname IS NULL OR member_nickname='') "
+            'AND updated_at<? ORDER BY updated_at ASC LIMIT ?',
+            (100, 1000)
+        ).fetchall()
+    ]
+    assert any('idx_members_placeholders' in line for line in plan_ph)
+
+    # 验证旧库无 member_nickname 列时能先补列再建部分索引。
+    legacy_db_path = tmp_path / 'legacy_schema.sqlite3'
+    raw = sqlite3.connect(legacy_db_path)
+    try:
+        raw.executescript('''
+            CREATE TABLE groups(
+                bot_hash TEXT NOT NULL, group_openid TEXT NOT NULL,
+                joined_at TEXT, member_role TEXT, allow_proactive_msg INTEGER,
+                recv_msg_setting TEXT, last_seen_at INTEGER NOT NULL,
+                state TEXT NOT NULL, members_state TEXT NOT NULL,
+                updated_at INTEGER NOT NULL, verified_at INTEGER,
+                PRIMARY KEY(bot_hash, group_openid));
+            CREATE TABLE members(
+                bot_hash TEXT NOT NULL, group_openid TEXT NOT NULL,
+                member_openid TEXT NOT NULL, username TEXT, member_role TEXT,
+                bot INTEGER, joined_at TEXT, union_openid TEXT,
+                updated_at INTEGER NOT NULL, source TEXT,
+                PRIMARY KEY(bot_hash, group_openid, member_openid));
+            CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+        ''')
+        raw.commit()
+    finally:
+        raw.close()
+    upgraded = store.open_db(legacy_db_path)
+    indexes = {
+        row[1] for row in upgraded.execute("PRAGMA index_list('members')").fetchall()
+    }
+    assert 'idx_members_placeholders' in indexes
+
+
+def test_atomic_group_state_helpers(store):
+    # mark_group_suspect：不存在不插新行，存在才置 suspect。
+    assert store.mark_group_suspect(_BOT, 'g_missing') is False
+    assert store.get_group(_BOT, 'g_missing') is None
+
+    store.touch_group(_BOT, 'g_atomic')
+    store.upsert_member(_BOT, 'g_atomic', 'm1', username='成员1')
+    assert store.mark_group_suspect(_BOT, 'g_atomic') is True
+    assert store.get_group(_BOT, 'g_atomic')['state'] == 'suspect'
+
+    # mark_group_warming：suspect 群拒绝；不存在拒绝。
+    assert store.mark_group_warming(_BOT, 'g_missing') is False
+    assert store.get_group(_BOT, 'g_missing') is None
+    assert store.mark_group_warming(_BOT, 'g_atomic') is False
+
+    # restore_group_active_if_suspect：仅 suspect -> active。
+    assert store.restore_group_active_if_suspect(_BOT, 'g_atomic') is True
+    assert store.get_group(_BOT, 'g_atomic')['state'] == 'active'
+    assert store.restore_group_active_if_suspect(_BOT, 'g_atomic') is False
+    assert store.restore_group_active_if_suspect(_BOT, 'g_missing') is False
+
+    # remove_group_if_suspect：active 群不删；suspect 群才删（连同成员）。
+    assert store.remove_group_if_suspect(_BOT, 'g_atomic') is False
+    assert store.get_group(_BOT, 'g_atomic') is not None
+    assert 'm1' in store.get_members(_BOT, 'g_atomic')
+    assert store.mark_group_suspect(_BOT, 'g_atomic') is True
+    assert store.remove_group_if_suspect(_BOT, 'g_atomic') is True
+    assert store.get_group(_BOT, 'g_atomic') is None
+    assert store.get_members(_BOT, 'g_atomic') == {}
+
+    # mark_group_warming / reset_group_warming 原子迁移，不降级 complete、不复活已删群。
+    store.touch_group(_BOT, 'g_warm')
+    assert store.mark_group_warming(_BOT, 'g_warm') is True
+    assert store.get_group(_BOT, 'g_warm')['members_state'] == 'warming'
+    assert store.mark_group_warming(_BOT, 'g_warm') is False
+    assert store.reset_group_warming(_BOT, 'g_warm') is True
+    assert store.get_group(_BOT, 'g_warm')['members_state'] == 'active'
+    assert store.reset_group_warming(_BOT, 'g_warm') is False
+
+    store.upsert_group(_BOT, 'g_done', state='active', members_state='complete', verified_at=100)
+    assert store.mark_group_warming(_BOT, 'g_done') is False
+    assert store.reset_group_warming(_BOT, 'g_done') is False
+    assert store.get_group(_BOT, 'g_done')['members_state'] == 'complete'
+    assert store.reset_group_warming(_BOT, 'g_missing') is False
+    assert store.get_group(_BOT, 'g_missing') is None
+
+
+def test_evict_and_reconcile_rollback_preserves_db_and_import_changes(store):
+    now = int(time.time())
+    day = 86400
+    store.upsert_group(_BOT, 'g_ev_fail', state='suspect', last_seen_at=now - 40 * day)
+    store.upsert_member(_BOT, 'g_ev_fail', 'm1', username='u1', updated_at=now - 10)
+    store.upsert_group(_BOT, 'g_age_fail', state='active', last_seen_at=now - 130 * day)
+    store.upsert_member(_BOT, 'g_age_fail', 'm2', username='u2', updated_at=now - 10)
+    store._commit_locked()
+
+    db = store._db()
+    db.execute(
+        "CREATE TRIGGER fail_group_update BEFORE UPDATE ON groups BEGIN "
+        "SELECT RAISE(ABORT, 'update_fail'); END"
+    )
+    db.commit()
+    store._import_changes = set()
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            store.evict_suspect_groups(now=now)
+        # 事务回滚后成员未被删，且 _import_changes 不被污染。
+        assert 'm1' in store.get_members(_BOT, 'g_ev_fail')
+        assert store.get_group(_BOT, 'g_ev_fail')['state'] == 'suspect'
+        assert store._import_changes == set()
+
+        with pytest.raises(sqlite3.IntegrityError):
+            store.evict_members_by_age(now=now)
+        assert 'm2' in store.get_members(_BOT, 'g_age_fail')
+        assert store.get_group(_BOT, 'g_age_fail')['state'] == 'active'
+        assert store._import_changes == set()
+    finally:
+        store._import_changes = None
+        db.execute('DROP TRIGGER fail_group_update')
+        db.commit()
+
+    # reconcile 慢路径与占位清理在 DELETE 失败回滚后不污染 _import_changes。
+    store.touch_group(_BOT, 'g_rec_rb')
+    store.upsert_member(_BOT, 'g_rec_rb', 'm_keep', username='留存', updated_at=100)
+    store.upsert_member(_BOT, 'g_rec_rb', 'm_gone', username='离群', updated_at=100)
+    store.upsert_member(_BOT, 'g_rec_rb', 'm_ph_old', updated_at=now - 70 * day)
+    store._commit_locked()
+    db.execute(
+        "CREATE TRIGGER fail_member_del BEFORE DELETE ON members BEGIN "
+        "SELECT RAISE(ABORT, 'del_fail'); END"
+    )
+    db.commit()
+    store._import_changes = set()
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            store.reconcile_group_members(_BOT, 'g_rec_rb', {'m_keep'}, 200)
+        assert store._import_changes == set()
+        assert set(store.get_members(_BOT, 'g_rec_rb')) == {'m_keep', 'm_gone', 'm_ph_old'}
+
+        with pytest.raises(sqlite3.IntegrityError):
+            store.evict_member_placeholders(now=now)
+        assert store._import_changes == set()
+        assert 'm_ph_old' in store.get_members(_BOT, 'g_rec_rb')
+    finally:
+        store._import_changes = None
+        db.execute('DROP TRIGGER fail_member_del')
+        db.commit()

@@ -14,8 +14,13 @@ import time
 
 __all__ = [
     'open_db', 'close_db', 'upsert_group', 'touch_group', 'remove_group', 'get_group',
+    'mark_group_suspect', 'restore_group_active_if_suspect', 'remove_group_if_suspect',
+    'mark_group_warming', 'reset_group_warming',
     'upsert_member', 'remove_member', 'get_member', 'get_members', 'list_seed_groups',
-    'evict_members_by_age', 'evict_groups_by_age', 'import_legacy', 'get_meta', 'set_meta',
+    'list_groups_for_calibration', 'reconcile_group_members',
+    'evict_members_by_age', 'evict_groups_by_age', 'evict_suspect_groups',
+    'evict_member_placeholders',
+    'import_legacy', 'get_meta', 'set_meta',
 ]
 
 _DEFAULT_PATH = os.path.join('data', 'qqGuildv2', 'qqguildv2.sqlite3')
@@ -63,6 +68,8 @@ def _connect(path, default_path):
                 union_group_openid TEXT,
                 PRIMARY KEY(bot_hash, group_openid));
             CREATE INDEX IF NOT EXISTS idx_groups_seen ON groups(last_seen_at);
+            CREATE INDEX IF NOT EXISTS idx_groups_calib
+                ON groups(bot_hash, state, members_state, verified_at, last_seen_at);
             CREATE TABLE IF NOT EXISTS members(
                 bot_hash TEXT NOT NULL, group_openid TEXT NOT NULL,
                 member_openid TEXT NOT NULL, username TEXT, member_role TEXT,
@@ -78,6 +85,12 @@ def _connect(path, default_path):
         member_cols = {row[1] for row in db.execute('PRAGMA table_info(members)')}
         if 'member_nickname' not in member_cols:
             db.execute('ALTER TABLE members ADD COLUMN member_nickname TEXT')
+        db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_members_placeholders '
+            'ON members(updated_at) '
+            "WHERE (username IS NULL OR username='') "
+            "AND (member_nickname IS NULL OR member_nickname='')"
+        )
     except Exception:
         db.close()
         raise
@@ -100,8 +113,16 @@ def open_db(path=None):
             close_db()
         if _connection is None:
             _connect(target, path is None)
+            # 进程启动时复位残留的 warming 状态，避免群一直卡在后台续翻中。
+            _connection.execute(
+                "UPDATE groups SET members_state='active' WHERE members_state='warming'"
+            )
+            _connection.commit()
             # Run the initial sweep before any new events can be recorded.
-            _evict_locked(int(time.time()), 1000)
+            now = int(time.time())
+            _evict_locked(now, 1000)
+            _evict_suspect_locked(now, 1000)
+            _evict_member_placeholders_locked(now, 1000)
             _commit_locked()
             if path is None:
                 import_legacy(os.path.abspath(_LEGACY_PATH))
@@ -175,7 +196,10 @@ def _maintenance(stop):
                     return
                 _commit_locked()
                 if time.monotonic() >= next_sweep:
-                    _evict_locked(int(time.time()), 1000)
+                    now = int(time.time())
+                    _evict_locked(now, 1000)
+                    _evict_suspect_locked(now, 1000)
+                    _evict_member_placeholders_locked(now, 1000)
                     _commit_locked()
                     next_sweep = time.monotonic() + 3600
         except sqlite3.Error:
@@ -221,9 +245,17 @@ def touch_group(bot_hash, group_openid, **fields):
     fields.setdefault('state', 'active')
     with _LOCK:
         old = get_group(bot_hash, group_openid)
-        if old and old['members_state'] == 'evicted':
+        revived_from_evicted = bool(old and old['members_state'] == 'evicted')
+        if revived_from_evicted:
             fields.setdefault('members_state', 'active')
+        if old and old['state'] == 'suspect':
+            fields['state'] = 'active'
         upsert_group(bot_hash, group_openid, **fields)
+        # 从 evicted 复活时清空旧 verified_at，避免误用淘汰前的校准时间判断老化。
+        if revived_from_evicted and fields.get('verified_at') is None:
+            key = (str(bot_hash), str(group_openid))
+            if key in _pending_groups and _pending_groups[key] is not None:
+                _pending_groups[key]['verified_at'] = None
 
 
 def remove_group(bot_hash, group_openid):
@@ -236,6 +268,65 @@ def remove_group(bot_hash, group_openid):
             if member_key[:2] == key:
                 del _pending_members[member_key]
         _changed('removed_group', key)
+
+
+def mark_group_suspect(bot_hash, group_openid):
+    """原子将已存在的群置为 suspect；群不存在时不插新行并返回 False。"""
+    key = (str(bot_hash), str(group_openid))
+    with _LOCK:
+        old = get_group(*key)
+        if old is None:
+            return False
+        upsert_group(key[0], key[1], state='suspect')
+        return True
+
+
+def restore_group_active_if_suspect(bot_hash, group_openid):
+    """原子将处于 suspect 的群恢复为 active。"""
+    key = (str(bot_hash), str(group_openid))
+    with _LOCK:
+        old = get_group(*key)
+        if old is None or old.get('state') != 'suspect':
+            return False
+        upsert_group(key[0], key[1], state='active')
+        return True
+
+
+def remove_group_if_suspect(bot_hash, group_openid):
+    """原子删除仍处于 suspect 的群及其成员，避免误删已恢复的活跃群。"""
+    key = (str(bot_hash), str(group_openid))
+    with _LOCK:
+        old = get_group(*key)
+        if old is None or old.get('state') != 'suspect':
+            return False
+        remove_group(key[0], key[1])
+        return True
+
+
+def mark_group_warming(bot_hash, group_openid):
+    """原子将活跃且未完整/未续翻的群置为 warming，群不存在或状态不符时返回 False。"""
+    key = (str(bot_hash), str(group_openid))
+    with _LOCK:
+        old = get_group(*key)
+        if old is None:
+            return False
+        if old.get('state') != 'active':
+            return False
+        if old.get('members_state') in ('complete', 'warming'):
+            return False
+        upsert_group(key[0], key[1], members_state='warming')
+        return True
+
+
+def reset_group_warming(bot_hash, group_openid):
+    """原子将处于 warming 的群复位为 active，防止复活已删群或降级已 complete 群。"""
+    key = (str(bot_hash), str(group_openid))
+    with _LOCK:
+        old = get_group(*key)
+        if old is None or old.get('members_state') != 'warming':
+            return False
+        upsert_group(key[0], key[1], members_state='active')
+        return True
 
 
 def get_group(bot_hash, group_openid):
@@ -312,9 +403,94 @@ def list_seed_groups(bot_hash, limit=3):
                     groups.pop(key[1], None)
                 else:
                     groups[key[1]] = row
-        active = [row for row in groups.values() if row['state'] != 'dormant']
+        active = [row for row in groups.values() if row['state'] == 'active']
         active.sort(key=lambda row: (-row['last_seen_at'], row['group_openid']))
         return [row['group_openid'] for row in active[:max(0, int(limit))]]
+
+
+def list_groups_for_calibration(bot_hash, active_since, stale_before, limit):
+    """挑出需要全量校准的群，按优先级排序返回 group_openid 列表。"""
+    max_rows = max(0, int(limit))
+    if max_rows == 0:
+        return []
+    with _LOCK:
+        db = _db()
+        _commit_locked()
+        rows = db.execute(
+            "SELECT group_openid FROM groups "
+            "WHERE bot_hash=? AND state='active' AND last_seen_at>=? "
+            "AND (members_state!='complete' OR verified_at IS NULL OR verified_at<?) "
+            "ORDER BY (members_state='complete') ASC, COALESCE(verified_at, 0) ASC, "
+            "last_seen_at DESC "
+            "LIMIT ?",
+            (str(bot_hash), int(active_since), int(stale_before), max_rows)
+        ).fetchall()
+        return [row['group_openid'] for row in rows]
+
+
+def reconcile_group_members(bot_hash, group_openid, keep_openids, sync_started_at):
+    """删除本次全量结果里没出现、且在 sync_started_at 之前就没有更新的成员，返回删除条数。"""
+    if not keep_openids:
+        return 0
+    keep_set = {
+        str(openid) for openid in keep_openids
+        if openid is not None and str(openid) != ''
+    }
+    if not keep_set:
+        return 0
+    bot_hash = str(bot_hash)
+    group_openid = str(group_openid)
+    cutoff = int(sync_started_at)
+    batch_size = 490
+    with _LOCK:
+        db = _db()
+        _commit_locked()
+        if len(keep_set) <= batch_size and _import_changes is None:
+            keep_list = sorted(keep_set)
+            placeholders = ','.join('?' for _ in keep_list)
+            try:
+                cur = db.execute(
+                    'DELETE FROM members '
+                    'WHERE bot_hash=? AND group_openid=? '
+                    'AND member_openid NOT IN (%s) AND +updated_at<?' % placeholders,
+                    (bot_hash, group_openid) + tuple(keep_list) + (cutoff,)
+                )
+                deleted = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            return deleted
+        # 超过单次占位符上限（或导入追踪期）时，先查候选旧成员再分批按 IN 删除，
+        # 避免拆批 NOT IN 误删其它批次的成员，同时严守单次 ≤500 占位符。
+        rows = db.execute(
+            'SELECT member_openid FROM members '
+            'WHERE bot_hash=? AND group_openid=? AND +updated_at<?',
+            (bot_hash, group_openid, cutoff)
+        ).fetchall()
+        to_delete = [row['member_openid'] for row in rows if row['member_openid'] not in keep_set]
+        if not to_delete:
+            return 0
+        deleted = 0
+        try:
+            for start in range(0, len(to_delete), batch_size):
+                chunk = to_delete[start:start + batch_size]
+                placeholders = ','.join('?' for _ in chunk)
+                cur = db.execute(
+                    'DELETE FROM members '
+                    'WHERE bot_hash=? AND group_openid=? AND +updated_at<? '
+                    'AND member_openid IN (%s)' % placeholders,
+                    (bot_hash, group_openid, cutoff) + tuple(chunk)
+                )
+                if cur.rowcount and cur.rowcount > 0:
+                    deleted += cur.rowcount
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        for member_openid in to_delete:
+            _changed('removed_member', (bot_hash, group_openid, member_openid))
+        return deleted
 
 
 def _evict_locked(now, limit, members=True, groups=True):
@@ -330,17 +506,25 @@ def _evict_locked(now, limit, members=True, groups=True):
         params = (now - 120 * _DAY,)
     rows = db.execute('SELECT bot_hash,group_openid,last_seen_at FROM groups WHERE ' + condition +
                       ' ORDER BY last_seen_at LIMIT ?', params + (max(0, int(limit)),)).fetchall()
-    for row in rows:
-        key = (row['bot_hash'], row['group_openid'])
-        db.execute('DELETE FROM members WHERE bot_hash=? AND group_openid=?', key)
-        if groups and row['last_seen_at'] < now - 365 * _DAY:
-            db.execute('DELETE FROM groups WHERE bot_hash=? AND group_openid=?', key)
-        else:
-            db.execute("UPDATE groups SET state='dormant',members_state='evicted' "
-                       'WHERE bot_hash=? AND group_openid=?', key)
-        _changed('removed_group', key)
     if rows:
-        db.commit()
+        try:
+            for row in rows:
+                key = (row['bot_hash'], row['group_openid'])
+                db.execute('DELETE FROM members WHERE bot_hash=? AND group_openid=?', key)
+                if groups and row['last_seen_at'] < now - 365 * _DAY:
+                    db.execute('DELETE FROM groups WHERE bot_hash=? AND group_openid=?', key)
+                else:
+                    db.execute(
+                        "UPDATE groups SET state='dormant',members_state='evicted',verified_at=NULL "
+                        'WHERE bot_hash=? AND group_openid=?',
+                        key
+                    )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        for row in rows:
+            _changed('removed_group', (row['bot_hash'], row['group_openid']))
         db.execute('PRAGMA incremental_vacuum')
     return len(rows)
 
@@ -353,6 +537,83 @@ def evict_members_by_age(now=None, limit=1000):
 def evict_groups_by_age(now=None, limit=1000):
     with _LOCK:
         return _evict_locked(int(time.time() if now is None else now), limit, members=False)
+
+
+def _evict_suspect_locked(now, limit):
+    db = _db()
+    _commit_locked()
+    rows = db.execute(
+        "SELECT bot_hash,group_openid FROM groups "
+        "WHERE state='suspect' AND last_seen_at<? "
+        'ORDER BY last_seen_at LIMIT ?',
+        (now - 30 * _DAY, max(0, int(limit)))
+    ).fetchall()
+    if rows:
+        try:
+            for row in rows:
+                key = (row['bot_hash'], row['group_openid'])
+                db.execute('DELETE FROM members WHERE bot_hash=? AND group_openid=?', key)
+                db.execute(
+                    "UPDATE groups SET state='dormant',members_state='evicted',verified_at=NULL "
+                    'WHERE bot_hash=? AND group_openid=?',
+                    key
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        for row in rows:
+            _changed('removed_group', (row['bot_hash'], row['group_openid']))
+        db.execute('PRAGMA incremental_vacuum')
+    return len(rows)
+
+
+def evict_suspect_groups(now=None, limit=1000):
+    with _LOCK:
+        return _evict_suspect_locked(int(time.time() if now is None else now), limit)
+
+
+def _evict_member_placeholders_locked(now, limit):
+    max_rows = max(0, int(limit))
+    if max_rows == 0:
+        return 0
+    db = _db()
+    _commit_locked()
+    cutoff = int(now) - 60 * _DAY
+    rows = db.execute(
+        "SELECT bot_hash, group_openid, member_openid FROM members "
+        "WHERE (username IS NULL OR username='') "
+        "AND (member_nickname IS NULL OR member_nickname='') "
+        "AND updated_at<? "
+        "ORDER BY updated_at ASC LIMIT ?",
+        (cutoff, max_rows)
+    ).fetchall()
+    if not rows:
+        return 0
+    try:
+        for row in rows:
+            key = (row['bot_hash'], row['group_openid'], row['member_openid'])
+            db.execute(
+                'DELETE FROM members WHERE bot_hash=? AND group_openid=? AND member_openid=?',
+                key
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for row in rows:
+        _changed('removed_member', (row['bot_hash'], row['group_openid'], row['member_openid']))
+    db.execute('PRAGMA incremental_vacuum')
+    return len(rows)
+
+
+def evict_member_placeholders(now=None, limit=1000):
+    """删除超过 60 天且无昵称/无群名片的纯占位成员行，返回删除条数。"""
+    with _LOCK:
+        return _evict_member_placeholders_locked(
+            int(time.time() if now is None else now),
+            limit
+        )
 
 
 def get_meta(key):

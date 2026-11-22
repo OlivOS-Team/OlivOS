@@ -13,6 +13,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 '''
 
 import json
+import threading
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -29,9 +30,22 @@ def self_context(monkeypatch):
     monkeypatch.setattr(common, 'sdkSubSelfOpenInfoRetryAt', {})
     monkeypatch.setattr(common, 'sdkSubSelfOpenInfoRequestHistory', {})
     monkeypatch.setattr(common, 'sdkSubSelfOpenInfoDisabled', set())
+    monkeypatch.setattr(common, 'sdkQQGroupApiDenied', set())
+    monkeypatch.setattr(common, 'sdkQQGroupApiBackoff', {})
+    monkeypatch.setattr(common, 'sdkQQGroupApiRateInfo', {})
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectState', {})
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectDue', [])
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectGeneration', {})
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectPending', {})
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectVerifying', set())
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectThread', None)
+    monkeypatch.setattr(common, 'sdkQQGroupSuspectEvent', threading.Event())
+    monkeypatch.setattr(common, '_schedule_qq_group_suspect_verify', lambda *args, **kwargs: True)
     proc = SimpleNamespace(Proc_data={})
     monkeypatch.setattr(OlivOS.pluginAPI, 'gProc', proc)
     yield common.bot_info_T(id=123, model='public'), proc
+    common.sdkQQGroupSuspectThread = None
+    common.sdkQQGroupSuspectEvent.set()
     store.close_db()
 
 
@@ -80,7 +94,9 @@ def test_invalid_seed_is_removed_then_next_seed_is_persisted(self_context, tmp_p
     })
     assert common._get_qq_group_self_open_id('hash', None, bot) == 'self-openid'
     assert calls == ['invalid', 'valid']
-    assert store.get_group('hash', 'invalid') is None
+    invalid_group = store.get_group('hash', 'invalid')
+    assert invalid_group is not None
+    assert invalid_group['state'] == 'suspect'
     saved = json.loads((tmp_path / 'data' / 'qqGuildv2' / 'bot_self.json').read_text(encoding='utf-8'))['hash']
     assert saved['openid'] == 'self-openid'
     assert saved['source'] == 'group'
@@ -100,10 +116,38 @@ def test_without_seeds_waits_for_group_event(self_context, monkeypatch):
 
 def test_11253_disables_self_discovery_for_bot(self_context, monkeypatch):
     bot, _ = self_context
+    bot_hash = OlivOS.API.getBotHash(
+        bot_id=bot.id, platform_sdk='qqGuildv2_link',
+        platform_platform='qqGuild', platform_model=bot.model
+    )
     calls = bot_state_factory(monkeypatch, {'group': (403, {'code': 11253})})
-    assert common._get_qq_group_self_open_id('hash', 'group', bot) is None
-    assert common._get_qq_group_self_open_id('hash', 'group', bot, now=1000000) is None
+    assert common._get_qq_group_self_open_id(bot_hash, 'group', bot) is None
+    assert common._get_qq_group_self_open_id(bot_hash, 'group', bot, now=1000000) is None
     assert calls == ['group']
+    assert common._check_qq_group_api_denied(bot_hash, 'group_bot_state') is True
+
+
+def test_11253_disables_group_bot_state_only_for_denied_bot(self_context, monkeypatch):
+    bot_a, _ = self_context
+    bot_b = common.bot_info_T(id=456, model='public')
+    hash_a = OlivOS.API.getBotHash(
+        bot_id=bot_a.id, platform_sdk='qqGuildv2_link',
+        platform_platform='qqGuild', platform_model=bot_a.model
+    )
+    hash_b = OlivOS.API.getBotHash(
+        bot_id=bot_b.id, platform_sdk='qqGuildv2_link',
+        platform_platform='qqGuild', platform_model=bot_b.model
+    )
+    calls = bot_state_factory(monkeypatch, {
+        'g_a': (403, {'code': 11253}),
+        'g_b': (200, {'member_openid': 'self-b'})
+    })
+    assert common._get_qq_group_self_open_id(hash_a, 'g_a', bot_a) is None
+    assert common._check_qq_group_api_denied(hash_a, 'group_bot_state') is True
+    assert common._check_qq_group_api_denied(hash_b, 'group_bot_state') is False
+    # 其它 bot 仍可正常探测并拿到自身 openid。
+    assert common._get_qq_group_self_open_id(hash_b, 'g_b', bot_b) == 'self-b'
+    assert calls == ['g_a', 'g_b']
 
 
 def test_unknown_self_openid_is_not_guessed_from_mentions(self_context, monkeypatch):
