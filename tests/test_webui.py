@@ -1645,6 +1645,37 @@ def test_busy_port_advances_and_tray_uses_actual_port(host, monkeypatch):
         assert not host.listen_path.exists()
 
 
+@pytest.mark.skipif(os.name != 'nt', reason='WSAEACCES 是 Windows 的端口保留错误码')
+def test_windows_reserved_port_error_advances(host, monkeypatch):
+    # Windows 对系统保留端口返回 WSAEACCES 而不是 WSAEADDRINUSE，WebUI 也应顺延端口。
+    import errno
+
+    real_start = serverAPI.web.TCPSite.start
+    attempts = []
+
+    async def start(site):
+        attempts.append(site._port)
+        if len(attempts) == 1:
+            raise OSError(errno.EACCES, 'test reserved port')
+        await real_start(site)
+
+    monkeypatch.setattr(serverAPI.web.TCPSite, 'start', start)
+    with socket.socket() as occupied:
+        occupied.bind(('127.0.0.1', 0))
+        occupied.listen()
+        requested = occupied.getsockname()[1]
+        host.config['port'] = requested
+        worker = threading.Thread(target=host.run, daemon=True)
+        worker.start()
+        try:
+            assert host.ready.wait(5) and host.error is None
+            assert attempts[0] == requested
+            assert host.config['port'] > requested
+        finally:
+            host.on_terminate()
+            worker.join(timeout=5)
+
+
 def test_listener_discovery_rejects_stale_records(host, monkeypatch):
     from types import SimpleNamespace
 
@@ -1675,7 +1706,8 @@ def test_bind_errors_other_than_busy_do_not_advance(host, monkeypatch):
     from unittest.mock import AsyncMock
     import errno
 
-    start = AsyncMock(side_effect=OSError(errno.EACCES, 'test permission failure'))
+    # 地址不可用属于配置错误，不能像端口被占用那样静默顺延。
+    start = AsyncMock(side_effect=OSError(errno.EADDRNOTAVAIL, 'test address failure'))
     monkeypatch.setattr(serverAPI.web.TCPSite, 'start', start)
     host.run()
     assert host.error and start.call_count == 1
