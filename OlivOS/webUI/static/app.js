@@ -2029,9 +2029,9 @@ function renderPerformanceStatistics(data) {
 }
 function uptimeText(milliseconds) {
   const total = Math.max(0, Math.floor(milliseconds / 1000));
-  const days = Math.floor(total / 86400000);
-  const hours = Math.floor(total / 3600000) % 24;
-  const minutes = Math.floor(total / 60000) % 60;
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor(total / 3600) % 24;
+  const minutes = Math.floor(total / 60) % 60;
   const seconds = total % 60;
   const pad = (value) => String(value).padStart(2, '0');
   return `运行时长：${days} 天 ${pad(hours)} 时 ${pad(minutes)} 分 ${pad(seconds)} 秒`;

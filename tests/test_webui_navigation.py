@@ -1468,6 +1468,20 @@ def test_dashboard_uptime_advances_smoothly_between_status_refreshes(browser):
     assert all(delta >= 0 for delta in deltas), deltas
     assert all(delta <= 1 for delta in deltas), deltas
     assert any(delta > 0 for delta in deltas), deltas
+    # 运行时长跨越分钟、小时和天后必须继续累计，不能因单位换算出错而重置。
+    uptime_boundaries = driver.execute_script(r'''
+        return [59, 60, 61, 3599, 3600, 86399, 86400].map(
+          (seconds) => uptimeText(seconds * 1000));
+    ''')
+    assert uptime_boundaries == [
+        '运行时长：0 天 00 时 00 分 59 秒',
+        '运行时长：0 天 00 时 01 分 00 秒',
+        '运行时长：0 天 00 时 01 分 01 秒',
+        '运行时长：0 天 00 时 59 分 59 秒',
+        '运行时长：0 天 01 时 00 分 00 秒',
+        '运行时长：0 天 23 时 59 分 59 秒',
+        '运行时长：1 天 00 时 00 分 00 秒',
+    ]
 
 
 def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
