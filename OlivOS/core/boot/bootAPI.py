@@ -42,6 +42,40 @@ def releaseDir(dir_path):
         os.makedirs(dir_path)
 
 
+def ensure_statistics_model(basic_conf):
+    # 旧版 basic.json 没有统计组件；运行时补全，并确保它在任意 WebUI 模型之前启动。
+    if not isinstance(basic_conf, dict):
+        return basic_conf
+    models = basic_conf.get('models')
+    if not isinstance(models, dict):
+        return basic_conf
+    model_name = 'OlivOS_statistics'
+    if model_name not in models:
+        model = copy.deepcopy(OlivOS.bootDataAPI.default_Conf['models'][model_name])
+        if model.get('logger_proc') not in models:
+            logger_names = [
+                name for name, item in models.items()
+                if isinstance(item, dict) and item.get('type') == 'logger'
+            ]
+            model['logger_proc'] = logger_names[0] if logger_names else None
+        models[model_name] = model
+    system = basic_conf.get('system')
+    if not isinstance(system, dict):
+        return basic_conf
+    init_list = system.get('init')
+    if not isinstance(init_list, list) or model_name in init_list:
+        return basic_conf
+    webui_indexes = [
+        index for index, name in enumerate(init_list)
+        if isinstance(models.get(name), dict) and models[name].get('type') == 'webUI'
+    ]
+    if webui_indexes:
+        init_list.insert(webui_indexes[0], model_name)
+    else:
+        init_list.append(model_name)
+    return basic_conf
+
+
 class Entity(object):
     def __init__(self, basic_conf=None, patch_conf=None):
         self.Config = {
@@ -130,6 +164,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
         preLoadPrint('init models from config ... ')
         if basic_conf is not None:
+            ensure_statistics_model(basic_conf)
             basic_conf_models = basic_conf['models']
             preLoadPrint('init models from config ... done')
         else:
@@ -954,6 +989,20 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     ),
                                     block=False
                                 )
+                        elif basic_conf_models_this['type'] == 'statistics':
+                            model_name = basic_conf_models_this['name']
+                            if model_name not in Proc_dict:
+                                logger_name = basic_conf_models_this.get('logger_proc')
+                                Proc_dict[model_name] = OlivOS.statisticsAPI.server(
+                                    Proc_name=model_name,
+                                    scan_interval=basic_conf_models_this.get('interval', 1),
+                                    dead_interval=basic_conf_models_this.get('dead_interval', 1),
+                                    rx_queue=None,
+                                    tx_queue=None,
+                                    control_queue=main_control.control_queue,
+                                    logger_proc=Proc_dict.get(logger_name)
+                                )
+                                Proc_Proc_dict[model_name] = Proc_dict[model_name].start_unity('threading')
                         elif basic_conf_models_this['type'] == 'webUI':
                             model_name = basic_conf_models_this['name']
                             if model_name not in Proc_dict:

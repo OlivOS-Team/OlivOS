@@ -226,32 +226,20 @@ def test_plugin_navigation_auth_failure_can_notify_parent_without_credentials(ho
 
 @pytest.mark.skipif(not os.environ.get('OLIVOS_WEBUI_BROWSER'), reason='设置 OLIVOS_WEBUI_BROWSER=1 运行浏览器验证')
 @pytest.mark.parametrize('reset_between', [False, True])
-def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
+def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between, chrome_session):
     pytest.importorskip('selenium')
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
     host.config.update(host='127.0.0.1', port=0)
     worker = threading.Thread(target=host.run, daemon=True)
     worker.start()
-    driver = None
     try:
         assert host.ready.wait(5) and host.error is None
-        options = webdriver.ChromeOptions()
-        if os.environ.get('OLIVOS_CHROME_NO_SANDBOX') == '1':
-            options.add_argument('--no-sandbox')
-        if os.environ.get('OLIVOS_CHROME_BINARY'):
-            options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
-        for argument in ('--headless=new', '--no-first-run', '--disable-background-networking',
-                         f'--user-data-dir={host.root / "login-race-profile"}'):
-            options.add_argument(argument)
-        driver_path = os.environ.get('OLIVOS_CHROMEDRIVER')
-        service = Service(executable_path=driver_path) if driver_path else None
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.get(f"http://127.0.0.1:{host.config['port']}")
-        wait = WebDriverWait(driver, 10)
+        url = f"http://127.0.0.1:{host.config['port']}"
+        driver = chrome_session.prepare(url)
+        driver.get(url)
+        wait = WebDriverWait(driver, 30)
         wait.until(lambda d: d.find_element(By.ID, 'token').is_displayed())
         driver.find_element(By.ID, 'token').send_keys(host.test_password)
         driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
@@ -281,8 +269,6 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between):
         ''', reset_between)
         assert result == {'stayedDisabled': True, 'loggedIn': True}
     finally:
-        if driver is not None:
-            driver.quit()
         host.on_terminate()
         worker.join(timeout=5)
 

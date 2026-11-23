@@ -25,6 +25,7 @@ default_Conf = {
             "OlivOS_account_config_save",
             "OlivOS_account_config",
             "OlivOS_nativeWinUIAPI",
+            "OlivOS_statistics",
             "OlivOS_webUI",
             "OlivOS_astralqsign_lib_exe_model",
             "OlivOS_gocqhttp_lib_exe_model",
@@ -166,6 +167,16 @@ default_Conf = {
         "OlivOS_dingtalk_queue"
     ],
     "models": {
+        "OlivOS_statistics": {
+            "enable": True,
+            "name": "OlivOS_statistics",
+            "type": "statistics",
+            "interval": 1,
+            "dead_interval": 1,
+            "proc_mode": "threading",
+            "control_queue": "OlivOS_control_queue",
+            "logger_proc": "OlivOS_logger"
+        },
         "OlivOS_webUI": {
             "enable": True,
             "name": "OlivOS_webUI",

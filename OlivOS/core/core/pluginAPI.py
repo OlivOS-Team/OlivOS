@@ -289,6 +289,7 @@ class shallow(API.Proc_templet):
 
     def run(self):
         OlivOS.pluginAPI.gProc = self
+        OlivOS.statisticsAPI.bind_control_queue(self.Proc_info.control_queue)
         profile_error = None
         try:
             tk_panels = tkBridgeAPI.load_panels('.')
@@ -364,6 +365,7 @@ class shallow(API.Proc_templet):
                 rx_count = 0
             timer_work = self._schedule.dispatch()
             if rx_packet_data is None:
+                OlivOS.statisticsAPI.flush_traffic()
                 if not timer_work:
                     time.sleep(self.Proc_info.scan_interval)
                 if (
@@ -548,6 +550,9 @@ class shallow(API.Proc_templet):
     def run_plugin(self, sdk_event):
         # plugin_event = API.Event(sdk_event=sdk_event, log_func=self.log, Proc=self)
         plugin_event = API.Event(sdk_event=sdk_event)
+        func_type = plugin_event.plugin_info.get('func_type')
+        if func_type is not None:
+            OlivOS.statisticsAPI.record_event_type(func_type)
         plugin_event_bot_hash = API.getBotHash(
             bot_id=plugin_event.base_info['self_id'],
             platform_sdk=plugin_event.platform['sdk'],
@@ -692,6 +697,7 @@ class shallow(API.Proc_templet):
                     ],
                     modelName
                 ))
+                OlivOS.statisticsAPI.record_failed()
                 plugin_event.set_block()
         return
 

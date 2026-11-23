@@ -114,6 +114,12 @@
             </svg>
             <span class="nav-label">日志</span>
           </button>
+          <button data-page="performance" aria-label="性能" title="性能">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4 18h16M6 15l4-5 3 3 5-8"></path>
+            </svg>
+            <span class="nav-label">性能</span>
+          </button>
           <button data-page="terminals" aria-label="终端" title="终端">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <rect x="3" y="4" width="18" height="16" rx="2"></rect>
@@ -205,14 +211,7 @@
         </div>
         <section id="dashboard" class="page">
           <div id="status-cards" class="cards"></div>
-          <div class="runtime-summary">
-            <h2>运行状态</h2>
-            <p id="runtime"></p>
-            <div id="unknown-status" hidden>
-              <p id="online-note"></p>
-              <ul id="unknown-accounts" class="account-status-list"></ul>
-            </div>
-            <p id="update-status"></p>
+          <section class="runtime-summary" aria-labelledby="runtime-title">
             <div class="toolbar">
               <button id="check-update">检查更新</button>
               <button id="dashboard-reload-plugins">重载插件</button>
@@ -226,6 +225,344 @@
                 社区论坛
               </a>
               <button id="exit" class="danger">退出 OlivOS</button>
+            </div>
+            <p id="update-status"></p>
+            <div id="runtime-details" class="runtime-details">
+              <div class="section-heading">
+                <h2 id="runtime-title">运行状态</h2>
+              </div>
+              <p id="runtime"></p>
+              <div id="unknown-status" hidden>
+                <p id="online-note"></p>
+                <ul id="unknown-accounts" class="account-status-list"></ul>
+              </div>
+              <p id="statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
+              <div id="statistics-content" class="dashboard-statistics" hidden>
+                <section class="panel dashboard-panel" aria-labelledby="performance-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-title">性能</h3>
+                    <span id="statistics-sampled" class="statistics-sampled"></span>
+                  </div>
+                  <div id="performance-metrics" class="metric-grid"></div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </section>
+        <section id="performance" class="page" hidden>
+          <div class="section-heading">
+            <h2>性能监测</h2>
+            <span id="performance-sampled" class="statistics-sampled"></span>
+          </div>
+          <p id="performance-statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
+          <div id="performance-content" class="performance-workbench" hidden>
+            <div class="performance-categories" role="tablist" aria-label="性能分类">
+              <button class="performance-category active" id="performance-category-cpu" type="button"
+                      role="tab" data-performance-category="cpu" aria-selected="true"
+                      aria-controls="performance-view-cpu">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+                    <path d="M9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">CPU</span>
+                  <span class="performance-category-value" data-performance-summary="cpu"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="cpu" aria-hidden="true"></span>
+              </button>
+              <button class="performance-category" id="performance-category-memory" type="button"
+                      role="tab" data-performance-category="memory" aria-selected="false"
+                      aria-controls="performance-view-memory">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="4" y="6" width="16" height="12" rx="1"></rect>
+                    <path d="M8 10v4M12 10v4M16 10v4"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">内存</span>
+                  <span class="performance-category-value" data-performance-summary="memory"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="memory" aria-hidden="true"></span>
+              </button>
+              <button class="performance-category" id="performance-category-disk" type="button"
+                      role="tab" data-performance-category="disk" aria-selected="false"
+                      aria-controls="performance-view-disk">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="4" y="5" width="16" height="6" rx="2"></rect>
+                    <rect x="4" y="13" width="16" height="6" rx="2"></rect>
+                    <circle cx="17" cy="8" r="1"></circle>
+                    <circle cx="17" cy="16" r="1"></circle>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">磁盘</span>
+                  <span class="performance-category-value" data-performance-summary="disk"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="disk" aria-hidden="true"></span>
+              </button>
+              <button class="performance-category" id="performance-category-network" type="button"
+                      role="tab" data-performance-category="network" aria-selected="false"
+                      aria-controls="performance-view-network">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M7 8h10M7 8l3-3M7 8l3 3M17 16H7M17 16l-3-3M17 16l-3 3"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">网络</span>
+                  <span class="performance-category-value" data-performance-summary="network"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="network" aria-hidden="true"></span>
+              </button>
+              <button class="performance-category" id="performance-category-traffic" type="button"
+                      role="tab" data-performance-category="traffic" aria-selected="false"
+                      aria-controls="performance-view-traffic">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 5h14v10H9l-4 4V5z"></path>
+                    <path d="M8 9h8M8 12h5"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">消息</span>
+                  <span class="performance-category-value" data-performance-summary="traffic"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="traffic" aria-hidden="true"></span>
+              </button>
+              <button class="performance-category" id="performance-category-processes" type="button"
+                      role="tab" data-performance-category="processes" aria-selected="false"
+                      aria-controls="performance-view-processes">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+                    <rect x="3" y="17" width="6" height="4" rx="1"></rect>
+                    <rect x="15" y="17" width="6" height="4" rx="1"></rect>
+                    <path d="M12 7v5M6 17v-5h12v5"></path>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">进程</span>
+                  <span class="performance-category-value" data-performance-summary="processes"></span>
+                </span>
+                <span class="performance-category-spark" data-performance-mini="processes" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="performance-detail">
+              <section id="performance-view-cpu" class="performance-view" data-performance-view="cpu"
+                       role="tabpanel" aria-labelledby="performance-category-cpu">
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>CPU</h3>
+                    <p id="performance-cpu-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value" data-performance-summary="cpu"></strong>
+                </div>
+                <section class="panel performance-panel performance-panel-hero"
+                         aria-labelledby="performance-cpu-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-cpu-chart-title">CPU</h3>
+                  </div>
+                  <div id="performance-cpu-chart" class="statistics-chart performance-chart-hero" role="img"
+                       aria-label="CPU 使用率与负载趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-cpu"></i>CPU 使用率</span>
+                    <span><i class="legend-dot legend-machine-load"></i>负载</span>
+                  </div>
+                </section>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-load-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-load-chart-title">OlivOS 负载</h3>
+                  </div>
+                  <div id="performance-load-chart" class="statistics-chart performance-chart-compact"
+                       role="img" aria-label="OlivOS 负载趋势"></div>
+                  <p id="performance-load-readout" class="performance-readout"></p>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-load"></i>OlivOS 负载</span>
+                  </div>
+                </section>
+                <dl class="performance-fact-grid" aria-label="CPU 详细信息">
+                  <div class="performance-fact"><dt>负载</dt><dd data-performance-stat="cpu-machine-load"></dd></div>
+                  <div class="performance-fact"><dt>逻辑处理器</dt><dd data-performance-stat="cpu-logical"></dd></div>
+                  <div class="performance-fact"><dt>OlivOS 负载</dt><dd data-performance-stat="cpu-load"></dd></div>
+                  <div class="performance-fact"><dt>OlivOS 进程</dt><dd data-performance-stat="cpu-processes"></dd></div>
+                  <div class="performance-fact"><dt>线程</dt><dd data-performance-stat="cpu-threads"></dd></div>
+                  <div class="performance-fact"><dt>句柄</dt><dd data-performance-stat="cpu-handles"></dd></div>
+                </dl>
+              </section>
+              <section id="performance-view-memory" class="performance-view" data-performance-view="memory"
+                       role="tabpanel" aria-labelledby="performance-category-memory" hidden>
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>内存</h3>
+                    <p id="performance-memory-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value" data-performance-summary="memory"></strong>
+                </div>
+                <section class="panel performance-panel performance-panel-hero"
+                         aria-labelledby="performance-memory-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-memory-chart-title">内存</h3>
+                  </div>
+                  <div id="performance-memory-chart" class="statistics-chart performance-chart-hero" role="img"
+                       aria-label="内存、Swap 与换入换出趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-memory"></i>内存使用率</span>
+                    <span><i class="legend-dot legend-swap"></i>Swap 使用率</span>
+                    <span><i class="legend-dot legend-swap-in"></i>换入</span>
+                    <span><i class="legend-dot legend-swap-out"></i>换出</span>
+                  </div>
+                </section>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-process-memory-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-process-memory-chart-title">OlivOS 进程内存</h3>
+                  </div>
+                  <div id="performance-process-memory-chart" class="statistics-chart performance-chart-compact"
+                       role="img" aria-label="OlivOS 进程内存趋势"></div>
+                  <p id="performance-process-memory-readout" class="performance-readout"></p>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-process-memory"></i>进程内存</span>
+                  </div>
+                </section>
+                <dl class="performance-fact-grid" aria-label="内存详细信息">
+                  <div class="performance-fact"><dt>使用中</dt><dd data-performance-stat="memory-used"></dd></div>
+                  <div class="performance-fact"><dt>可用</dt><dd data-performance-stat="memory-available"></dd></div>
+                  <div class="performance-fact"><dt>总计</dt><dd data-performance-stat="memory-total"></dd></div>
+                  <div class="performance-fact"><dt>Swap</dt><dd data-performance-stat="memory-swap"></dd></div>
+                  <div class="performance-fact"><dt>换入</dt><dd data-performance-stat="memory-swap-in"></dd></div>
+                  <div class="performance-fact"><dt>换出</dt><dd data-performance-stat="memory-swap-out"></dd></div>
+                </dl>
+              </section>
+              <section id="performance-view-disk" class="performance-view" data-performance-view="disk"
+                       role="tabpanel" aria-labelledby="performance-category-disk" hidden>
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>磁盘</h3>
+                    <p id="performance-disk-usage-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value" data-performance-summary="disk"></strong>
+                </div>
+                <section class="panel performance-panel performance-panel-hero"
+                         aria-labelledby="performance-disk-usage-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-disk-usage-chart-title">磁盘</h3>
+                  </div>
+                  <div id="performance-disk-usage-chart" class="statistics-chart performance-chart-hero" role="img"
+                       aria-label="磁盘占用率趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-disk"></i>磁盘占用率</span>
+                  </div>
+                </section>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-disk-io-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-disk-io-chart-title">磁盘 IO</h3>
+                  </div>
+                  <div id="performance-disk-io-chart" class="statistics-chart performance-chart-compact" role="img"
+                       aria-label="磁盘读取与写入速率趋势"></div>
+                  <p id="performance-disk-io-readout" class="performance-readout"></p>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-disk-read"></i>读取</span>
+                    <span><i class="legend-dot legend-disk-write"></i>写入</span>
+                  </div>
+                </section>
+                <dl class="performance-fact-grid" aria-label="磁盘详细信息">
+                  <div class="performance-fact"><dt>占用率</dt><dd data-performance-stat="disk-percent"></dd></div>
+                  <div class="performance-fact"><dt>已用</dt><dd data-performance-stat="disk-used"></dd></div>
+                  <div class="performance-fact"><dt>容量</dt><dd data-performance-stat="disk-total"></dd></div>
+                  <div class="performance-fact"><dt>卷</dt><dd data-performance-stat="disk-volumes"></dd></div>
+                  <div class="performance-fact"><dt>读取</dt><dd data-performance-stat="disk-read"></dd></div>
+                  <div class="performance-fact"><dt>写入</dt><dd data-performance-stat="disk-write"></dd></div>
+                </dl>
+              </section>
+              <section id="performance-view-network" class="performance-view" data-performance-view="network"
+                       role="tabpanel" aria-labelledby="performance-category-network" hidden>
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>网络</h3>
+                    <p id="performance-network-readout" class="performance-readout"></p>
+                  </div>
+                  <strong id="performance-network-value"
+                          class="performance-view-value performance-view-value-network"></strong>
+                </div>
+                <section class="panel performance-panel performance-panel-hero"
+                         aria-labelledby="performance-network-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-network-chart-title">网络</h3>
+                  </div>
+                  <div id="performance-network-chart" class="statistics-chart performance-chart-hero" role="img"
+                       aria-label="网络下行与上行速率趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-network-down"></i>网络下行</span>
+                    <span><i class="legend-dot legend-network-up"></i>网络上行</span>
+                  </div>
+                </section>
+                <dl class="performance-fact-grid" aria-label="网络详细信息">
+                  <div class="performance-fact"><dt>下行</dt><dd data-performance-stat="network-recv"></dd></div>
+                  <div class="performance-fact"><dt>上行</dt><dd data-performance-stat="network-sent"></dd></div>
+                  <div class="performance-fact"><dt>接收包/秒</dt><dd data-performance-stat="network-packets-recv"></dd></div>
+                  <div class="performance-fact"><dt>发送包/秒</dt><dd data-performance-stat="network-packets-sent"></dd></div>
+                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
+                       aria-hidden="true"></div>
+                </dl>
+              </section>
+              <section id="performance-view-traffic" class="performance-view" data-performance-view="traffic"
+                       role="tabpanel" aria-labelledby="performance-category-traffic" hidden>
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>消息</h3>
+                    <p id="performance-traffic-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value" data-performance-summary="traffic"></strong>
+                </div>
+                <section class="panel performance-panel performance-panel-hero"
+                         aria-labelledby="performance-traffic-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-traffic-chart-title">消息</h3>
+                  </div>
+                  <div id="performance-traffic-chart" class="statistics-chart performance-chart-hero" role="img"
+                       aria-label="入站与出站消息流量趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-inbound"></i>入站</span>
+                    <span><i class="legend-dot legend-outbound"></i>出站</span>
+                  </div>
+                </section>
+                <dl class="performance-fact-grid" aria-label="消息详细信息">
+                  <div class="performance-fact"><dt>入站/分钟</dt><dd data-performance-stat="traffic-in"></dd></div>
+                  <div class="performance-fact"><dt>出站/分钟</dt><dd data-performance-stat="traffic-out"></dd></div>
+                  <div class="performance-fact"><dt>累计入站</dt><dd data-performance-stat="traffic-in-total"></dd></div>
+                  <div class="performance-fact"><dt>累计出站</dt><dd data-performance-stat="traffic-out-total"></dd></div>
+                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
+                       aria-hidden="true"></div>
+                </dl>
+              </section>
+              <section id="performance-view-processes" class="performance-view" data-performance-view="processes"
+                       role="tabpanel" aria-labelledby="performance-category-processes" hidden>
+                <div class="performance-view-heading performance-view-heading-processes">
+                  <div>
+                    <h3>进程</h3>
+                    <p id="performance-processes-readout" class="performance-readout"></p>
+                  </div>
+                  <strong class="performance-view-value performance-view-value-processes"
+                          data-performance-summary="processes-detail"></strong>
+                </div>
+                <section class="panel performance-panel performance-process-panel"
+                         aria-labelledby="performance-processes-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-processes-title">OlivOS 进程与线程</h3>
+                    <button id="performance-processes-refresh" class="process-refresh-button"
+                            type="button">刷新</button>
+                  </div>
+                  <p id="performance-processes-note" class="process-empty" role="status"></p>
+                  <div id="performance-process-tree" class="process-tree" role="tree"
+                       aria-label="OlivOS 进程与线程树"></div>
+                </section>
+              </section>
             </div>
           </div>
         </section>

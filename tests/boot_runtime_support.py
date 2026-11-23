@@ -278,6 +278,7 @@ def install_boot_harness(monkeypatch):
     monkeypatch.setattr(OlivOS.diagnoseAPI, 'logger', make_proc_factory('logger', records))
     monkeypatch.setattr(OlivOS.pluginAPI, 'shallow', make_proc_factory('plugin', records))
     monkeypatch.setattr(OlivOS.onebotV11LinkServerAPI, 'server', make_proc_factory('onebotV11_link', records))
+    monkeypatch.setattr(OlivOS.statisticsAPI, 'server', make_proc_factory('statistics', records))
     monkeypatch.setattr(OlivOS.webUI.serverAPI, 'server', make_proc_factory('webUI', records))
     monkeypatch.setattr(OlivOS.accountAPI.Account, 'load', load_accounts)
     monkeypatch.setattr(OlivOS.accountAPI.Account, 'getEnabledAccountData', lambda data: data)

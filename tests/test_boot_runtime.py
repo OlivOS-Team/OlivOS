@@ -186,6 +186,7 @@ def test_entity_start_assembles_models_and_routes_control_packets(monkeypatch, t
     assert harness.records['started'] == [
         ('logger', 'processing'),
         ('plugin', 'processing'),
+        ('OlivOS_statistics', 'threading'),
         ('webui', 'threading'),
         (link_name, 'threading'),
     ]

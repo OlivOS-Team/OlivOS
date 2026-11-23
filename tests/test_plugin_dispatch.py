@@ -106,6 +106,16 @@ def test_plugin_exception_is_logged_and_does_not_escape_dispatch(dispatcher):
     assert any(call.args[0] == 4 for call in loader.log.call_args_list)
 
 
+def test_plugin_exception_records_failed_event(dispatcher, monkeypatch):
+    # 插件回调异常应进入统计失败计数，不能被静默吞掉。
+    loader, bot = dispatcher
+    record_failed = Mock()
+    monkeypatch.setattr(OlivOS.statisticsAPI, 'record_failed', record_failed)
+    register(loader, 'broken', Mock(side_effect=RuntimeError('fixture failure')))
+    loader.run_plugin(event_for(bot))
+    record_failed.assert_called_once_with()
+
+
 def test_unknown_account_is_not_delivered_to_plugins(dispatcher):
     loader, bot = dispatcher
     callback = Mock()

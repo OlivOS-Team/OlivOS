@@ -103,8 +103,17 @@ const state = {
   seenEvents: new Set(),
   qrURL: null,
   timer: null,
-  uptimeTimer: null,
+  uptimeFrame: null,
   uptimeSnapshot: null,
+  uptimeClock: null,
+  statistics: null,
+  performanceStatistics: null,
+  performanceProcesses: null,
+  performanceProcessDetails: {},
+  performanceProcessOpen: {},
+  performanceProcessDetailGroups: {},
+  performanceCategory: 'cpu',
+  dashboardTimer: null,
   authGeneration: 0,
   cachedLogin: false,
   checkingAuth: false,
@@ -119,11 +128,15 @@ const state = {
 };
 const titles = {
   dashboard: '仪表盘',
+  performance: '性能',
   accounts: '账号',
   logs: '日志',
   terminals: '终端',
   plugins: '插件',
 };
+function isStatusPage(page) {
+  return page === 'dashboard' || page === 'performance';
+}
 const levels = {
   '-1': 'TRACE',
   0: 'DEBUG',
@@ -416,9 +429,7 @@ async function login(ev, token = null, ticket = null) {
     startEventStream(result.cursor);
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (state.page === 'dashboard') {
-        refreshStatus().then(() => ensureSession()).catch(notifyError);
-      } else {
+      if (!isStatusPage(state.page)) {
         checkAuthentication();
         if (state.page === 'logs') loadLogDisplay().catch(notifyError);
         // 账号页要跟着连接状态变，不能只在进入页面那一刻刷一次。
@@ -426,14 +437,21 @@ async function login(ev, token = null, ticket = null) {
       }
       checkCachedLogin();
     }, 10000);
-    clearInterval(state.uptimeTimer);
-    state.uptimeTimer = setInterval(updateUptime, 1000);
+    clearInterval(state.dashboardTimer);
+    state.dashboardTimer = setInterval(() => {
+      if (isStatusPage(state.page) && !document.hidden) {
+        refreshStatus().then(() => ensureSession()).catch(notifyError);
+      }
+    }, 3000);
+    if (state.page === 'dashboard') startUptimeLoop();
   } catch (error) {
     if (error.authHandled || error.authObsolete) return;
     for (const name of [...state.streams.keys()]) closeStream(name);
     clearInterval(state.timer);
-    clearInterval(state.uptimeTimer);
+    clearInterval(state.dashboardTimer);
+    stopUptimeLoop();
     state.uptimeSnapshot = null;
+    state.uptimeClock = null;
     state.token = '';
     state.session = '';
     $('shell').hidden = true;
@@ -462,8 +480,16 @@ function resetLogin(message = '') {
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
-  clearInterval(state.uptimeTimer);
+  clearInterval(state.dashboardTimer);
+  stopUptimeLoop();
   state.uptimeSnapshot = null;
+  state.uptimeClock = null;
+  state.statistics = null;
+  state.performanceStatistics = null;
+  state.performanceProcesses = null;
+  state.performanceProcessDetails = {};
+  state.performanceProcessOpen = {};
+  state.performanceProcessDetailGroups = {};
   state.token = '';
   state.session = '';
   state.sessionRefresh = null;
@@ -627,7 +653,9 @@ async function navigate(page) {
   if (page !== 'logs') closeStream('logs');
   if (page !== 'terminals') closeStream('terminal');
   if (page !== 'plugin-page') rememberPage();
-  if (page === 'dashboard') await refreshStatus();
+  if (page === 'dashboard') startUptimeLoop();
+  else stopUptimeLoop();
+  if (isStatusPage(page)) await refreshStatus();
   if (page === 'accounts') {
     if (!state.dirty) await loadAccounts();
     await refreshStatus();
@@ -648,23 +676,1356 @@ function versionCard(version, slogan) {
   if (slogan) card.append(element('span', slogan, { class: 'version-slogan', title: slogan }));
   return card;
 }
-function uptimeText(seconds) {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor(seconds / 3600) % 24;
-  const minutes = Math.floor(seconds / 60) % 60;
-  return `运行时长：${days} 天 ${hours} 时 ${minutes} 分 ${seconds % 60} 秒`;
+function formatCount(value) {
+  const number = Number(value);
+  return (Number.isFinite(number) ? Math.max(0, number) : 0).toLocaleString('zh-CN');
 }
-// 服务端心跳是间断的，页面以最近一次 uptime 为锚点按本地单调时钟推进；
-// 下一次心跳到达时再校准，页面被浏览器节流后恢复也不会丢失经过的时间。
-function updateUptime() {
-  if (state.page !== 'dashboard' || !state.uptimeSnapshot) return;
-  const elapsed = Math.floor((performance.now() - state.uptimeSnapshot.receivedAt) / 1000);
-  $('runtime').textContent = uptimeText(state.uptimeSnapshot.seconds + elapsed);
+function formatSignedCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? String(Math.trunc(number)) : '—';
+}
+function formatBytes(value) {
+  let number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return '0 B';
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  let unit = 0;
+  while (number >= 1024 && unit < units.length - 1) {
+    number /= 1024;
+    unit += 1;
+  }
+  return `${number.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+function formatRate(value) {
+  return `${formatBytes(value)}/s`;
+}
+function formatPercent(value) {
+  const number = Number(value);
+  return `${(Number.isFinite(number) ? Math.max(0, number) : 0).toFixed(1)}%`;
+}
+function formatCpuTime(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0 ms';
+  if (seconds < 1) return `${Math.round(seconds * 1000)} ms`;
+  if (seconds < 60) return `${seconds.toFixed(2)} s`;
+  return `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
+}
+function formatDuration(value) {
+  const total = Math.max(0, Math.floor(Number(value) || 0));
+  const days = Math.floor(total / 86400);
+  const hours = String(Math.floor((total % 86400) / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const seconds = String(total % 60).padStart(2, '0');
+  return days ? `${days} 天 ${hours}:${minutes}:${seconds}` : `${hours}:${minutes}:${seconds}`;
+}
+function formatDateTime(timestamp) {
+  const date = new Date(Number(timestamp) * 1000);
+  if (!Number.isFinite(date.getTime())) return '—';
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+function formatOptionalPercent(value) {
+  return value === null || value === undefined ? '—' : formatPercent(value);
+}
+function sampledAtText(timestamp) {
+  const date = new Date(Number(timestamp) * 1000);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `更新于 ${date.toLocaleTimeString('zh-CN', { hour12: false })}`;
+}
+function metricChart(options = {}) {
+  return element('div', null, {
+    id: options.id,
+    class: 'statistics-chart metric-card-chart',
+    role: 'img',
+    'aria-label': options.label || '',
+  });
+}
+function metricCard(label, value, detail, options = {}) {
+  const card = element('div', null, {
+    class: options.chart ? 'metric-card metric-chart-card' : 'metric-card',
+  });
+  card.append(
+    element('span', label, { class: 'metric-label' }),
+    element('strong', value, { class: 'metric-value' }),
+  );
+  if (options.chart) {
+    const visual = element('div', null, { class: 'metric-card-visual' });
+    visual.append(metricChart(options.chart));
+    card.append(visual);
+  }
+  card.append(element('span', detail, { class: 'metric-detail' }));
+  return card;
+}
+function svgNode(tag, attrs = {}) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
+}
+function clampPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.min(100, Math.max(0, number));
+}
+function ringMetricCard(label, percent, detail, tone = 'cpu', options = {}) {
+  const value = clampPercent(percent);
+  const card = element('div', null, {
+    class: `metric-card metric-ring-card metric-ring-${tone}` +
+      (options.chart ? ' metric-chart-card' : ''),
+    'data-ring': tone,
+  });
+  const ring = element('div', null, {
+    class: 'metric-ring',
+    'data-percent': String(value),
+  });
+  const svg = svgNode('svg', {
+    viewBox: '0 0 100 100',
+    'aria-hidden': 'true',
+    focusable: 'false',
+  });
+  svg.append(
+    svgNode('circle', { class: 'metric-ring-track', cx: '50', cy: '50', r: '42' }),
+    svgNode('circle', {
+      class: 'metric-ring-progress',
+      cx: '50',
+      cy: '50',
+      r: '42',
+      pathLength: '100',
+      'stroke-dasharray': '100',
+      'stroke-dashoffset': String(100 - value),
+      transform: 'rotate(-90 50 50)',
+    }),
+  );
+  if (options.secondaryPercent !== undefined && options.secondaryPercent !== null) {
+    const secondary = clampPercent(options.secondaryPercent);
+    ring.dataset.secondaryPercent = String(secondary);
+    svg.append(svgNode('circle', {
+      class: 'metric-ring-secondary',
+      cx: '50',
+      cy: '50',
+      r: '32',
+      pathLength: '100',
+      'stroke-dasharray': '100',
+      'stroke-dashoffset': String(100 - secondary),
+      transform: 'rotate(-90 50 50)',
+    }));
+  }
+  ring.append(svg, element('strong', formatPercent(value), { class: 'metric-value metric-ring-value' }));
+  card.append(element('span', label, { class: 'metric-label' }));
+  if (options.chart) {
+    const visual = element('div', null, {
+      class: 'metric-card-visual metric-card-visual-overlay',
+    });
+    visual.append(metricChart(options.chart), ring);
+    card.append(visual);
+  } else {
+    card.append(ring);
+  }
+  card.append(element('span', detail, { class: 'metric-detail' }));
+  return card;
+}
+function formatOptionalCount(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? formatCount(number) : '—';
+}
+function formatLoad(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(2) : '—';
+}
+function formatCpuCores(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${(Math.max(0, number) / 100).toFixed(2)} 核心` : '—';
+}
+function trafficBucketValues(traffic, key) {
+  return (traffic?.history || []).map((item) => {
+    const number = Number(item?.[key]);
+    return Number.isFinite(number) ? Math.max(0, number) : 0;
+  });
+}
+function formatTrafficBucket(value) {
+  return `${formatCount(value)} 条`;
+}
+function chartTimeText(timestamp, slotFromRight) {
+  if (timestamp !== null && timestamp !== undefined) {
+    const date = new Date(Number(timestamp) * 1000);
+    if (Number.isFinite(date.getTime())) {
+      return date.toLocaleTimeString('zh-CN', { hour12: false });
+    }
+  }
+  return `第 ${slotFromRight} 个采样点`;
+}
+function setMetrics(container, items) {
+  container.replaceChildren(...items.map(([label, value, detail, options = {}]) => (
+    options.ring
+      ? ringMetricCard(label, value, detail, options.tone, options)
+      : metricCard(label, value, detail, options)
+  )));
+}
+const chartHoverState = new WeakMap();
+function renderTrend(container, series, fixedMaximum = null, capacity = null, options = {}) {
+  if (!container) return;
+  const width = 100;
+  const height = 40;
+  const padding = 2;
+  const plotWidth = width - padding * 2;
+  const plotHeight = height - padding * 2;
+  const rawSeries = (series || []).map((item) => ({
+    className: item.className || '',
+    legendClass: item.legendClass || '',
+    label: item.label || '',
+    formatValue: typeof item.formatValue === 'function' ? item.formatValue : formatCount,
+    values: Array.isArray(item.values) ? item.values : [],
+  }));
+  const maxLength = rawSeries.reduce((maximum, item) => Math.max(maximum, item.values.length), 0);
+  const requestedCapacity = Number(capacity);
+  const effectiveCapacity = Number.isFinite(requestedCapacity)
+    ? Math.max(2, Math.floor(requestedCapacity))
+    : Math.max(2, maxLength);
+  const sourceTimestamps = Array.isArray(options.timestamps) ? options.timestamps : [];
+  const timestampPadding = Math.max(0, effectiveCapacity - sourceTimestamps.length);
+  const timestamps = new Array(timestampPadding).fill(null)
+    .concat(sourceTimestamps.slice(-effectiveCapacity));
+  const cleaned = rawSeries.map((item) => {
+    const recent = item.values.slice(-effectiveCapacity);
+    const numeric = recent.map((value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? Math.max(0, number) : null;
+    });
+    const paddingCount = effectiveCapacity - numeric.length;
+    return {
+      ...item,
+      values: new Array(paddingCount).fill(0).concat(numeric.map((value) => (
+        value === null ? 0 : value
+      ))),
+      actual: new Array(paddingCount).fill(false).concat(numeric.map((value) => value !== null)),
+      rawValues: new Array(paddingCount).fill(null).concat(numeric),
+    };
+  });
+  const allValues = cleaned.flatMap((item) => item.values);
+  const maximum = fixedMaximum === null
+    ? Math.max(1, ...allValues)
+    : Math.max(1, Number(fixedMaximum) || 1);
+  const logarithmic = options.scale === 'log';
+  const scaleValue = (value) => (
+    logarithmic ? Math.log10(1 + Math.max(0, value)) : value
+  );
+  const scaleMaximum = Math.max(Number.EPSILON, scaleValue(maximum));
+  const svg = svgNode('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    preserveAspectRatio: 'none',
+    'aria-hidden': 'true',
+  });
+  svg.dataset.capacity = String(effectiveCapacity);
+  svg.dataset.seriesCount = String(cleaned.length);
+  svg.dataset.scale = logarithmic ? 'log' : 'linear';
+  const defs = svgNode('defs');
+  svg.append(defs);
+  const denominator = Math.max(1, effectiveCapacity - 1);
+  const xForIndex = (index) => padding + plotWidth * (index / denominator);
+  const yForValue = (value) => (
+    height - padding - plotHeight * Math.min(1, scaleValue(value) / scaleMaximum)
+  );
+  for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+    const value = maximum * ratio;
+    const y = yForValue(value);
+    const gridline = svgNode('line', {
+      class: 'chart-grid',
+      x1: '0',
+      x2: String(width),
+      y1: String(y),
+      y2: String(y),
+    });
+    gridline.dataset.gridRatio = String(ratio);
+    gridline.dataset.gridValue = String(value);
+    svg.append(gridline);
+  }
+  for (const [index, item] of cleaned.entries()) {
+    const points = item.values.map((value, index) => (
+      `${xForIndex(index).toFixed(2)},${yForValue(value).toFixed(2)}`
+    ));
+    if (options.area) {
+      const gradientId = `${container.id || 'trend'}-area-${index}`;
+      const gradient = svgNode('linearGradient', {
+        id: gradientId,
+        x1: '0',
+        y1: '0',
+        x2: '0',
+        y2: '1',
+        class: `chart-gradient ${item.className.replace(/^chart-series-/, 'chart-gradient-')}`,
+      });
+      gradient.append(
+        svgNode('stop', { offset: '0%', class: 'chart-gradient-stop chart-gradient-start' }),
+        svgNode('stop', { offset: '100%', class: 'chart-gradient-stop chart-gradient-end' }),
+      );
+      defs.append(gradient);
+      const baseline = height - padding;
+      const areaPoints = [
+        `${xForIndex(0).toFixed(2)},${baseline}`,
+        ...points,
+        `${xForIndex(item.values.length - 1).toFixed(2)},${baseline}`,
+      ];
+      const area = svgNode('path', {
+        class: 'chart-area',
+        d: `M ${areaPoints.join(' L ')} Z`,
+        fill: `url(#${gradientId})`,
+      });
+      area.dataset.series = item.className;
+      svg.append(area);
+    }
+    const polyline = svgNode('polyline', {
+      class: `chart-series ${item.className}`,
+      points: points.join(' '),
+    });
+    polyline.dataset.series = item.className;
+    svg.append(polyline);
+  }
+  const cursor = svgNode('line', {
+    class: 'chart-cursor',
+    x1: '0',
+    x2: '0',
+    y1: String(padding),
+    y2: String(height - padding),
+  });
+  cursor.style.display = 'none';
+  svg.append(cursor);
+  const tooltip = element('div', null, {
+    class: 'chart-tooltip',
+    'aria-hidden': 'true',
+  });
+  tooltip.hidden = true;
+  container.replaceChildren(svg, tooltip);
+
+  function hideHover() {
+    cursor.style.display = 'none';
+    tooltip.hidden = true;
+    tooltip.replaceChildren();
+  }
+  function positionTooltip(x) {
+    const ratio = x / width;
+    if (ratio < 0.24) {
+      tooltip.style.left = '4px';
+      tooltip.style.right = 'auto';
+      tooltip.style.transform = 'none';
+    } else if (ratio > 0.76) {
+      tooltip.style.left = 'auto';
+      tooltip.style.right = '4px';
+      tooltip.style.transform = 'none';
+    } else {
+      tooltip.style.left = `${(ratio * 100).toFixed(2)}%`;
+      tooltip.style.right = 'auto';
+      tooltip.style.transform = 'translateX(-50%)';
+    }
+  }
+  function showHover(index) {
+    const slot = Math.max(0, Math.min(effectiveCapacity - 1, Math.floor(index)));
+    const x = xForIndex(slot);
+    cursor.setAttribute('x1', String(x));
+    cursor.setAttribute('x2', String(x));
+    cursor.style.display = '';
+    const hasData = cleaned.some((item) => item.actual[slot]);
+    tooltip.replaceChildren();
+    if (hasData) {
+      tooltip.append(element('span', chartTimeText(timestamps[slot], effectiveCapacity - slot), {
+        class: 'chart-tooltip-time',
+      }));
+      for (const item of cleaned) {
+        const row = element('div', null, { class: 'chart-tooltip-row' });
+        const dot = element('i', null, {
+          class: `legend-dot ${item.legendClass}`.trim(),
+        });
+        const value = item.actual[slot] ? item.formatValue(item.rawValues[slot]) : '—';
+        row.append(
+          dot,
+          element('span', item.label, { class: 'chart-tooltip-label' }),
+          element('strong', value, { class: 'chart-tooltip-value' }),
+        );
+        tooltip.append(row);
+      }
+    } else {
+      tooltip.append(element('span', '暂无历史采样', { class: 'chart-tooltip-empty' }));
+    }
+    positionTooltip(x);
+    tooltip.hidden = false;
+  }
+  function slotFromEvent(event) {
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return null;
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const plotRatio = Math.max(0, Math.min(1, (ratio * width - padding) / plotWidth));
+    return Math.round(plotRatio * (effectiveCapacity - 1));
+  }
+  function handlePointer(event) {
+    const slot = slotFromEvent(event);
+    if (slot === null) return;
+    chartHoverState.set(container, slot);
+    showHover(slot);
+  }
+  container.onpointerenter = handlePointer;
+  container.onpointermove = handlePointer;
+  container.onpointerleave = () => {
+    chartHoverState.delete(container);
+    hideHover();
+  };
+  const previous = chartHoverState.get(container);
+  if (previous !== undefined && container.matches(':hover')) showHover(previous);
+  else if (!container.matches(':hover')) {
+    chartHoverState.delete(container);
+    hideHover();
+  }
+}
+function showStatisticsUnavailable(reason) {
+  state.statistics = null;
+  $('statistics-content').hidden = true;
+  $('statistics-note').hidden = false;
+  $('statistics-note').textContent = reason === 'statistics_warming_up'
+    ? '监测组件正在启动，稍后自动重试。'
+    : '性能与流量统计暂不可用，不影响其他功能。';
+  $('statistics-sampled').textContent = '';
+}
+function renderStatistics(data) {
+  if (!data?.available || !data.performance || !data.traffic) {
+    showStatisticsUnavailable(data?.reason);
+    return;
+  }
+  state.statistics = data;
+  $('statistics-content').hidden = false;
+  $('statistics-note').hidden = true;
+  $('statistics-note').textContent = '';
+  $('statistics-sampled').textContent = sampledAtText(data.sampled_at);
+
+  const performance = data.performance;
+  const traffic = data.traffic;
+  const cpu = performance.cpu || {};
+  const memory = performance.memory || {};
+  const disk = performance.disk || {};
+  const network = performance.network || {};
+  const process = performance.process || {};
+  const diskDetail = [
+    `${formatBytes(disk.used)} / ${formatBytes(disk.total)}`,
+    Number.isFinite(Number(disk.volume_count)) && Number(disk.volume_count) > 0
+      ? `${formatCount(disk.volume_count)} 个卷`
+      : '',
+    `读取 ${formatRate(disk.read_bps)} · 写入 ${formatRate(disk.write_bps)}`,
+  ].filter(Boolean).join(' · ');
+  const loadValue = formatLoad(cpu.load_1);
+  const load = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const threadDetail = process.threads === null || process.threads === undefined
+    ? '— 线程'
+    : `${formatCount(process.threads)} 线程`;
+  const cpuCount = Number(cpu.count);
+  const processCpuValue = Number(process.cpu_percent);
+  const processCpuShare = process.cpu_percent !== null && process.cpu_percent !== undefined &&
+    Number.isFinite(cpuCount) && cpuCount > 0 && Number.isFinite(processCpuValue)
+    ? Math.max(0, processCpuValue) / cpuCount
+    : null;
+  const processCpu = process.cpu_percent === null || process.cpu_percent === undefined
+    ? ''
+    : ` · ${formatCpuCores(processCpuValue)}`;
+  const cpuDetail = `${formatCount(cpu.count)} 逻辑核心${load} | ` +
+    `OlivOS ${formatOptionalCount(process.count)} 进程 · ${threadDetail}${processCpu}`;
+  const memoryTotal = Number(memory.total);
+  const processMemoryPercent = Number.isFinite(memoryTotal) && memoryTotal > 0
+    ? Math.max(0, Number(process.rss) || 0) * 100 / memoryTotal
+    : 0;
+  const memoryDetail = `${formatBytes(memory.used)} / ${formatBytes(memory.total)} | ` +
+    `OlivOS ${formatBytes(process.rss)} (${formatPercent(processMemoryPercent)})`;
+  setMetrics($('performance-metrics'), [
+    ['CPU', cpu.percent, cpuDetail, {
+      ring: true, tone: 'cpu', secondaryPercent: processCpuShare,
+      chart: { id: 'dashboard-cpu-chart', label: 'CPU 使用率趋势' },
+    }],
+    ['内存', memory.percent, memoryDetail, {
+      ring: true, tone: 'memory', secondaryPercent: processMemoryPercent,
+      chart: { id: 'dashboard-memory-chart', label: '内存占用趋势' },
+    }],
+    ['磁盘', disk.percent, diskDetail, {
+      ring: true, tone: 'disk',
+      chart: { id: 'dashboard-disk-chart', label: '磁盘读取与写入速率趋势' },
+    }],
+    ['网络', `↓ ${formatRate(network.recv_bps)} · ↑ ${formatRate(network.sent_bps)}`,
+      `下行 ${formatCount(network.packets_recv_per_second)} 包/秒 · ` +
+      `上行 ${formatCount(network.packets_sent_per_second)} 包/秒`, {
+        chart: { id: 'dashboard-network-chart', label: '网络下行与上行速率趋势' },
+      }],
+    ['收发消息',
+      `↓ ${formatCount(traffic.inbound_per_minute)} 条/分钟 · ` +
+      `↑ ${formatCount(traffic.outbound_per_minute)} 条/分钟`,
+      `累计 收 ${formatCount(traffic.inbound_total)} · 发 ${formatCount(traffic.outbound_total)}`, {
+        chart: { id: 'dashboard-traffic-chart', label: '收发消息趋势' },
+      }],
+    ['失败事件', `${formatCount(traffic.failed_per_minute)} 条/分钟`,
+      `累计 ${formatCount(traffic.failed_total)} 条`, {
+        chart: { id: 'dashboard-failure-chart', label: '失败事件趋势' },
+      }],
+  ]);
+  const history = performance.history || {};
+  renderTrend($('dashboard-cpu-chart'), [
+    {
+      className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
+      formatValue: formatPercent, values: history.cpu_percent || [],
+    },
+  ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
+  renderTrend($('dashboard-memory-chart'), [
+    {
+      className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
+      formatValue: formatPercent, values: history.memory_percent || [],
+    },
+  ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
+  renderTrend($('dashboard-disk-chart'), [
+    {
+      className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
+      formatValue: formatRate, values: history.disk_read_bps || [],
+    },
+    {
+      className: 'chart-series-disk-write', legendClass: 'legend-disk-write', label: '写入',
+      formatValue: formatRate, values: history.disk_write_bps || [],
+    },
+  ], null, history.capacity, {
+    timestamps: history.timestamps || [], area: true, scale: 'log',
+  });
+  renderTrend($('dashboard-network-chart'), [
+    {
+      className: 'chart-series-network-down', legendClass: 'legend-network-down', label: '网络下行',
+      formatValue: formatRate, values: history.network_recv_bps || [],
+    },
+    {
+      className: 'chart-series-network-up', legendClass: 'legend-network-up', label: '网络上行',
+      formatValue: formatRate, values: history.network_sent_bps || [],
+    },
+  ], null, history.capacity, {
+    timestamps: history.timestamps || [], area: true, scale: 'log',
+  });
+  const trafficHistory = traffic.history || [];
+  renderTrend($('dashboard-traffic-chart'), [
+    {
+      className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '收',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+    },
+    {
+      className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '发',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+    area: true,
+  });
+  renderTrend($('dashboard-failure-chart'), [
+    {
+      className: 'chart-series-failed', legendClass: 'legend-failed', label: '失败',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'failed'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+    area: true,
+  });
+}
+function setPerformanceReadout(id, text) {
+  const node = $(id);
+  if (node) node.textContent = text;
+}
+const performanceCategories = ['cpu', 'memory', 'disk', 'network', 'traffic', 'processes'];
+function setPerformanceSummary(category, value) {
+  document.querySelectorAll(`[data-performance-summary="${category}"]`).forEach((node) => {
+    node.textContent = value;
+  });
+}
+function setPerformanceStat(name, value) {
+  document.querySelectorAll(`[data-performance-stat="${name}"]`).forEach((node) => {
+    node.textContent = value;
+  });
+}
+function setPerformanceCategory(category, refreshProcesses = false) {
+  const selected = performanceCategories.includes(category) ? category : 'cpu';
+  const previous = state.performanceCategory;
+  state.performanceCategory = selected;
+  document.querySelectorAll('[data-performance-category]').forEach((button) => {
+    const active = button.dataset.performanceCategory === selected;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
+  });
+  const activeButton = document.querySelector(`[data-performance-category="${selected}"]`);
+  const categories = activeButton && activeButton.closest('.performance-categories');
+  if (activeButton && categories && categories.scrollWidth > categories.clientWidth) {
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'auto' : 'smooth';
+    activeButton.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+  }
+  document.querySelectorAll('[data-performance-view]').forEach((view) => {
+    view.hidden = view.dataset.performanceView !== selected;
+  });
+  if (selected === 'processes') {
+    if (previous !== selected) renderProcessTree(state.performanceProcesses);
+    if (refreshProcesses) refreshPerformanceProcesses().catch(notifyError);
+  }
+}
+const threadStateLabels = {
+  R: '运行', S: '睡眠', D: '不可中断', Z: '僵尸', T: '停止', t: '跟踪停止',
+  X: '结束', I: '空闲', K: '内核', W: '换出', P: '停放',
+};
+const processMemoryLabels = {
+  rss: 'RSS', vms: 'VMS', shared: '共享', text: '代码', lib: '库', data: '数据',
+  dirty: '脏页', uss: '独占', pss: '比例', swap: '交换', private: '私有',
+  peak_wset: '峰值工作集', wset: '工作集', peak_paged_pool: '峰值分页池',
+  paged_pool: '分页池', peak_nonpaged_pool: '峰值非分页池', nonpaged_pool: '非分页池',
+  pagefile: '页面文件', peak_pagefile: '峰值页面文件', num_page_faults: '缺页',
+  pfaults: '缺页', pageins: '换入页',
+};
+const processMemoryByteKeys = new Set([
+  'rss', 'vms', 'shared', 'text', 'lib', 'data', 'dirty', 'uss', 'pss', 'swap',
+  'private', 'peak_wset', 'wset', 'peak_paged_pool', 'paged_pool',
+  'peak_nonpaged_pool', 'nonpaged_pool', 'pagefile', 'peak_pagefile',
+]);
+function processDetailKey(process) {
+  const createTime = Number(process && process.create_time);
+  return `${process.pid}:${Number.isFinite(createTime) ? createTime.toFixed(3) : '0.000'}`;
+}
+function processFact(label, value) {
+  const fact = element('span', null, { class: 'process-fact' });
+  fact.append(
+    element('span', label, { class: 'process-fact-label' }),
+    element('span', value, { class: 'process-fact-value' }),
+  );
+  return fact;
+}
+function processCommand(label, value) {
+  const row = element('div', null, { class: 'process-command' });
+  row.append(
+    element('span', label, { class: 'process-command-label' }),
+    element('span', value || '—', { class: 'process-command-value' }),
+  );
+  return row;
+}
+function formatAffinity(value) {
+  if (!Array.isArray(value) || !value.length) return '—';
+  const numbers = [...new Set(value.map((item) => Number(item)).filter(Number.isFinite))]
+    .sort((left, right) => left - right);
+  if (!numbers.length) return '—';
+  const ranges = [];
+  let start = numbers[0];
+  let end = start;
+  for (const number of numbers.slice(1)) {
+    if (number === end + 1) {
+      end = number;
+      continue;
+    }
+    ranges.push(start === end ? String(start) : `${start}-${end}`);
+    start = number;
+    end = number;
+  }
+  ranges.push(start === end ? String(start) : `${start}-${end}`);
+  return `${ranges.join(', ')}（${numbers.length}）`;
+}
+function formatContextSwitches(value) {
+  if (!value) return '—';
+  return `自愿 ${formatCount(value.voluntary)} / 非自愿 ${formatCount(value.involuntary)}`;
+}
+function formatIoCounters(value) {
+  if (!value) return '—';
+  const parts = [];
+  if (value.read_bytes !== undefined) {
+    parts.push(`读 ${formatBytes(value.read_bytes)}（${formatCount(value.read_count)} 次）`);
+  }
+  if (value.write_bytes !== undefined) {
+    parts.push(`写 ${formatBytes(value.write_bytes)}（${formatCount(value.write_count)} 次）`);
+  }
+  if (value.other_bytes !== undefined) {
+    parts.push(`其他 ${formatBytes(value.other_bytes)}（${formatCount(value.other_count)} 次）`);
+  }
+  return parts.length ? parts.join(' · ') : '—';
+}
+function formatIoPriority(value) {
+  if (!value || value.class === null || value.class === undefined) return '—';
+  return value.value === null || value.value === undefined
+    ? `等级 ${value.class}` : `等级 ${value.class}:${value.value}`;
+}
+function processThreadElement(thread) {
+  const row = element('li', null, { class: 'process-thread' });
+  const names = [];
+  if (thread.name) names.push(thread.name);
+  if (thread.python_name && thread.python_name !== thread.name) names.push(thread.python_name);
+  const name = names.length ? ` · ${names.join(' / ')}` : '';
+  row.append(element('span', `线程 ${formatCount(thread.id)}${name}`, {
+    class: 'process-thread-id',
+  }));
+  if (thread.state) {
+    row.append(element('span', threadStateLabels[thread.state] || thread.state, {
+      class: 'process-thread-state',
+      title: `状态 ${thread.state}`,
+    }));
+  }
+  const meta = [];
+  if (thread.cpu_percent !== null && thread.cpu_percent !== undefined) {
+    meta.push(`CPU ${formatPercent(thread.cpu_percent)}`);
+  }
+  meta.push(`用户 ${formatCpuTime(thread.user)}`);
+  meta.push(`内核 ${formatCpuTime(thread.system)}`);
+  if (thread.priority !== null && thread.priority !== undefined) {
+    meta.push(`优先级 ${formatSignedCount(thread.priority)}`);
+  }
+  if (thread.nice !== null && thread.nice !== undefined) {
+    meta.push(`Nice ${formatSignedCount(thread.nice)}`);
+  }
+  if (thread.processor !== null && thread.processor !== undefined) {
+    meta.push(`处理器 ${formatCount(thread.processor)}`);
+  }
+  if (thread.ctx_switches) meta.push(`切换 ${formatContextSwitches(thread.ctx_switches)}`);
+  if (thread.wchan) meta.push(`等待 ${thread.wchan}`);
+  if (thread.start_time !== null && thread.start_time !== undefined) {
+    meta.push(`启动 ${formatDateTime(thread.start_time)}`);
+  }
+  if (thread.start_module) meta.push(`起始 ${thread.start_module}`);
+  row.append(element('span', meta.join(' · '), { class: 'process-thread-cpu' }));
+  return row;
+}
+function processNodeElement(process, level, rootPid, sampledAt) {
+  const processKey = processDetailKey(process);
+  const node = element('li', null, {
+    class: 'process-node',
+    role: 'treeitem',
+    'aria-level': String(level),
+  });
+  const branch = element('details', null, {
+    class: 'process-branch',
+    'data-process-branch': processKey,
+  });
+  const branchOpen = state.performanceProcessOpen[processKey];
+  branch.open = branchOpen === undefined ? true : Boolean(branchOpen);
+  branch.addEventListener('toggle', () => {
+    state.performanceProcessOpen[processKey] = branch.open;
+  });
+  const row = element('summary', null, { class: 'process-row' });
+  row.append(element('span', process.name || `PID ${formatCount(process.pid)}`, {
+    class: 'process-name',
+  }));
+  if (process.pid === rootPid) {
+    row.append(element('span', 'OlivOS 主进程', { class: 'process-root-badge' }));
+  }
+  row.append(element('span', `PID ${formatCount(process.pid)}`, { class: 'process-pid' }));
+  const meta = [
+    process.status || '',
+    process.thread_count === null || process.thread_count === undefined
+      ? '线程 —'
+      : `${formatCount(process.thread_count)} 线程`,
+    `CPU ${formatPercent(process.cpu_percent)}`,
+    `内存 ${formatBytes(process.memory_rss)}`,
+  ].filter(Boolean);
+  if (process.memory_percent !== null && process.memory_percent !== undefined) {
+    meta.push(`${formatPercent(process.memory_percent)} 内存占比`);
+  }
+  if (process.handles !== null && process.handles !== undefined) {
+    meta.push(`句柄 ${formatCount(process.handles)}`);
+  }
+  if (process.num_fds !== null && process.num_fds !== undefined) {
+    meta.push(`文件描述符 ${formatCount(process.num_fds)}`);
+  }
+  row.append(element('span', meta.join(' · '), { class: 'process-meta' }));
+  const body = element('div', null, { class: 'process-body' });
+  const facts = element('div', null, { class: 'process-facts' });
+  const createTime = Number(process.create_time);
+  const uptime = Number.isFinite(createTime) ? Math.max(0, Number(sampledAt) - createTime) : 0;
+  facts.append(
+    processFact('父进程', process.ppid ? formatCount(process.ppid) : '—'),
+    processFact('用户', process.username || '—'),
+    processFact('启动', formatDateTime(process.create_time)),
+    processFact('运行', formatDuration(uptime)),
+    processFact('虚拟内存', formatBytes(process.memory_vms)),
+    processFact('内存占比', formatOptionalPercent(process.memory_percent)),
+    processFact('CPU 时间',
+      `用户 ${formatCpuTime(process.cpu_user)} / 内核 ${formatCpuTime(process.cpu_system)}`),
+  );
+  if (process.memory_peak !== null && process.memory_peak !== undefined) {
+    facts.append(processFact('峰值内存', formatBytes(process.memory_peak)));
+  }
+  if (process.memory_private !== null && process.memory_private !== undefined) {
+    facts.append(processFact('私有内存', formatBytes(process.memory_private)));
+  }
+  if (process.memory_shared !== null && process.memory_shared !== undefined) {
+    facts.append(processFact('共享内存', formatBytes(process.memory_shared)));
+  }
+  if (process.cpu_children_user !== null || process.cpu_children_system !== null) {
+    facts.append(processFact('子进程 CPU',
+      `用户 ${formatCpuTime(process.cpu_children_user)} / ` +
+      `内核 ${formatCpuTime(process.cpu_children_system)}`));
+  }
+  if (process.cpu_iowait !== null && process.cpu_iowait !== undefined) {
+    facts.append(processFact('I/O 等待', formatCpuTime(process.cpu_iowait)));
+  }
+  if (process.nice !== null && process.nice !== undefined) {
+    facts.append(processFact('优先级', formatSignedCount(process.nice)));
+  }
+  if (process.io_priority) facts.append(processFact('I/O 优先级', formatIoPriority(process.io_priority)));
+  if (process.cpu_affinity) facts.append(processFact('CPU 亲和性', formatAffinity(process.cpu_affinity)));
+  if (process.ctx_switches) {
+    facts.append(processFact('上下文切换', formatContextSwitches(process.ctx_switches)));
+  }
+  if (process.io) facts.append(processFact('磁盘 I/O', formatIoCounters(process.io)));
+  body.append(facts);
+  if (process.exe) body.append(processCommand('可执行文件', process.exe));
+  if (process.cmdline) body.append(processCommand('命令行', process.cmdline));
+  if (Array.isArray(process.threads)) {
+    if (process.threads.length) {
+      const threads = element('ul', null, {
+        class: 'process-threads',
+        role: 'group',
+        'aria-label': `PID ${formatCount(process.pid)} 的线程`,
+      });
+      for (const thread of process.threads) threads.append(processThreadElement(thread));
+      body.append(threads);
+      if (process.threads_truncated) {
+        body.append(element('p', '部分线程的扩展信息未读取。', { class: 'process-empty' }));
+      }
+    } else {
+      body.append(element('p', '未读取到线程。', { class: 'process-empty' }));
+    }
+  } else {
+    body.append(element('p', '线程信息不可用。', { class: 'process-empty' }));
+  }
+  const detail = element('div', null, {
+    class: 'process-detail',
+    'data-process-detail': processKey,
+  });
+  body.append(detail);
+  renderProcessDetail(detail, process);
+  if (Array.isArray(process.children) && process.children.length) {
+    const children = element('ul', null, {
+      class: 'process-children',
+      role: 'group',
+      'aria-label': `PID ${formatCount(process.pid)} 的子进程`,
+    });
+    for (const child of process.children) {
+      children.append(processNodeElement(child, level + 1, rootPid, sampledAt));
+    }
+    body.append(children);
+  }
+  branch.append(row, body);
+  node.append(branch);
+  return node;
+}
+function formatProcessAddress(value) {
+  if (!value || !value.ip) return '—';
+  return `${value.ip}:${value.port === null || value.port === undefined ? '—' : value.port}`;
+}
+function processDetailList(process, groupKey, title, collection, itemText) {
+  const processKey = processDetailKey(process);
+  const groupStates = state.performanceProcessDetailGroups[processKey] || {};
+  const group = element('details', null, {
+    class: 'process-detail-group',
+    'data-process-detail-group': groupKey,
+  });
+  group.open = Boolean(groupStates[groupKey]);
+  group.addEventListener('toggle', () => {
+    groupStates[groupKey] = group.open;
+    state.performanceProcessDetailGroups[processKey] = groupStates;
+  });
+  group.append(element('summary', `${title}（${formatCount(collection ? collection.count : 0)}）`));
+  if (!collection) {
+    group.append(element('p', '不可用', { class: 'process-empty' }));
+    return group;
+  }
+  if (!collection.items.length) {
+    group.append(element('p', '无', { class: 'process-empty' }));
+    return group;
+  }
+  const list = element('ul', null, { class: 'process-detail-list' });
+  for (const item of collection.items) list.append(element('li', itemText(item)));
+  if (collection.truncated) {
+    list.append(element('li', `仅显示前 ${formatCount(collection.items.length)} 项`, {
+      class: 'process-empty',
+    }));
+  }
+  group.append(list);
+  return group;
+}
+function renderProcessDetail(container, process) {
+  const entry = state.performanceProcessDetails[processDetailKey(process)];
+  if (!entry) {
+    container.replaceChildren(button(
+      '读取文件、连接与内存详情',
+      () => loadProcessDetail(process, container),
+      'process-detail-button',
+    ));
+    return;
+  }
+  if (entry.loading) {
+    container.replaceChildren(element('p', '正在读取进程详情…', { class: 'process-empty' }));
+    return;
+  }
+  if (entry.error) {
+    container.replaceChildren(
+      element('p', `读取进程详情失败：${entry.error}`, { class: 'process-empty' }),
+      button('重试', () => loadProcessDetail(process, container), 'process-detail-button'),
+    );
+    return;
+  }
+  const data = entry.data;
+  if (!data || !data.available) {
+    const message = data && data.reason === 'process_changed'
+      ? '进程已重启或 PID 已复用，请刷新进程树。'
+      : data && data.reason === 'process_not_found' ? '进程已退出。' : '进程详情暂不可用。';
+    container.replaceChildren(element('p', message, { class: 'process-empty' }));
+    return;
+  }
+  const summary = element('div', null, { class: 'process-detail-summary' });
+  summary.append(
+    element('span', `打开文件 ${formatCount(data.open_files ? data.open_files.count : 0)}`),
+    element('span', `网络连接 ${formatCount(data.connections ? data.connections.count : 0)}`),
+    element('span', `内存映射 ${formatCount(data.memory_maps ? data.memory_maps.count : 0)}`),
+  );
+  container.replaceChildren(summary);
+  if (data.memory_full) {
+    const facts = element('div', null, { class: 'process-facts process-detail-facts' });
+    for (const [key, value] of Object.entries(data.memory_full)) {
+      if (!processMemoryLabels[key] || (value === 0 && key !== 'rss' && key !== 'vms')) continue;
+      facts.append(processFact(
+        processMemoryLabels[key],
+        processMemoryByteKeys.has(key) ? formatBytes(value) : formatCount(value),
+      ));
+    }
+    if (facts.childElementCount) container.append(facts);
+  }
+  container.append(processDetailList(process, 'files', '打开的文件', data.open_files, (item) => {
+    const fd = item.fd === null || item.fd === undefined ? '' : ` · FD ${formatCount(item.fd)}`;
+    const mode = item.mode ? ` · ${item.mode}` : '';
+    return `${item.path || '—'}${fd}${mode}`;
+  }));
+  container.append(processDetailList(process, 'connections', '网络连接', data.connections, (item) => {
+    const status = item.status ? ` · ${item.status}` : '';
+    return `${formatProcessAddress(item.laddr)} → ${formatProcessAddress(item.raddr)}${status}`;
+  }));
+  container.append(processDetailList(process, 'maps', '内存映射', data.memory_maps, (item) => {
+    const metrics = item.metrics || {};
+    const rss = metrics.rss === undefined ? '—' : formatBytes(metrics.rss);
+    const size = metrics.size === undefined ? '—' : formatBytes(metrics.size);
+    return `${item.path || '[匿名]'} · RSS ${rss} · 大小 ${size}`;
+  }));
+  if (Array.isArray(data.errors) && data.errors.length) {
+    container.append(element('p', `部分详情不可用：${data.errors.join('、')}`, {
+      class: 'process-empty',
+    }));
+  }
+  container.append(button(
+    '重新读取',
+    () => loadProcessDetail(process, container),
+    'process-detail-button',
+  ));
+}
+async function loadProcessDetail(process, container) {
+  const key = processDetailKey(process);
+  state.performanceProcessDetails[key] = { loading: true };
+  const initial = document.querySelector(`[data-process-detail="${key}"]`) || container;
+  renderProcessDetail(initial, process);
+  try {
+    const query = new URLSearchParams({ create_time: String(process.create_time ?? '') });
+    const data = await api(`/api/performance/processes/${process.pid}?${query.toString()}`);
+    state.performanceProcessDetails[key] = { data };
+  } catch (error) {
+    if (error.authHandled || error.authObsolete) throw error;
+    state.performanceProcessDetails[key] = { error: error.message || '网络请求失败' };
+  }
+  const current = document.querySelector(`[data-process-detail="${key}"]`) || initial;
+  renderProcessDetail(current, process);
+}
+function cleanupProcessDetails(data) {
+  const valid = new Set();
+  const walk = (nodes) => {
+    for (const process of nodes || []) {
+      valid.add(processDetailKey(process));
+      walk(process.children);
+    }
+  };
+  walk(data && data.roots);
+  for (const key of Object.keys(state.performanceProcessDetails)) {
+    if (!valid.has(key)) delete state.performanceProcessDetails[key];
+  }
+  for (const key of Object.keys(state.performanceProcessOpen)) {
+    if (!valid.has(key)) delete state.performanceProcessOpen[key];
+  }
+  for (const key of Object.keys(state.performanceProcessDetailGroups)) {
+    if (!valid.has(key)) delete state.performanceProcessDetailGroups[key];
+  }
+}
+function renderProcessTree(data) {
+  const container = $('performance-process-tree');
+  if (!container) return;
+  const note = $('performance-processes-note');
+  const readout = $('performance-processes-readout');
+  if (!data) {
+    if (note) {
+      note.hidden = false;
+      note.textContent = '正在读取 OlivOS 进程树…';
+    }
+    if (readout) readout.textContent = '';
+    container.replaceChildren();
+    return;
+  }
+  if (!data.available || !Array.isArray(data.roots) || !data.roots.length) {
+    if (note) {
+      note.hidden = false;
+      note.textContent = data.reason === 'statistics_unavailable'
+        ? '统计组件暂不可用，无法读取进程树。'
+        : 'OlivOS 进程树暂不可用。';
+    }
+    if (readout) readout.textContent = '';
+    container.replaceChildren();
+    return;
+  }
+  if (note) {
+    note.hidden = true;
+    note.textContent = '';
+  }
+  if (readout) {
+    readout.textContent = `${formatCount(data.process_count)} 个进程 · ` +
+      `${formatCount(data.thread_count)} 个线程 · ${sampledAtText(data.sampled_at)}`;
+  }
+  const list = element('ul', null, {
+    class: 'process-tree-list',
+    role: 'group',
+    'aria-label': 'OlivOS 进程与线程树',
+  });
+  for (const process of data.roots) {
+    list.append(processNodeElement(process, 1, data.root_pid, data.sampled_at));
+  }
+  container.replaceChildren(list);
+}
+let processTreeRequestId = 0;
+async function refreshPerformanceProcesses() {
+  const requestId = ++processTreeRequestId;
+  let data;
+  try {
+    data = await api('/api/performance/processes');
+  } catch (error) {
+    if (requestId === processTreeRequestId && !error.authHandled && !error.authObsolete) {
+      state.performanceProcesses = {
+        available: false,
+        reason: 'statistics_unavailable',
+        roots: [],
+      };
+      if (state.page === 'performance' && state.performanceCategory === 'processes') {
+        renderProcessTree(state.performanceProcesses);
+      }
+    }
+    throw error;
+  }
+  if (requestId !== processTreeRequestId) return;
+  state.performanceProcesses = data;
+  cleanupProcessDetails(data);
+  if (state.page === 'performance' && state.performanceCategory === 'processes') {
+    renderProcessTree(data);
+  }
+}
+function renderPerformanceMini(container, values) {
+  if (!container) return;
+  const width = 100;
+  const height = 22;
+  const padding = 2;
+  const capacity = 60;
+  const numeric = (Array.isArray(values) ? values : []).slice(-capacity).map((value) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, number) : 0;
+  });
+  while (numeric.length < capacity) numeric.unshift(0);
+  const maximum = Math.max(1, ...numeric);
+  const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
+  const yFor = (value) => (
+    height - padding - (height - padding * 2) * Math.min(1, value / maximum)
+  );
+  const points = numeric.map((value, index) => (
+    `${xFor(index).toFixed(2)},${yFor(value).toFixed(2)}`
+  ));
+  const svg = svgNode('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    preserveAspectRatio: 'none',
+    'aria-hidden': 'true',
+  });
+  const baseline = height - padding;
+  const area = svgNode('path', {
+    class: 'mini-area',
+    d: `M ${padding.toFixed(2)},${baseline.toFixed(2)} L ${points.join(' L ')} ` +
+      `L ${xFor(numeric.length - 1).toFixed(2)},${baseline.toFixed(2)} Z`,
+  });
+  const line = svgNode('polyline', { class: 'mini-line', points: points.join(' ') });
+  svg.append(area, line);
+  container.replaceChildren(svg);
+}
+function showPerformanceStatisticsUnavailable(reason) {
+  state.performanceStatistics = null;
+  const content = $('performance-content');
+  const note = $('performance-statistics-note');
+  const sampled = $('performance-sampled');
+  if (content) content.hidden = true;
+  if (note) {
+    note.hidden = false;
+    note.textContent = reason === 'statistics_warming_up'
+      ? '监测组件正在启动，稍后自动重试。'
+      : '性能与流量统计暂不可用，不影响其他功能。';
+  }
+  if (sampled) sampled.textContent = '';
+}
+function renderPerformanceStatistics(data) {
+  if (!data?.available || !data.performance || !data.traffic) {
+    showPerformanceStatisticsUnavailable(data?.reason);
+    return;
+  }
+  state.performanceStatistics = data;
+  const content = $('performance-content');
+  const note = $('performance-statistics-note');
+  const sampled = $('performance-sampled');
+  if (content) content.hidden = false;
+  if (note) {
+    note.hidden = true;
+    note.textContent = '';
+  }
+  if (sampled) sampled.textContent = sampledAtText(data.sampled_at);
+
+  const performance = data.performance;
+  const traffic = data.traffic;
+  const cpu = performance.cpu || {};
+  const memory = performance.memory || {};
+  const disk = performance.disk || {};
+  const network = performance.network || {};
+  const process = performance.process || {};
+  const history = performance.history || {};
+  const timestamps = history.timestamps || [];
+  const loadValue = formatLoad(cpu.load_1);
+  const systemLoad = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
+  const processCpu = formatCpuCores(process.cpu_percent);
+  const swap = memory.swap_percent === null || memory.swap_percent === undefined
+    ? '—'
+    : formatPercent(memory.swap_percent);
+  const processScale = [
+    `${formatCount(process.count)} 进程`,
+    `${formatOptionalCount(process.threads)} 线程`,
+    `${formatOptionalCount(process.handles)} 句柄`,
+  ].join(' · ');
+
+  setPerformanceReadout('performance-cpu-readout',
+    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${systemLoad}`);
+  setPerformanceReadout('performance-memory-readout',
+    `${formatPercent(memory.percent)} · ${formatBytes(memory.used)} / ${formatBytes(memory.total)} · Swap ${swap}`);
+  setPerformanceReadout('performance-disk-usage-readout',
+    `${formatPercent(disk.percent)} · ${formatBytes(disk.used)} / ${formatBytes(disk.total)} · ` +
+    `${formatCount(disk.volume_count)} 个卷`);
+  setPerformanceReadout('performance-disk-io-readout',
+    `读取 ${formatRate(disk.read_bps)} · 写入 ${formatRate(disk.write_bps)}`);
+  setPerformanceReadout('performance-network-readout',
+    `下行 ${formatRate(network.recv_bps)} · 上行 ${formatRate(network.sent_bps)}`);
+  setPerformanceReadout('performance-load-readout',
+    `OlivOS 负载 ${processCpu} · ${processScale}`);
+  setPerformanceReadout('performance-process-memory-readout',
+    `${formatBytes(process.rss)} · ${processScale}`);
+  setPerformanceReadout('performance-traffic-readout',
+    `入站 ${formatCount(traffic.inbound_per_minute)} 条/分钟 · ` +
+    `出站 ${formatCount(traffic.outbound_per_minute)} 条/分钟`);
+
+  setPerformanceSummary('cpu', formatPercent(cpu.percent));
+  setPerformanceSummary('memory', formatPercent(memory.percent));
+  setPerformanceSummary('disk', formatPercent(disk.percent));
+  setPerformanceSummary('network', `↓ ${formatRate(network.recv_bps)}`);
+  setPerformanceReadout('performance-network-value',
+    `↓ ${formatRate(network.recv_bps)} · ↑ ${formatRate(network.sent_bps)}`);
+  setPerformanceSummary('traffic',
+    `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
+  setPerformanceSummary('processes', `${formatCount(process.count)} 进程`);
+  setPerformanceSummary('processes-detail', processScale);
+
+  setPerformanceStat('cpu-logical', formatCount(cpu.count));
+  setPerformanceStat('cpu-machine-load', loadValue);
+  setPerformanceStat('cpu-load', processCpu);
+  setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
+  setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
+  setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
+  setPerformanceStat('memory-used', formatBytes(memory.used));
+  setPerformanceStat('memory-available', formatBytes(memory.available));
+  setPerformanceStat('memory-total', formatBytes(memory.total));
+  setPerformanceStat('memory-swap', swap);
+  setPerformanceStat('memory-swap-in', formatRate(memory.swap_in_bps));
+  setPerformanceStat('memory-swap-out', formatRate(memory.swap_out_bps));
+  setPerformanceStat('disk-percent', formatPercent(disk.percent));
+  setPerformanceStat('disk-used', formatBytes(disk.used));
+  setPerformanceStat('disk-total', formatBytes(disk.total));
+  setPerformanceStat('disk-volumes', `${formatCount(disk.volume_count)} 个卷`);
+  setPerformanceStat('disk-read', formatRate(disk.read_bps));
+  setPerformanceStat('disk-write', formatRate(disk.write_bps));
+  setPerformanceStat('network-recv', formatRate(network.recv_bps));
+  setPerformanceStat('network-sent', formatRate(network.sent_bps));
+  setPerformanceStat('network-packets-recv',
+    `${formatCount(network.packets_recv_per_second)} 个/秒`);
+  setPerformanceStat('network-packets-sent',
+    `${formatCount(network.packets_sent_per_second)} 个/秒`);
+  setPerformanceStat('traffic-in', `${formatCount(traffic.inbound_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-out', `${formatCount(traffic.outbound_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-in-total', formatCount(traffic.inbound_total));
+  setPerformanceStat('traffic-out-total', formatCount(traffic.outbound_total));
+
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="cpu"]'), history.cpu_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="memory"]'), history.memory_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="disk"]'), history.disk_percent || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || []);
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="traffic"]'),
+    trafficBucketValues(traffic, 'inbound'));
+  renderPerformanceMini(
+    document.querySelector('[data-performance-mini="processes"]'), history.process_count || []);
+
+  renderTrend($('performance-cpu-chart'), [
+    {
+      className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
+      formatValue: formatPercent, values: history.cpu_percent || [],
+    },
+    {
+      className: 'chart-series-machine-load', legendClass: 'legend-machine-load', label: '负载',
+      formatValue: formatLoad, values: history.load_1 || [],
+    },
+  ], null, history.capacity, { timestamps });
+  renderTrend($('performance-memory-chart'), [
+    {
+      className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
+      formatValue: formatPercent, values: history.memory_percent || [],
+    },
+    {
+      className: 'chart-series-swap', legendClass: 'legend-swap', label: 'Swap 使用率',
+      formatValue: formatPercent, values: history.swap_percent || [],
+    },
+    {
+      className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
+      formatValue: formatRate, values: history.swap_in_bps || [],
+    },
+    {
+      className: 'chart-series-swap-out', legendClass: 'legend-swap-out', label: '换出',
+      formatValue: formatRate, values: history.swap_out_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
+  renderTrend($('performance-disk-usage-chart'), [
+    {
+      className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',
+      formatValue: formatPercent, values: history.disk_percent || [],
+    },
+  ], 100, history.capacity, { timestamps });
+  renderTrend($('performance-disk-io-chart'), [
+    {
+      className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
+      formatValue: formatRate, values: history.disk_read_bps || [],
+    },
+    {
+      className: 'chart-series-disk-write', legendClass: 'legend-disk-write', label: '写入',
+      formatValue: formatRate, values: history.disk_write_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
+  renderTrend($('performance-network-chart'), [
+    {
+      className: 'chart-series-network-down', legendClass: 'legend-network-down', label: '网络下行',
+      formatValue: formatRate, values: history.network_recv_bps || [],
+    },
+    {
+      className: 'chart-series-network-up', legendClass: 'legend-network-up', label: '网络上行',
+      formatValue: formatRate, values: history.network_sent_bps || [],
+    },
+  ], null, history.capacity, { timestamps, scale: 'log' });
+  renderTrend($('performance-load-chart'), [
+    {
+      className: 'chart-series-load', legendClass: 'legend-load', label: 'OlivOS 负载',
+      formatValue: formatCpuCores, values: history.process_cpu_percent || [],
+    },
+  ], null, history.capacity, { timestamps });
+  renderTrend($('performance-process-memory-chart'), [
+    {
+      className: 'chart-series-process-memory', legendClass: 'legend-process-memory',
+      label: 'OlivOS 进程内存', formatValue: formatBytes, values: history.process_rss || [],
+    },
+  ], null, history.capacity, { timestamps });
+  const trafficHistory = traffic.history || [];
+  renderTrend($('performance-traffic-chart'), [
+    {
+      className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '入站',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+    },
+    {
+      className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '出站',
+      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+    },
+  ], null, traffic.history_capacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+  });
+  setPerformanceCategory(state.performanceCategory);
+}
+function uptimeText(milliseconds) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(total / 86400000);
+  const hours = Math.floor(total / 3600000) % 24;
+  const minutes = Math.floor(total / 60000) % 60;
+  const seconds = total % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return `运行时长：${days} 天 ${pad(hours)} 时 ${pad(minutes)} 分 ${pad(seconds)} 秒`;
+}
+// 服务端 uptime 只有整数秒，把它视为区间下界；本地用 performance.now() 推进，
+// 新心跳只收紧区间，超出区间时以有界速率追赶，避免回退、跳秒和抖动。
+function applyUptimeStatus(status, startedAt, receivedAt) {
+  const seconds = Math.max(0, Math.floor(Number(status.uptime) || 0));
+  const rtt = Math.max(0, receivedAt - startedAt);
+  const lower = seconds * 1000 + rtt / 2;
+  const upper = (seconds + 1) * 1000 + rtt / 2;
+  const previous = state.uptimeSnapshot;
+  const reset = state.uptimeClock === null || (
+    previous && (
+      seconds + 3 < previous.seconds
+      || state.uptimeClock.valueMs > upper + 2000
+    )
+  );
+  state.uptimeSnapshot = { seconds, receivedAt, rtt, lower, upper };
+  if (reset) {
+    state.uptimeClock = {
+      valueMs: lower + 500,
+      updatedAt: receivedAt,
+      sampleAt: receivedAt,
+      lower,
+      upper,
+    };
+  } else {
+    state.uptimeClock.sampleAt = receivedAt;
+    state.uptimeClock.lower = lower;
+    state.uptimeClock.upper = upper;
+  }
+}
+function updateUptime(now = performance.now()) {
+  if (state.page !== 'dashboard' || !state.uptimeClock) return;
+  const clock = state.uptimeClock;
+  const delta = Math.max(0, now - clock.updatedAt);
+  clock.updatedAt = now;
+  const elapsed = Math.max(0, now - clock.sampleAt);
+  const lower = clock.lower + elapsed;
+  const upper = clock.upper + elapsed;
+  const rate = clock.valueMs < lower ? 1.08 : clock.valueMs > upper ? 0.92 : 1;
+  clock.valueMs += delta * rate;
+  const text = uptimeText(clock.valueMs);
+  if ($('runtime').textContent !== text) $('runtime').textContent = text;
+}
+function startUptimeLoop() {
+  if (state.uptimeFrame !== null) return;
+  const step = () => {
+    state.uptimeFrame = null;
+    if (!state.token || state.page !== 'dashboard') return;
+    updateUptime(performance.now());
+    state.uptimeFrame = requestAnimationFrame(step);
+  };
+  state.uptimeFrame = requestAnimationFrame(step);
+}
+function stopUptimeLoop() {
+  if (state.uptimeFrame === null) return;
+  cancelAnimationFrame(state.uptimeFrame);
+  state.uptimeFrame = null;
 }
 let statusRequestId = 0;
 async function refreshStatus() {
   const requestId = ++statusRequestId;
+  const startedAt = performance.now();
   const status = await api('/api/status');
+  const receivedAt = performance.now();
   // 请求可能重叠：先发的后到会覆盖更新的状态，晚到的旧响应直接丢弃。
   if (requestId !== statusRequestId) return;
   if (Number.isInteger(status.plugin_page_cache)) {
@@ -683,8 +2044,8 @@ async function refreshStatus() {
     card.append(element('span', label), element('strong', value));
     cards.append(card);
   }
-  state.uptimeSnapshot = { seconds: Number(status.uptime) || 0, receivedAt: performance.now() };
-  updateUptime();
+  applyUptimeStatus(status, startedAt, receivedAt);
+  updateUptime(receivedAt);
   $('online-note').textContent = status.unknown
     ? `${status.unknown} 个启用账号尚无可用的连接状态：`
     : '';
@@ -701,6 +2062,14 @@ async function refreshStatus() {
   $('update-status').textContent = status.update_available
     ? '发现可用更新。'
     : '当前未收到新版本通知。';
+  if (state.page === 'performance') {
+    renderPerformanceStatistics(status.statistics);
+    if (state.performanceCategory === 'processes') {
+      refreshPerformanceProcesses().catch(notifyError);
+    }
+  } else if (state.page === 'dashboard') {
+    renderStatistics(status.statistics);
+  }
   state.accountConnections = status.account_connections || {};
   if (state.page === 'accounts') renderAccounts();
 }
@@ -2752,7 +4121,25 @@ function eventBatch(items) {
 
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
+bind('performance-processes-refresh', () => refreshPerformanceProcesses());
 bind('plugin-pages-close', closePluginPages);
+document.querySelectorAll('[data-performance-category]').forEach((button) => {
+  button.addEventListener('click', () => {
+    setPerformanceCategory(button.dataset.performanceCategory, true);
+  });
+  button.addEventListener('keydown', (event) => {
+    const direction = {
+      ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1,
+    }[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    const buttons = [...document.querySelectorAll('[data-performance-category]')];
+    const index = buttons.indexOf(button);
+    const next = buttons[(index + direction + buttons.length) % buttons.length];
+    setPerformanceCategory(next.dataset.performanceCategory, true);
+    next.focus();
+  });
+});
 bind('sidebar-toggle', toggleSidebar);
 bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
@@ -2929,7 +4316,15 @@ bind('tk-bridge-dialog', () => {
   if (!$('tk-bridge-dialog').open) finishTkPreview();
 }, 'close');
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.tkBridge?.id) refreshTkPreview(state.tkBridge);
+  if (document.hidden) {
+    stopUptimeLoop();
+    return;
+  }
+  if (state.tkBridge?.id) refreshTkPreview(state.tkBridge);
+  if (state.token && isStatusPage(state.page)) {
+    if (state.page === 'dashboard') startUptimeLoop();
+    refreshStatus().then(() => ensureSession()).catch(notifyError);
+  }
 });
 for (const id of ['reload-plugins', 'dashboard-reload-plugins']) {
   bind(id, async () => {
@@ -2956,7 +4351,8 @@ window.addEventListener('beforeunload', (ev) => {
 window.addEventListener('pagehide', () => {
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
-  clearInterval(state.uptimeTimer);
+  clearInterval(state.dashboardTimer);
+  stopUptimeLoop();
 });
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted && state.token) login(null, state.token);
