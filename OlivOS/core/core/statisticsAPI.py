@@ -1830,12 +1830,18 @@ class server(API.Proc_templet):
             groups.setdefault(index, []).append(item)
         return groups
 
+    @staticmethod
+    def _window_start(now_wall, width, capacity):
+        # 桶边界固定到绝对时间刻度，避免窗口起点每秒滑动导致历史桶重新分组。
+        current = math.floor(now_wall / width)
+        return (current - capacity + 1) * width
+
     def _performance_window(self, name, now_wall, rollup_source=None):
         config = WINDOW_CONFIG[name]
         seconds = config['seconds']
         capacity = config['points']
         width = seconds / float(capacity)
-        start = now_wall - seconds
+        start = self._window_start(now_wall, width, capacity)
         source = rollup_source if config['rollup'] else self.performance_long_history
         groups = self._window_groups(
             source, start, width, capacity
@@ -1847,7 +1853,7 @@ class server(API.Proc_templet):
         }
         for key in PERFORMANCE_HISTORY_KEYS:
             result[key] = []
-        last_values = {key: 0 for key in PERFORMANCE_HISTORY_KEYS}
+        buckets = {key: [] for key in PERFORMANCE_HISTORY_KEYS}
         for index in range(capacity):
             group = groups.get(index)
             if group:
@@ -1856,7 +1862,7 @@ class server(API.Proc_templet):
                 result['timestamps'].append(min(now_wall, start + (index + 1) * width))
             for key in PERFORMANCE_HISTORY_KEYS:
                 if not group:
-                    result[key].append(last_values[key])
+                    buckets[key].append(None)
                     continue
                 if config['rollup'] or key in PERFORMANCE_RATE_KEYS:
                     values = [
@@ -1866,9 +1872,17 @@ class server(API.Proc_templet):
                     value = _round(sum(values) / len(values)) if values else None
                 else:
                     value = group[-1].get(key)
+                buckets[key].append(value)
+        # 窗口尚未填满时用最早有效值回填，之后沿用最近值，避免把空桶画成 0。
+        for key in PERFORMANCE_HISTORY_KEYS:
+            values = buckets[key]
+            first = next((value for value in values if value is not None), None)
+            last = first
+            for value in values:
                 if value is None:
-                    value = last_values[key]
-                last_values[key] = value
+                    value = last
+                else:
+                    last = value
                 result[key].append(value)
         return result
 
@@ -1885,7 +1899,7 @@ class server(API.Proc_templet):
                 max(2, int(math.ceil(seconds / self.traffic_bucket_seconds))),
             )
         width = seconds / float(capacity)
-        start = now_wall - seconds
+        start = self._window_start(now_wall, width, capacity)
         groups = self._window_groups(source, start, width, capacity)
         result = {
             'interval': _round(width, 3),

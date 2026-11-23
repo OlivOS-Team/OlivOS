@@ -251,7 +251,7 @@ def test_statistics_system_metadata_falls_back_to_architecture(monkeypatch):
 
 
 def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):
-    # 性能页的 1/5/15 分钟数据只能按需附加；每个窗口固定 60 点，缺失时间桶补 0。
+    # 性能页的 1/5/15 分钟数据只能按需附加；每个窗口固定 60 点，空桶沿用相邻有效值。
     monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
     now = 1000000.0
     monkeypatch.setattr(statisticsAPI.time, 'time', lambda: now)
@@ -309,8 +309,8 @@ def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):
     assert json.loads(json.dumps(windows, ensure_ascii=False)) == windows
 
 
-def test_statistics_window_fills_left_and_shifts_existing_samples():
-    # 固定长度窗口应先用 0 填满左侧；时间前进后，旧采样整体左移，空桶沿用最近有效值。
+def test_statistics_window_backfills_leading_buckets_and_shifts_existing_samples():
+    # 固定长度窗口用最早有效值回填空桶，不能把尚未采样的区域压成 0；时间前进后旧采样整体左移。
     monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
     now = 1000000.0
     records = [
@@ -322,16 +322,36 @@ def test_statistics_window_fills_left_and_shifts_existing_samples():
     window = monitor._performance_window('1m', now)
     assert len(window['timestamps']) == window['capacity'] == 60
     assert len(window['cpu_percent']) == 60
-    assert window['cpu_percent'][:58] == [0] * 58
-    assert window['cpu_percent'][-2:] == [10.0, 20.0]
+    assert window['cpu_percent'][:58] == [10.0] * 58
+    assert window['cpu_percent'][-3:] == [10.0, 20.0, 20.0]
 
     shifted = monitor._performance_window('1m', now + 1)
-    assert shifted['cpu_percent'][:57] == [0] * 57
-    assert shifted['cpu_percent'][-3:] == [10.0, 20.0, 20.0]
+    assert shifted['cpu_percent'][:56] == [10.0] * 56
+    assert shifted['cpu_percent'][-4:] == [10.0, 20.0, 20.0, 20.0]
 
     monitor.performance_long_history.append({'ts': now + 1, 'cpu_percent': 30.0})
     with_gap = monitor._performance_window('1m', now + 2)
-    assert with_gap['cpu_percent'][-4:] == [10.0, 20.0, 20.0, 30.0]
+    assert with_gap['cpu_percent'][-5:] == [10.0, 20.0, 20.0, 30.0, 30.0]
+
+
+def test_statistics_window_keeps_completed_bucket_averages_stable():
+    # 新采样只能更新最新桶；窗口推进不足一个桶时，已完成桶的平均值必须保持不变。
+    monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
+    now = 1000000.0
+    for offset in range(10):
+        monitor.performance_long_history.append({
+            'ts': now - 10 + offset,
+            'swap_in_bps': 10.0 + offset,
+        })
+    first = monitor._performance_window('5m', now)
+    assert first['swap_in_bps'][-3:] == [12.0, 17.0, 17.0]
+
+    monitor.performance_long_history.append({'ts': now + 1, 'swap_in_bps': 100.0})
+    second = monitor._performance_window('5m', now + 1)
+    assert second['swap_in_bps'][-3:] == [12.0, 17.0, 100.0]
+
+    at_boundary = monitor._performance_window('5m', now + 5)
+    assert at_boundary['swap_in_bps'][-4:] == [12.0, 17.0, 100.0, 100.0]
 
 
 def test_statistics_minute_rollups_average_performance_and_sum_traffic():
@@ -396,11 +416,12 @@ def test_statistics_daily_windows_use_minute_rollups(monkeypatch):
         assert len(performance['timestamps']) == capacity
         assert len(performance['cpu_percent']) == capacity
         assert len(traffic['timestamps']) == capacity
-    assert windows['performance']['windows']['24h']['cpu_percent'][0] == 4.5
-    assert windows['performance']['windows']['24h']['cpu_percent'][-1] == 1434.5
-    assert sum(windows['traffic']['windows']['24h']['inbound']) == 1440
+    # 固定桶边界后，24 小时窗口从整 10 分钟刻度开始，首尾桶按实际落入的分钟聚合。
+    assert windows['performance']['windows']['24h']['cpu_percent'][0] == 7.5
+    assert windows['performance']['windows']['24h']['cpu_percent'][-1] == 1436.0
+    assert sum(windows['traffic']['windows']['24h']['inbound']) == 1437
     assert sum(windows['traffic']['windows']['1h']['inbound']) == 60
-    assert sum(windows['traffic']['windows']['6h']['inbound']) == 360
+    assert sum(windows['traffic']['windows']['6h']['inbound']) == 359
     assert monitor.performance_long_history.maxlen == 901
     assert monitor.performance_rollup_history.maxlen == 1441
     assert windows['performance']['sampling']['rollup_interval'] == 60.0

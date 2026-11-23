@@ -1496,8 +1496,11 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
     def window_timestamps(capacity, interval):
         return [now - interval * (capacity - index - 1) for index in range(capacity)]
 
-    def padded(values, capacity):
-        return [0] * max(0, capacity - len(values)) + values[-capacity:]
+    def padded(values, capacity, lead=0):
+        missing = max(0, capacity - len(values))
+        if lead == 'first' and values:
+            lead = values[0]
+        return [lead] * missing + values[-capacity:]
 
     def performance_window(interval, cpu_value, capacity=60):
         series_timestamps = window_timestamps(capacity, interval)
@@ -1507,7 +1510,7 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
             'network_recv_bps', 'network_sent_bps', 'process_count', 'process_rss',
             'process_cpu_percent', 'process_threads', 'process_handles',
         )}
-        series = {key: padded(item, capacity) for key, item in series.items()}
+        series = {key: padded(item, capacity, 'first') for key, item in series.items()}
         return {
             'interval': interval,
             'capacity': capacity,
@@ -1770,7 +1773,7 @@ def process_detail_snapshot(pid, create_time=None):
 
 
 def chart_contract(driver, selector):
-    # 读取图表容量与每条折线的实际点数，用于验证补零后横轴点位固定。
+    # 读取图表容量与每条折线的实际点数，用于验证空桶回填后横轴点位固定。
     return driver.execute_script(r"""
         const svg = document.querySelector(arguments[0]).querySelector('svg');
         return {
@@ -1902,7 +1905,8 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     # 这一页的折线图不再显示图例，信息由图表悬停提示和卡片文字承担。
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-metrics .chart-legend').length") == 0
-    # CPU/内存/磁盘/网络图固定 120 点容量，收发消息与失败事件图沿用统计模块的 60 点容量；数据不足时左侧补零。
+    # CPU/内存/磁盘/网络图固定 120 点容量，收发消息与失败事件图沿用统计模块的 60 点容量；
+    # 性能序列左侧空槽用最早有效值回填，流量计数序列才补零。
     assert chart_contract(driver, '#dashboard-cpu-chart') == {
         'capacity': 120, 'seriesCount': 1, 'pointCounts': [120]}
     assert chart_contract(driver, '#dashboard-memory-chart') == {
@@ -1957,9 +1961,19 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
             (area) => area.getAttribute('fill').startsWith('url(#'))];
         });
     """) == [[1, True], [1, True], [2, True], [2, True], [2, True], [1, True]]
-    assert driver.execute_script(
-        "return document.querySelector('#dashboard-cpu-chart .chart-series-cpu')"
-        ".getAttribute('points').split(' ')[0].endsWith(',38.00')")
+    # 左侧空槽用最早采样回填，不能把尚未采样的区域直接压到 0 基线。
+    leading_cpu = driver.execute_script("""
+        const line = document.querySelector('#dashboard-cpu-chart .chart-series-cpu');
+        const points = line.getAttribute('points').trim().split(/\\s+/);
+        const history = state.statistics.performance.history.cpu_percent;
+        return {
+          first: points[0].split(',')[1],
+          firstActual: points[points.length - history.length].split(',')[1],
+          baseline: '38.00',
+        };
+    """)
+    assert leading_cpu['first'] == leading_cpu['firstActual']
+    assert leading_cpu['first'] != leading_cpu['baseline']
     network_tip = hover_chart(driver, '#dashboard-network-chart', 0.999)
     assert network_tip['hidden'] is False and network_tip['cursorVisible'] is True
     assert '网络下行' in network_tip['text'] and '8.0 KiB/s' in network_tip['text']
@@ -2917,6 +2931,33 @@ def test_performance_chart_points_follow_backend_window_shift(browser):
     assert len(after) == len(window['cpu_percent']) == capacity
     assert top_after == top_before - 1
     assert after[top_before][0] > after[top_after][0]
+
+
+@pytest.mark.browser
+def test_performance_chart_backfills_empty_leading_buckets(browser):
+    # 窗口左侧尚未采样的空桶由最早有效值回填，不能补成 0 把折线压到底部。
+    driver = browser.driver
+    snapshot = statistics_snapshot()
+    window = snapshot['performance']['windows']['1m']
+    capacity = window['capacity']
+    window['cpu_percent'] = [None] * (capacity - 1) + [64.0]
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return state.page === 'performance' && !document.getElementById('performance-content').hidden'''))
+
+    points = driver.execute_script(r'''
+        const line = document.querySelector('#performance-cpu-chart .chart-series-cpu');
+        return line.getAttribute('points').trim().split(/\s+/).map(
+          (point) => Number(point.split(',')[1]));
+    ''')
+    assert len(points) == capacity
+    assert abs(points[0] - points[-1]) < 0.01
+    assert abs(points[0] - 38.0) > 1
 
 
 @pytest.mark.browser

@@ -1034,6 +1034,36 @@ function setMetrics(container, items) {
   )));
 }
 const chartHoverState = new WeakMap();
+// 性能序列的空桶沿用相邻有效值，不用 0 伪造数据；流量计数序列仍按 0 补空桶。
+function resampleTrendValues(values, capacity, { zeroPadding = false } = {}) {
+  const size = Math.max(2, Math.floor(Number(capacity)) || 2);
+  const recent = (Array.isArray(values) ? values : []).slice(-size);
+  const numeric = recent.map((value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, number) : null;
+  });
+  const rawValues = new Array(Math.max(0, size - numeric.length)).fill(null).concat(numeric);
+  const actual = rawValues.map((value) => value !== null);
+  if (zeroPadding) {
+    return {
+      values: rawValues.map((value) => (value === null ? 0 : value)),
+      actual,
+      rawValues,
+      hasData: actual.some(Boolean),
+    };
+  }
+  const filled = rawValues.slice();
+  const firstIndex = actual.indexOf(true);
+  if (firstIndex >= 0) {
+    let last = rawValues[firstIndex];
+    for (let index = 0; index < filled.length; index += 1) {
+      if (rawValues[index] !== null) last = rawValues[index];
+      else filled[index] = last;
+    }
+  }
+  return {values: filled, actual, rawValues, hasData: firstIndex >= 0};
+}
 function renderTrend(container, series, fixedMaximum = null, capacity = null, options = {}) {
   if (!container) return;
   const width = 100;
@@ -1046,6 +1076,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     legendClass: item.legendClass || '',
     label: item.label || '',
     percentage: item.percentage === true,
+    zeroPadding: item.zeroPadding === true,
     formatValue: typeof item.formatValue === 'function' ? item.formatValue : formatCount,
     values: Array.isArray(item.values) ? item.values : [],
   }));
@@ -1058,24 +1089,14 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
   const timestampPadding = Math.max(0, effectiveCapacity - sourceTimestamps.length);
   const timestamps = new Array(timestampPadding).fill(null)
     .concat(sourceTimestamps.slice(-effectiveCapacity));
-  const cleaned = rawSeries.map((item) => {
-    const recent = item.values.slice(-effectiveCapacity);
-    const numeric = recent.map((value) => {
-      if (value === null || value === undefined || value === '') return null;
-      const number = Number(value);
-      return Number.isFinite(number) ? Math.max(0, number) : null;
-    });
-    const paddingCount = effectiveCapacity - numeric.length;
-    return {
-      ...item,
-      values: new Array(paddingCount).fill(0).concat(numeric.map((value) => (
-        value === null ? 0 : value
-      ))),
-      actual: new Array(paddingCount).fill(false).concat(numeric.map((value) => value !== null)),
-      rawValues: new Array(paddingCount).fill(null).concat(numeric),
-    };
-  });
-  const allValues = cleaned.flatMap((item) => item.values);
+  const cleaned = rawSeries.map((item) => ({
+    ...item,
+    ...resampleTrendValues(item.values, effectiveCapacity, {
+      zeroPadding: item.zeroPadding,
+    }),
+  }));
+  const allValues = cleaned.flatMap((item) => item.values)
+    .filter((value) => value !== null);
   const hasPercentageSeries = cleaned.some((item) => item.percentage);
   const fixed = fixedMaximum === null ? null : Math.max(1, Number(fixedMaximum) || 1);
   const maximum = fixed !== null
@@ -1129,6 +1150,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     svg.append(gridline);
   }
   for (const [index, item] of cleaned.entries()) {
+    if (!item.hasData && !item.zeroPadding) continue;
     const itemScaleMaximum = seriesScaleMaximum(item);
     const points = item.values.map((value, index) => (
       `${xForIndex(index).toFixed(2)},${yForValue(value, itemScaleMaximum).toFixed(2)}`
@@ -1395,11 +1417,13 @@ function renderStatistics(data) {
   renderTrend($('dashboard-traffic-chart'), [
     {
       className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '收',
-      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+      formatValue: formatTrafficBucket, zeroPadding: true,
+      values: trafficBucketValues(traffic, 'inbound'),
     },
     {
       className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '发',
-      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+      formatValue: formatTrafficBucket, zeroPadding: true,
+      values: trafficBucketValues(traffic, 'outbound'),
     },
   ], null, traffic.history_capacity, {
     timestamps: trafficHistory.map((item) => item.ts),
@@ -1408,7 +1432,8 @@ function renderStatistics(data) {
   renderTrend($('dashboard-failure-chart'), [
     {
       className: 'chart-series-failed', legendClass: 'legend-failed', label: '失败',
-      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'failed'),
+      formatValue: formatTrafficBucket, zeroPadding: true,
+      values: trafficBucketValues(traffic, 'failed'),
     },
   ], null, traffic.history_capacity, {
     timestamps: trafficHistory.map((item) => item.ts),
@@ -2066,17 +2091,18 @@ async function refreshPerformanceProcesses() {
     renderProcessTree(data);
   }
 }
-function renderPerformanceMini(container, values) {
+function renderPerformanceMini(container, values, { zeroPadding = false } = {}) {
   if (!container) return;
   const width = 100;
   const height = 22;
   const padding = 2;
   const capacity = 60;
-  const numeric = (Array.isArray(values) ? values : []).slice(-capacity).map((value) => {
-    const number = Number(value);
-    return Number.isFinite(number) ? Math.max(0, number) : 0;
-  });
-  while (numeric.length < capacity) numeric.unshift(0);
+  const sampled = resampleTrendValues(values, capacity, { zeroPadding });
+  if (!sampled.hasData && !zeroPadding) {
+    container.replaceChildren();
+    return;
+  }
+  const numeric = sampled.values;
   const percentage = ['cpu', 'memory', 'disk'].includes(container.dataset.performanceMini);
   const maximum = percentage ? 100 : Math.max(1, ...numeric);
   const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
@@ -2305,7 +2331,7 @@ function renderPerformanceStatistics(data) {
     document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || []);
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="traffic"]'),
-    trafficBucketValues(traffic, 'inbound', trafficHistory));
+    trafficBucketValues(traffic, 'inbound', trafficHistory), {zeroPadding: true});
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="processes"]'), history.process_count || []);
 
@@ -2378,12 +2404,12 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-traffic-chart'), [
     {
       className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '入站',
-      formatValue: trafficFormatValue,
+      formatValue: trafficFormatValue, zeroPadding: true,
       values: trafficBucketValues(traffic, 'inbound', trafficHistory),
     },
     {
       className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '出站',
-      formatValue: trafficFormatValue,
+      formatValue: trafficFormatValue, zeroPadding: true,
       values: trafficBucketValues(traffic, 'outbound', trafficHistory),
     },
   ], null, trafficCapacity, {
@@ -2393,7 +2419,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-failure-chart'), [
     {
       className: 'chart-series-failed', legendClass: 'legend-failed', label: '失败事件',
-      formatValue: trafficFormatValue,
+      formatValue: trafficFormatValue, zeroPadding: true,
       values: trafficBucketValues(traffic, 'failed', trafficHistory),
     },
   ], null, trafficCapacity, {
