@@ -1472,7 +1472,7 @@ def test_dashboard_uptime_advances_smoothly_between_status_refreshes(browser):
 
 def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
                         cpu_percent=32.5, memory_percent=37.5, disk_percent=25.0,
-                        process_threads=18, process_handles=400):
+                        process_threads=18, process_handles=400, process_num_fds=None):
     # 仪表盘浏览器用例使用的完整快照，字段与 statisticsAPI.server.snapshot() 保持一致。
     now = time.time()
     timestamps = [now - 30, now - 20, now - 10, now]
@@ -1495,7 +1495,8 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
             'network': {'sent_bps': 4096, 'recv_bps': 8192,
                         'packets_sent_per_second': 10, 'packets_recv_per_second': 20},
             'process': {'count': 3, 'rss': 256 * 1024 ** 2, 'cpu_percent': 12.5,
-                        'threads': process_threads, 'handles': process_handles},
+                        'threads': process_threads, 'handles': process_handles,
+                        'num_fds': process_num_fds},
             'history': {
                 'interval': 1.0,
                 'capacity': 120,
@@ -2356,8 +2357,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return !document.getElementById('performance-view-cpu').hidden"))
     assert '暂无历史采样' in hover_chart(driver, '#performance-cpu-chart', 0.0)['text']
 
-    # 刷新快照时只更新现有节点；平台缺线程/句柄数据时显示破折号，不伪造 0。
-    updated = statistics_snapshot(cpu_percent=55.0, process_threads=None, process_handles=None)
+    # 刷新快照时只更新现有节点；线程缺失显示破折号，句柄缺失时不展示，文件描述符按可用性展示。
+    updated = statistics_snapshot(cpu_percent=55.0, process_threads=None,
+                                  process_handles=None, process_num_fds=42)
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=lambda: updated)
     driver.execute_async_script("""
@@ -2369,7 +2371,8 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-memory').hidden"))
     assert '— 线程' in browser.find('#performance-process-memory-readout').text
-    assert '— 句柄' in browser.find('#performance-process-memory-readout').text
+    assert '句柄' not in browser.find('#performance-process-memory-readout').text
+    assert '42 文件描述符' in browser.find('#performance-process-memory-readout').text
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-content .performance-panel').length") == 9
 

@@ -803,7 +803,10 @@ class server(API.Proc_templet):
             return None, []
 
     def _process_tree_totals(self):
-        result = {'count': 0, 'rss': 0, 'cpu_percent': 0.0, 'threads': None, 'handles': None}
+        result = {
+            'count': 0, 'rss': 0, 'cpu_percent': 0.0,
+            'threads': None, 'handles': None, 'num_fds': None,
+        }
         root, processes = self._process_tree()
         if root is None:
             return result, None
@@ -812,8 +815,10 @@ class server(API.Proc_templet):
         cpu_seconds = 0.0
         threads = 0
         handles = 0
+        num_fds = 0
         threads_ok = True
         handles_ok = platform.system() == 'Windows'
+        num_fds_ok = True
         for proc in processes:
             try:
                 with proc.oneshot():
@@ -830,11 +835,21 @@ class server(API.Proc_templet):
                             handles += proc.num_handles()
                         except Exception:
                             handles_ok = False
+                    if num_fds_ok:
+                        num_fds_func = getattr(proc, 'num_fds', None)
+                        if not callable(num_fds_func):
+                            num_fds_ok = False
+                        else:
+                            try:
+                                num_fds += num_fds_func()
+                            except Exception:
+                                num_fds_ok = False
             except Exception:
                 continue
         result['rss'] = max(0, int(rss))
         result['threads'] = threads if threads_ok else None
         result['handles'] = handles if handles_ok else None
+        result['num_fds'] = num_fds if num_fds_ok else None
         return result, cpu_seconds
 
     def _process_tree_metrics(self, now=None):

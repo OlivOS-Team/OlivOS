@@ -1843,11 +1843,17 @@ function renderPerformanceStatistics(data) {
   const swap = memory.swap_percent === null || memory.swap_percent === undefined
     ? '—'
     : formatPercent(memory.swap_percent);
-  const processScale = [
+  const processScaleItems = [
     `${formatCount(process.count)} 进程`,
     `${formatOptionalCount(process.threads)} 线程`,
-    `${formatOptionalCount(process.handles)} 句柄`,
-  ].join(' · ');
+  ];
+  if (process.handles !== null && process.handles !== undefined) {
+    processScaleItems.push(`${formatCount(process.handles)} 句柄`);
+  }
+  if (process.num_fds !== null && process.num_fds !== undefined) {
+    processScaleItems.push(`${formatCount(process.num_fds)} 文件描述符`);
+  }
+  const processScale = processScaleItems.join(' · ');
 
   setPerformanceReadout('performance-cpu-readout',
     `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${systemLoad}`);

@@ -330,6 +330,7 @@ def test_statistics_process_cpu_uses_cpu_time_delta(monkeypatch):
 
 def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypatch):
     # 进程树快照要保留父子关系、每个进程的线程明细，并用两次 CPU 时间差计算进程负载。
+    from contextlib import nullcontext
     from types import SimpleNamespace
 
     class FakeCpuTimes(object):
@@ -365,6 +366,9 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
 
         def memory_info(self):
             return SimpleNamespace(rss=1024, vms=2048, peak_wset=1536, private=900, shared=100)
+
+        def oneshot(self):
+            return nullcontext()
 
         def memory_percent(self):
             return 25.0
@@ -463,6 +467,9 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
     assert second['roots'][0]['children'][0]['cpu_percent'] == 50.0
     assert [item['cpu_percent'] for item in second['roots'][0]['threads']] == [50.0, 25.0]
     assert second['roots'][0]['children'][0]['threads'][0]['cpu_percent'] == 15.0
+    totals = monitor._process_tree_metrics(now=14.0)
+    assert totals['num_fds'] == 24
+    assert totals['handles'] is None
 
 
 def test_statistics_process_detail_returns_limited_files_connections_and_memory(monkeypatch):
