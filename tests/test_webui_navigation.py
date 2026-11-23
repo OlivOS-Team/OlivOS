@@ -2660,9 +2660,10 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     assert [item['maximum'] for item in independent] == [1.25, 512]
     assert all(abs(item['lastY'] - 2.0) < 0.1 for item in independent)
 
-    # 横线按数值刻度映射：线性标尺等距，对数标尺非等距。
+    # 刻度线固定落在 0%、25%、50%、75%、100%，线性与对数图的横线都应等距。
     grid_contracts = driver.execute_script("""
-        return ['#performance-cpu-chart', '#performance-network-chart'].map((selector) => {
+        return ['#performance-cpu-chart', '#performance-memory-chart',
+          '#performance-disk-io-chart', '#performance-network-chart'].map((selector) => {
           const svg = document.querySelector(selector).querySelector('svg');
           const ys = [...svg.querySelectorAll('.chart-grid')]
             .map((line) => Number(line.getAttribute('y1')));
@@ -2673,9 +2674,10 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     assert grid_contracts[0]['scale'] == 'linear'
     assert grid_contracts[0]['count'] == 5
     assert max(grid_contracts[0]['gaps']) - min(grid_contracts[0]['gaps']) < 0.01
-    assert grid_contracts[1]['scale'] == 'log'
-    assert grid_contracts[1]['count'] == 5
-    assert max(grid_contracts[1]['gaps']) - min(grid_contracts[1]['gaps']) > 1
+    for contract in grid_contracts[1:]:
+        assert contract['scale'] == 'log'
+        assert contract['count'] == 5
+        assert max(contract['gaps']) - min(contract['gaps']) < 0.01
 
 
 @pytest.mark.browser
