@@ -100,6 +100,7 @@ def navigation_host(tmp_path):
 
 @pytest.fixture
 def browser(navigation_host, chrome_session):
+    from selenium.common.exceptions import StaleElementReferenceException
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
@@ -113,8 +114,17 @@ def browser(navigation_host, chrome_session):
         return driver.find_element(By.CSS_SELECTOR, selector)
 
     def click(selector):
-        wait.until(lambda _: find(selector).is_displayed() and find(selector).is_enabled())
-        find(selector).click()
+        def click_when_ready(_):
+            # 统计轮询会重建局部节点；点击前重新定位，stale 时交给 wait 重试。
+            element = find(selector)
+            if not (element.is_displayed() and element.is_enabled()):
+                return False
+            try:
+                element.click()
+            except StaleElementReferenceException:
+                return False
+            return True
+        wait.until(click_when_ready)
 
     def type_text(selector, text):
         # Chrome 158 对 sandbox iframe 内输入框的可交互性判定更严格，
