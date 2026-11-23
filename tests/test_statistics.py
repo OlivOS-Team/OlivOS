@@ -493,6 +493,7 @@ def test_statistics_performance_reports_extended_system_details(monkeypatch):
     monkeypatch.setattr(
         statisticsAPI.psutil, 'cpu_freq',
         lambda: SimpleNamespace(current=2400.0),
+        raising=False,
     )
     monkeypatch.setattr(statisticsAPI.psutil, 'getloadavg', lambda: (1.25, 1.0, 0.8))
     monkeypatch.setattr(statisticsAPI.psutil, 'virtual_memory', lambda: SimpleNamespace(
@@ -537,6 +538,16 @@ def test_statistics_performance_reports_extended_system_details(monkeypatch):
     assert sample['network']['connection_count'] == 3
     assert sample['network']['tcp_states'] == {'ESTABLISHED': 2, 'TIME_WAIT': 1}
     assert sample['network']['interfaces'] == []
+
+
+def test_statistics_performance_tolerates_missing_cpu_frequency(monkeypatch):
+    # macOS ARM 等平台可能不导出 psutil.cpu_freq，采集应降级为未知频率而不是抛错。
+    monkeypatch.delattr(statisticsAPI.psutil, 'cpu_freq', raising=False)
+    monitor = make_statistics_monitor()
+
+    sample = monitor._sample_performance()
+
+    assert sample['cpu']['frequency_mhz'] is None
 
 
 def test_statistics_disk_io_reports_iops_and_latency(monkeypatch):

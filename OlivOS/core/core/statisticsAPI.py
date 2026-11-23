@@ -1556,7 +1556,9 @@ class server(API.Proc_templet):
         cpu_percent = self._safe(lambda: psutil.cpu_percent(interval=None), 0.0)
         cpu_count = self._safe(lambda: psutil.cpu_count(logical=True), None)
         cpu_physical_count = self._safe(lambda: psutil.cpu_count(logical=False), None)
-        cpu_frequency = self._safe(psutil.cpu_freq, None)
+        # 部分平台（如 macOS ARM）不会导出 cpu_freq，缺失时按未知频率处理。
+        cpu_freq_func = getattr(psutil, 'cpu_freq', None)
+        cpu_frequency = self._safe(cpu_freq_func, None) if callable(cpu_freq_func) else None
         per_cpu_percent = self._safe(
             lambda: psutil.cpu_percent(interval=None, percpu=True), []
         )
