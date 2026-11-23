@@ -646,7 +646,7 @@ def test_plugin_navigation_matches_sidebar_selection_style(browser):
     driver = browser.driver
     driver.switch_to.default_content()
     entry = browser.find('#plugin-links .plugin-link-entry.active')
-    category = browser.find('[data-performance-category="cpu"]')
+    category = browser.find('[data-performance-category="overview"]')
     time.sleep(0.2)
     # 插件页面入口应对齐导航基准；性能分类复用导航样式，因此用作可见参照。
     active_styles = driver.execute_script("""
@@ -680,7 +680,7 @@ def test_plugin_navigation_matches_sidebar_selection_style(browser):
     browser.click('[data-page="performance"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-content').hidden"))
-    category = browser.find('[data-performance-category="cpu"]')
+    category = browser.find('[data-performance-category="overview"]')
     ActionChains(driver).click_and_hold(category).perform()
     time.sleep(0.2)
     category_pressed = driver.execute_script(pressed_script, category)
@@ -1532,6 +1532,17 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
         'sampled_at': now,
         'performance': {
             'sampled_at': now,
+            'system': {
+                'os': 'Windows',
+                'os_release': '11',
+                'os_version': '10.0.22631',
+                'architecture': 'AMD64',
+                'hostname': 'OLIVOS-TEST',
+                'cpu_model': 'Test CPU 9000',
+                'python_version': '3.11.9',
+                'python_implementation': 'CPython',
+                'working_directory': 'D:/fixture',
+            },
             'cpu': {'percent': cpu_percent, 'count': 8, 'load_1': 1.25, 'load_5': 1.0,
                     'load_15': 0.8, 'physical_count': 4, 'frequency_mhz': 2400,
                     'per_cpu_percent': [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]},
@@ -2174,7 +2185,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         const navigation = getComputedStyle(
           document.querySelector('#navigation [data-page="performance"]'));
         const performanceCategory = getComputedStyle(
-          document.querySelector('[data-performance-category="cpu"]'));
+          document.querySelector('[data-performance-category="overview"]'));
         return {
           background: performanceCategory.backgroundColor === navigation.backgroundColor,
           border: performanceCategory.borderColor === navigation.borderColor,
@@ -2182,7 +2193,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         };
     """) == {'background': True, 'border': True, 'shadow': True}
     navigation_button = browser.find('#navigation [data-page="performance"]')
-    category_button = browser.find('[data-performance-category="cpu"]')
+    category_button = browser.find('[data-performance-category="overview"]')
     pressed_script = """
         const style = getComputedStyle(arguments[0]);
         return {
@@ -2208,13 +2219,24 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           'performance-load-chart-title', 'performance-traffic-chart-title'].map(
           (id) => document.getElementById(id).textContent);
     """) == ['CPU', '内存', '磁盘', '网络', 'OlivOS 负载', '消息']
-    assert '负载 1.25' in browser.find('#performance-cpu-readout').text
-    assert 'OlivOS 负载 0.13 核心' in browser.find('#performance-load-readout').text
-    assert browser.find('[data-performance-stat="cpu-machine-load"]').text == '1.25 / 1.00 / 0.80'
-    assert browser.find('[data-performance-stat="cpu-load"]').text == '0.13 核心'
+    # CPU 详情默认隐藏在概览之后，读取 textContent 以校验已渲染内容。
+    assert '负载 1.25' in browser.find('#performance-cpu-readout').get_attribute('textContent')
+    assert 'OlivOS 负载 0.13 核心' in browser.find('#performance-load-readout').get_attribute(
+        'textContent')
+    assert browser.find('[data-performance-stat="cpu-machine-load"]').get_attribute(
+        'textContent') == '1.25 / 1.00 / 0.80'
+    assert browser.find('[data-performance-stat="cpu-load"]').get_attribute(
+        'textContent') == '0.13 核心'
+    assert browser.find('[data-performance-stat="cpu-model"]').get_attribute(
+        'textContent') == 'Test CPU 9000'
     assert '正在读取监测数据' not in browser.find('#performance-statistics-note').text
+    assert browser.find('[data-performance-stat="system-cpu-model"]').text == 'Test CPU 9000'
+    assert browser.find('[data-performance-stat="system-os"]').text == 'Windows'
+    assert browser.find('[data-performance-stat="system-python-version"]').text == '3.11.9'
+    assert browser.find('[data-performance-stat="system-memory-total"]').text == '16.0 GiB'
+    assert 'Windows 11' in browser.find('#performance-overview-readout').text
 
-    # 左侧分类导航按任务管理器风格排列，默认选中 CPU，并显示每类的小型趋势图。
+    # 左侧分类导航按任务管理器风格排列，默认选中概览，性能类目显示小型趋势图。
     category_state = driver.execute_script("""
         return [...document.querySelectorAll('#performance-content .performance-category')]
           .map((node) => ({
@@ -2224,10 +2246,11 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           }));
     """)
     assert [item['key'] for item in category_state] == [
-        'cpu', 'memory', 'disk', 'network', 'traffic', 'processes',
+        'overview', 'cpu', 'memory', 'disk', 'network', 'traffic', 'processes',
     ]
     assert category_state[0]['selected'] == 'true'
-    assert all(item['mini'] for item in category_state)
+    assert not category_state[0]['mini']
+    assert all(item['mini'] for item in category_state[1:])
     # CPU、内存、磁盘迷你趋势图固定使用 0-100 标度，稳定值不应贴顶。
     percentage_minis = driver.execute_script(r'''
         return ['cpu', 'memory', 'disk'].map((key) => {
@@ -2264,7 +2287,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script("""
         return [...document.querySelectorAll('[data-performance-view]')]
           .filter((view) => !view.hidden).map((view) => view.dataset.performanceView);
-    """) == ['cpu']
+    """) == ['overview']
 
     # 进程标签按需读取进程树，显示父子进程与每个进程下的线程。
     browser.click('[data-performance-category="processes"]')
@@ -2445,12 +2468,12 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script(
         "return document.getElementById('performance-fact-handles').hidden")
     assert driver.execute_script(
-        "return document.querySelectorAll('#performance-content .performance-panel').length") == 13
+        "return document.querySelectorAll('#performance-content .performance-panel').length") == 15
 
     # 所有事实网格需按当前列数补齐占位项，末行空槽应与普通事实单元格同色。
     set_viewport(browser, 1280, 800)
     fact_layout = driver.execute_script("""
-        return ['cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
+        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
           const grid = document.querySelector(
             `#performance-view-${category} .performance-fact-grid`);
           const template = getComputedStyle(grid).gridTemplateColumns;
@@ -2471,7 +2494,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           };
         });
     """)
-    expected_counts = {'cpu': 8, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8}
+    expected_counts = {
+        'overview': 6, 'cpu': 9, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8,
+    }
     for item in fact_layout:
         assert item['count'] == expected_counts[item['category']]
         assert item['columns'] == 3
@@ -2479,7 +2504,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         assert item['fillerBackground'] in (None, item['factBackground'])
     set_viewport(browser, 900, 800)
     browser.wait.until(lambda _: driver.execute_script("""
-        return ['cpu', 'memory', 'disk', 'network', 'traffic'].every((category) => {
+        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].every((category) => {
           const grid = document.querySelector(
             `#performance-view-${category} .performance-fact-grid`);
           const template = getComputedStyle(grid).gridTemplateColumns;
@@ -2489,7 +2514,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         });
     """))
     narrow_fact_layout = driver.execute_script("""
-        return ['cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
+        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
           const grid = document.querySelector(
             `#performance-view-${category} .performance-fact-grid`);
           const template = getComputedStyle(grid).gridTemplateColumns;
@@ -2577,7 +2602,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           getComputedStyle(document.querySelector('.performance-categories')).flexDirection === 'column' &&
           toggle.getAttribute('aria-expanded') === 'false';
     """)
-    for category in ('cpu', 'memory', 'disk', 'network', 'traffic'):
+    for category in ('overview', 'cpu', 'memory', 'disk', 'network', 'traffic'):
         browser.click('#performance-nav-toggle')
         browser.wait.until(lambda _: driver.execute_script(
             "return document.body.classList.contains('performance-nav-open') && "
@@ -3176,7 +3201,7 @@ def test_performance_drawer_traps_focus_and_exposes_modal_state(browser):
         const drawer = document.getElementById('performance-nav-drawer');
         return document.body.classList.contains('performance-nav-open') &&
           drawer.contains(document.activeElement) &&
-          document.activeElement.dataset.performanceCategory === 'cpu';
+          document.activeElement.dataset.performanceCategory === 'overview';
     """))
     assert driver.execute_script("""
         const drawer = document.getElementById('performance-nav-drawer');
@@ -3194,7 +3219,7 @@ def test_performance_drawer_traps_focus_and_exposes_modal_state(browser):
             const active = document.activeElement;
             return active.id || active.dataset.performanceCategory;
         """))
-    assert visited == {'performance-nav-close', 'performance-category-cpu'}
+    assert visited == {'performance-nav-close', 'performance-category-overview'}
     ActionChains(driver).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
     assert driver.execute_script(
         "return document.getElementById('performance-nav-drawer')"

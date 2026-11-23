@@ -180,6 +180,12 @@ def test_statistics_snapshot_is_json_serializable_and_history_is_bounded():
     snapshot = monitor.snapshot()
     assert snapshot['available'] is True
     history = snapshot['performance']['history']
+    system = snapshot['performance']['system']
+    assert set(system) == {
+        'os', 'os_release', 'os_version', 'architecture', 'hostname',
+        'cpu_model', 'python_version', 'python_implementation', 'working_directory',
+    }
+    assert all(value is None or isinstance(value, str) for value in system.values())
     assert history['capacity'] == 2
     assert isinstance(history['cpu_percent'], list)
     assert len(history['cpu_percent']) <= 2
@@ -198,6 +204,50 @@ def test_statistics_snapshot_is_json_serializable_and_history_is_bounded():
     assert snapshot['traffic']['bucket_seconds'] == 5.0
     assert snapshot['traffic']['history_capacity'] == 2
     assert json.loads(json.dumps(snapshot, ensure_ascii=False)) == snapshot
+
+
+def test_statistics_system_metadata_reports_platform_details(monkeypatch):
+    # 概览页展示的静态配置来自进程内缓存的系统信息，Linux 优先读取 CPU 型号。
+    monkeypatch.setattr(statisticsAPI.platform, 'system', lambda: 'Linux')
+    monkeypatch.setattr(statisticsAPI.platform, 'release', lambda: '6.8.0-test')
+    monkeypatch.setattr(statisticsAPI.platform, 'version', lambda: '#1 SMP PREEMPT')
+    monkeypatch.setattr(statisticsAPI.platform, 'machine', lambda: 'x86_64')
+    monkeypatch.setattr(statisticsAPI.platform, 'node', lambda: 'olivos-host')
+    monkeypatch.setattr(statisticsAPI.platform, 'processor', lambda: '')
+    monkeypatch.setattr(statisticsAPI.platform, 'python_version', lambda: '3.11.9')
+    monkeypatch.setattr(statisticsAPI.platform, 'python_implementation', lambda: 'CPython')
+    monkeypatch.setattr(statisticsAPI, '_linux_cpu_model', lambda: 'Test CPU 9000')
+    monkeypatch.setattr(statisticsAPI.os, 'getcwd', lambda: '/srv/olivos')
+
+    assert statisticsAPI._system_metadata() == {
+        'os': 'Linux',
+        'os_release': '6.8.0-test',
+        'os_version': '#1 SMP PREEMPT',
+        'architecture': 'x86_64',
+        'hostname': 'olivos-host',
+        'cpu_model': 'Test CPU 9000',
+        'python_version': '3.11.9',
+        'python_implementation': 'CPython',
+        'working_directory': '/srv/olivos',
+    }
+
+
+def test_statistics_system_metadata_falls_back_to_architecture(monkeypatch):
+    # processor 在部分平台为空，此时应回退到机器架构而不是让概览字段缺失。
+    monkeypatch.setattr(statisticsAPI.platform, 'system', lambda: 'Windows')
+    monkeypatch.setattr(statisticsAPI.platform, 'release', lambda: '11')
+    monkeypatch.setattr(statisticsAPI.platform, 'version', lambda: '10.0.22631')
+    monkeypatch.setattr(statisticsAPI.platform, 'machine', lambda: 'AMD64')
+    monkeypatch.setattr(statisticsAPI.platform, 'node', lambda: 'olivos-host')
+    monkeypatch.setattr(statisticsAPI.platform, 'processor', lambda: 'Intel64 Family 6')
+    monkeypatch.setattr(statisticsAPI.platform, 'python_version', lambda: '3.11.9')
+    monkeypatch.setattr(statisticsAPI.platform, 'python_implementation', lambda: 'CPython')
+    monkeypatch.setattr(statisticsAPI.os, 'getcwd', lambda: 'D:/OlivOS')
+
+    assert statisticsAPI._system_metadata()['cpu_model'] == 'Intel64 Family 6'
+    assert statisticsAPI._system_metadata()['os'] == 'Windows'
+    monkeypatch.setattr(statisticsAPI.platform, 'processor', lambda: '')
+    assert statisticsAPI._system_metadata()['cpu_model'] == 'AMD64'
 
 
 def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):

@@ -72,6 +72,8 @@ PERFORMANCE_RATE_KEYS = frozenset((
 TRAFFIC_TARGET = {'type': 'statistics', 'fliter': 'control_only'}
 PROCESS_CMDLINE_LIMIT = 1200
 PROCESS_PATH_LIMIT = 1024
+SYSTEM_TEXT_LIMIT = 240
+SYSTEM_PATH_LIMIT = 1024
 PROCESS_DETAIL_ITEMS_LIMIT = 100
 PROCESS_THREAD_DETAIL_LIMIT = 256
 _WINDOWS_THREAD_QUERY_INFORMATION = 0x0040
@@ -139,6 +141,52 @@ def _text(value, limit):
     if len(text) > limit:
         return text[:max(0, limit - 1)] + '…'
     return text
+
+
+def _safe_text(func, limit):
+    try:
+        return _text(func(), limit)
+    except Exception:
+        return None
+
+
+def _linux_cpu_model():
+    try:
+        with open('/proc/cpuinfo', 'r', encoding='utf-8', errors='replace') as handle:
+            for line in handle:
+                if line.lower().startswith('model name'):
+                    _, _, value = line.partition(':')
+                    return _text(value, SYSTEM_TEXT_LIMIT)
+    except Exception:
+        pass
+    return None
+
+
+def _system_metadata():
+    # 概览页只展示不随采样变化的系统信息，因此进程内采集一次即可。
+    system_name = _safe_text(platform.system, SYSTEM_TEXT_LIMIT)
+    display_name = {'Darwin': 'macOS'}.get(system_name, system_name)
+    cpu_model = _linux_cpu_model() if system_name == 'Linux' else None
+    if not cpu_model:
+        cpu_model = _safe_text(platform.processor, SYSTEM_TEXT_LIMIT)
+    if not cpu_model:
+        cpu_model = _safe_text(platform.machine, SYSTEM_TEXT_LIMIT)
+    working_directory = None
+    try:
+        working_directory = os.getcwd()
+    except Exception:
+        pass
+    return {
+        'os': _text(display_name, SYSTEM_TEXT_LIMIT),
+        'os_release': _safe_text(platform.release, SYSTEM_TEXT_LIMIT),
+        'os_version': _safe_text(platform.version, SYSTEM_TEXT_LIMIT),
+        'architecture': _safe_text(platform.machine, SYSTEM_TEXT_LIMIT),
+        'hostname': _safe_text(platform.node, SYSTEM_TEXT_LIMIT),
+        'cpu_model': cpu_model,
+        'python_version': _safe_text(platform.python_version, SYSTEM_TEXT_LIMIT),
+        'python_implementation': _safe_text(platform.python_implementation, SYSTEM_TEXT_LIMIT),
+        'working_directory': _text(working_directory, SYSTEM_PATH_LIMIT),
+    }
 
 
 def _masked_cmdline(parts, limit=PROCESS_CMDLINE_LIMIT):
@@ -851,6 +899,7 @@ class server(API.Proc_templet):
         self._network_connection_count = None
         self._network_tcp_states = None
         self._memory_io = _WindowsMemoryIO()
+        self.system_info = _system_metadata()
         self._last_process_cpu_at = None
         self._last_process_cpu_total = 0.0
         self._process_detail_lock = threading.Lock()
@@ -1537,6 +1586,7 @@ class server(API.Proc_templet):
         disk_percent = disk_usage['percent']
         return {
             'sampled_at': time.time(),
+            'system': dict(self.system_info),
             'cpu': {
                 'percent': _round(cpu_percent),
                 'count': max(0, int(cpu_count or 0)),

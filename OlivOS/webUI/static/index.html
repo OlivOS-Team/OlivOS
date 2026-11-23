@@ -255,7 +255,7 @@
             <button id="performance-nav-toggle" class="performance-nav-toggle" type="button"
                     aria-expanded="false" aria-controls="performance-categories">
               <span class="performance-nav-toggle-label">性能分类</span>
-              <span id="performance-nav-current" class="performance-nav-toggle-current">CPU</span>
+              <span id="performance-nav-current" class="performance-nav-toggle-current">概览</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"></path></svg>
             </button>
             <div id="performance-window-switch" class="performance-window-switch"
@@ -281,8 +281,24 @@
                 </button>
               </div>
             <div id="performance-categories" class="performance-categories" role="tablist" aria-label="性能分类">
-              <button class="performance-category active" id="performance-category-cpu" type="button"
-                      role="tab" data-performance-category="cpu" aria-selected="true"
+              <button class="performance-category active" id="performance-category-overview" type="button"
+                      role="tab" data-performance-category="overview" aria-selected="true"
+                      aria-controls="performance-view-overview">
+                <span class="performance-category-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="4" y="4" width="7" height="7" rx="1"></rect>
+                    <rect x="13" y="4" width="7" height="7" rx="1"></rect>
+                    <rect x="4" y="13" width="7" height="7" rx="1"></rect>
+                    <rect x="13" y="13" width="7" height="7" rx="1"></rect>
+                  </svg>
+                </span>
+                <span class="performance-category-copy">
+                  <span class="performance-category-name">概览</span>
+                  <span class="performance-category-value" data-performance-summary="overview"></span>
+                </span>
+              </button>
+              <button class="performance-category" id="performance-category-cpu" type="button"
+                      role="tab" data-performance-category="cpu" aria-selected="false"
                       aria-controls="performance-view-cpu">
                 <span class="performance-category-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -377,8 +393,46 @@
             </div>
             </div>
             <div class="performance-detail">
+              <section id="performance-view-overview" class="performance-view"
+                       data-performance-view="overview" role="tabpanel"
+                       aria-labelledby="performance-category-overview">
+                <div class="performance-view-heading">
+                  <div>
+                    <h3>概览</h3>
+                    <p id="performance-overview-readout" class="performance-readout"></p>
+                  </div>
+                </div>
+                <section class="panel performance-panel"
+                         aria-labelledby="performance-overview-system-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-overview-system-title">系统</h3>
+                  </div>
+                  <dl class="performance-fact-grid" aria-label="系统配置">
+                    <div class="performance-fact"><dt>CPU 型号</dt><dd data-performance-stat="system-cpu-model"></dd></div>
+                    <div class="performance-fact"><dt>操作系统</dt><dd data-performance-stat="system-os"></dd></div>
+                    <div class="performance-fact"><dt>内核版本</dt><dd data-performance-stat="system-os-release"></dd></div>
+                    <div class="performance-fact"><dt>系统版本</dt><dd data-performance-stat="system-os-version"></dd></div>
+                    <div class="performance-fact"><dt>系统架构</dt><dd data-performance-stat="system-architecture"></dd></div>
+                    <div class="performance-fact"><dt>主机名</dt><dd data-performance-stat="system-hostname"></dd></div>
+                  </dl>
+                </section>
+                <section class="panel performance-panel"
+                         aria-labelledby="performance-overview-runtime-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-overview-runtime-title">运行环境</h3>
+                  </div>
+                  <dl class="performance-fact-grid" aria-label="运行环境配置">
+                    <div class="performance-fact"><dt>Python 版本</dt><dd data-performance-stat="system-python-version"></dd></div>
+                    <div class="performance-fact"><dt>Python 实现</dt><dd data-performance-stat="system-python-implementation"></dd></div>
+                    <div class="performance-fact"><dt>逻辑处理器</dt><dd data-performance-stat="system-cpu-logical"></dd></div>
+                    <div class="performance-fact"><dt>物理核心</dt><dd data-performance-stat="system-cpu-physical"></dd></div>
+                    <div class="performance-fact"><dt>内存总量</dt><dd data-performance-stat="system-memory-total"></dd></div>
+                    <div class="performance-fact"><dt>工作目录</dt><dd data-performance-stat="system-working-directory"></dd></div>
+                  </dl>
+                </section>
+              </section>
               <section id="performance-view-cpu" class="performance-view" data-performance-view="cpu"
-                       role="tabpanel" aria-labelledby="performance-category-cpu">
+                       role="tabpanel" aria-labelledby="performance-category-cpu" hidden>
                 <div class="performance-view-heading">
                   <div>
                     <h3>CPU</h3>
@@ -419,6 +473,7 @@
                        aria-label="每个逻辑核心的使用率"></div>
                 </section>
                 <dl class="performance-fact-grid" aria-label="CPU 详细信息">
+                  <div class="performance-fact"><dt>CPU 型号</dt><dd data-performance-stat="cpu-model"></dd></div>
                   <div class="performance-fact"><dt>负载（1/5/15 分钟）</dt><dd data-performance-stat="cpu-machine-load"></dd></div>
                   <div class="performance-fact"><dt>逻辑处理器</dt><dd data-performance-stat="cpu-logical"></dd></div>
                   <div class="performance-fact"><dt>物理核心</dt><dd data-performance-stat="cpu-physical"></dd></div>

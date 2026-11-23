@@ -114,7 +114,7 @@ const state = {
   performanceProcessDetails: {},
   performanceProcessOpen: {},
   performanceProcessDetailGroups: {},
-  performanceCategory: 'cpu',
+  performanceCategory: 'overview',
   performanceWindow: '1m',
   performanceNavOpen: false,
   dashboardTimer: null,
@@ -916,6 +916,9 @@ function formatOptionalCount(value) {
   const number = Number(value);
   return Number.isFinite(number) ? formatCount(number) : '—';
 }
+function formatOptionalText(value) {
+  return value === null || value === undefined || value === '' ? '—' : String(value);
+}
 function formatLoad(value) {
   if (value === null || value === undefined || value === '') return '—';
   const number = Number(value);
@@ -1416,7 +1419,9 @@ function setPerformanceReadout(id, text) {
   const node = $(id);
   if (node) node.textContent = text;
 }
-const performanceCategories = ['cpu', 'memory', 'disk', 'network', 'traffic', 'processes'];
+const performanceCategories = [
+  'overview', 'cpu', 'memory', 'disk', 'network', 'traffic', 'processes',
+];
 function setPerformanceSummary(category, value) {
   document.querySelectorAll(`[data-performance-summary="${category}"]`).forEach((node) => {
     node.textContent = value;
@@ -1582,7 +1587,7 @@ function revealPerformanceCategory(button) {
   button.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
 }
 function setPerformanceCategory(category, { refreshProcesses = false, reveal = false } = {}) {
-  const selected = performanceCategories.includes(category) ? category : 'cpu';
+  const selected = performanceCategories.includes(category) ? category : 'overview';
   const previous = state.performanceCategory;
   state.performanceCategory = selected;
   document.querySelectorAll('[data-performance-category]').forEach((button) => {
@@ -2129,6 +2134,7 @@ function renderPerformanceStatistics(data) {
 
   const performance = data.performance;
   const traffic = data.traffic;
+  const system = performance.system || {};
   const cpu = performance.cpu || {};
   const memory = performance.memory || {};
   const disk = performance.disk || {};
@@ -2171,7 +2177,13 @@ function renderPerformanceStatistics(data) {
   const physicalCount = formatOptionalCount(cpu.physical_count);
   const frequency = formatFrequency(cpu.frequency_mhz);
   const failedRate = failureRatePercent(traffic);
+  const overviewSummary = [
+    [system.os, system.os_release].filter(Boolean).join(' '),
+    system.architecture,
+    [system.python_implementation, system.python_version].filter(Boolean).join(' '),
+  ].filter(Boolean).join(' · ');
 
+  setPerformanceReadout('performance-overview-readout', overviewSummary || '—');
   setPerformanceReadout('performance-cpu-readout',
     `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心 · ` +
     `${physicalCount} 物理核心 · ${frequency}${systemLoad}`);
@@ -2197,6 +2209,7 @@ function renderPerformanceStatistics(data) {
     `失败 ${formatCount(traffic.failed_per_minute)} 条/分钟`);
 
   setPerformanceSummary('cpu', formatPercent(cpu.percent));
+  setPerformanceSummary('overview', `${formatCount(cpu.count)} 核 · ${formatBytes(memory.total)}`);
   setPerformanceSummary('memory', formatPercent(memory.percent));
   setPerformanceSummary('disk', formatPercent(disk.percent));
   setPerformanceSummary('network', `↓ ${formatRate(network.recv_bps)}`);
@@ -2207,7 +2220,20 @@ function renderPerformanceStatistics(data) {
   setPerformanceSummary('processes', `${formatCount(process.count)} 进程`);
   setPerformanceSummary('processes-detail', processScale);
 
+  setPerformanceStat('cpu-model', formatOptionalText(system.cpu_model));
   setPerformanceStat('cpu-logical', formatCount(cpu.count));
+  setPerformanceStat('system-cpu-model', formatOptionalText(system.cpu_model));
+  setPerformanceStat('system-os', formatOptionalText(system.os));
+  setPerformanceStat('system-os-release', formatOptionalText(system.os_release));
+  setPerformanceStat('system-os-version', formatOptionalText(system.os_version));
+  setPerformanceStat('system-architecture', formatOptionalText(system.architecture));
+  setPerformanceStat('system-hostname', formatOptionalText(system.hostname));
+  setPerformanceStat('system-python-version', formatOptionalText(system.python_version));
+  setPerformanceStat('system-python-implementation', formatOptionalText(system.python_implementation));
+  setPerformanceStat('system-cpu-logical', formatCount(cpu.count));
+  setPerformanceStat('system-cpu-physical', physicalCount);
+  setPerformanceStat('system-memory-total', formatBytes(memory.total));
+  setPerformanceStat('system-working-directory', formatOptionalText(system.working_directory));
   setPerformanceStat('cpu-physical', physicalCount);
   setPerformanceStat('cpu-frequency', frequency);
   setPerformanceStat('cpu-machine-load', loadText);
