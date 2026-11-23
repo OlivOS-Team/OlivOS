@@ -290,6 +290,52 @@ def test_status_returns_statistics_snapshot_and_degrades_without_monitor(client,
     assert client.get('/api/status').json['statistics'] == snapshot
 
 
+def test_status_only_attaches_performance_windows_when_requested(client, host):
+    # 默认 /api/status 保持仪表盘契约；只有性能页显式携带 windows=1 才返回长窗口。
+    from types import SimpleNamespace
+
+    def snapshot(include_windows=False):
+        data = {
+            'available': True,
+            'sampled_at': 123.0,
+            'performance': {'cpu': {'percent': 12.5}, 'history': {'capacity': 120}},
+            'traffic': {'inbound_total': 3, 'history': []},
+        }
+        if include_windows:
+            data['performance']['windows'] = {'1m': {'capacity': 60}}
+            data['traffic']['windows'] = {'1m': {'capacity': 12}}
+        return data
+
+    host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=snapshot)
+
+    default = client.get('/api/status').json['statistics']
+    with_windows = client.get('/api/status?windows=1').json['statistics']
+
+    assert 'windows' not in default['performance']
+    assert 'windows' not in default['traffic']
+    assert with_windows['performance']['windows']['1m']['capacity'] == 60
+    assert with_windows['traffic']['windows']['1m']['capacity'] == 12
+
+
+def test_status_windows_query_accepts_legacy_monitor_without_snapshot_argument(client, host):
+    # 兼容只实现无参 snapshot() 的旧统计组件：windows=1 时应退回普通快照而不是 500。
+    from types import SimpleNamespace
+
+    snapshot = {
+        'available': True,
+        'sampled_at': 123.0,
+        'performance': {'cpu': {'percent': 12.5}, 'history': {'capacity': 120}},
+        'traffic': {'inbound_total': 3, 'history': []},
+    }
+    host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: snapshot)
+
+    response = client.get('/api/status?windows=1')
+
+    assert response.status_code == 200
+    assert response.json['statistics'] == snapshot
+
+
 def test_status_statistics_degrades_when_monitor_raises(client, host):
     # 统计组件自身异常时 /api/status 仍须返回 200 和降级结构，避免仪表盘整体失败。
     from types import SimpleNamespace

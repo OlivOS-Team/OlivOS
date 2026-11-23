@@ -16,6 +16,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 
 import copy
 import ctypes
+import math
 import os
 import platform
 import re
@@ -33,6 +34,41 @@ MESSAGE_EVENT_TYPES = ('private_message', 'group_message')
 DEFAULT_HISTORY_SIZE = 120
 DEFAULT_TRAFFIC_BUCKET_SECONDS = 5.0
 DEFAULT_TRAFFIC_HISTORY_SIZE = 60
+WINDOW_CONFIG = {
+    '1m': {'seconds': 60.0, 'points': 60, 'rollup': False},
+    '5m': {'seconds': 300.0, 'points': 60, 'rollup': False},
+    '15m': {'seconds': 900.0, 'points': 60, 'rollup': False},
+    '1h': {'seconds': 3600.0, 'points': 60, 'rollup': True},
+    '6h': {'seconds': 21600.0, 'points': 60, 'rollup': True},
+    '24h': {'seconds': 86400.0, 'points': 144, 'rollup': True},
+}
+WINDOW_SECONDS = {name: config['seconds'] for name, config in WINDOW_CONFIG.items()}
+WINDOW_POINTS = 60
+RAW_WINDOW_SECONDS = max(
+    config['seconds'] for config in WINDOW_CONFIG.values() if not config['rollup']
+)
+ROLLUP_WINDOW_SECONDS = max(
+    config['seconds'] for config in WINDOW_CONFIG.values() if config['rollup']
+)
+ROLLUP_INTERVAL_SECONDS = 60.0
+ROLLUP_CAPACITY = int(math.ceil(ROLLUP_WINDOW_SECONDS / ROLLUP_INTERVAL_SECONDS)) + 1
+NETWORK_CONNECTION_REFRESH_SECONDS = 5.0
+NETWORK_INTERFACE_LIMIT = 16
+PERFORMANCE_HISTORY_KEYS = (
+    'cpu_percent', 'load_1', 'memory_percent', 'swap_percent', 'swap_in_bps',
+    'swap_out_bps', 'disk_percent', 'disk_read_bps', 'disk_write_bps',
+    'network_recv_bps', 'network_sent_bps', 'process_count', 'process_rss',
+    'process_cpu_percent', 'process_threads', 'process_handles',
+)
+PERFORMANCE_GAUGE_KEYS = frozenset((
+    'cpu_percent', 'load_1', 'memory_percent', 'swap_percent', 'disk_percent',
+    'process_count', 'process_rss', 'process_cpu_percent', 'process_threads',
+    'process_handles',
+))
+PERFORMANCE_RATE_KEYS = frozenset((
+    'swap_in_bps', 'swap_out_bps', 'disk_read_bps', 'disk_write_bps',
+    'network_recv_bps', 'network_sent_bps',
+))
 TRAFFIC_TARGET = {'type': 'statistics', 'fliter': 'control_only'}
 PROCESS_CMDLINE_LIMIT = 1200
 PROCESS_PATH_LIMIT = 1024
@@ -516,6 +552,20 @@ def _rate(current, previous, elapsed):
     return max(0.0, (current - previous) / elapsed)
 
 
+def _counter_delta(current, previous, name):
+    if current is None or previous is None:
+        return None
+    try:
+        return max(0, int(getattr(current, name)) - int(getattr(previous, name)))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _optional_non_negative_float(value):
+    number = _optional_float(value)
+    return None if number is None else max(0.0, number)
+
+
 class _WindowsMemoryIO(object):
     # Windows 的 psutil 交换区计数器恒为 0，改用 PDH 的硬缺页读写速率。
     PDH_FMT_DOUBLE = 0x00000200
@@ -766,8 +816,23 @@ class server(API.Proc_templet):
         self.traffic_history_size = max(2, _non_negative_int(
             traffic_history_size, DEFAULT_TRAFFIC_HISTORY_SIZE
         ))
+        self.scan_interval = max(0.1, _non_negative_float(
+            scan_interval, 1.0
+        ))
         self.performance_history = deque(maxlen=self.history_size)
         self.traffic_history = deque(maxlen=self.traffic_history_size)
+        self.performance_long_history = deque(maxlen=max(
+            self.history_size,
+            int(math.ceil(RAW_WINDOW_SECONDS / self.scan_interval)) + 1,
+        ))
+        self.traffic_long_history = deque(maxlen=max(
+            self.traffic_history_size,
+            int(math.ceil(RAW_WINDOW_SECONDS / self.traffic_bucket_seconds)) + 1,
+        ))
+        self.performance_rollup_history = deque(maxlen=ROLLUP_CAPACITY)
+        self.traffic_rollup_history = deque(maxlen=ROLLUP_CAPACITY)
+        self._performance_rollup_current = None
+        self._traffic_rollup_current = None
         self.inbound_total = 0
         self.outbound_total = 0
         self.event_total = 0
@@ -780,7 +845,11 @@ class server(API.Proc_templet):
         self._last_io_at = None
         self._last_disk_io = None
         self._last_net_io = None
+        self._last_net_pernic_io = None
         self._last_swap_io = None
+        self._last_network_connections_at = None
+        self._network_connection_count = None
+        self._network_tcp_states = None
         self._memory_io = _WindowsMemoryIO()
         self._last_process_cpu_at = None
         self._last_process_cpu_total = 0.0
@@ -1245,14 +1314,26 @@ class server(API.Proc_templet):
     def _sample_io(self, now, swap=None):
         disk_io = self._safe(psutil.disk_io_counters)
         net_io = self._safe(psutil.net_io_counters)
+        net_pernic_io = self._safe(lambda: psutil.net_io_counters(pernic=True))
         swap_io = swap
         result = {
             'disk_read_bps': 0.0,
             'disk_write_bps': 0.0,
+            'disk_read_iops': None,
+            'disk_write_iops': None,
+            'disk_read_latency_ms': None,
+            'disk_write_latency_ms': None,
             'net_sent_bps': 0.0,
             'net_recv_bps': 0.0,
             'packets_sent_per_second': 0.0,
             'packets_recv_per_second': 0.0,
+            'errin_per_second': None,
+            'errout_per_second': None,
+            'dropin_per_second': None,
+            'dropout_per_second': None,
+            'connection_count': None,
+            'tcp_states': None,
+            'interfaces': [],
             'swap_in_bps': 0.0,
             'swap_out_bps': 0.0,
         }
@@ -1266,6 +1347,30 @@ class server(API.Proc_templet):
                 result['disk_write_bps'] = _round(_rate(
                     disk_io.write_bytes, self._last_disk_io.write_bytes, elapsed
                 ))
+                read_count_delta = _counter_delta(
+                    disk_io, self._last_disk_io, 'read_count'
+                )
+                write_count_delta = _counter_delta(
+                    disk_io, self._last_disk_io, 'write_count'
+                )
+                read_time_delta = _counter_delta(
+                    disk_io, self._last_disk_io, 'read_time'
+                )
+                write_time_delta = _counter_delta(
+                    disk_io, self._last_disk_io, 'write_time'
+                )
+                if read_count_delta is not None:
+                    result['disk_read_iops'] = _round(read_count_delta / elapsed)
+                    if read_count_delta > 0 and read_time_delta is not None:
+                        result['disk_read_latency_ms'] = _round(
+                            read_time_delta / read_count_delta
+                        )
+                if write_count_delta is not None:
+                    result['disk_write_iops'] = _round(write_count_delta / elapsed)
+                    if write_count_delta > 0 and write_time_delta is not None:
+                        result['disk_write_latency_ms'] = _round(
+                            write_time_delta / write_count_delta
+                        )
             if net_io is not None and self._last_net_io is not None:
                 result['net_sent_bps'] = _round(_rate(
                     net_io.bytes_sent, self._last_net_io.bytes_sent, elapsed
@@ -1279,6 +1384,33 @@ class server(API.Proc_templet):
                 result['packets_recv_per_second'] = _round(_rate(
                     net_io.packets_recv, self._last_net_io.packets_recv, elapsed
                 ))
+                for key in ('errin', 'errout', 'dropin', 'dropout'):
+                    delta = _counter_delta(net_io, self._last_net_io, key)
+                    if delta is not None:
+                        result['%s_per_second' % key] = _round(delta / elapsed)
+            interfaces = []
+            if net_pernic_io is not None and self._last_net_pernic_io is not None:
+                for name, current in net_pernic_io.items():
+                    previous = self._last_net_pernic_io.get(name)
+                    if previous is None:
+                        continue
+                    item = {
+                        'name': _text(name, 128),
+                        'sent_bps': _round(_rate(
+                            current.bytes_sent, previous.bytes_sent, elapsed
+                        )),
+                        'recv_bps': _round(_rate(
+                            current.bytes_recv, previous.bytes_recv, elapsed
+                        )),
+                    }
+                    for key in ('errin', 'errout', 'dropin', 'dropout'):
+                        delta = _counter_delta(current, previous, key)
+                        item['%s_per_second' % key] = (
+                            None if delta is None else _round(delta / elapsed)
+                        )
+                    interfaces.append(item)
+            interfaces.sort(key=lambda item: item['recv_bps'] + item['sent_bps'], reverse=True)
+            result['interfaces'] = interfaces[:NETWORK_INTERFACE_LIMIT]
             if memory_io is not None:
                 result['swap_in_bps'] = _round(memory_io[0])
                 result['swap_out_bps'] = _round(memory_io[1])
@@ -1289,9 +1421,29 @@ class server(API.Proc_templet):
                 result['swap_out_bps'] = _round(_rate(
                     getattr(swap_io, 'sout', 0), getattr(self._last_swap_io, 'sout', 0), elapsed
                 ))
+        if (
+            self._last_network_connections_at is None
+            or now - self._last_network_connections_at >= NETWORK_CONNECTION_REFRESH_SECONDS
+        ):
+            self._last_network_connections_at = now
+            connections = self._safe(lambda: psutil.net_connections(kind='inet'))
+            if connections is None:
+                self._network_connection_count = None
+                self._network_tcp_states = None
+            else:
+                states = {}
+                for connection in connections:
+                    status = _text(getattr(connection, 'status', None) or 'NONE', 32)
+                    if status:
+                        states[status] = states.get(status, 0) + 1
+                self._network_connection_count = len(connections)
+                self._network_tcp_states = states
+        result['connection_count'] = self._network_connection_count
+        result['tcp_states'] = copy.deepcopy(self._network_tcp_states)
         self._last_io_at = now
         self._last_disk_io = disk_io
         self._last_net_io = net_io
+        self._last_net_pernic_io = net_pernic_io
         self._last_swap_io = swap_io
         return result
 
@@ -1354,6 +1506,13 @@ class server(API.Proc_templet):
         now = time.monotonic()
         cpu_percent = self._safe(lambda: psutil.cpu_percent(interval=None), 0.0)
         cpu_count = self._safe(lambda: psutil.cpu_count(logical=True), None)
+        cpu_physical_count = self._safe(lambda: psutil.cpu_count(logical=False), None)
+        cpu_frequency = self._safe(psutil.cpu_freq, None)
+        per_cpu_percent = self._safe(
+            lambda: psutil.cpu_percent(interval=None, percpu=True), []
+        )
+        if not isinstance(per_cpu_percent, (list, tuple)):
+            per_cpu_percent = []
         load_func = getattr(psutil, 'getloadavg', None)
         load = self._safe(load_func, None) if callable(load_func) else None
         memory = self._safe(psutil.virtual_memory)
@@ -1369,6 +1528,10 @@ class server(API.Proc_templet):
         memory_available = max(0, int(getattr(memory, 'available', 0) or 0))
         memory_percent = _round(getattr(memory, 'percent', 0.0) if memory is not None else 0.0)
         swap_percent = _round(getattr(swap, 'percent', 0.0)) if swap is not None else None
+        frequency_mhz = (
+            _optional_non_negative_float(getattr(cpu_frequency, 'current', None))
+            if cpu_frequency is not None else None
+        )
         disk_total = disk_usage['total']
         disk_used = disk_usage['used']
         disk_percent = disk_usage['percent']
@@ -1380,15 +1543,26 @@ class server(API.Proc_templet):
                 'load_1': load_1,
                 'load_5': load_5,
                 'load_15': load_15,
+                'physical_count': _optional_int(cpu_physical_count),
+                'frequency_mhz': None if frequency_mhz is None else _round(frequency_mhz),
+                'per_cpu_percent': [_round(item) for item in per_cpu_percent],
             },
             'memory': {
                 'total': memory_total,
                 'used': memory_used,
                 'available': memory_available,
+                'free': _optional_int(getattr(memory, 'free', None)),
                 'percent': memory_percent,
+                'cached': _optional_int(getattr(memory, 'cached', None)),
+                'buffers': _optional_int(getattr(memory, 'buffers', None)),
+                'shared': _optional_int(getattr(memory, 'shared', None)),
+                'swap_total': _optional_int(getattr(swap, 'total', None)),
+                'swap_used': _optional_int(getattr(swap, 'used', None)),
+                'swap_free': _optional_int(getattr(swap, 'free', None)),
                 'swap_percent': swap_percent,
                 'swap_in_bps': io['swap_in_bps'],
                 'swap_out_bps': io['swap_out_bps'],
+                'page_faults': None,
             },
             'disk': {
                 'path': os.getcwd(),
@@ -1399,12 +1573,23 @@ class server(API.Proc_templet):
                 'volumes': disk_usage['volumes'],
                 'read_bps': io['disk_read_bps'],
                 'write_bps': io['disk_write_bps'],
+                'read_iops': io['disk_read_iops'],
+                'write_iops': io['disk_write_iops'],
+                'read_latency_ms': io['disk_read_latency_ms'],
+                'write_latency_ms': io['disk_write_latency_ms'],
             },
             'network': {
                 'sent_bps': io['net_sent_bps'],
                 'recv_bps': io['net_recv_bps'],
                 'packets_sent_per_second': io['packets_sent_per_second'],
                 'packets_recv_per_second': io['packets_recv_per_second'],
+                'errin_per_second': io['errin_per_second'],
+                'errout_per_second': io['errout_per_second'],
+                'dropin_per_second': io['dropin_per_second'],
+                'dropout_per_second': io['dropout_per_second'],
+                'connection_count': io['connection_count'],
+                'tcp_states': io['tcp_states'],
+                'interfaces': io['interfaces'],
             },
             'process': process,
         }
@@ -1415,7 +1600,7 @@ class server(API.Proc_templet):
         with self.lock:
             self._last_sample = sample
             self._last_sample_at = sample['sampled_at']
-            self.performance_history.append({
+            record = {
                 'ts': sample['sampled_at'],
                 'cpu_percent': sample['cpu']['percent'],
                 'load_1': sample['cpu']['load_1'],
@@ -1433,20 +1618,26 @@ class server(API.Proc_templet):
                 'process_cpu_percent': sample['process']['cpu_percent'],
                 'process_threads': sample['process']['threads'],
                 'process_handles': sample['process']['handles'],
-            })
+            }
+            self.performance_history.append(record)
+            self.performance_long_history.append(dict(record))
+            self._update_performance_rollup_locked(record)
             self._roll_traffic_bucket_locked(now)
         return sample
 
     def _roll_traffic_bucket_locked(self, now):
         if now - self._traffic_bucket_started_at < self.traffic_bucket_seconds:
             return
-        self.traffic_history.append({
+        bucket = {
             'ts': time.time(),
             'inbound': self._pending_traffic['inbound'],
             'outbound': self._pending_traffic['outbound'],
             'events': self._pending_traffic['events'],
             'failed': self._pending_traffic['failed'],
-        })
+        }
+        self.traffic_history.append(bucket)
+        self.traffic_long_history.append(dict(bucket))
+        self._update_traffic_rollup_locked(bucket)
         self._pending_traffic = {'inbound': 0, 'outbound': 0, 'events': 0, 'failed': 0}
         self._traffic_bucket_started_at = now
 
@@ -1486,10 +1677,174 @@ class server(API.Proc_templet):
         )
         return _round(total * 60.0 / elapsed)
 
-    def _history_series(self, key):
-        return [item.get(key) for item in self.performance_history]
+    def _history_series(self, key, history=None):
+        source = self.performance_history if history is None else history
+        return [item.get(key) for item in source]
 
-    def snapshot(self):
+    @staticmethod
+    def _rollup_start(timestamp, interval):
+        timestamp = _optional_float(timestamp)
+        if timestamp is None:
+            return None
+        return int(timestamp // interval) * interval
+
+    @staticmethod
+    def _new_performance_rollup(start):
+        return {
+            'ts': start,
+            'sums': {key: 0.0 for key in PERFORMANCE_HISTORY_KEYS},
+            'counts': {key: 0 for key in PERFORMANCE_HISTORY_KEYS},
+        }
+
+    @staticmethod
+    def _performance_rollup_record(current):
+        record = {'ts': current['ts']}
+        for key in PERFORMANCE_HISTORY_KEYS:
+            count = current['counts'][key]
+            record[key] = (
+                _round(current['sums'][key] / count) if count else None
+            )
+        return record
+
+    def _update_performance_rollup_locked(self, record):
+        start = self._rollup_start(record.get('ts'), ROLLUP_INTERVAL_SECONDS)
+        if start is None:
+            return
+        current = self._performance_rollup_current
+        if current is None:
+            current = self._new_performance_rollup(start)
+            self._performance_rollup_current = current
+        elif start > current['ts']:
+            self.performance_rollup_history.append(
+                self._performance_rollup_record(current)
+            )
+            current = self._new_performance_rollup(start)
+            self._performance_rollup_current = current
+        for key in PERFORMANCE_HISTORY_KEYS:
+            value = _optional_float(record.get(key))
+            if value is None:
+                continue
+            current['sums'][key] += value
+            current['counts'][key] += 1
+
+    def _performance_rollup_source_locked(self):
+        source = list(self.performance_rollup_history)
+        if self._performance_rollup_current is not None:
+            source.append(self._performance_rollup_record(
+                self._performance_rollup_current
+            ))
+        return source
+
+    @staticmethod
+    def _new_traffic_rollup(start):
+        return {
+            'ts': start,
+            'inbound': 0,
+            'outbound': 0,
+            'events': 0,
+            'failed': 0,
+        }
+
+    def _update_traffic_rollup_locked(self, bucket):
+        start = self._rollup_start(bucket.get('ts'), ROLLUP_INTERVAL_SECONDS)
+        if start is None:
+            return
+        current = self._traffic_rollup_current
+        if current is None:
+            current = self._new_traffic_rollup(start)
+            self._traffic_rollup_current = current
+        elif start > current['ts']:
+            self.traffic_rollup_history.append(dict(current))
+            current = self._new_traffic_rollup(start)
+            self._traffic_rollup_current = current
+        for key in ('inbound', 'outbound', 'events', 'failed'):
+            current[key] += _non_negative_int(bucket.get(key))
+
+    def _traffic_rollup_source_locked(self):
+        source = list(self.traffic_rollup_history)
+        if self._traffic_rollup_current is not None:
+            source.append(dict(self._traffic_rollup_current))
+        return source
+
+    @staticmethod
+    def _window_groups(items, start, width, capacity):
+        groups = {}
+        if width <= 0 or capacity <= 0:
+            return groups
+        for item in items:
+            timestamp = _optional_float(item.get('ts'))
+            if timestamp is None or timestamp < start:
+                continue
+            index = int((timestamp - start) / width)
+            index = max(0, min(capacity - 1, index))
+            groups.setdefault(index, []).append(item)
+        return groups
+
+    def _performance_window(self, name, now_wall, rollup_source=None):
+        config = WINDOW_CONFIG[name]
+        seconds = config['seconds']
+        capacity = config['points']
+        width = seconds / float(capacity)
+        start = now_wall - seconds
+        source = rollup_source if config['rollup'] else self.performance_long_history
+        groups = self._window_groups(
+            source, start, width, capacity
+        )
+        result = {
+            'interval': _round(width, 3),
+            'capacity': capacity,
+            'timestamps': [],
+        }
+        for key in PERFORMANCE_HISTORY_KEYS:
+            result[key] = []
+        for index in sorted(groups):
+            group = groups[index]
+            result['timestamps'].append(group[-1].get('ts'))
+            for key in PERFORMANCE_HISTORY_KEYS:
+                if config['rollup'] or key in PERFORMANCE_RATE_KEYS:
+                    values = [
+                        _optional_float(item.get(key)) for item in group
+                    ]
+                    values = [value for value in values if value is not None]
+                    result[key].append(
+                        _round(sum(values) / len(values)) if values else None
+                    )
+                else:
+                    result[key].append(group[-1].get(key))
+        return result
+
+    def _traffic_window(self, name, now_wall, raw_source, rollup_source):
+        config = WINDOW_CONFIG[name]
+        seconds = config['seconds']
+        if config['rollup']:
+            source = rollup_source
+            capacity = config['points']
+        else:
+            source = raw_source
+            capacity = min(
+                WINDOW_POINTS,
+                max(2, int(math.ceil(seconds / self.traffic_bucket_seconds))),
+            )
+        width = seconds / float(capacity)
+        start = now_wall - seconds
+        groups = self._window_groups(source, start, width, capacity)
+        result = {
+            'interval': _round(width, 3),
+            'capacity': capacity,
+            'timestamps': [],
+            'inbound': [],
+            'outbound': [],
+            'events': [],
+            'failed': [],
+        }
+        for index in sorted(groups):
+            group = groups[index]
+            result['timestamps'].append(group[-1].get('ts'))
+            for key in ('inbound', 'outbound', 'events', 'failed'):
+                result[key].append(sum(_non_negative_int(item.get(key)) for item in group))
+        return result
+
+    def snapshot(self, include_windows=False):
         try:
             with self.lock:
                 if self._last_sample is None:
@@ -1516,28 +1871,55 @@ class server(API.Proc_templet):
                     'process_threads': self._history_series('process_threads'),
                     'process_handles': self._history_series('process_handles'),
                 }
+                performance['sampling'] = {
+                    'interval': _non_negative_float(self.Proc_info.scan_interval, 1.0),
+                    'history_capacity': self.history_size,
+                    'long_history_capacity': self.performance_long_history.maxlen,
+                    'rollup_interval': ROLLUP_INTERVAL_SECONDS,
+                    'rollup_capacity': self.performance_rollup_history.maxlen,
+                    'last_sampled_at': self._last_sample_at,
+                }
                 now_wall = time.time()
                 history = [dict(item) for item in self.traffic_history]
                 pending = dict(self._pending_traffic)
                 if any(pending.values()):
                     history.append(dict(pending, ts=now_wall))
+                long_history = [dict(item) for item in self.traffic_long_history]
+                if any(pending.values()):
+                    long_history.append(dict(pending, ts=now_wall))
+                traffic = {
+                    'inbound_total': self.inbound_total,
+                    'outbound_total': self.outbound_total,
+                    'event_total': self.event_total,
+                    'failed_total': self.failed_total,
+                    'inbound_per_minute': self._traffic_rate(history, 'inbound', now_wall),
+                    'outbound_per_minute': self._traffic_rate(history, 'outbound', now_wall),
+                    'event_per_minute': self._traffic_rate(history, 'events', now_wall),
+                    'failed_per_minute': self._traffic_rate(history, 'failed', now_wall),
+                    'bucket_seconds': self.traffic_bucket_seconds,
+                    'history_capacity': self.traffic_history_size,
+                    'history': history,
+                }
+                if include_windows:
+                    performance_rollup_source = self._performance_rollup_source_locked()
+                    traffic_rollup_source = self._traffic_rollup_source_locked()
+                    performance['windows'] = {
+                        name: self._performance_window(
+                            name, now_wall, performance_rollup_source
+                        )
+                        for name in WINDOW_CONFIG
+                    }
+                    traffic['windows'] = {
+                        name: self._traffic_window(
+                            name, now_wall, long_history, traffic_rollup_source
+                        )
+                        for name in WINDOW_CONFIG
+                    }
                 return {
                     'available': True,
                     'sampled_at': self._last_sample_at,
                     'performance': performance,
-                    'traffic': {
-                        'inbound_total': self.inbound_total,
-                        'outbound_total': self.outbound_total,
-                        'event_total': self.event_total,
-                        'failed_total': self.failed_total,
-                        'inbound_per_minute': self._traffic_rate(history, 'inbound', now_wall),
-                        'outbound_per_minute': self._traffic_rate(history, 'outbound', now_wall),
-                        'event_per_minute': self._traffic_rate(history, 'events', now_wall),
-                        'failed_per_minute': self._traffic_rate(history, 'failed', now_wall),
-                        'bucket_seconds': self.traffic_bucket_seconds,
-                        'history_capacity': self.traffic_history_size,
-                        'history': history,
-                    },
+                    'traffic': traffic,
                 }
         except Exception:
             return unavailable_snapshot()

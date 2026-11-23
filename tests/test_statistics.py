@@ -200,6 +200,138 @@ def test_statistics_snapshot_is_json_serializable_and_history_is_bounded():
     assert json.loads(json.dumps(snapshot, ensure_ascii=False)) == snapshot
 
 
+def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):
+    # 性能页的 1/5/15 分钟数据只能按需附加；每个窗口最多 60 点，且默认快照结构不变。
+    monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
+    now = 1000000.0
+    monkeypatch.setattr(statisticsAPI.time, 'time', lambda: now)
+    monitor._last_sample = {'sampled_at': now}
+    monitor._last_sample_at = now
+    for index in range(1000):
+        record = {
+            'ts': now - 999 + index,
+            'cpu_percent': float(index % 100),
+            'load_1': 1.0,
+            'memory_percent': 20.0,
+            'swap_percent': 0.0,
+            'swap_in_bps': 10.0,
+            'swap_out_bps': 20.0,
+            'disk_percent': 30.0,
+            'disk_read_bps': 100.0,
+            'disk_write_bps': 200.0,
+            'network_recv_bps': 300.0,
+            'network_sent_bps': 400.0,
+            'process_count': 2,
+            'process_rss': 1024,
+            'process_cpu_percent': 5.0,
+            'process_threads': 4,
+            'process_handles': 6,
+        }
+        monitor.performance_history.append(record)
+        monitor.performance_long_history.append(dict(record))
+    for index in range(180):
+        monitor.traffic_long_history.append({
+            'ts': now - 179 * 5 + index * 5,
+            'inbound': 1,
+            'outbound': 2,
+            'events': 3,
+            'failed': 1,
+        })
+
+    default = monitor.snapshot()
+    windows = monitor.snapshot(include_windows=True)
+
+    assert 'windows' not in default['performance']
+    assert 'windows' not in default['traffic']
+    for name, expected_interval in [('1m', 1.0), ('5m', 5.0), ('15m', 15.0)]:
+        performance = windows['performance']['windows'][name]
+        assert performance['capacity'] == 60
+        assert performance['interval'] == expected_interval
+        assert len(performance['timestamps']) <= 60
+        assert len(performance['cpu_percent']) == len(performance['timestamps'])
+        assert performance['swap_in_bps'][-1] == 10.0
+    assert windows['traffic']['windows']['1m']['capacity'] == 12
+    assert windows['traffic']['windows']['5m']['capacity'] == 60
+    assert windows['traffic']['windows']['15m']['capacity'] == 60
+    assert len(windows['traffic']['windows']['1m']['inbound']) <= 12
+    assert len(windows['traffic']['windows']['5m']['inbound']) <= 60
+    assert len(windows['traffic']['windows']['15m']['inbound']) <= 60
+    assert json.loads(json.dumps(windows, ensure_ascii=False)) == windows
+
+
+def test_statistics_minute_rollups_average_performance_and_sum_traffic():
+    # 分钟聚合层用平均值压缩性能指标，用求和保留消息流量；跨分钟后只把完整桶写入历史。
+    monitor = make_statistics_monitor()
+    monitor._update_performance_rollup_locked({'ts': 120, 'cpu_percent': 10.0})
+    monitor._update_performance_rollup_locked({'ts': 150, 'cpu_percent': 20.0})
+    monitor._update_performance_rollup_locked({'ts': 180, 'cpu_percent': 40.0})
+    monitor._update_traffic_rollup_locked({
+        'ts': 121, 'inbound': 1, 'outbound': 2, 'events': 3, 'failed': 1,
+    })
+    monitor._update_traffic_rollup_locked({
+        'ts': 150, 'inbound': 2, 'outbound': 3, 'events': 4, 'failed': 2,
+    })
+    monitor._update_traffic_rollup_locked({
+        'ts': 181, 'inbound': 4, 'outbound': 5, 'events': 6, 'failed': 3,
+    })
+
+    assert monitor.performance_rollup_history[-1]['cpu_percent'] == 15.0
+    assert monitor.traffic_rollup_history[-1] == {
+        'ts': 120, 'inbound': 3, 'outbound': 5, 'events': 7, 'failed': 3,
+    }
+    assert monitor._performance_rollup_current['ts'] == 180
+    assert monitor._performance_rollup_current['sums']['cpu_percent'] == 40.0
+    assert monitor._traffic_rollup_current == {
+        'ts': 180, 'inbound': 4, 'outbound': 5, 'events': 6, 'failed': 3,
+    }
+
+
+def test_statistics_daily_windows_use_minute_rollups(monkeypatch):
+    # 日级窗口只扫描约 1440 个分钟桶，不把 24 小时的原始采样塞进长期队列。
+    monitor = make_statistics_monitor(scan_interval=1.0)
+    now = 1000000.0
+    monkeypatch.setattr(statisticsAPI.time, 'time', lambda: now)
+    monitor._last_sample = {'sampled_at': now}
+    monitor._last_sample_at = now
+    base = int(now // 60) * 60 - 1439 * 60
+    for index in range(1440):
+        timestamp = base + index * 60
+        monitor.performance_rollup_history.append({
+            'ts': timestamp,
+            'cpu_percent': float(index),
+        })
+        monitor.traffic_rollup_history.append({
+            'ts': timestamp,
+            'inbound': 1,
+            'outbound': 2,
+            'events': 3,
+            'failed': 0,
+        })
+
+    windows = monitor.snapshot(include_windows=True)
+
+    expected = [('1h', 60.0, 60), ('6h', 360.0, 60), ('24h', 600.0, 144)]
+    for name, interval, capacity in expected:
+        performance = windows['performance']['windows'][name]
+        traffic = windows['traffic']['windows'][name]
+        assert performance['interval'] == interval
+        assert performance['capacity'] == capacity
+        assert traffic['interval'] == interval
+        assert traffic['capacity'] == capacity
+        assert len(performance['timestamps']) == capacity
+        assert len(performance['cpu_percent']) == capacity
+        assert len(traffic['timestamps']) == capacity
+    assert windows['performance']['windows']['24h']['cpu_percent'][0] == 4.5
+    assert windows['performance']['windows']['24h']['cpu_percent'][-1] == 1434.5
+    assert sum(windows['traffic']['windows']['24h']['inbound']) == 1440
+    assert sum(windows['traffic']['windows']['1h']['inbound']) == 60
+    assert sum(windows['traffic']['windows']['6h']['inbound']) == 360
+    assert monitor.performance_long_history.maxlen == 901
+    assert monitor.performance_rollup_history.maxlen == 1441
+    assert windows['performance']['sampling']['rollup_interval'] == 60.0
+    assert windows['performance']['sampling']['rollup_capacity'] == 1441
+
+
 def test_statistics_monitor_accepts_traffic_control_packets():
     # 插件进程与控制组件之间只传递批量增量，统计进程负责累计总量。
     monitor = make_statistics_monitor()
@@ -240,6 +372,212 @@ def test_statistics_disk_usage_aggregates_all_volumes(monkeypatch):
     assert disk['used'] == 2800
     assert disk['percent'] == 70.0
     assert [item['mountpoint'] for item in disk['volumes']] == ['C:\\', 'D:\\']
+
+
+def test_statistics_performance_reports_extended_system_details(monkeypatch):
+    # 性能页需要 CPU 物理核心、频率、每核心使用率，以及内存、磁盘、网络细分字段。
+    from types import SimpleNamespace
+
+    def cpu_percent(interval=None, percpu=False):
+        return [10.0, 20.0, 30.0, 40.0] if percpu else 25.0
+
+    def net_io_counters(pernic=False):
+        if pernic:
+            return {}
+        return SimpleNamespace(
+            bytes_sent=100, bytes_recv=200, packets_sent=3, packets_recv=4,
+            errin=1, errout=2, dropin=3, dropout=4,
+        )
+
+    monkeypatch.setattr(statisticsAPI.psutil, 'cpu_percent', cpu_percent)
+    monkeypatch.setattr(
+        statisticsAPI.psutil, 'cpu_count',
+        lambda logical=True: 4 if logical else 2,
+    )
+    monkeypatch.setattr(
+        statisticsAPI.psutil, 'cpu_freq',
+        lambda: SimpleNamespace(current=2400.0),
+    )
+    monkeypatch.setattr(statisticsAPI.psutil, 'getloadavg', lambda: (1.25, 1.0, 0.8))
+    monkeypatch.setattr(statisticsAPI.psutil, 'virtual_memory', lambda: SimpleNamespace(
+        total=1000, used=400, available=600, free=100, percent=40.0,
+        cached=200, buffers=50, shared=25,
+    ))
+    monkeypatch.setattr(statisticsAPI.psutil, 'swap_memory', lambda: SimpleNamespace(
+        total=500, used=125, free=375, percent=25.0, sin=0, sout=0,
+    ))
+    monkeypatch.setattr(statisticsAPI.psutil, 'disk_partitions', lambda all=False: [])
+    monkeypatch.setattr(
+        statisticsAPI.psutil, 'disk_usage',
+        lambda path: SimpleNamespace(total=1000, used=400, percent=40.0),
+    )
+    monkeypatch.setattr(statisticsAPI.psutil, 'disk_io_counters', lambda: SimpleNamespace(
+        read_bytes=0, write_bytes=0, read_count=0, write_count=0,
+        read_time=0, write_time=0,
+    ))
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_io_counters', net_io_counters)
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_connections', lambda kind='inet': [
+        SimpleNamespace(status='ESTABLISHED'),
+        SimpleNamespace(status='ESTABLISHED'),
+        SimpleNamespace(status='TIME_WAIT'),
+    ])
+    monitor = make_statistics_monitor()
+    monitor._memory_io.disabled = True
+
+    sample = monitor._sample_performance()
+
+    assert sample['cpu']['physical_count'] == 2
+    assert sample['cpu']['frequency_mhz'] == 2400.0
+    assert sample['cpu']['per_cpu_percent'] == [10.0, 20.0, 30.0, 40.0]
+    assert sample['memory']['free'] == 100
+    assert sample['memory']['cached'] == 200
+    assert sample['memory']['buffers'] == 50
+    assert sample['memory']['shared'] == 25
+    assert sample['memory']['swap_total'] == 500
+    assert sample['memory']['swap_used'] == 125
+    assert sample['memory']['swap_free'] == 375
+    assert sample['memory']['page_faults'] is None
+    assert sample['disk']['read_iops'] is None
+    assert sample['network']['connection_count'] == 3
+    assert sample['network']['tcp_states'] == {'ESTABLISHED': 2, 'TIME_WAIT': 1}
+    assert sample['network']['interfaces'] == []
+
+
+def test_statistics_disk_io_reports_iops_and_latency(monkeypatch):
+    # 磁盘质量指标使用累计计数差值；计数不增长时延迟必须为 None，不能显示假的 0 ms。
+    from types import SimpleNamespace
+
+    readings = [
+        SimpleNamespace(
+            read_bytes=1000, write_bytes=2000, read_count=10, write_count=20,
+            read_time=100, write_time=200,
+        ),
+        SimpleNamespace(
+            read_bytes=3000, write_bytes=4000, read_count=30, write_count=40,
+            read_time=160, write_time=240,
+        ),
+        SimpleNamespace(
+            read_bytes=5000, write_bytes=6000, read_count=30, write_count=40,
+            read_time=220, write_time=280,
+        ),
+    ]
+    net = SimpleNamespace(
+        bytes_sent=0, bytes_recv=0, packets_sent=0, packets_recv=0,
+        errin=0, errout=0, dropin=0, dropout=0,
+    )
+    monkeypatch.setattr(statisticsAPI.psutil, 'disk_io_counters', lambda: readings.pop(0))
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_io_counters', lambda pernic=False: {} if pernic else net)
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_connections', lambda kind='inet': [])
+    monitor = make_statistics_monitor()
+    monitor._memory_io.disabled = True
+
+    monitor._sample_io(100.0)
+    sample = monitor._sample_io(102.0)
+    stalled = monitor._sample_io(104.0)
+
+    assert sample['disk_read_iops'] == 10.0
+    assert sample['disk_write_iops'] == 10.0
+    assert sample['disk_read_latency_ms'] == 3.0
+    assert sample['disk_write_latency_ms'] == 2.0
+    assert stalled['disk_read_iops'] == 0.0
+    assert stalled['disk_write_iops'] == 0.0
+    assert stalled['disk_read_latency_ms'] is None
+    assert stalled['disk_write_latency_ms'] is None
+
+
+def test_statistics_network_reports_packet_quality_and_interfaces(monkeypatch):
+    # 网络质量包含聚合错误/丢包、连接状态和按网卡吞吐；网卡按吞吐降序排列。
+    from types import SimpleNamespace
+
+    net_readings = [
+        SimpleNamespace(
+            bytes_sent=100, bytes_recv=200, packets_sent=10, packets_recv=20,
+            errin=1, errout=1, dropin=1, dropout=1,
+        ),
+        SimpleNamespace(
+            bytes_sent=1100, bytes_recv=2200, packets_sent=30, packets_recv=40,
+            errin=3, errout=2, dropin=4, dropout=5,
+        ),
+    ]
+    pernic_readings = [
+        {
+            'eth0': SimpleNamespace(
+                bytes_sent=100, bytes_recv=200, errin=1, errout=1,
+                dropin=1, dropout=1,
+            ),
+            'wlan0': SimpleNamespace(
+                bytes_sent=10, bytes_recv=20, errin=0, errout=0,
+                dropin=0, dropout=0,
+            ),
+        },
+        {
+            'eth0': SimpleNamespace(
+                bytes_sent=1100, bytes_recv=2200, errin=3, errout=2,
+                dropin=4, dropout=5,
+            ),
+            'wlan0': SimpleNamespace(
+                bytes_sent=210, bytes_recv=620, errin=0, errout=0,
+                dropin=0, dropout=0,
+            ),
+        },
+    ]
+    disk = SimpleNamespace(
+        read_bytes=0, write_bytes=0, read_count=0, write_count=0,
+        read_time=0, write_time=0,
+    )
+    monkeypatch.setattr(statisticsAPI.psutil, 'disk_io_counters', lambda: disk)
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_io_counters', lambda pernic=False: (
+        pernic_readings.pop(0) if pernic else net_readings.pop(0)
+    ))
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_connections', lambda kind='inet': [
+        SimpleNamespace(status='ESTABLISHED'),
+        SimpleNamespace(status='TIME_WAIT'),
+    ])
+    monitor = make_statistics_monitor()
+    monitor._memory_io.disabled = True
+
+    monitor._sample_io(100.0)
+    sample = monitor._sample_io(102.0)
+
+    assert sample['errin_per_second'] == 1.0
+    assert sample['errout_per_second'] == 0.5
+    assert sample['dropin_per_second'] == 1.5
+    assert sample['dropout_per_second'] == 2.0
+    assert sample['connection_count'] == 2
+    assert sample['tcp_states'] == {'ESTABLISHED': 1, 'TIME_WAIT': 1}
+    assert [item['name'] for item in sample['interfaces']] == ['eth0', 'wlan0']
+    assert sample['interfaces'][0]['recv_bps'] == 1000.0
+    assert sample['interfaces'][0]['sent_bps'] == 500.0
+    assert sample['interfaces'][1]['recv_bps'] == 300.0
+
+
+def test_statistics_network_connection_failure_degrades_to_null(monkeypatch):
+    # 连接枚举在权限不足时必须降级为 None，不能拖垮网络带宽其它指标。
+    from types import SimpleNamespace
+
+    net = SimpleNamespace(
+        bytes_sent=100, bytes_recv=200, packets_sent=3, packets_recv=4,
+        errin=0, errout=0, dropin=0, dropout=0,
+    )
+    disk = SimpleNamespace(
+        read_bytes=0, write_bytes=0, read_count=0, write_count=0,
+        read_time=0, write_time=0,
+    )
+
+    def denied(kind='inet'):
+        raise PermissionError('connection table denied')
+
+    monkeypatch.setattr(statisticsAPI.psutil, 'disk_io_counters', lambda: disk)
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_io_counters', lambda pernic=False: {} if pernic else net)
+    monkeypatch.setattr(statisticsAPI.psutil, 'net_connections', denied)
+    monitor = make_statistics_monitor()
+    monitor._memory_io.disabled = True
+
+    sample = monitor._sample_io(100.0)
+
+    assert sample['connection_count'] is None
+    assert sample['tcp_states'] is None
+    assert sample['net_recv_bps'] == 0.0
 
 
 def test_statistics_swap_io_uses_counter_delta(monkeypatch):

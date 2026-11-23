@@ -258,6 +258,15 @@
               <span id="performance-nav-current" class="performance-nav-toggle-current">CPU</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"></path></svg>
             </button>
+            <div id="performance-window-switch" class="performance-window-switch"
+                 role="group" aria-label="趋势时间窗口">
+              <button type="button" class="active" data-performance-window="1m">1 分钟</button>
+              <button type="button" data-performance-window="5m">5 分钟</button>
+              <button type="button" data-performance-window="15m">15 分钟</button>
+              <button type="button" data-performance-window="1h">1 小时</button>
+              <button type="button" data-performance-window="6h">6 小时</button>
+              <button type="button" data-performance-window="24h">24 小时</button>
+            </div>
             <span id="performance-sampled" class="statistics-sampled"></span>
           </div>
           <p id="performance-statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
@@ -401,9 +410,19 @@
                     <span><i class="legend-dot legend-load"></i>OlivOS 负载</span>
                   </div>
                 </section>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-cpu-cores-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-cpu-cores-title">核心使用率</h3>
+                  </div>
+                  <div id="performance-cpu-cores" class="performance-core-grid" role="list"
+                       aria-label="每个逻辑核心的使用率"></div>
+                </section>
                 <dl class="performance-fact-grid" aria-label="CPU 详细信息">
-                  <div class="performance-fact"><dt>负载</dt><dd data-performance-stat="cpu-machine-load"></dd></div>
+                  <div class="performance-fact"><dt>负载（1/5/15 分钟）</dt><dd data-performance-stat="cpu-machine-load"></dd></div>
                   <div class="performance-fact"><dt>逻辑处理器</dt><dd data-performance-stat="cpu-logical"></dd></div>
+                  <div class="performance-fact"><dt>物理核心</dt><dd data-performance-stat="cpu-physical"></dd></div>
+                  <div class="performance-fact"><dt>当前频率</dt><dd data-performance-stat="cpu-frequency"></dd></div>
                   <div class="performance-fact"><dt>OlivOS 负载</dt><dd data-performance-stat="cpu-load"></dd></div>
                   <div class="performance-fact"><dt>OlivOS 进程</dt><dd data-performance-stat="cpu-processes"></dd></div>
                   <div class="performance-fact"><dt>线程</dt><dd data-performance-stat="cpu-threads"></dd></div>
@@ -449,7 +468,14 @@
                   <div class="performance-fact"><dt>使用中</dt><dd data-performance-stat="memory-used"></dd></div>
                   <div class="performance-fact"><dt>可用</dt><dd data-performance-stat="memory-available"></dd></div>
                   <div class="performance-fact"><dt>总计</dt><dd data-performance-stat="memory-total"></dd></div>
-                  <div class="performance-fact"><dt>Swap</dt><dd data-performance-stat="memory-swap"></dd></div>
+                  <div class="performance-fact"><dt>空闲</dt><dd data-performance-stat="memory-free"></dd></div>
+                  <div class="performance-fact"><dt>缓存</dt><dd data-performance-stat="memory-cached"></dd></div>
+                  <div class="performance-fact"><dt>Buffers</dt><dd data-performance-stat="memory-buffers"></dd></div>
+                  <div class="performance-fact"><dt>共享内存</dt><dd data-performance-stat="memory-shared"></dd></div>
+                  <div class="performance-fact"><dt>Swap 使用率</dt><dd data-performance-stat="memory-swap"></dd></div>
+                  <div class="performance-fact"><dt>Swap 总计</dt><dd data-performance-stat="memory-swap-total"></dd></div>
+                  <div class="performance-fact"><dt>Swap 已用</dt><dd data-performance-stat="memory-swap-used"></dd></div>
+                  <div class="performance-fact"><dt>Swap 可用</dt><dd data-performance-stat="memory-swap-free"></dd></div>
                   <div class="performance-fact"><dt>换入</dt><dd data-performance-stat="memory-swap-in"></dd></div>
                   <div class="performance-fact"><dt>换出</dt><dd data-performance-stat="memory-swap-out"></dd></div>
                 </dl>
@@ -494,7 +520,17 @@
                   <div class="performance-fact"><dt>卷</dt><dd data-performance-stat="disk-volumes"></dd></div>
                   <div class="performance-fact"><dt>读取</dt><dd data-performance-stat="disk-read"></dd></div>
                   <div class="performance-fact"><dt>写入</dt><dd data-performance-stat="disk-write"></dd></div>
+                  <div class="performance-fact"><dt>读 IOPS</dt><dd data-performance-stat="disk-read-iops"></dd></div>
+                  <div class="performance-fact"><dt>写 IOPS</dt><dd data-performance-stat="disk-write-iops"></dd></div>
+                  <div class="performance-fact"><dt>读延迟</dt><dd data-performance-stat="disk-read-latency"></dd></div>
+                  <div class="performance-fact"><dt>写延迟</dt><dd data-performance-stat="disk-write-latency"></dd></div>
                 </dl>
+                <section class="panel performance-panel" aria-labelledby="performance-disk-volumes-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-disk-volumes-title">卷明细</h3>
+                  </div>
+                  <div id="performance-disk-volumes" class="performance-volume-list"></div>
+                </section>
               </section>
               <section id="performance-view-network" class="performance-view" data-performance-view="network"
                        role="tabpanel" aria-labelledby="performance-category-network" hidden>
@@ -523,9 +559,17 @@
                   <div class="performance-fact"><dt>上行</dt><dd data-performance-stat="network-sent"></dd></div>
                   <div class="performance-fact"><dt>接收包/秒</dt><dd data-performance-stat="network-packets-recv"></dd></div>
                   <div class="performance-fact"><dt>发送包/秒</dt><dd data-performance-stat="network-packets-sent"></dd></div>
-                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
-                       aria-hidden="true"></div>
+                  <div class="performance-fact"><dt>错误收/发</dt><dd data-performance-stat="network-errors"></dd></div>
+                  <div class="performance-fact"><dt>丢包收/发</dt><dd data-performance-stat="network-drops"></dd></div>
+                  <div class="performance-fact"><dt>连接数</dt><dd data-performance-stat="network-connections"></dd></div>
+                  <div class="performance-fact"><dt>TCP 状态</dt><dd data-performance-stat="network-tcp-states"></dd></div>
                 </dl>
+                <section class="panel performance-panel" aria-labelledby="performance-network-interfaces-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-network-interfaces-title">网卡吞吐</h3>
+                  </div>
+                  <div id="performance-network-interfaces" class="performance-interface-list"></div>
+                </section>
               </section>
               <section id="performance-view-traffic" class="performance-view" data-performance-view="traffic"
                        role="tabpanel" aria-labelledby="performance-category-traffic" hidden>
@@ -548,13 +592,26 @@
                     <span><i class="legend-dot legend-outbound"></i>出站</span>
                   </div>
                 </section>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-failure-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-failure-chart-title">失败事件</h3>
+                  </div>
+                  <div id="performance-failure-chart" class="statistics-chart performance-chart-compact"
+                       role="img" aria-label="失败事件趋势"></div>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-failed"></i>失败事件</span>
+                  </div>
+                </section>
                 <dl class="performance-fact-grid" aria-label="消息详细信息">
                   <div class="performance-fact"><dt>入站/分钟</dt><dd data-performance-stat="traffic-in"></dd></div>
                   <div class="performance-fact"><dt>出站/分钟</dt><dd data-performance-stat="traffic-out"></dd></div>
                   <div class="performance-fact"><dt>累计入站</dt><dd data-performance-stat="traffic-in-total"></dd></div>
                   <div class="performance-fact"><dt>累计出站</dt><dd data-performance-stat="traffic-out-total"></dd></div>
-                  <div class="performance-fact performance-fact-empty performance-fact-empty-wide"
-                       aria-hidden="true"></div>
+                  <div class="performance-fact"><dt>事件/分钟</dt><dd data-performance-stat="traffic-events"></dd></div>
+                  <div class="performance-fact"><dt>失败/分钟</dt><dd data-performance-stat="traffic-failed"></dd></div>
+                  <div class="performance-fact"><dt>失败率</dt><dd data-performance-stat="traffic-failed-rate"></dd></div>
+                  <div class="performance-fact"><dt>累计失败</dt><dd data-performance-stat="traffic-failed-total"></dd></div>
                 </dl>
               </section>
               <section id="performance-view-processes" class="performance-view" data-performance-view="processes"

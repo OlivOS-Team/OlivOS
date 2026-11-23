@@ -114,6 +114,7 @@ const state = {
   performanceProcessOpen: {},
   performanceProcessDetailGroups: {},
   performanceCategory: 'cpu',
+  performanceWindow: '1m',
   performanceNavOpen: false,
   dashboardTimer: null,
   authGeneration: 0,
@@ -924,19 +925,98 @@ function formatCpuCores(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `${(Math.max(0, number) / 100).toFixed(2)} 核心` : '—';
 }
-function trafficBucketValues(traffic, key) {
-  return (traffic?.history || []).map((item) => {
+function formatOptionalBytes(value) {
+  return value === null || value === undefined ? '—' : formatBytes(value);
+}
+function formatOptionalDecimal(value, digits = 2) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : '—';
+}
+function formatOptionalPerSecond(value, unit = '个') {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number.toFixed(1)} ${unit}/秒` : '—';
+}
+function formatOptionalLatency(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${number.toFixed(2)} ms` : '—';
+}
+function formatFrequency(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? `${Math.round(number)} MHz` : '—';
+}
+function failureRatePercent(traffic) {
+  const failed = Number(traffic?.failed_per_minute);
+  const events = Number(traffic?.event_per_minute);
+  if (!Number.isFinite(failed) || failed <= 0) return 0;
+  if (!Number.isFinite(events) || events <= 0) return 100;
+  return Math.min(100, failed * 100 / events);
+}
+const performanceWindowLabels = {
+  '1m': '1 分钟',
+  '5m': '5 分钟',
+  '15m': '15 分钟',
+  '1h': '1 小时',
+  '6h': '6 小时',
+  '24h': '24 小时',
+};
+const performanceWindowKeys = ['1m', '5m', '15m', '1h', '6h', '24h'];
+const performanceWindowUsesDate = new Set(['6h', '24h']);
+function trafficWindowHistory(windowData) {
+  const timestamps = Array.isArray(windowData?.timestamps) ? windowData.timestamps : [];
+  return timestamps.map((timestamp, index) => ({
+    ts: timestamp,
+    inbound: windowData.inbound?.[index] || 0,
+    outbound: windowData.outbound?.[index] || 0,
+    events: windowData.events?.[index] || 0,
+    failed: windowData.failed?.[index] || 0,
+  }));
+}
+function tcpStatesText(states) {
+  if (!states || typeof states !== 'object') return '—';
+  const items = Object.entries(states)
+    .filter(([, count]) => Number.isFinite(Number(count)))
+    .sort((left, right) => Number(right[1]) - Number(left[1]));
+  return items.length
+    ? items.map(([state, count]) => `${state} ${formatCount(count)}`).join(' · ')
+    : '—';
+}
+function trafficBucketValues(traffic, key, history = null) {
+  const source = Array.isArray(history) ? history : (traffic?.history || []);
+  return source.map((item) => {
     const number = Number(item?.[key]);
     return Number.isFinite(number) ? Math.max(0, number) : 0;
   });
 }
-function formatTrafficBucket(value) {
-  return `${formatCount(value)} 条`;
+function formatBucketInterval(seconds) {
+  const number = Number(seconds);
+  if (!Number.isFinite(number) || number <= 0) return '';
+  if (number < 60) return `${Math.round(number)} 秒`;
+  const minutes = number / 60;
+  return `${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} 分钟`;
 }
-function chartTimeText(timestamp, slotFromRight) {
+function formatTrafficBucket(value, intervalSeconds = null) {
+  const count = `${formatCount(value)} 条`;
+  const interval = formatBucketInterval(intervalSeconds);
+  return interval ? `${count} / ${interval}` : count;
+}
+function chartTimeText(timestamp, slotFromRight, options = {}) {
   if (timestamp !== null && timestamp !== undefined) {
     const date = new Date(Number(timestamp) * 1000);
     if (Number.isFinite(date.getTime())) {
+      if (options.includeDate) {
+        return date.toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+      }
       return date.toLocaleTimeString('zh-CN', { hour12: false });
     }
   }
@@ -1133,7 +1213,10 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     const hasData = cleaned.some((item) => item.actual[slot]);
     tooltip.replaceChildren();
     if (hasData) {
-      tooltip.append(element('span', chartTimeText(timestamps[slot], effectiveCapacity - slot), {
+      tooltip.append(element('span', chartTimeText(
+        timestamps[slot], effectiveCapacity - slot,
+        { includeDate: options.includeDate === true },
+      ), {
         class: 'chart-tooltip-time',
       }));
       for (const item of cleaned) {
@@ -1341,6 +1424,117 @@ function setPerformanceStat(name, value) {
   document.querySelectorAll(`[data-performance-stat="${name}"]`).forEach((node) => {
     node.textContent = value;
   });
+}
+function syncPerformanceWindowControls(data) {
+  const performanceWindows = data?.performance?.windows || {};
+  const trafficWindows = data?.traffic?.windows || {};
+  document.querySelectorAll('[data-performance-window]').forEach((button) => {
+    const key = button.dataset.performanceWindow;
+    const available = Boolean(performanceWindows[key] || trafficWindows[key]);
+    const active = key === state.performanceWindow;
+    button.disabled = !available;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+function renderPerformanceCores(values) {
+  const container = $('performance-cpu-cores');
+  if (!container) return;
+  const rows = Array.isArray(values) ? values : [];
+  if (!rows.length) {
+    container.replaceChildren(element('p', '当前平台未提供每核心使用率。', {
+      class: 'performance-list-empty',
+    }));
+    return;
+  }
+  container.replaceChildren(...rows.map((value, index) => {
+    const percent = clampPercent(value);
+    const item = element('div', null, { class: 'performance-core-item', role: 'listitem' });
+    const head = element('div', null, { class: 'performance-core-head' });
+    head.append(
+      element('span', `核心 ${index + 1}`, { class: 'performance-core-name' }),
+      element('span', formatPercent(percent), { class: 'performance-core-value' }),
+    );
+    const meter = element('div', null, { class: 'performance-meter', 'aria-hidden': 'true' });
+    const fill = element('div', null, { class: 'performance-meter-fill' });
+    fill.style.width = `${percent}%`;
+    meter.append(fill);
+    item.append(head, meter);
+    return item;
+  }));
+}
+function renderPerformanceVolumes(volumes) {
+  const container = $('performance-disk-volumes');
+  if (!container) return;
+  const rows = Array.isArray(volumes) ? volumes : [];
+  if (!rows.length) {
+    container.replaceChildren(element('p', '暂无可用卷信息。', {
+      class: 'performance-list-empty',
+    }));
+    return;
+  }
+  container.replaceChildren(...rows.map((volume) => {
+    const percent = clampPercent(volume?.percent);
+    const total = Math.max(0, Number(volume?.total) || 0);
+    const used = Math.max(0, Number(volume?.used) || 0);
+    const name = volume?.mountpoint || volume?.device || '卷';
+    const item = element('div', null, { class: 'performance-volume-item' });
+    const head = element('div', null, { class: 'performance-volume-head' });
+    head.append(
+      element('span', name, { class: 'performance-volume-name', title: name }),
+      element('span', formatPercent(percent), { class: 'performance-volume-value' }),
+    );
+    const meter = element('div', null, { class: 'performance-meter', 'aria-hidden': 'true' });
+    const fill = element('div', null, { class: 'performance-meter-fill' });
+    fill.style.width = `${percent}%`;
+    meter.append(fill);
+    const device = volume?.device && volume.device !== name ? ` · ${volume.device}` : '';
+    item.append(
+      head,
+      meter,
+      element('div',
+        `${formatBytes(used)} / ${formatBytes(total)} · 剩余 ${formatBytes(Math.max(0, total - used))}` +
+          device,
+        { class: 'performance-volume-meta' }),
+    );
+    return item;
+  }));
+}
+function renderPerformanceInterfaces(interfaces) {
+  const container = $('performance-network-interfaces');
+  if (!container) return;
+  const rows = Array.isArray(interfaces) ? interfaces.slice(0, 16) : [];
+  if (!rows.length) {
+    container.replaceChildren(element('p', '暂无可用网卡吞吐数据。', {
+      class: 'performance-list-empty',
+    }));
+    return;
+  }
+  container.replaceChildren(...rows.map((networkInterface) => {
+    const name = networkInterface?.name || '网卡';
+    const item = element('div', null, { class: 'performance-interface-item' });
+    const head = element('div', null, { class: 'performance-interface-head' });
+    head.append(
+      element('span', name, { class: 'performance-interface-name', title: name }),
+      element('span',
+        `↓ ${formatRate(networkInterface?.recv_bps)} · ↑ ${formatRate(networkInterface?.sent_bps)}`,
+        { class: 'performance-interface-value' }),
+    );
+    const details = [];
+    if (networkInterface?.errin_per_second !== null || networkInterface?.errout_per_second !== null) {
+      details.push(`错误 收 ${formatOptionalPerSecond(networkInterface?.errin_per_second)} / ` +
+        `发 ${formatOptionalPerSecond(networkInterface?.errout_per_second)}`);
+    }
+    if (networkInterface?.dropin_per_second !== null || networkInterface?.dropout_per_second !== null) {
+      details.push(`丢包 收 ${formatOptionalPerSecond(networkInterface?.dropin_per_second)} / ` +
+        `发 ${formatOptionalPerSecond(networkInterface?.dropout_per_second)}`);
+    }
+    if (details.length) {
+      item.append(element('div', details.join(' · '), { class: 'performance-interface-meta' }));
+    }
+    item.prepend(head);
+    return item;
+  }));
 }
 function revealPerformanceCategory(button) {
   if (!button) return;
@@ -1899,7 +2093,6 @@ function renderPerformanceStatistics(data) {
     note.hidden = true;
     note.textContent = '';
   }
-  if (sampled) sampled.textContent = sampledAtText(data.sampled_at);
 
   const performance = data.performance;
   const traffic = data.traffic;
@@ -1908,9 +2101,33 @@ function renderPerformanceStatistics(data) {
   const disk = performance.disk || {};
   const network = performance.network || {};
   const process = performance.process || {};
-  const history = performance.history || {};
+  const selectedPerformanceWindow = performance.windows?.[state.performanceWindow] || null;
+  const selectedTrafficWindow = traffic.windows?.[state.performanceWindow] || null;
+  const history = selectedPerformanceWindow || performance.history || {};
   const timestamps = history.timestamps || [];
+  const trafficHistory = selectedTrafficWindow
+    ? trafficWindowHistory(selectedTrafficWindow)
+    : (traffic.history || []);
+  const trafficCapacity = selectedTrafficWindow?.capacity ?? traffic.history_capacity;
+  const pointCapacity = Number(history.capacity ?? trafficCapacity);
+  const trafficInterval = Number(
+    selectedTrafficWindow?.interval ?? traffic.bucket_seconds);
+  const includeDate = performanceWindowUsesDate.has(state.performanceWindow);
+  const trafficFormatValue = (value) => formatTrafficBucket(value, trafficInterval);
+  const sampleInterval = Number(history.interval);
+  const windowText = selectedPerformanceWindow || selectedTrafficWindow
+    ? performanceWindowLabels[state.performanceWindow]
+    : '默认';
+  syncPerformanceWindowControls(data);
+  if (sampled) {
+    sampled.textContent =
+      `采样 ${Number.isFinite(sampleInterval) ? sampleInterval.toFixed(1) : '—'} 秒 · ` +
+      `窗口 ${windowText} · ${formatCount(timestamps.length)} 点` +
+      `${Number.isFinite(pointCapacity) ? ` · 容量 ${formatCount(pointCapacity)} 点` : ''} · ` +
+      `${sampledAtText(data.sampled_at)}`;
+  }
   const loadValue = formatLoad(cpu.load_1);
+  const loadText = [cpu.load_1, cpu.load_5, cpu.load_15].map(formatLoad).join(' / ');
   const systemLoad = loadValue === '—' ? '' : ` · 负载 ${loadValue}`;
   const processCpu = formatCpuCores(process.cpu_percent);
   const swap = memory.swap_percent === null || memory.swap_percent === undefined
@@ -1927,16 +2144,23 @@ function renderPerformanceStatistics(data) {
     processScaleItems.push(`${formatCount(process.num_fds)} 文件描述符`);
   }
   const processScale = processScaleItems.join(' · ');
+  const physicalCount = formatOptionalCount(cpu.physical_count);
+  const frequency = formatFrequency(cpu.frequency_mhz);
+  const failedRate = failureRatePercent(traffic);
 
   setPerformanceReadout('performance-cpu-readout',
-    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${systemLoad}`);
+    `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心 · ` +
+    `${physicalCount} 物理核心 · ${frequency}${systemLoad}`);
   setPerformanceReadout('performance-memory-readout',
     `${formatPercent(memory.percent)} · ${formatBytes(memory.used)} / ${formatBytes(memory.total)} · Swap ${swap}`);
   setPerformanceReadout('performance-disk-usage-readout',
     `${formatPercent(disk.percent)} · ${formatBytes(disk.used)} / ${formatBytes(disk.total)} · ` +
     `${formatCount(disk.volume_count)} 个卷`);
   setPerformanceReadout('performance-disk-io-readout',
-    `读取 ${formatRate(disk.read_bps)} · 写入 ${formatRate(disk.write_bps)}`);
+    `读取 ${formatRate(disk.read_bps)}（${formatOptionalPerSecond(disk.read_iops, '次')}，` +
+    `${formatOptionalLatency(disk.read_latency_ms)}） · ` +
+    `写入 ${formatRate(disk.write_bps)}（${formatOptionalPerSecond(disk.write_iops, '次')}，` +
+    `${formatOptionalLatency(disk.write_latency_ms)}）`);
   setPerformanceReadout('performance-network-readout',
     `下行 ${formatRate(network.recv_bps)} · 上行 ${formatRate(network.sent_bps)}`);
   setPerformanceReadout('performance-load-readout',
@@ -1945,7 +2169,8 @@ function renderPerformanceStatistics(data) {
     `${formatBytes(process.rss)} · ${processScale}`);
   setPerformanceReadout('performance-traffic-readout',
     `入站 ${formatCount(traffic.inbound_per_minute)} 条/分钟 · ` +
-    `出站 ${formatCount(traffic.outbound_per_minute)} 条/分钟`);
+    `出站 ${formatCount(traffic.outbound_per_minute)} 条/分钟 · ` +
+    `失败 ${formatCount(traffic.failed_per_minute)} 条/分钟`);
 
   setPerformanceSummary('cpu', formatPercent(cpu.percent));
   setPerformanceSummary('memory', formatPercent(memory.percent));
@@ -1959,7 +2184,9 @@ function renderPerformanceStatistics(data) {
   setPerformanceSummary('processes-detail', processScale);
 
   setPerformanceStat('cpu-logical', formatCount(cpu.count));
-  setPerformanceStat('cpu-machine-load', loadValue);
+  setPerformanceStat('cpu-physical', physicalCount);
+  setPerformanceStat('cpu-frequency', frequency);
+  setPerformanceStat('cpu-machine-load', loadText);
   setPerformanceStat('cpu-load', processCpu);
   setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
   setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
@@ -1971,7 +2198,14 @@ function renderPerformanceStatistics(data) {
   setPerformanceStat('memory-used', formatBytes(memory.used));
   setPerformanceStat('memory-available', formatBytes(memory.available));
   setPerformanceStat('memory-total', formatBytes(memory.total));
+  setPerformanceStat('memory-free', formatOptionalBytes(memory.free));
+  setPerformanceStat('memory-cached', formatOptionalBytes(memory.cached));
+  setPerformanceStat('memory-buffers', formatOptionalBytes(memory.buffers));
+  setPerformanceStat('memory-shared', formatOptionalBytes(memory.shared));
   setPerformanceStat('memory-swap', swap);
+  setPerformanceStat('memory-swap-total', formatOptionalBytes(memory.swap_total));
+  setPerformanceStat('memory-swap-used', formatOptionalBytes(memory.swap_used));
+  setPerformanceStat('memory-swap-free', formatOptionalBytes(memory.swap_free));
   setPerformanceStat('memory-swap-in', formatRate(memory.swap_in_bps));
   setPerformanceStat('memory-swap-out', formatRate(memory.swap_out_bps));
   setPerformanceStat('disk-percent', formatPercent(disk.percent));
@@ -1980,16 +2214,36 @@ function renderPerformanceStatistics(data) {
   setPerformanceStat('disk-volumes', `${formatCount(disk.volume_count)} 个卷`);
   setPerformanceStat('disk-read', formatRate(disk.read_bps));
   setPerformanceStat('disk-write', formatRate(disk.write_bps));
+  setPerformanceStat('disk-read-iops', formatOptionalPerSecond(disk.read_iops, '次'));
+  setPerformanceStat('disk-write-iops', formatOptionalPerSecond(disk.write_iops, '次'));
+  setPerformanceStat('disk-read-latency', formatOptionalLatency(disk.read_latency_ms));
+  setPerformanceStat('disk-write-latency', formatOptionalLatency(disk.write_latency_ms));
   setPerformanceStat('network-recv', formatRate(network.recv_bps));
   setPerformanceStat('network-sent', formatRate(network.sent_bps));
   setPerformanceStat('network-packets-recv',
     `${formatCount(network.packets_recv_per_second)} 个/秒`);
   setPerformanceStat('network-packets-sent',
     `${formatCount(network.packets_sent_per_second)} 个/秒`);
+  setPerformanceStat('network-errors',
+    `收 ${formatOptionalPerSecond(network.errin_per_second)} / ` +
+    `发 ${formatOptionalPerSecond(network.errout_per_second)}`);
+  setPerformanceStat('network-drops',
+    `收 ${formatOptionalPerSecond(network.dropin_per_second)} / ` +
+    `发 ${formatOptionalPerSecond(network.dropout_per_second)}`);
+  setPerformanceStat('network-connections', formatOptionalCount(network.connection_count));
+  setPerformanceStat('network-tcp-states', tcpStatesText(network.tcp_states));
   setPerformanceStat('traffic-in', `${formatCount(traffic.inbound_per_minute)} 条/分钟`);
   setPerformanceStat('traffic-out', `${formatCount(traffic.outbound_per_minute)} 条/分钟`);
   setPerformanceStat('traffic-in-total', formatCount(traffic.inbound_total));
   setPerformanceStat('traffic-out-total', formatCount(traffic.outbound_total));
+  setPerformanceStat('traffic-events', `${formatCount(traffic.event_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-failed', `${formatCount(traffic.failed_per_minute)} 条/分钟`);
+  setPerformanceStat('traffic-failed-rate', formatPercent(failedRate));
+  setPerformanceStat('traffic-failed-total', formatCount(traffic.failed_total));
+
+  renderPerformanceCores(cpu.per_cpu_percent);
+  renderPerformanceVolumes(disk.volumes);
+  renderPerformanceInterfaces(network.interfaces);
 
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="cpu"]'), history.cpu_percent || []);
@@ -2001,7 +2255,7 @@ function renderPerformanceStatistics(data) {
     document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || []);
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="traffic"]'),
-    trafficBucketValues(traffic, 'inbound'));
+    trafficBucketValues(traffic, 'inbound', trafficHistory));
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="processes"]'), history.process_count || []);
 
@@ -2014,7 +2268,7 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-machine-load', legendClass: 'legend-machine-load', label: '负载',
       formatValue: formatLoad, values: history.load_1 || [],
     },
-  ], null, history.capacity, { timestamps });
+  ], null, history.capacity, { timestamps, includeDate });
   renderTrend($('performance-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
@@ -2032,13 +2286,13 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-swap-out', legendClass: 'legend-swap-out', label: '换出',
       formatValue: formatRate, values: history.swap_out_bps || [],
     },
-  ], null, history.capacity, { timestamps, scale: 'log' });
+  ], null, history.capacity, { timestamps, includeDate, scale: 'log' });
   renderTrend($('performance-disk-usage-chart'), [
     {
       className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',
       formatValue: formatPercent, values: history.disk_percent || [], percentage: true,
     },
-  ], 100, history.capacity, { timestamps });
+  ], 100, history.capacity, { timestamps, includeDate });
   renderTrend($('performance-disk-io-chart'), [
     {
       className: 'chart-series-disk-read', legendClass: 'legend-disk-read', label: '读取',
@@ -2048,7 +2302,7 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-disk-write', legendClass: 'legend-disk-write', label: '写入',
       formatValue: formatRate, values: history.disk_write_bps || [],
     },
-  ], null, history.capacity, { timestamps, scale: 'log' });
+  ], null, history.capacity, { timestamps, includeDate, scale: 'log' });
   renderTrend($('performance-network-chart'), [
     {
       className: 'chart-series-network-down', legendClass: 'legend-network-down', label: '网络下行',
@@ -2058,31 +2312,43 @@ function renderPerformanceStatistics(data) {
       className: 'chart-series-network-up', legendClass: 'legend-network-up', label: '网络上行',
       formatValue: formatRate, values: history.network_sent_bps || [],
     },
-  ], null, history.capacity, { timestamps, scale: 'log' });
+  ], null, history.capacity, { timestamps, includeDate, scale: 'log' });
   renderTrend($('performance-load-chart'), [
     {
       className: 'chart-series-load', legendClass: 'legend-load', label: 'OlivOS 负载',
       formatValue: formatCpuCores, values: history.process_cpu_percent || [],
     },
-  ], null, history.capacity, { timestamps });
+  ], null, history.capacity, { timestamps, includeDate });
   renderTrend($('performance-process-memory-chart'), [
     {
       className: 'chart-series-process-memory', legendClass: 'legend-process-memory',
       label: 'OlivOS 进程内存', formatValue: formatBytes, values: history.process_rss || [],
     },
-  ], null, history.capacity, { timestamps });
-  const trafficHistory = traffic.history || [];
+  ], null, history.capacity, { timestamps, includeDate });
   renderTrend($('performance-traffic-chart'), [
     {
       className: 'chart-series-inbound', legendClass: 'legend-inbound', label: '入站',
-      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'inbound'),
+      formatValue: trafficFormatValue,
+      values: trafficBucketValues(traffic, 'inbound', trafficHistory),
     },
     {
       className: 'chart-series-outbound', legendClass: 'legend-outbound', label: '出站',
-      formatValue: formatTrafficBucket, values: trafficBucketValues(traffic, 'outbound'),
+      formatValue: trafficFormatValue,
+      values: trafficBucketValues(traffic, 'outbound', trafficHistory),
     },
-  ], null, traffic.history_capacity, {
+  ], null, trafficCapacity, {
     timestamps: trafficHistory.map((item) => item.ts),
+    includeDate,
+  });
+  renderTrend($('performance-failure-chart'), [
+    {
+      className: 'chart-series-failed', legendClass: 'legend-failed', label: '失败事件',
+      formatValue: trafficFormatValue,
+      values: trafficBucketValues(traffic, 'failed', trafficHistory),
+    },
+  ], null, trafficCapacity, {
+    timestamps: trafficHistory.map((item) => item.ts),
+    includeDate,
   });
   setPerformanceCategory(state.performanceCategory);
 }
@@ -2156,7 +2422,9 @@ let statusRequestId = 0;
 async function refreshStatus() {
   const requestId = ++statusRequestId;
   const startedAt = performance.now();
-  const status = await api('/api/status');
+  const status = await api(state.page === 'performance'
+    ? '/api/status?windows=1'
+    : '/api/status');
   const receivedAt = performance.now();
   // 请求可能重叠：先发的后到会覆盖更新的状态，晚到的旧响应直接丢弃。
   if (requestId !== statusRequestId) return;
@@ -4259,6 +4527,14 @@ bind('performance-nav-close', () => setPerformanceNavOpen(false));
 bind('performance-nav-backdrop', () => setPerformanceNavOpen(false));
 document.addEventListener('keydown', trapPerformanceNavFocus);
 bind('plugin-pages-close', closePluginPages);
+document.querySelectorAll('[data-performance-window]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const key = button.dataset.performanceWindow;
+    if (!performanceWindowKeys.includes(key) || button.disabled) return;
+    state.performanceWindow = key;
+    if (state.performanceStatistics) renderPerformanceStatistics(state.performanceStatistics);
+  });
+});
 document.querySelectorAll('[data-performance-category]').forEach((button) => {
   button.addEventListener('click', () => {
     setPerformanceCategory(button.dataset.performanceCategory, {

@@ -352,7 +352,7 @@ def _record_activity(host, online, known, last_seen_map):
             online.add(bot_hash)
 
 
-def runtime_status(host):
+def runtime_status(host, include_windows=False):
     online = set()
     known = set()
     activity_maps = []
@@ -440,11 +440,11 @@ def runtime_status(host):
               'unknown_accounts': unknown_accounts, 'account_connections': account_connections,
               'uptime': int(time.monotonic() - host.started_at), 'update_available': host.update_available,
               'plugin_page_cache': getattr(host, 'plugin_page_cache', 10)}
-    status['statistics'] = statistics_snapshot(host)
+    status['statistics'] = statistics_snapshot(host, include_windows=include_windows)
     return status
 
 
-def statistics_snapshot(host):
+def statistics_snapshot(host, include_windows=False):
     """读取统计组件的线程内快照；组件缺失或采样失败时返回可渲染的降级结构。"""
     for proc in list(getattr(host, 'runtime', {}).values()):
         if getattr(proc, 'Proc_type', None) != 'statistics':
@@ -453,7 +453,13 @@ def statistics_snapshot(host):
         if not callable(snapshot):
             break
         try:
-            data = snapshot()
+            data = snapshot(include_windows=True) if include_windows else snapshot()
+        except TypeError:
+            # 兼容测试替身或第三方统计组件只实现无参 snapshot() 的情况。
+            try:
+                data = snapshot()
+            except Exception:
+                break
         except Exception:
             break
         if isinstance(data, dict):
@@ -723,7 +729,8 @@ def register_routes(host):
 
     @app.get('/api/status')
     def status():
-        return jsonify(runtime_status(host))
+        include_windows = request.args.get('windows') == '1'
+        return jsonify(runtime_status(host, include_windows=include_windows))
 
     @app.get('/api/performance/processes')
     def performance_processes():
