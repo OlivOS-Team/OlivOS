@@ -2138,6 +2138,20 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     ]
     assert category_state[0]['selected'] == 'true'
     assert all(item['mini'] for item in category_state)
+    # CPU、内存、磁盘迷你趋势图固定使用 0-100 标度，稳定值不应贴顶。
+    percentage_minis = driver.execute_script(r'''
+        return ['cpu', 'memory', 'disk'].map((key) => {
+          const svg = document.querySelector('[data-performance-mini=' + key + '] svg');
+          const points = svg.querySelector('.mini-line').getAttribute('points')
+            .trim().split(/\s+/);
+          return {
+            maximum: Number(svg.dataset.maximum),
+            y: Number(points[points.length - 1].split(',')[1]),
+          };
+        });
+    ''')
+    assert [item['maximum'] for item in percentage_minis] == [100, 100, 100]
+    assert all(item['y'] > 10 for item in percentage_minis)
     network_summary = driver.execute_script(
         "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
     assert '↓ 8.0 KiB/s' in network_summary
@@ -2281,6 +2295,37 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           '#performance-process-memory-chart', '#performance-traffic-chart'].map(
           (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
     """) == ['linear', 'log', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
+
+    # 百分比折线固定使用 100% 标度，并继续遵循所在图表的线性/对数标尺。
+    percentage_charts = driver.execute_script(r'''
+        return [
+          ['#performance-cpu-chart', '.chart-series-cpu'],
+          ['#performance-memory-chart', '.chart-series-memory'],
+          ['#performance-memory-chart', '.chart-series-swap'],
+          ['#performance-disk-usage-chart', '.chart-series-disk'],
+        ].map(([chart, series]) => {
+          const svg = document.querySelector(chart).querySelector('svg');
+          const line = svg.querySelector(series);
+          const points = line.getAttribute('points').trim().split(/\s+/);
+          return {
+            chartMaximum: Number(svg.dataset.maximum),
+            seriesMaximum: Number(line.dataset.maximum),
+            scale: line.dataset.scale,
+            lastY: Number(points[points.length - 1].split(',')[1]),
+          };
+        });
+    ''')
+    assert all(item['chartMaximum'] == 100 for item in percentage_charts)
+    assert all(item['seriesMaximum'] == 100 for item in percentage_charts)
+    assert [item['scale'] for item in percentage_charts] == ['linear', 'log', 'log', 'linear']
+    assert all(item['lastY'] > 8 for item in percentage_charts)
+    independent_maxima = driver.execute_script(r'''
+        return [
+          document.querySelector('#performance-cpu-chart .chart-series-machine-load'),
+          document.querySelector('#performance-memory-chart .chart-series-swap-in'),
+        ].map((line) => Number(line.dataset.maximum));
+    ''')
+    assert independent_maxima == [1.25, 512]
 
     # 换出与 Swap 使用率使用不同颜色，且折线与图例颜色保持一致。
     swap_colors = driver.execute_script("""

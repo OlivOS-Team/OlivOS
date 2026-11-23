@@ -910,6 +910,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     className: item.className || '',
     legendClass: item.legendClass || '',
     label: item.label || '',
+    percentage: item.percentage === true,
     formatValue: typeof item.formatValue === 'function' ? item.formatValue : formatCount,
     values: Array.isArray(item.values) ? item.values : [],
   }));
@@ -940,14 +941,24 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     };
   });
   const allValues = cleaned.flatMap((item) => item.values);
-  const maximum = fixedMaximum === null
-    ? Math.max(1, ...allValues)
-    : Math.max(1, Number(fixedMaximum) || 1);
+  const hasPercentageSeries = cleaned.some((item) => item.percentage);
+  const fixed = fixedMaximum === null ? null : Math.max(1, Number(fixedMaximum) || 1);
+  const maximum = fixed !== null
+    ? fixed
+    : (hasPercentageSeries ? 100 : Math.max(1, ...allValues));
   const logarithmic = options.scale === 'log';
   const scaleValue = (value) => (
     logarithmic ? Math.log10(1 + Math.max(0, value)) : value
   );
   const scaleMaximum = Math.max(Number.EPSILON, scaleValue(maximum));
+  const seriesMaximum = (item) => {
+    if (item.percentage) return 100;
+    if (hasPercentageSeries) return Math.max(1, ...item.values);
+    return maximum;
+  };
+  const seriesScaleMaximum = (item) => (
+    Math.max(Number.EPSILON, scaleValue(seriesMaximum(item)))
+  );
   const svg = svgNode('svg', {
     viewBox: `0 0 ${width} ${height}`,
     preserveAspectRatio: 'none',
@@ -956,12 +967,13 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
   svg.dataset.capacity = String(effectiveCapacity);
   svg.dataset.seriesCount = String(cleaned.length);
   svg.dataset.scale = logarithmic ? 'log' : 'linear';
+  svg.dataset.maximum = String(maximum);
   const defs = svgNode('defs');
   svg.append(defs);
   const denominator = Math.max(1, effectiveCapacity - 1);
   const xForIndex = (index) => padding + plotWidth * (index / denominator);
-  const yForValue = (value) => (
-    height - padding - plotHeight * Math.min(1, scaleValue(value) / scaleMaximum)
+  const yForValue = (value, itemScaleMaximum = scaleMaximum) => (
+    height - padding - plotHeight * Math.min(1, scaleValue(value) / itemScaleMaximum)
   );
   for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
     const value = maximum * ratio;
@@ -978,8 +990,9 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     svg.append(gridline);
   }
   for (const [index, item] of cleaned.entries()) {
+    const itemScaleMaximum = seriesScaleMaximum(item);
     const points = item.values.map((value, index) => (
-      `${xForIndex(index).toFixed(2)},${yForValue(value).toFixed(2)}`
+      `${xForIndex(index).toFixed(2)},${yForValue(value, itemScaleMaximum).toFixed(2)}`
     ));
     if (options.area) {
       const gradientId = `${container.id || 'trend'}-area-${index}`;
@@ -1015,6 +1028,9 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
       points: points.join(' '),
     });
     polyline.dataset.series = item.className;
+    polyline.dataset.maximum = String(seriesMaximum(item));
+    polyline.dataset.percentage = item.percentage ? 'true' : 'false';
+    polyline.dataset.scale = logarithmic ? 'log' : 'linear';
     svg.append(polyline);
   }
   const cursor = svgNode('line', {
@@ -1200,13 +1216,13 @@ function renderStatistics(data) {
   renderTrend($('dashboard-cpu-chart'), [
     {
       className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
-      formatValue: formatPercent, values: history.cpu_percent || [],
+      formatValue: formatPercent, values: history.cpu_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
   renderTrend($('dashboard-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
-      formatValue: formatPercent, values: history.memory_percent || [],
+      formatValue: formatPercent, values: history.memory_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
   renderTrend($('dashboard-disk-chart'), [
@@ -1775,7 +1791,8 @@ function renderPerformanceMini(container, values) {
     return Number.isFinite(number) ? Math.max(0, number) : 0;
   });
   while (numeric.length < capacity) numeric.unshift(0);
-  const maximum = Math.max(1, ...numeric);
+  const percentage = ['cpu', 'memory', 'disk'].includes(container.dataset.performanceMini);
+  const maximum = percentage ? 100 : Math.max(1, ...numeric);
   const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
   const yFor = (value) => (
     height - padding - (height - padding * 2) * Math.min(1, value / maximum)
@@ -1788,6 +1805,7 @@ function renderPerformanceMini(container, values) {
     preserveAspectRatio: 'none',
     'aria-hidden': 'true',
   });
+  svg.dataset.maximum = String(maximum);
   const baseline = height - padding;
   const area = svgNode('path', {
     class: 'mini-area',
@@ -1931,7 +1949,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-cpu-chart'), [
     {
       className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
-      formatValue: formatPercent, values: history.cpu_percent || [],
+      formatValue: formatPercent, values: history.cpu_percent || [], percentage: true,
     },
     {
       className: 'chart-series-machine-load', legendClass: 'legend-machine-load', label: '负载',
@@ -1941,11 +1959,11 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
-      formatValue: formatPercent, values: history.memory_percent || [],
+      formatValue: formatPercent, values: history.memory_percent || [], percentage: true,
     },
     {
       className: 'chart-series-swap', legendClass: 'legend-swap', label: 'Swap 使用率',
-      formatValue: formatPercent, values: history.swap_percent || [],
+      formatValue: formatPercent, values: history.swap_percent || [], percentage: true,
     },
     {
       className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
@@ -1959,7 +1977,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-disk-usage-chart'), [
     {
       className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',
-      formatValue: formatPercent, values: history.disk_percent || [],
+      formatValue: formatPercent, values: history.disk_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps });
   renderTrend($('performance-disk-io-chart'), [
