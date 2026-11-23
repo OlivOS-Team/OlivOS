@@ -1010,6 +1010,9 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
   const seriesScaleMaximum = (item) => (
     Math.max(Number.EPSILON, scaleValue(seriesMaximum(item)))
   );
+  // 刻线使用固定参考量程，仅用于区分线性与对数标尺，不随数据最大值变化。
+  const gridReferenceMaximum = 100;
+  const gridScaleMaximum = Math.max(Number.EPSILON, scaleValue(gridReferenceMaximum));
   const svg = svgNode('svg', {
     viewBox: `0 0 ${width} ${height}`,
     preserveAspectRatio: 'none',
@@ -1027,8 +1030,8 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     height - padding - plotHeight * Math.min(1, scaleValue(value) / itemScaleMaximum)
   );
   for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
-    const value = maximum * ratio;
-    const y = yForValue(value);
+    const value = gridReferenceMaximum * ratio;
+    const y = height - padding - plotHeight * Math.min(1, scaleValue(value) / gridScaleMaximum);
     const gridline = svgNode('line', {
       class: 'chart-grid',
       x1: '0',

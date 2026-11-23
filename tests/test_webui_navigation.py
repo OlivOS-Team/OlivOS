@@ -2660,24 +2660,31 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     assert [item['maximum'] for item in independent] == [1.25, 512]
     assert all(abs(item['lastY'] - 2.0) < 0.1 for item in independent)
 
-    # 线性图的横线等距；对数图按数值映射，横线应保持非等距以体现对数标尺。
+    # 刻线使用固定 0-100 参考量程：线性图等距，对数图非等距且不随数据最大值变化。
     grid_contracts = driver.execute_script("""
         return ['#performance-cpu-chart', '#performance-memory-chart',
           '#performance-disk-io-chart', '#performance-network-chart'].map((selector) => {
           const svg = document.querySelector(selector).querySelector('svg');
-          const ys = [...svg.querySelectorAll('.chart-grid')]
-            .map((line) => Number(line.getAttribute('y1')));
+          const gridlines = [...svg.querySelectorAll('.chart-grid')];
+          const ys = gridlines.map((line) => Number(line.getAttribute('y1')));
+          const values = gridlines.map((line) => Number(line.dataset.gridValue));
           const gaps = ys.slice(1).map((value, index) => Math.abs(value - ys[index]));
-          return {scale: svg.dataset.scale, count: ys.length, gaps};
+          return {scale: svg.dataset.scale, maximum: Number(svg.dataset.maximum),
+            count: ys.length, values, gaps};
         });
     """)
     assert grid_contracts[0]['scale'] == 'linear'
     assert grid_contracts[0]['count'] == 5
+    assert grid_contracts[0]['values'] == [0, 25, 50, 75, 100]
     assert max(grid_contracts[0]['gaps']) - min(grid_contracts[0]['gaps']) < 0.01
+    assert len({contract['maximum'] for contract in grid_contracts[1:]}) > 1
+    reference_gaps = grid_contracts[1]['gaps']
     for contract in grid_contracts[1:]:
         assert contract['scale'] == 'log'
         assert contract['count'] == 5
+        assert contract['values'] == [0, 25, 50, 75, 100]
         assert max(contract['gaps']) - min(contract['gaps']) > 1
+        assert all(abs(left - right) < 0.01 for left, right in zip(reference_gaps, contract['gaps']))
 
 
 @pytest.mark.browser
