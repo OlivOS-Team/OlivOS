@@ -2660,7 +2660,7 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     assert [item['maximum'] for item in independent] == [1.25, 512]
     assert all(abs(item['lastY'] - 2.0) < 0.1 for item in independent)
 
-    # 刻度线固定落在 0%、25%、50%、75%、100%，线性与对数图的横线都应等距。
+    # 线性图的横线等距；对数图按数值映射，横线应保持非等距以体现对数标尺。
     grid_contracts = driver.execute_script("""
         return ['#performance-cpu-chart', '#performance-memory-chart',
           '#performance-disk-io-chart', '#performance-network-chart'].map((selector) => {
@@ -2677,7 +2677,7 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     for contract in grid_contracts[1:]:
         assert contract['scale'] == 'log'
         assert contract['count'] == 5
-        assert max(contract['gaps']) - min(contract['gaps']) < 0.01
+        assert max(contract['gaps']) - min(contract['gaps']) > 1
 
 
 @pytest.mark.browser

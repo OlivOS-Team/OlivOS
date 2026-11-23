@@ -1027,7 +1027,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     height - padding - plotHeight * Math.min(1, scaleValue(value) / itemScaleMaximum)
   );
   for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
-    const value = logarithmic ? Math.pow(maximum + 1, ratio) - 1 : maximum * ratio;
+    const value = maximum * ratio;
     const y = yForValue(value);
     const gridline = svgNode('line', {
       class: 'chart-grid',
