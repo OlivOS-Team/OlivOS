@@ -1971,8 +1971,9 @@ body.performance-nav-open .performance-nav-toggle svg {
   overflow-wrap: anywhere;
 }
 .performance-fact-grid {
+  --performance-fact-columns: 3;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--performance-fact-columns), minmax(0, 1fr));
   gap: 1px;
   margin: 0;
   overflow: hidden;
@@ -2212,10 +2213,7 @@ body.performance-nav-open .performance-nav-toggle svg {
     grid-template-columns: 180px minmax(0, 1fr);
   }
   .performance-fact-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .performance-fact-empty {
-    display: none;
+    --performance-fact-columns: 2;
   }
 }
 @media (max-width: 1100px) {

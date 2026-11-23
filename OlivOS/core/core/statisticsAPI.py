@@ -1797,20 +1797,29 @@ class server(API.Proc_templet):
         }
         for key in PERFORMANCE_HISTORY_KEYS:
             result[key] = []
-        for index in sorted(groups):
-            group = groups[index]
-            result['timestamps'].append(group[-1].get('ts'))
+        last_values = {key: 0 for key in PERFORMANCE_HISTORY_KEYS}
+        for index in range(capacity):
+            group = groups.get(index)
+            if group:
+                result['timestamps'].append(group[-1].get('ts'))
+            else:
+                result['timestamps'].append(min(now_wall, start + (index + 1) * width))
             for key in PERFORMANCE_HISTORY_KEYS:
+                if not group:
+                    result[key].append(last_values[key])
+                    continue
                 if config['rollup'] or key in PERFORMANCE_RATE_KEYS:
                     values = [
                         _optional_float(item.get(key)) for item in group
                     ]
                     values = [value for value in values if value is not None]
-                    result[key].append(
-                        _round(sum(values) / len(values)) if values else None
-                    )
+                    value = _round(sum(values) / len(values)) if values else None
                 else:
-                    result[key].append(group[-1].get(key))
+                    value = group[-1].get(key)
+                if value is None:
+                    value = last_values[key]
+                last_values[key] = value
+                result[key].append(value)
         return result
 
     def _traffic_window(self, name, now_wall, raw_source, rollup_source):
@@ -1837,11 +1846,17 @@ class server(API.Proc_templet):
             'events': [],
             'failed': [],
         }
-        for index in sorted(groups):
-            group = groups[index]
-            result['timestamps'].append(group[-1].get('ts'))
+        for index in range(capacity):
+            group = groups.get(index)
+            if group:
+                result['timestamps'].append(group[-1].get('ts'))
+            else:
+                result['timestamps'].append(min(now_wall, start + (index + 1) * width))
             for key in ('inbound', 'outbound', 'events', 'failed'):
-                result[key].append(sum(_non_negative_int(item.get(key)) for item in group))
+                result[key].append(
+                    sum(_non_negative_int(item.get(key)) for item in group)
+                    if group else 0
+                )
         return result
 
     def snapshot(self, include_windows=False):

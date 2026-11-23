@@ -6,6 +6,7 @@ const pageStorageKey = 'olivos.webui.page';
 const sidebarStorageKey = 'olivos.webui.sidebarCollapsed';
 const mobileSidebarQuery = window.matchMedia('(max-width: 800px), (orientation: portrait)');
 const performanceNavMobileQuery = window.matchMedia('(max-width: 800px)');
+const performanceFactColumnsQuery = window.matchMedia('(max-width: 1030px)');
 
 // 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
 function takeLoginTicket() {
@@ -1035,7 +1036,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
   const width = 100;
   const height = 40;
   const padding = 2;
-  const plotWidth = width - padding * 2;
+  const plotWidth = width;
   const plotHeight = height - padding * 2;
   const rawSeries = (series || []).map((item) => ({
     className: item.className || '',
@@ -1099,13 +1100,14 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     'aria-hidden': 'true',
   });
   svg.dataset.capacity = String(effectiveCapacity);
+  svg.dataset.samples = String(effectiveCapacity);
   svg.dataset.seriesCount = String(cleaned.length);
   svg.dataset.scale = logarithmic ? 'log' : 'linear';
   svg.dataset.maximum = String(maximum);
   const defs = svgNode('defs');
   svg.append(defs);
   const denominator = Math.max(1, effectiveCapacity - 1);
-  const xForIndex = (index) => padding + plotWidth * (index / denominator);
+  const xForIndex = (index) => plotWidth * (index / denominator);
   const yForValue = (value, itemScaleMaximum = scaleMaximum) => (
     height - padding - plotHeight * Math.min(1, scaleValue(value) / itemScaleMaximum)
   );
@@ -1242,7 +1244,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     const rect = svg.getBoundingClientRect();
     if (!rect.width) return null;
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    const plotRatio = Math.max(0, Math.min(1, (ratio * width - padding) / plotWidth));
+    const plotRatio = Math.max(0, Math.min(1, (ratio * width) / plotWidth));
     return Math.round(plotRatio * (effectiveCapacity - 1));
   }
   function handlePointer(event) {
@@ -1535,6 +1537,37 @@ function renderPerformanceInterfaces(interfaces) {
     item.prepend(head);
     return item;
   }));
+}
+function syncPerformanceFactGrids() {
+  for (const grid of document.querySelectorAll('.performance-fact-grid')) {
+    for (const child of [...grid.children]) {
+      if (child.classList.contains('performance-fact-empty')) child.remove();
+    }
+    const columns = Math.max(
+      1,
+      Number(getComputedStyle(grid).getPropertyValue('--performance-fact-columns')) || 3,
+    );
+    const count = [...grid.children].filter(
+      (child) => child.classList.contains('performance-fact'),
+    ).length;
+    const missing = (columns - (count % columns)) % columns;
+    for (let index = 0; index < missing; index += 1) {
+      grid.append(element('div', null, {
+        class: 'performance-fact performance-fact-empty',
+        'aria-hidden': 'true',
+      }));
+    }
+  }
+}
+let performanceFactSyncFrame = null;
+function schedulePerformanceFactGridSync() {
+  if (performanceFactSyncFrame !== null) {
+    cancelAnimationFrame(performanceFactSyncFrame);
+  }
+  performanceFactSyncFrame = requestAnimationFrame(() => {
+    performanceFactSyncFrame = null;
+    syncPerformanceFactGrids();
+  });
 }
 function revealPerformanceCategory(button) {
   if (!button) return;
@@ -2109,22 +2142,13 @@ function renderPerformanceStatistics(data) {
     ? trafficWindowHistory(selectedTrafficWindow)
     : (traffic.history || []);
   const trafficCapacity = selectedTrafficWindow?.capacity ?? traffic.history_capacity;
-  const pointCapacity = Number(history.capacity ?? trafficCapacity);
   const trafficInterval = Number(
     selectedTrafficWindow?.interval ?? traffic.bucket_seconds);
   const includeDate = performanceWindowUsesDate.has(state.performanceWindow);
   const trafficFormatValue = (value) => formatTrafficBucket(value, trafficInterval);
-  const sampleInterval = Number(history.interval);
-  const windowText = selectedPerformanceWindow || selectedTrafficWindow
-    ? performanceWindowLabels[state.performanceWindow]
-    : '默认';
   syncPerformanceWindowControls(data);
   if (sampled) {
-    sampled.textContent =
-      `采样 ${Number.isFinite(sampleInterval) ? sampleInterval.toFixed(1) : '—'} 秒 · ` +
-      `窗口 ${windowText} · ${formatCount(timestamps.length)} 点` +
-      `${Number.isFinite(pointCapacity) ? ` · 容量 ${formatCount(pointCapacity)} 点` : ''} · ` +
-      `${sampledAtText(data.sampled_at)}`;
+    sampled.textContent = sampledAtText(data.sampled_at);
   }
   const loadValue = formatLoad(cpu.load_1);
   const loadText = [cpu.load_1, cpu.load_5, cpu.load_15].map(formatLoad).join(' / ');
@@ -4791,6 +4815,13 @@ window.addEventListener('hashchange', () => {
 {
   initializeSidebar();
   initializeSelectMenus();
+  syncPerformanceFactGrids();
+  window.addEventListener('resize', schedulePerformanceFactGridSync);
+  if (performanceFactColumnsQuery.addEventListener) {
+    performanceFactColumnsQuery.addEventListener('change', schedulePerformanceFactGridSync);
+  } else {
+    performanceFactColumnsQuery.addListener(schedulePerformanceFactGridSync);
+  }
   loadPublicVersion();
   if (document.readyState === 'complete') registerServiceWorker();
   else window.addEventListener('load', registerServiceWorker, { once: true });

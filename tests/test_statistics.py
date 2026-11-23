@@ -201,7 +201,7 @@ def test_statistics_snapshot_is_json_serializable_and_history_is_bounded():
 
 
 def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):
-    # 性能页的 1/5/15 分钟数据只能按需附加；每个窗口最多 60 点，且默认快照结构不变。
+    # 性能页的 1/5/15 分钟数据只能按需附加；每个窗口固定 60 点，缺失时间桶补 0。
     monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
     now = 1000000.0
     monkeypatch.setattr(statisticsAPI.time, 'time', lambda: now)
@@ -247,16 +247,41 @@ def test_statistics_windows_are_opt_in_and_downsampled(monkeypatch):
         performance = windows['performance']['windows'][name]
         assert performance['capacity'] == 60
         assert performance['interval'] == expected_interval
-        assert len(performance['timestamps']) <= 60
+        assert len(performance['timestamps']) == 60
         assert len(performance['cpu_percent']) == len(performance['timestamps'])
         assert performance['swap_in_bps'][-1] == 10.0
     assert windows['traffic']['windows']['1m']['capacity'] == 12
     assert windows['traffic']['windows']['5m']['capacity'] == 60
     assert windows['traffic']['windows']['15m']['capacity'] == 60
-    assert len(windows['traffic']['windows']['1m']['inbound']) <= 12
-    assert len(windows['traffic']['windows']['5m']['inbound']) <= 60
-    assert len(windows['traffic']['windows']['15m']['inbound']) <= 60
+    assert len(windows['traffic']['windows']['1m']['inbound']) == 12
+    assert len(windows['traffic']['windows']['5m']['inbound']) == 60
+    assert len(windows['traffic']['windows']['15m']['inbound']) == 60
     assert json.loads(json.dumps(windows, ensure_ascii=False)) == windows
+
+
+def test_statistics_window_fills_left_and_shifts_existing_samples():
+    # 固定长度窗口应先用 0 填满左侧；时间前进后，旧采样整体左移，空桶沿用最近有效值。
+    monitor = make_statistics_monitor(history_size=1200, scan_interval=1.0)
+    now = 1000000.0
+    records = [
+        {'ts': now - 2, 'cpu_percent': 10.0},
+        {'ts': now - 1, 'cpu_percent': 20.0},
+    ]
+    monitor.performance_long_history.extend(records)
+
+    window = monitor._performance_window('1m', now)
+    assert len(window['timestamps']) == window['capacity'] == 60
+    assert len(window['cpu_percent']) == 60
+    assert window['cpu_percent'][:58] == [0] * 58
+    assert window['cpu_percent'][-2:] == [10.0, 20.0]
+
+    shifted = monitor._performance_window('1m', now + 1)
+    assert shifted['cpu_percent'][:57] == [0] * 57
+    assert shifted['cpu_percent'][-3:] == [10.0, 20.0, 20.0]
+
+    monitor.performance_long_history.append({'ts': now + 1, 'cpu_percent': 30.0})
+    with_gap = monitor._performance_window('1m', now + 2)
+    assert with_gap['cpu_percent'][-4:] == [10.0, 20.0, 20.0, 30.0]
 
 
 def test_statistics_minute_rollups_average_performance_and_sum_traffic():

@@ -1493,31 +1493,38 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
     now = time.time()
     timestamps = [now - 30, now - 20, now - 10, now]
 
+    def window_timestamps(capacity, interval):
+        return [now - interval * (capacity - index - 1) for index in range(capacity)]
+
+    def padded(values, capacity):
+        return [0] * max(0, capacity - len(values)) + values[-capacity:]
+
     def performance_window(interval, cpu_value, capacity=60):
-        window_timestamps = [now - interval * 2, now - interval, now]
+        series_timestamps = window_timestamps(capacity, interval)
         series = {key: [cpu_value, cpu_value + 1, cpu_value + 2] for key in (
             'cpu_percent', 'load_1', 'memory_percent', 'swap_percent', 'swap_in_bps',
             'swap_out_bps', 'disk_percent', 'disk_read_bps', 'disk_write_bps',
             'network_recv_bps', 'network_sent_bps', 'process_count', 'process_rss',
             'process_cpu_percent', 'process_threads', 'process_handles',
         )}
+        series = {key: padded(item, capacity) for key, item in series.items()}
         return {
             'interval': interval,
             'capacity': capacity,
-            'timestamps': window_timestamps,
+            'timestamps': series_timestamps,
             **series,
         }
 
     def traffic_window(capacity, interval, base):
-        window_timestamps = [now - interval * 2, now - interval, now]
+        series_timestamps = window_timestamps(capacity, interval)
         return {
             'interval': interval,
             'capacity': capacity,
-            'timestamps': window_timestamps,
-            'inbound': [base, base + 1, base + 2],
-            'outbound': [base + 3, base + 4, base + 5],
-            'events': [base + 6, base + 7, base + 8],
-            'failed': [0, 1, 0],
+            'timestamps': series_timestamps,
+            'inbound': padded([base, base + 1, base + 2], capacity),
+            'outbound': padded([base + 3, base + 4, base + 5], capacity),
+            'events': padded([base + 6, base + 7, base + 8], capacity),
+            'failed': padded([0, 1, 0], capacity),
         }
 
     return {
@@ -2414,7 +2421,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     browser.click('[data-performance-category="cpu"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-cpu').hidden"))
-    assert '暂无历史采样' in hover_chart(driver, '#performance-cpu-chart', 0.0)['text']
+    # 采样不足时不能再留下左侧空白区；最左端也应命中真实采样点。
+    left_tooltip = hover_chart(driver, '#performance-cpu-chart', 0.0)['text']
+    assert '暂无历史采样' not in left_tooltip
+    assert 'CPU 使用率' in left_tooltip
 
     # 刷新快照时只更新现有节点；线程缺失显示破折号，句柄缺失时不展示，文件描述符按可用性展示。
     updated = statistics_snapshot(cpu_percent=55.0, process_threads=None,
@@ -2437,35 +2447,72 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-content .performance-panel').length") == 13
 
-    # 网络与消息的 8 项事实表在桌面为三列、窄屏为两列，扩展后仍保持网格布局。
+    # 所有事实网格需按当前列数补齐占位项，末行空槽应与普通事实单元格同色。
     set_viewport(browser, 1280, 800)
     fact_layout = driver.execute_script("""
-        return ['network', 'traffic'].map((category) => {
+        return ['cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
           const grid = document.querySelector(
             `#performance-view-${category} .performance-fact-grid`);
           const template = getComputedStyle(grid).gridTemplateColumns;
           const repeated = template.match(/^repeat\\((\\d+),/);
+          const facts = [...grid.children].filter(
+            (node) => node.classList.contains('performance-fact'));
+          const fillers = facts.filter(
+            (node) => node.classList.contains('performance-fact-empty'));
           return {
-            count: grid.querySelectorAll('.performance-fact').length,
+            category,
+            count: facts.length - fillers.length,
+            rendered: facts.length,
             columns: repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length,
+            factBackground: getComputedStyle(facts[0]).backgroundColor,
+            fillerBackground: fillers.length
+              ? getComputedStyle(fillers[0]).backgroundColor
+              : null,
           };
         });
     """)
-    assert all(item['count'] == 8 for item in fact_layout)
-    assert all(item['columns'] == 3 for item in fact_layout)
+    expected_counts = {'cpu': 8, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8}
+    for item in fact_layout:
+        assert item['count'] == expected_counts[item['category']]
+        assert item['columns'] == 3
+        assert item['rendered'] % item['columns'] == 0
+        assert item['fillerBackground'] in (None, item['factBackground'])
     set_viewport(browser, 900, 800)
-    narrow_fact_layout = driver.execute_script("""
-        return ['network', 'traffic'].map((category) => {
+    browser.wait.until(lambda _: driver.execute_script("""
+        return ['cpu', 'memory', 'disk', 'network', 'traffic'].every((category) => {
           const grid = document.querySelector(
             `#performance-view-${category} .performance-fact-grid`);
-          const columns = getComputedStyle(grid).gridTemplateColumns;
-          const repeated = columns.match(/^repeat\\((\\d+),/);
+          const template = getComputedStyle(grid).gridTemplateColumns;
+          const repeated = template.match(/^repeat\\((\\d+),/);
+          const columns = repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length;
+          return columns === 2 && grid.children.length % 2 === 0;
+        });
+    """))
+    narrow_fact_layout = driver.execute_script("""
+        return ['cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
+          const grid = document.querySelector(
+            `#performance-view-${category} .performance-fact-grid`);
+          const template = getComputedStyle(grid).gridTemplateColumns;
+          const repeated = template.match(/^repeat\\((\\d+),/);
+          const facts = [...grid.children].filter(
+            (node) => node.classList.contains('performance-fact'));
+          const fillers = facts.filter(
+            (node) => node.classList.contains('performance-fact-empty'));
           return {
-            columns: repeated ? Number(repeated[1]) : columns.split(' ').filter(Boolean).length,
+            category,
+            rendered: facts.length,
+            columns: repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length,
+            factBackground: getComputedStyle(facts[0]).backgroundColor,
+            fillerBackground: fillers.length
+              ? getComputedStyle(fillers[0]).backgroundColor
+              : null,
           };
         });
     """)
-    assert all(item['columns'] == 2 for item in narrow_fact_layout), narrow_fact_layout
+    for item in narrow_fact_layout:
+        assert item['columns'] == 2
+        assert item['rendered'] % item['columns'] == 0
+        assert item['fillerBackground'] in (None, item['factBackground'])
 
     # 桌面端左右两栏各自滚动，内容不足时不应占出滚动条。
     set_viewport(browser, 1280, 420)
@@ -2657,7 +2704,7 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
     browser.wait.until(lambda _: driver.execute_script(
         "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
 
-    # 默认 1 分钟窗口下，8 张性能图与失败事件图保持容量、序列数量和补零后的固定点数。
+    # 默认 1 分钟窗口下，前端点数必须与后端窗口数组长度一致，并保持固定容量。
     expected = {
         '#performance-cpu-chart': (60, 2),
         '#performance-memory-chart': (60, 4),
@@ -2763,6 +2810,91 @@ def test_performance_charts_use_percentage_and_independent_series_scales(browser
 
 
 @pytest.mark.browser
+def test_performance_chart_series_fill_plot_width_in_every_window(browser):
+    # 每个时间窗都应让现有采样铺满绘图区，并让首尾采样点贴住折线图左右边缘。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+
+    selectors = [
+        '#performance-cpu-chart', '#performance-memory-chart',
+        '#performance-disk-usage-chart', '#performance-disk-io-chart',
+        '#performance-network-chart', '#performance-load-chart',
+        '#performance-process-memory-chart', '#performance-traffic-chart',
+        '#performance-failure-chart',
+    ]
+    for window_key in ('1m', '5m', '15m', '1h', '6h', '24h'):
+        browser.click(f'[data-performance-window="{window_key}"]')
+        browser.wait.until(lambda _, key=window_key: driver.execute_script(
+            'return state.performanceWindow === arguments[0]', key))
+        contracts = driver.execute_script("""
+            return arguments[0].map((selector) => {
+              const svg = document.querySelector(selector).querySelector('svg');
+              return {
+                selector,
+                capacity: Number(svg.dataset.capacity),
+                samples: Number(svg.dataset.samples),
+                series: [...svg.querySelectorAll('.chart-series')].map((line) => {
+                  const xs = line.getAttribute('points').trim().split(/\\s+/)
+                    .map((point) => Number(point.split(',')[0]));
+                  return {count: xs.length, firstX: xs[0], lastX: xs[xs.length - 1]};
+                }),
+              };
+            });
+        """, selectors)
+        for chart in contracts:
+            assert chart['capacity'] >= 2, (window_key, chart['selector'])
+            for item in chart['series']:
+                assert chart['samples'] == chart['capacity'], (window_key, chart['selector'])
+                assert item['count'] == chart['samples'], (window_key, chart['selector'])
+                assert item['firstX'] == 0, (window_key, chart['selector'])
+                assert item['lastX'] == 100, (window_key, chart['selector'])
+
+
+@pytest.mark.browser
+def test_performance_chart_points_follow_backend_window_shift(browser):
+    # 前端点数必须等于后端窗口数组长度；窗口推进时，旧点应整体左移而不是被重新拉伸。
+    driver = browser.driver
+    snapshot = statistics_snapshot()
+    window = snapshot['performance']['windows']['1m']
+    capacity = window['capacity']
+    window['cpu_percent'] = [0] * (capacity - 1) + [99.0]
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return state.page === 'performance' && !document.getElementById('performance-content').hidden'''))
+
+    def cpu_points():
+        series = browser.find('#performance-cpu-chart .chart-series-cpu')
+        text = driver.execute_script(r'''return arguments[0].getAttribute('points');''', series)
+        return [tuple(map(float, point.split(','))) for point in text.split()]
+
+    before = cpu_points()
+    assert len(before) == len(window['cpu_percent']) == capacity
+    top_before = min(range(len(before)), key=lambda index: before[index][1])
+    assert top_before == capacity - 1
+
+    window['cpu_percent'] = [0] * (capacity - 2) + [99.0, 0]
+    driver.execute_script(
+        'state.statistics = arguments[0]; renderPerformanceStatistics(arguments[0]);', snapshot)
+    after = cpu_points()
+    top_after = min(range(len(after)), key=lambda index: after[index][1])
+    assert len(after) == len(window['cpu_percent']) == capacity
+    assert top_after == top_before - 1
+    assert after[top_before][0] > after[top_after][0]
+
+
+@pytest.mark.browser
 def test_performance_extended_metrics_and_local_time_window_switch(browser):
     # 性能页要展示细化的 CPU、内存、磁盘、网络与消息质量数据，并支持本地切换时间窗。
     driver = browser.driver
@@ -2813,8 +2945,7 @@ def test_performance_extended_metrics_and_local_time_window_switch(browser):
         {'key': '6h', 'active': False, 'disabled': False},
         {'key': '24h', 'active': False, 'disabled': False},
     ]
-    assert '采样 1.0 秒 · 窗口 1 分钟 · 3 点' in details['sampled']
-    assert '容量 60 点' in details['sampled']
+    assert re.fullmatch(r'更新于 \d{2}:\d{2}:\d{2}', details['sampled'])
     assert details['cpuLoad'] == '1.25 / 1.00 / 0.80'
     assert details['cpuPhysical'] == '4'
     assert details['cpuFrequency'] == '2400 MHz'
@@ -2908,18 +3039,15 @@ def test_performance_extended_metrics_and_local_time_window_switch(browser):
     ''')
     assert switched['requests'] == 0
     assert switched['five']['active'] is True
-    assert '窗口 5 分钟 · 3 点' in switched['five']['sampled']
-    assert '容量 60 点' in switched['five']['sampled']
+    assert re.fullmatch(r'更新于 \d{2}:\d{2}:\d{2}', switched['five']['sampled'])
     assert switched['five']['cpuY'] < switched['beforeY']
     assert switched['five']['trafficCapacity'] == 60
     assert switched['five']['failureCapacity'] == 60
     assert switched['fifteen']['active'] is True
-    assert '窗口 15 分钟 · 3 点' in switched['fifteen']['sampled']
-    assert '容量 60 点' in switched['fifteen']['sampled']
+    assert re.fullmatch(r'更新于 \d{2}:\d{2}:\d{2}', switched['fifteen']['sampled'])
     assert switched['fifteen']['cpuY'] < switched['five']['cpuY']
     assert switched['daily']['active'] is True
-    assert '窗口 24 小时 · 3 点' in switched['daily']['sampled']
-    assert '容量 144 点' in switched['daily']['sampled']
+    assert re.fullmatch(r'更新于 \d{2}:\d{2}:\d{2}', switched['daily']['sampled'])
     assert switched['daily']['cpuCapacity'] == 144
     assert switched['daily']['trafficCapacity'] == 144
     assert switched['daily']['failureCapacity'] == 144
@@ -2966,7 +3094,7 @@ def test_performance_window_falls_back_when_backend_has_no_windows(browser):
         };
     ''')
     assert fallback['before']['disabled'] == [True, True, True, True, True, True]
-    assert '窗口 默认' in fallback['before']['sampled']
+    assert re.fullmatch(r'更新于 \d{2}:\d{2}:\d{2}', fallback['before']['sampled'])
     assert fallback['before']['cpuCapacity'] == 120
     assert fallback['before']['trafficCapacity'] == 60
     assert fallback['windowKey'] == '1m'
