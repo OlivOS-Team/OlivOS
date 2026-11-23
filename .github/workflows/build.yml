@@ -437,7 +437,9 @@ jobs:
 
   all-test-success:
     name: all-test-success
+    # 测试门控同时承接 lint 门控，并拒绝被跳过的测试，保证失败沿链传递。
     needs:
+      - all-lint-success
       - test
     if: always()
     runs-on: ubuntu-latest
@@ -448,16 +450,16 @@ jobs:
       - uses: ./.github/actions/verify-needs
         with:
           label: test
+          allow-skipped: 'false'
           needs-json: ${{ toJSON(needs) }}
 
   all-build-success:
     name: all-build-success
     needs:
-      - build-windows-publish
+      - all-test-success
+      - all-publish-build-success
       - build-windows
-      - build-linux-publish
       - build-linux
-      - build-macos-publish
       - build-macos
     if: always()
     runs-on: ubuntu-latest
@@ -470,11 +472,28 @@ jobs:
           label: build
           needs-json: ${{ toJSON(needs) }}
 
+  all-publish-build-success:
+    name: all-publish-build-success
+    needs:
+      - build-windows-publish
+      - build-linux-publish
+      - build-macos-publish
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: publish build
+          allow-skipped: 'false'
+          needs-json: ${{ toJSON(needs) }}
+
   all-ci-success:
     name: all-ci-success
+    # 总门控只连接 build 门控，使各阶段顺序收敛，避免跨列长线。
     needs:
-      - all-lint-success
-      - all-test-success
       - all-build-success
     if: always()
     runs-on: ubuntu-latest
@@ -488,11 +507,10 @@ jobs:
 
   release-draft:
     runs-on: ubuntu-latest
+    # 发布草稿只等待发布构建门控；构建被跳过时门控失败，避免误发草稿。
     if: github.ref_type == 'tag'
     needs:
-      - build-windows-publish
-      - build-linux-publish
-      - build-macos-publish
+      - all-publish-build-success
     permissions:
       contents: write
     steps:

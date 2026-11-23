@@ -8,6 +8,10 @@ inputs:
   needs-json:
     description: 调用方传入的 toJSON(needs) 结果。
     required: true
+  allow-skipped:
+    description: 是否把 skipped 视为通过。
+    required: false
+    default: 'true'
 runs:
   using: composite
   steps:
@@ -16,6 +20,7 @@ runs:
       env:
         NEEDS_JSON: ${{ inputs.needs-json }}
         CHECK_LABEL: ${{ inputs.label }}
+        ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
       run: |
         python - <<'PY'
         import json
@@ -25,10 +30,13 @@ runs:
         results = json.loads(os.environ['NEEDS_JSON'])
         label = os.environ.get('CHECK_LABEL', '')
         prefix = f'{label} ' if label else ''
+        allowed = {'success'}
+        if os.environ.get('ALLOW_SKIPPED', 'true').lower() == 'true':
+            allowed.add('skipped')
         failed = {
             name: value.get('result')
             for name, value in results.items()
-            if value.get('result') not in ('success', 'skipped')
+            if value.get('result') not in allowed
         }
         if failed:
             print(f'Required {prefix}checks did not succeed:')
