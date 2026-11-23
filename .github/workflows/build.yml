@@ -14,14 +14,14 @@ jobs:
     uses: ./.github/workflows/lint.yml
 
   test:
-    needs: lint
+    needs: all-lint-success
     uses: ./.github/workflows/test.yml
     permissions:
       actions: read
       contents: read
 
   build-windows-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -57,7 +57,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-windows:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -234,7 +234,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -279,7 +279,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -339,7 +339,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
@@ -375,7 +375,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
@@ -420,11 +420,41 @@ jobs:
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
 
-  all-ci-success:
-    name: all-ci-success
+  all-lint-success:
+    name: all-lint-success
     needs:
       - lint
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: lint
+          needs-json: ${{ toJSON(needs) }}
+
+  all-test-success:
+    name: all-test-success
+    # 测试门控只汇总测试阶段；测试被跳过时视为失败，避免上游门控失败后误判通过。
+    needs:
       - test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: test
+          allow-skipped: 'false'
+          needs-json: ${{ toJSON(needs) }}
+
+  all-build-success:
+    name: all-build-success
+    needs:
       - build-windows-publish
       - build-windows
       - build-linux-publish
@@ -434,36 +464,56 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all required checks succeeded
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import sys
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: build
+          allow-skipped: 'false'
+          needs-json: ${{ toJSON(needs) }}
 
-          results = json.loads(os.environ['NEEDS_JSON'])
-          failed = {
-              name: value.get('result')
-              for name, value in results.items()
-              if value.get('result') not in ('success', 'skipped')
-          }
-          if failed:
-              print('Required checks did not succeed:')
-              for name, result in sorted(failed.items()):
-                  print(f'  {name}: {result}')
-              sys.exit(1)
-          print('All required checks succeeded or were skipped.')
-          PY
-
-  release-draft:
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
+  all-publish-build-success:
+    name: all-publish-build-success
     needs:
       - build-windows-publish
       - build-linux-publish
       - build-macos-publish
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: publish build
+          allow-skipped: 'false'
+          needs-json: ${{ toJSON(needs) }}
+
+  all-ci-success:
+    name: all-ci-success
+    # 总门控汇总三个阶段门控；阶段顺序由实际 job 依赖保证。
+    needs:
+      - all-lint-success
+      - all-test-success
+      - all-build-success
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          needs-json: ${{ toJSON(needs) }}
+
+  release-draft:
+    runs-on: ubuntu-latest
+    # 发布草稿只等待发布构建门控；构建被跳过时门控失败，避免误发草稿。
+    if: github.ref_type == 'tag'
+    needs:
+      - all-publish-build-success
     permissions:
       contents: write
     steps:

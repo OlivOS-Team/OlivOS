@@ -252,11 +252,26 @@
         <section id="performance" class="page" hidden>
           <div class="section-heading">
             <h2>性能监测</h2>
+            <button id="performance-nav-toggle" class="performance-nav-toggle" type="button"
+                    aria-expanded="false" aria-controls="performance-categories">
+              <span class="performance-nav-toggle-label">性能分类</span>
+              <span id="performance-nav-current" class="performance-nav-toggle-current">CPU</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"></path></svg>
+            </button>
             <span id="performance-sampled" class="statistics-sampled"></span>
           </div>
           <p id="performance-statistics-note" class="statistics-note" role="status">正在读取监测数据…</p>
           <div id="performance-content" class="performance-workbench" hidden>
-            <div class="performance-categories" role="tablist" aria-label="性能分类">
+            <div id="performance-nav-backdrop" class="performance-nav-backdrop" aria-hidden="true"></div>
+            <div id="performance-nav-drawer" class="performance-nav-drawer">
+              <div class="performance-nav-head">
+                <span id="performance-nav-title">性能分类</span>
+                <button id="performance-nav-close" class="performance-nav-close" type="button"
+                        aria-label="关闭性能分类">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+                </button>
+              </div>
+            <div id="performance-categories" class="performance-categories" role="tablist" aria-label="性能分类">
               <button class="performance-category active" id="performance-category-cpu" type="button"
                       role="tab" data-performance-category="cpu" aria-selected="true"
                       aria-controls="performance-view-cpu">
@@ -351,6 +366,7 @@
                 <span class="performance-category-spark" data-performance-mini="processes" aria-hidden="true"></span>
               </button>
             </div>
+            </div>
             <div class="performance-detail">
               <section id="performance-view-cpu" class="performance-view" data-performance-view="cpu"
                        role="tabpanel" aria-labelledby="performance-category-cpu">
@@ -391,7 +407,7 @@
                   <div class="performance-fact"><dt>OlivOS 负载</dt><dd data-performance-stat="cpu-load"></dd></div>
                   <div class="performance-fact"><dt>OlivOS 进程</dt><dd data-performance-stat="cpu-processes"></dd></div>
                   <div class="performance-fact"><dt>线程</dt><dd data-performance-stat="cpu-threads"></dd></div>
-                  <div class="performance-fact"><dt>句柄</dt><dd data-performance-stat="cpu-handles"></dd></div>
+                  <div id="performance-fact-handles" class="performance-fact"><dt>句柄</dt><dd data-performance-stat="cpu-handles"></dd></div>
                 </dl>
               </section>
               <section id="performance-view-memory" class="performance-view" data-performance-view="memory"

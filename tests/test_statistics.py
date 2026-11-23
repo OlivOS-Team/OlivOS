@@ -330,6 +330,7 @@ def test_statistics_process_cpu_uses_cpu_time_delta(monkeypatch):
 
 def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypatch):
     # 进程树快照要保留父子关系、每个进程的线程明细，并用两次 CPU 时间差计算进程负载。
+    from contextlib import nullcontext
     from types import SimpleNamespace
 
     class FakeCpuTimes(object):
@@ -365,6 +366,9 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
 
         def memory_info(self):
             return SimpleNamespace(rss=1024, vms=2048, peak_wset=1536, private=900, shared=100)
+
+        def oneshot(self):
+            return nullcontext()
 
         def memory_percent(self):
             return 25.0
@@ -463,6 +467,59 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
     assert second['roots'][0]['children'][0]['cpu_percent'] == 50.0
     assert [item['cpu_percent'] for item in second['roots'][0]['threads']] == [50.0, 25.0]
     assert second['roots'][0]['children'][0]['threads'][0]['cpu_percent'] == 15.0
+    totals = monitor._process_tree_metrics(now=14.0)
+    assert totals['num_fds'] == 24
+    assert totals['handles'] is None
+
+
+def test_statistics_process_tree_marks_file_descriptors_incomplete_on_process_failure(monkeypatch):
+    # 进程树中任一进程读取失败时，文件描述符总数只能视为不完整，不能返回部分和冒充全量。
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    class FakeProcess(object):
+        def __init__(self, pid, fail=False):
+            self.pid = pid
+            self.fail = fail
+            self.child_items = []
+
+        def oneshot(self):
+            return nullcontext()
+
+        def memory_info(self):
+            if self.fail:
+                raise RuntimeError('process vanished')
+            return SimpleNamespace(rss=1024)
+
+        def cpu_times(self):
+            return SimpleNamespace(user=0.1, system=0.1)
+
+        def num_threads(self):
+            return 1
+
+        def num_handles(self):
+            return 7
+
+        def num_fds(self):
+            return 5
+
+        def children(self, recursive=True):
+            return self.child_items
+
+    root = FakeProcess(100)
+    child = FakeProcess(101, fail=True)
+    root.child_items = [child]
+    monkeypatch.setattr(statisticsAPI.platform, 'system', lambda: 'Test')
+    monkeypatch.setattr(statisticsAPI.psutil, 'Process', lambda pid: root)
+    monitor = make_statistics_monitor()
+
+    totals, cpu_seconds = monitor._process_tree_totals()
+
+    assert totals['count'] == 2
+    assert totals['threads'] == 1
+    assert totals['handles'] is None
+    assert totals['num_fds'] is None
+    assert cpu_seconds == 0.2
 
 
 def test_statistics_process_detail_returns_limited_files_connections_and_memory(monkeypatch):

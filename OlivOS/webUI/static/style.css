@@ -1614,9 +1614,63 @@ header h1 {
   min-height: 260px;
   margin-top: 12px;
 }
+.performance-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-self: end;
+  gap: 7px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-small);
+}
+.performance-nav-toggle:hover {
+  background: var(--hover);
+}
+.performance-nav-toggle-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.performance-nav-toggle-current {
+  font-size: 12px;
+  font-weight: 600;
+}
+.performance-nav-toggle svg,
+.performance-nav-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.performance-nav-toggle svg {
+  transition: transform 180ms ease;
+}
+body.performance-nav-open .performance-nav-toggle svg {
+  transform: rotate(180deg);
+}
+.performance-nav-backdrop {
+  display: none;
+}
+.performance-nav-drawer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.performance-nav-head,
+.performance-nav-close {
+  display: none;
+}
 .performance-categories {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 4px;
   min-width: 0;
   padding: 6px;
@@ -2054,15 +2108,17 @@ header h1 {
     height: auto;
     min-height: 0;
   }
+  .performance-nav-drawer {
+    position: sticky;
+    top: env(safe-area-inset-top, 0);
+    z-index: 3;
+  }
   .performance-categories {
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
-    position: sticky;
-    top: env(safe-area-inset-top, 0);
-    z-index: 3;
   }
   .performance-detail {
     overflow: visible;
@@ -2712,6 +2768,119 @@ dialog::backdrop {
   body.sidebar-open {
     overflow: hidden;
   }
+}
+@media (max-width: 800px) {
+  body.performance-nav-open {
+    overflow: hidden;
+  }
+  .performance-nav-toggle {
+    display: inline-flex;
+  }
+  .performance-workbench {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+  .performance-detail {
+    overflow: visible;
+  }
+  .performance-nav-backdrop {
+    display: block;
+    position: fixed;
+    z-index: 13;
+    inset: 0;
+    background: #0006;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 180ms ease,
+      visibility 0s linear 180ms;
+  }
+  body.performance-nav-open .performance-nav-backdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 180ms ease,
+      visibility 0s;
+  }
+  .performance-nav-drawer {
+    position: fixed;
+    z-index: 14;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(84vw, 340px);
+    max-width: 100%;
+    height: 100dvh;
+    padding:
+      calc(16px + env(safe-area-inset-top))
+      12px
+      calc(16px + env(safe-area-inset-bottom));
+    border-left: 1px solid var(--line);
+    background: var(--panel);
+    box-shadow: var(--shadow-dialog);
+    transform: translateX(102%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+  }
+  body.performance-nav-open .performance-nav-drawer {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 180ms ease,
+      visibility 0s;
+  }
+  .performance-nav-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 4px 12px;
+    font-weight: 600;
+  }
+  .performance-nav-close {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--muted);
+    place-items: center;
+  }
+  .performance-nav-close:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .performance-categories {
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .performance-category {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 58px;
+  }
+  .performance-category-spark {
+    grid-column: 2;
+  }
+}
+@media (max-width: 800px), (orientation: portrait) {
   button,
   .button-link,
   .theme-toggle,

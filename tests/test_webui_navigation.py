@@ -170,7 +170,8 @@ def set_viewport(browser, width, height, *, mobile_device=False):
     aria-hidden 要等监听器跑完才更新；只等 matchMedia 就断言会读到上一档视口的旧值。
     """
     driver = browser.driver
-    mobile = width <= 800
+    # 侧边栏媒体查询还包含纵向视口，宽大于 800px 的竖屏同样属于移动侧栏模式。
+    mobile = width <= 800 or height > width
     driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
         'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': mobile_device})
     browser.wait.until(lambda _: driver.execute_script(
@@ -1468,11 +1469,25 @@ def test_dashboard_uptime_advances_smoothly_between_status_refreshes(browser):
     assert all(delta >= 0 for delta in deltas), deltas
     assert all(delta <= 1 for delta in deltas), deltas
     assert any(delta > 0 for delta in deltas), deltas
+    # 运行时长跨越分钟、小时和天后必须继续累计，不能因单位换算出错而重置。
+    uptime_boundaries = driver.execute_script(r'''
+        return [59, 60, 61, 3599, 3600, 86399, 86400].map(
+          (seconds) => uptimeText(seconds * 1000));
+    ''')
+    assert uptime_boundaries == [
+        '运行时长：0 天 00 时 00 分 59 秒',
+        '运行时长：0 天 00 时 01 分 00 秒',
+        '运行时长：0 天 00 时 01 分 01 秒',
+        '运行时长：0 天 00 时 59 分 59 秒',
+        '运行时长：0 天 01 时 00 分 00 秒',
+        '运行时长：0 天 23 时 59 分 59 秒',
+        '运行时长：1 天 00 时 00 分 00 秒',
+    ]
 
 
 def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
                         cpu_percent=32.5, memory_percent=37.5, disk_percent=25.0,
-                        process_threads=18, process_handles=400):
+                        process_threads=18, process_handles=400, process_num_fds=None):
     # 仪表盘浏览器用例使用的完整快照，字段与 statisticsAPI.server.snapshot() 保持一致。
     now = time.time()
     timestamps = [now - 30, now - 20, now - 10, now]
@@ -1495,7 +1510,8 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
             'network': {'sent_bps': 4096, 'recv_bps': 8192,
                         'packets_sent_per_second': 10, 'packets_recv_per_second': 20},
             'process': {'count': 3, 'rss': 256 * 1024 ** 2, 'cpu_percent': 12.5,
-                        'threads': process_threads, 'handles': process_handles},
+                        'threads': process_threads, 'handles': process_handles,
+                        'num_fds': process_num_fds},
             'history': {
                 'interval': 1.0,
                 'capacity': 120,
@@ -2137,6 +2153,20 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     ]
     assert category_state[0]['selected'] == 'true'
     assert all(item['mini'] for item in category_state)
+    # CPU、内存、磁盘迷你趋势图固定使用 0-100 标度，稳定值不应贴顶。
+    percentage_minis = driver.execute_script(r'''
+        return ['cpu', 'memory', 'disk'].map((key) => {
+          const svg = document.querySelector('[data-performance-mini=' + key + '] svg');
+          const points = svg.querySelector('.mini-line').getAttribute('points')
+            .trim().split(/\s+/);
+          return {
+            maximum: Number(svg.dataset.maximum),
+            y: Number(points[points.length - 1].split(',')[1]),
+          };
+        });
+    ''')
+    assert [item['maximum'] for item in percentage_minis] == [100, 100, 100]
+    assert all(item['y'] > 10 for item in percentage_minis)
     network_summary = driver.execute_script(
         "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
     assert '↓ 8.0 KiB/s' in network_summary
@@ -2181,6 +2211,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           children: document.querySelectorAll('#performance-process-tree .process-children .process-node').length,
         };
     """) == {'rootBadge': 'OlivOS 主进程', 'threads': 3, 'children': 1}
+    process_row_text = driver.execute_script(
+        "return document.querySelector('#performance-process-tree .process-row').textContent")
+    assert '句柄 100' in process_row_text
+    assert '文件描述符 42' in process_row_text
     process_facts = driver.execute_script(
         "return document.querySelector('.process-facts').textContent")
     assert '虚拟内存' in process_facts
@@ -2255,32 +2289,6 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-cpu').hidden"))
 
-    # 8 张图表仍全部渲染，且容量、序列数和标尺保持原有约束。
-    expected = {
-        '#performance-cpu-chart': (120, 2),
-        '#performance-memory-chart': (120, 4),
-        '#performance-disk-usage-chart': (120, 1),
-        '#performance-disk-io-chart': (120, 2),
-        '#performance-network-chart': (120, 2),
-        '#performance-load-chart': (120, 1),
-        '#performance-process-memory-chart': (120, 1),
-        '#performance-traffic-chart': (60, 2),
-    }
-    for selector, (capacity, series_count) in expected.items():
-        actual = chart_contract(driver, selector)
-        assert actual['capacity'] == capacity, selector
-        assert actual['seriesCount'] == series_count, selector
-        assert actual['pointCounts'] == [capacity] * series_count, selector
-
-    # CPU 与磁盘占用保持线性；内存（含换入/换出）、磁盘 IO、网络使用对数标尺；流量图使用线性标尺。
-    assert driver.execute_script("""
-        return ['#performance-cpu-chart', '#performance-memory-chart',
-          '#performance-disk-usage-chart', '#performance-disk-io-chart',
-          '#performance-network-chart', '#performance-load-chart',
-          '#performance-process-memory-chart', '#performance-traffic-chart'].map(
-          (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
-    """) == ['linear', 'log', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
-
     # 换出与 Swap 使用率使用不同颜色，且折线与图例颜色保持一致。
     swap_colors = driver.execute_script("""
         const chart = document.querySelector('#performance-memory-chart');
@@ -2294,23 +2302,6 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert swap_colors[0] != swap_colors[1]
     assert swap_colors[2] != swap_colors[3]
     assert swap_colors[0] == swap_colors[2] and swap_colors[1] == swap_colors[3]
-
-    # 横线按数值刻度映射：线性标尺等距，对数标尺非等距。
-    grid_contracts = driver.execute_script("""
-        return ['#performance-cpu-chart', '#performance-network-chart'].map((selector) => {
-          const svg = document.querySelector(selector).querySelector('svg');
-          const ys = [...svg.querySelectorAll('.chart-grid')]
-            .map((line) => Number(line.getAttribute('y1')));
-          const gaps = ys.slice(1).map((value, index) => Math.abs(value - ys[index]));
-          return {scale: svg.dataset.scale, count: ys.length, gaps};
-        });
-    """)
-    assert grid_contracts[0]['scale'] == 'linear'
-    assert grid_contracts[0]['count'] == 5
-    assert max(grid_contracts[0]['gaps']) - min(grid_contracts[0]['gaps']) < 0.01
-    assert grid_contracts[1]['scale'] == 'log'
-    assert grid_contracts[1]['count'] == 5
-    assert max(grid_contracts[1]['gaps']) - min(grid_contracts[1]['gaps']) > 1
 
     # 切换左侧分类后，右侧只展示对应详情，悬停提示使用该分类的图表。
     tooltip_cases = {
@@ -2356,8 +2347,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         "return !document.getElementById('performance-view-cpu').hidden"))
     assert '暂无历史采样' in hover_chart(driver, '#performance-cpu-chart', 0.0)['text']
 
-    # 刷新快照时只更新现有节点；平台缺线程/句柄数据时显示破折号，不伪造 0。
-    updated = statistics_snapshot(cpu_percent=55.0, process_threads=None, process_handles=None)
+    # 刷新快照时只更新现有节点；线程缺失显示破折号，句柄缺失时不展示，文件描述符按可用性展示。
+    updated = statistics_snapshot(cpu_percent=55.0, process_threads=None,
+                                  process_handles=None, process_num_fds=42)
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=lambda: updated)
     driver.execute_async_script("""
@@ -2369,7 +2361,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-memory').hidden"))
     assert '— 线程' in browser.find('#performance-process-memory-readout').text
-    assert '— 句柄' in browser.find('#performance-process-memory-readout').text
+    assert '句柄' not in browser.find('#performance-process-memory-readout').text
+    assert '42 文件描述符' in browser.find('#performance-process-memory-readout').text
+    assert driver.execute_script(
+        "return document.getElementById('performance-fact-handles').hidden")
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-content .performance-panel').length") == 9
 
@@ -2444,7 +2439,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           detail.scrollHeight <= detail.clientHeight;
     """)
 
-    # 移动端分类栏转为横向滚动，右侧详情单列显示且所有分类都不撑出视口。
+    # 移动端分类导航改用抽屉，右侧详情单列显示且所有分类都不撑出视口。
     set_viewport(browser, 390, 844, mobile_device=True)
     browser.open_sidebar()
     browser.click('[data-page="performance"]')
@@ -2454,12 +2449,23 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     set_viewport(browser, 320, 640, mobile_device=True)
     browser.wait.until(lambda _: driver.execute_script(
         "return document.documentElement.scrollWidth <= innerWidth"))
-    assert driver.execute_script(
-        "return getComputedStyle(document.querySelector('.performance-categories')).flexDirection") == 'row'
+    assert driver.execute_script("""
+        const drawer = document.querySelector('.performance-nav-drawer');
+        const toggle = document.getElementById('performance-nav-toggle');
+        return getComputedStyle(drawer).position === 'fixed' &&
+          getComputedStyle(drawer).visibility === 'hidden' &&
+          getComputedStyle(document.querySelector('.performance-categories')).flexDirection === 'column' &&
+          toggle.getAttribute('aria-expanded') === 'false';
+    """)
     for category in ('cpu', 'memory', 'disk', 'network', 'traffic'):
+        browser.click('#performance-nav-toggle')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return document.body.classList.contains('performance-nav-open') && "
+            "document.getElementById('performance-nav-toggle').getAttribute('aria-expanded') === 'true'"))
         browser.click(f'[data-performance-category="{category}"]')
         browser.wait.until(lambda _: driver.execute_script(
-            "return !document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
+            "return !document.body.classList.contains('performance-nav-open') && "
+            "!document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
             category))
         assert driver.execute_script("""
             const view = [...document.querySelectorAll('[data-performance-view]')]
@@ -2469,23 +2475,56 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             )) && document.documentElement.scrollWidth <= innerWidth;
         """)
 
-    # 进程页在移动端使用卡片、字段网格与分行线程，当前分类应自动滚入横向导航。
+    # 数据刷新只更新抽屉内容，不能把用户正在浏览的滚动位置拉回当前分类。
+    set_viewport(browser, 320, 360, mobile_device=True)
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: statistics_snapshot(cpu_percent=33.0),
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    scroll_before_refresh = driver.execute_script("""
+        const bar = document.querySelector('.performance-categories');
+        bar.scrollTop = bar.scrollHeight;
+        return bar.scrollTop;
+    """)
+    driver.execute_async_script("""
+        const done = arguments[arguments.length - 1];
+        refreshStatus().then(() => done(true), (error) => done(String(error)));
+    """)
+    scroll_after_refresh = driver.execute_script("""
+        const bar = document.querySelector('.performance-categories');
+        return {
+          after: bar.scrollTop,
+          open: state.performanceNavOpen,
+        };
+    """)
+    assert scroll_before_refresh > 0
+    assert scroll_after_refresh['after'] == scroll_before_refresh
+    assert scroll_after_refresh['open']
+    browser.click('#performance-nav-close')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.body.classList.contains('performance-nav-open')"))
+    set_viewport(browser, 320, 640, mobile_device=True)
+
+    # 进程页在移动端使用卡片、字段网格与分行线程，选择后抽屉应关闭并更新当前分类。
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=lambda: updated,
         process_tree_snapshot=process_tree_snapshot,
         process_detail_snapshot=process_detail_snapshot)
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
     driver.execute_script(
         "document.querySelector('[data-performance-category=\"processes\"]').click()")
     browser.wait.until(lambda _: driver.execute_script("""
-        return !document.getElementById('performance-view-processes').hidden &&
+        return !document.body.classList.contains('performance-nav-open') &&
+          !document.getElementById('performance-view-processes').hidden &&
           document.querySelectorAll('#performance-process-tree .process-row').length === 2;
     """))
     browser.wait.until(lambda _: driver.execute_script("""
-        const button = document.querySelector('[data-performance-category="processes"]');
-        const bar = document.querySelector('.performance-categories');
-        const buttonRect = button.getBoundingClientRect();
-        const barRect = bar.getBoundingClientRect();
-        return buttonRect.left >= barRect.left - 1 && buttonRect.right <= barRect.right + 1;
+        return document.getElementById('performance-nav-current').textContent.trim() == '进程';
     """))
     process_layout = driver.execute_script("""
         const row = document.querySelector('#performance-process-tree .process-row');
@@ -2499,7 +2538,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         const refresh = document.getElementById('performance-processes-refresh');
         const heading = document.querySelector('.performance-view-heading-processes');
         const headingValue = document.querySelector('.performance-view-value-processes');
-        const categories = document.querySelector('.performance-categories');
+        const drawer = document.querySelector('.performance-nav-drawer');
         return {
           rowDisplay: getComputedStyle(row).display,
           rowColumns: getComputedStyle(row).gridTemplateColumns.split(' ').filter(Boolean).length,
@@ -2513,7 +2552,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           refreshHeight: refresh.getBoundingClientRect().height,
           headingDisplay: getComputedStyle(heading).display,
           headingAlign: getComputedStyle(headingValue).textAlign,
-          categoriesPosition: getComputedStyle(categories).position,
+          drawerPosition: getComputedStyle(drawer).position,
           fits: document.documentElement.scrollWidth <= innerWidth,
         };
     """)
@@ -2528,8 +2567,258 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert process_layout['refreshHeight'] >= 40
     assert process_layout['headingDisplay'] == 'grid'
     assert process_layout['headingAlign'] == 'left'
-    assert process_layout['categoriesPosition'] == 'sticky'
+    assert process_layout['drawerPosition'] == 'fixed'
     assert process_layout['fits']
+
+
+@pytest.mark.browser
+def test_performance_charts_use_percentage_and_independent_series_scales(browser):
+    # 图表缩放是独立行为：百分比图固定 100%，非百分比序列各自缩放，并按线性/对数标尺绘制。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+
+    # 8 张图表保持容量、序列数量和补零后的固定点数。
+    expected = {
+        '#performance-cpu-chart': (120, 2),
+        '#performance-memory-chart': (120, 4),
+        '#performance-disk-usage-chart': (120, 1),
+        '#performance-disk-io-chart': (120, 2),
+        '#performance-network-chart': (120, 2),
+        '#performance-load-chart': (120, 1),
+        '#performance-process-memory-chart': (120, 1),
+        '#performance-traffic-chart': (60, 2),
+    }
+    for selector, (capacity, series_count) in expected.items():
+        actual = chart_contract(driver, selector)
+        assert actual['capacity'] == capacity, selector
+        assert actual['seriesCount'] == series_count, selector
+        assert actual['pointCounts'] == [capacity] * series_count, selector
+
+    # CPU 与磁盘占用保持线性；内存（含换入/换出）、磁盘 IO、网络使用对数标尺；流量图使用线性标尺。
+    assert driver.execute_script("""
+        return ['#performance-cpu-chart', '#performance-memory-chart',
+          '#performance-disk-usage-chart', '#performance-disk-io-chart',
+          '#performance-network-chart', '#performance-load-chart',
+          '#performance-process-memory-chart', '#performance-traffic-chart'].map(
+          (selector) => document.querySelector(selector).querySelector('svg').dataset.scale);
+    """) == ['linear', 'log', 'linear', 'log', 'log', 'linear', 'linear', 'linear']
+
+    # 百分比折线固定使用 100% 标度，实际坐标必须反映真实百分比而不是贴顶或压底。
+    percentage_points = driver.execute_script(r'''
+        return [
+          ['#performance-cpu-chart', '.chart-series-cpu'],
+          ['#performance-memory-chart', '.chart-series-memory'],
+          ['#performance-memory-chart', '.chart-series-swap'],
+          ['#performance-disk-usage-chart', '.chart-series-disk'],
+        ].map(([chart, series]) => {
+          const svg = document.querySelector(chart).querySelector('svg');
+          const line = svg.querySelector(series);
+          const points = line.getAttribute('points').trim().split(/\s+/);
+          return {
+            series: chart + ' ' + series,
+            chartMaximum: Number(svg.dataset.maximum),
+            seriesMaximum: Number(line.dataset.maximum),
+            scale: line.dataset.scale,
+            lastY: Number(points[points.length - 1].split(',')[1]),
+          };
+        });
+    ''')
+    assert all(item['chartMaximum'] == 100 for item in percentage_points)
+    assert all(item['seriesMaximum'] == 100 for item in percentage_points)
+    assert [item['scale'] for item in percentage_points] == ['linear', 'log', 'log', 'linear']
+    by_series = {item['series']: item for item in percentage_points}
+    cpu_percent = by_series['#performance-cpu-chart .chart-series-cpu']
+    memory_percent = by_series['#performance-memory-chart .chart-series-memory']
+    swap_percent = by_series['#performance-memory-chart .chart-series-swap']
+    disk_percent = by_series['#performance-disk-usage-chart .chart-series-disk']
+    assert abs(cpu_percent['lastY'] - 26.3) < 0.3
+    assert abs(memory_percent['lastY'] - 9.5) < 0.4
+    assert abs(swap_percent['lastY'] - 38.0) < 0.1
+    assert abs(disk_percent['lastY'] - 29.0) < 0.1
+
+    # 非百分比序列使用自身最大值：满值点应贴近图表顶部，而不是被整图 100% 标度压到底部。
+    independent = driver.execute_script(r'''
+        return [
+          ['#performance-cpu-chart', '.chart-series-machine-load'],
+          ['#performance-memory-chart', '.chart-series-swap-in'],
+        ].map(([chart, series]) => {
+          const line = document.querySelector(chart).querySelector(series);
+          const points = line.getAttribute('points').trim().split(/\s+/);
+          return {
+            maximum: Number(line.dataset.maximum),
+            lastY: Number(points[points.length - 1].split(',')[1]),
+          };
+        });
+    ''')
+    assert [item['maximum'] for item in independent] == [1.25, 512]
+    assert all(abs(item['lastY'] - 2.0) < 0.1 for item in independent)
+
+    # 横线按数值刻度映射：线性标尺等距，对数标尺非等距。
+    grid_contracts = driver.execute_script("""
+        return ['#performance-cpu-chart', '#performance-network-chart'].map((selector) => {
+          const svg = document.querySelector(selector).querySelector('svg');
+          const ys = [...svg.querySelectorAll('.chart-grid')]
+            .map((line) => Number(line.getAttribute('y1')));
+          const gaps = ys.slice(1).map((value, index) => Math.abs(value - ys[index]));
+          return {scale: svg.dataset.scale, count: ys.length, gaps};
+        });
+    """)
+    assert grid_contracts[0]['scale'] == 'linear'
+    assert grid_contracts[0]['count'] == 5
+    assert max(grid_contracts[0]['gaps']) - min(grid_contracts[0]['gaps']) < 0.01
+    assert grid_contracts[1]['scale'] == 'log'
+    assert grid_contracts[1]['count'] == 5
+    assert max(grid_contracts[1]['gaps']) - min(grid_contracts[1]['gaps']) > 1
+
+
+@pytest.mark.browser
+def test_performance_navigation_uses_drawer_only_at_mobile_width(browser):
+    # 宽竖屏不属于性能抽屉断点；900x1200 应继续使用 801-1100px 的横向导航。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+
+    # 800px 及以下显示抽屉按钮，并打开固定抽屉。
+    set_viewport(browser, 800, 1200, mobile_device=True)
+    browser.wait.until(lambda _: driver.execute_script("""
+        return innerWidth === 800 &&
+          getComputedStyle(document.getElementById('performance-nav-toggle')).display !== 'none' &&
+          getComputedStyle(document.getElementById('performance-nav-drawer')).position === 'fixed';
+    """))
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
+
+    # 加宽到 900px 后自动关闭抽屉，并恢复横向导航而不是纵向抽屉。
+    set_viewport(browser, 900, 1200)
+    browser.wait.until(lambda _: driver.execute_script("""
+        return innerWidth === 900 && !state.performanceNavOpen &&
+          !document.body.classList.contains('performance-nav-open');
+    """))
+    layout = driver.execute_script("""
+        const toggle = document.getElementById('performance-nav-toggle');
+        const drawer = document.getElementById('performance-nav-drawer');
+        const categories = document.querySelector('.performance-categories');
+        return {
+          compact: matchMedia('(max-width: 800px)').matches,
+          portrait: matchMedia('(orientation: portrait)').matches,
+          toggleDisplay: getComputedStyle(toggle).display,
+          drawerPosition: getComputedStyle(drawer).position,
+          direction: getComputedStyle(categories).flexDirection,
+        };
+    """)
+    assert layout == {
+        'compact': False,
+        'portrait': True,
+        'toggleDisplay': 'none',
+        'drawerPosition': 'sticky',
+        'direction': 'row',
+    }
+
+
+@pytest.mark.browser
+def test_performance_drawer_traps_focus_and_exposes_modal_state(browser):
+    # 抽屉打开时是模态对话框：键盘焦点必须循环在关闭按钮和当前分类之间。
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.common.keys import Keys
+
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+    set_viewport(browser, 320, 844, mobile_device=True)
+
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script("""
+        const drawer = document.getElementById('performance-nav-drawer');
+        return document.body.classList.contains('performance-nav-open') &&
+          drawer.contains(document.activeElement) &&
+          document.activeElement.dataset.performanceCategory === 'cpu';
+    """))
+    assert driver.execute_script("""
+        const drawer = document.getElementById('performance-nav-drawer');
+        return {
+          role: drawer.getAttribute('role'),
+          modal: drawer.getAttribute('aria-modal'),
+          labelledby: drawer.getAttribute('aria-labelledby'),
+        };
+    """) == {'role': 'dialog', 'modal': 'true', 'labelledby': 'performance-nav-title'}
+
+    visited = set()
+    for _ in range(4):
+        ActionChains(driver).send_keys(Keys.TAB).perform()
+        visited.add(driver.execute_script("""
+            const active = document.activeElement;
+            return active.id || active.dataset.performanceCategory;
+        """))
+    assert visited == {'performance-nav-close', 'performance-category-cpu'}
+    ActionChains(driver).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+    assert driver.execute_script(
+        "return document.getElementById('performance-nav-drawer')"
+        ".contains(document.activeElement)")
+
+    browser.click('#performance-nav-close')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.body.classList.contains('performance-nav-open')"))
+    assert driver.execute_script("""
+        const drawer = document.getElementById('performance-nav-drawer');
+        return [drawer.getAttribute('role'), drawer.getAttribute('aria-modal')];
+    """) == [None, None]
+
+
+@pytest.mark.browser
+def test_performance_drawer_closes_when_statistics_become_unavailable(browser):
+    # 统计数据在抽屉打开期间失效时，必须先关闭抽屉并解除页面滚动锁定。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return state.page === 'performance' && !document.getElementById('performance-content').hidden"))
+    set_viewport(browser, 320, 640, mobile_device=True)
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
+
+    def fail():
+        raise RuntimeError('fixture statistics failure while drawer open')
+
+    browser.host.runtime['statistics'] = SimpleNamespace(Proc_type='statistics', snapshot=fail)
+    driver.execute_async_script("""
+        const done = arguments[arguments.length - 1];
+        refreshStatus().then(() => done(true), (error) => done(String(error)));
+    """)
+    browser.wait.until(lambda _: '暂不可用' in browser.find('#performance-statistics-note').text)
+
+    assert driver.execute_script("return document.getElementById('performance-content').hidden")
+    assert driver.execute_script("""
+        return {
+          open: state.performanceNavOpen,
+          bodyClass: document.body.classList.contains('performance-nav-open'),
+          expanded: document.getElementById('performance-nav-toggle').getAttribute('aria-expanded'),
+        };
+    """) == {'open': False, 'bodyClass': False, 'expanded': 'false'}
 
 
 @pytest.mark.browser
@@ -2578,6 +2867,7 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
             const root = document.getElementById('performance-view-processes');
             const detail = document.querySelector('.performance-detail');
             const categories = document.querySelector('.performance-categories');
+            const drawer = document.querySelector('.performance-nav-drawer');
             const workbench = document.querySelector('.performance-workbench');
             const viewport = document.documentElement.clientWidth;
             const overflow = [...root.querySelectorAll('*')].filter((node) => {
@@ -2596,6 +2886,7 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
               workbenchColumns: getComputedStyle(workbench).gridTemplateColumns
                 .split(' ').filter(Boolean).length,
               categoriesDirection: getComputedStyle(categories).flexDirection,
+              drawerPosition: getComputedStyle(drawer).position,
               detailWidth: detail.clientWidth,
               detailScrollWidth: detail.scrollWidth,
               categoriesWidth: categories.clientWidth,
@@ -2605,7 +2896,12 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
         """)
         assert layout['documentWidth'] <= layout['viewport'] + 1, (width, layout)
         assert layout['workbenchColumns'] == (1 if width <= 1100 else 2), (width, layout)
-        assert layout['categoriesDirection'] == ('row' if width <= 1100 else 'column'), (width, layout)
+        assert layout['categoriesDirection'] == (
+            'row' if 800 < width <= 1100 else 'column'
+        ), (width, layout)
+        assert layout['drawerPosition'] == (
+            'fixed' if width <= 800 else 'sticky' if width <= 1100 else 'static'
+        ), (width, layout)
         assert layout['detailScrollWidth'] <= layout['detailWidth'] + 1, (width, layout['overflow'])
         if width > 1100:
             assert layout['categoriesScrollWidth'] <= layout['categoriesWidth'] + 1, (width, layout)

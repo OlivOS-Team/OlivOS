@@ -5,6 +5,7 @@ const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 const sidebarStorageKey = 'olivos.webui.sidebarCollapsed';
 const mobileSidebarQuery = window.matchMedia('(max-width: 800px), (orientation: portrait)');
+const performanceNavMobileQuery = window.matchMedia('(max-width: 800px)');
 
 // 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
 function takeLoginTicket() {
@@ -113,6 +114,7 @@ const state = {
   performanceProcessOpen: {},
   performanceProcessDetailGroups: {},
   performanceCategory: 'cpu',
+  performanceNavOpen: false,
   dashboardTimer: null,
   authGeneration: 0,
   cachedLogin: false,
@@ -262,6 +264,9 @@ let sidebarReturnFocus = null;
 function sidebarIsMobile() {
   return mobileSidebarQuery.matches;
 }
+function performanceNavIsMobile() {
+  return performanceNavMobileQuery.matches;
+}
 function toggleSidebar() {
   if (sidebarIsMobile()) setSidebarOpen(!state.sidebarOpen);
   else setSidebarCollapsed(!state.sidebarCollapsed);
@@ -300,7 +305,10 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
     updateSidebarToggle();
     return;
   }
-  if (open) sidebarReturnFocus = document.activeElement;
+  if (open) {
+    if (state.performanceNavOpen) setPerformanceNavOpen(false, { restoreFocus: false });
+    sidebarReturnFocus = document.activeElement;
+  }
   state.sidebarOpen = open;
   $('shell').dataset.sidebarOpen = String(open);
   document.body.classList.toggle('sidebar-open', open);
@@ -316,6 +324,11 @@ function syncSidebarMode() {
   if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
   updateSidebarToggle();
 }
+function syncPerformanceNavMode() {
+  if (!performanceNavIsMobile()) {
+    setPerformanceNavOpen(false, { restoreFocus: false });
+  }
+}
 function initializeSidebar() {
   let collapsed = false;
   try {
@@ -330,6 +343,80 @@ function initializeSidebar() {
   } else {
     mobileSidebarQuery.addListener(syncSidebarMode);
   }
+  if (performanceNavMobileQuery.addEventListener) {
+    performanceNavMobileQuery.addEventListener('change', syncPerformanceNavMode);
+  } else {
+    performanceNavMobileQuery.addListener(syncPerformanceNavMode);
+  }
+}
+let performanceNavReturnFocus = null;
+function setPerformanceNavOpen(open, { restoreFocus = true } = {}) {
+  open = performanceNavIsMobile() && open;
+  const toggle = $('performance-nav-toggle');
+  if (state.performanceNavOpen === open) {
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    return;
+  }
+  if (open) {
+    if (state.sidebarOpen) setSidebarOpen(false, { restoreFocus: false });
+    performanceNavReturnFocus = document.activeElement;
+  }
+  state.performanceNavOpen = open;
+  document.body.classList.toggle('performance-nav-open', open);
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  const drawer = $('performance-nav-drawer');
+  if (drawer) {
+    if (open) {
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('aria-modal', 'true');
+      drawer.setAttribute('aria-labelledby', 'performance-nav-title');
+    } else {
+      drawer.removeAttribute('role');
+      drawer.removeAttribute('aria-modal');
+      drawer.removeAttribute('aria-labelledby');
+    }
+  }
+  if (open) {
+    const selected = document.querySelector(`[data-performance-category="${state.performanceCategory}"]`);
+    window.requestAnimationFrame(() => {
+      if (!state.performanceNavOpen) return;
+      revealPerformanceCategory(selected);
+      selected?.focus({ preventScroll: true });
+    });
+  } else if (restoreFocus && performanceNavReturnFocus?.focus) {
+    performanceNavReturnFocus.focus({ preventScroll: true });
+  }
+  if (!open) performanceNavReturnFocus = null;
+}
+function performanceNavFocusable() {
+  const drawer = $('performance-nav-drawer');
+  if (!drawer) return [];
+  return [...drawer.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )].filter((node) => !node.disabled && node.tabIndex !== -1 && node.getClientRects().length > 0);
+}
+function trapPerformanceNavFocus(event) {
+  if (event.key !== 'Tab' || !state.performanceNavOpen) return;
+  const focusable = performanceNavFocusable();
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!focusable.includes(active)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus({ preventScroll: true });
+    return;
+  }
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
+}
+function togglePerformanceNav() {
+  setPerformanceNavOpen(!state.performanceNavOpen);
 }
 function closeStream(name) {
   const entry = state.streams.get(name);
@@ -636,6 +723,7 @@ async function navigate(page) {
   closeSelectMenu();
   state.navigationGeneration++;
   if (state.sidebarOpen) setSidebarOpen(false);
+  if (state.performanceNavOpen) setPerformanceNavOpen(false, { restoreFocus: false });
   state.page = page;
   document.querySelectorAll('.page').forEach((node) => {
     node.hidden = node.id !== page;
@@ -873,6 +961,7 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     className: item.className || '',
     legendClass: item.legendClass || '',
     label: item.label || '',
+    percentage: item.percentage === true,
     formatValue: typeof item.formatValue === 'function' ? item.formatValue : formatCount,
     values: Array.isArray(item.values) ? item.values : [],
   }));
@@ -903,14 +992,24 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     };
   });
   const allValues = cleaned.flatMap((item) => item.values);
-  const maximum = fixedMaximum === null
-    ? Math.max(1, ...allValues)
-    : Math.max(1, Number(fixedMaximum) || 1);
+  const hasPercentageSeries = cleaned.some((item) => item.percentage);
+  const fixed = fixedMaximum === null ? null : Math.max(1, Number(fixedMaximum) || 1);
+  const maximum = fixed !== null
+    ? fixed
+    : (hasPercentageSeries ? 100 : Math.max(1, ...allValues));
   const logarithmic = options.scale === 'log';
   const scaleValue = (value) => (
     logarithmic ? Math.log10(1 + Math.max(0, value)) : value
   );
   const scaleMaximum = Math.max(Number.EPSILON, scaleValue(maximum));
+  const seriesMaximum = (item) => {
+    if (item.percentage) return 100;
+    if (hasPercentageSeries) return Math.max(1, ...item.values);
+    return maximum;
+  };
+  const seriesScaleMaximum = (item) => (
+    Math.max(Number.EPSILON, scaleValue(seriesMaximum(item)))
+  );
   const svg = svgNode('svg', {
     viewBox: `0 0 ${width} ${height}`,
     preserveAspectRatio: 'none',
@@ -919,12 +1018,13 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
   svg.dataset.capacity = String(effectiveCapacity);
   svg.dataset.seriesCount = String(cleaned.length);
   svg.dataset.scale = logarithmic ? 'log' : 'linear';
+  svg.dataset.maximum = String(maximum);
   const defs = svgNode('defs');
   svg.append(defs);
   const denominator = Math.max(1, effectiveCapacity - 1);
   const xForIndex = (index) => padding + plotWidth * (index / denominator);
-  const yForValue = (value) => (
-    height - padding - plotHeight * Math.min(1, scaleValue(value) / scaleMaximum)
+  const yForValue = (value, itemScaleMaximum = scaleMaximum) => (
+    height - padding - plotHeight * Math.min(1, scaleValue(value) / itemScaleMaximum)
   );
   for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
     const value = maximum * ratio;
@@ -941,8 +1041,9 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
     svg.append(gridline);
   }
   for (const [index, item] of cleaned.entries()) {
+    const itemScaleMaximum = seriesScaleMaximum(item);
     const points = item.values.map((value, index) => (
-      `${xForIndex(index).toFixed(2)},${yForValue(value).toFixed(2)}`
+      `${xForIndex(index).toFixed(2)},${yForValue(value, itemScaleMaximum).toFixed(2)}`
     ));
     if (options.area) {
       const gradientId = `${container.id || 'trend'}-area-${index}`;
@@ -978,6 +1079,9 @@ function renderTrend(container, series, fixedMaximum = null, capacity = null, op
       points: points.join(' '),
     });
     polyline.dataset.series = item.className;
+    polyline.dataset.maximum = String(seriesMaximum(item));
+    polyline.dataset.percentage = item.percentage ? 'true' : 'false';
+    polyline.dataset.scale = logarithmic ? 'log' : 'linear';
     svg.append(polyline);
   }
   const cursor = svgNode('line', {
@@ -1163,13 +1267,13 @@ function renderStatistics(data) {
   renderTrend($('dashboard-cpu-chart'), [
     {
       className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
-      formatValue: formatPercent, values: history.cpu_percent || [],
+      formatValue: formatPercent, values: history.cpu_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
   renderTrend($('dashboard-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
-      formatValue: formatPercent, values: history.memory_percent || [],
+      formatValue: formatPercent, values: history.memory_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps: history.timestamps || [], area: true });
   renderTrend($('dashboard-disk-chart'), [
@@ -1235,7 +1339,19 @@ function setPerformanceStat(name, value) {
     node.textContent = value;
   });
 }
-function setPerformanceCategory(category, refreshProcesses = false) {
+function revealPerformanceCategory(button) {
+  if (!button) return;
+  const categories = button.closest('.performance-categories');
+  if (!categories ||
+      (categories.scrollWidth <= categories.clientWidth &&
+       categories.scrollHeight <= categories.clientHeight)) {
+    return;
+  }
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto' : 'smooth';
+  button.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+}
+function setPerformanceCategory(category, { refreshProcesses = false, reveal = false } = {}) {
   const selected = performanceCategories.includes(category) ? category : 'cpu';
   const previous = state.performanceCategory;
   state.performanceCategory = selected;
@@ -1246,12 +1362,12 @@ function setPerformanceCategory(category, refreshProcesses = false) {
     button.tabIndex = active ? 0 : -1;
   });
   const activeButton = document.querySelector(`[data-performance-category="${selected}"]`);
-  const categories = activeButton && activeButton.closest('.performance-categories');
-  if (activeButton && categories && categories.scrollWidth > categories.clientWidth) {
-    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ? 'auto' : 'smooth';
-    activeButton.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+  const current = $('performance-nav-current');
+  if (current) {
+    current.textContent =
+      activeButton?.querySelector('.performance-category-name')?.textContent || selected;
   }
+  if (reveal) revealPerformanceCategory(activeButton);
   document.querySelectorAll('[data-performance-view]').forEach((view) => {
     view.hidden = view.dataset.performanceView !== selected;
   });
@@ -1726,7 +1842,8 @@ function renderPerformanceMini(container, values) {
     return Number.isFinite(number) ? Math.max(0, number) : 0;
   });
   while (numeric.length < capacity) numeric.unshift(0);
-  const maximum = Math.max(1, ...numeric);
+  const percentage = ['cpu', 'memory', 'disk'].includes(container.dataset.performanceMini);
+  const maximum = percentage ? 100 : Math.max(1, ...numeric);
   const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
   const yFor = (value) => (
     height - padding - (height - padding * 2) * Math.min(1, value / maximum)
@@ -1739,6 +1856,7 @@ function renderPerformanceMini(container, values) {
     preserveAspectRatio: 'none',
     'aria-hidden': 'true',
   });
+  svg.dataset.maximum = String(maximum);
   const baseline = height - padding;
   const area = svgNode('path', {
     class: 'mini-area',
@@ -1751,6 +1869,7 @@ function renderPerformanceMini(container, values) {
 }
 function showPerformanceStatisticsUnavailable(reason) {
   state.performanceStatistics = null;
+  if (state.performanceNavOpen) setPerformanceNavOpen(false);
   const content = $('performance-content');
   const note = $('performance-statistics-note');
   const sampled = $('performance-sampled');
@@ -1794,11 +1913,17 @@ function renderPerformanceStatistics(data) {
   const swap = memory.swap_percent === null || memory.swap_percent === undefined
     ? '—'
     : formatPercent(memory.swap_percent);
-  const processScale = [
+  const processScaleItems = [
     `${formatCount(process.count)} 进程`,
     `${formatOptionalCount(process.threads)} 线程`,
-    `${formatOptionalCount(process.handles)} 句柄`,
-  ].join(' · ');
+  ];
+  if (process.handles !== null && process.handles !== undefined) {
+    processScaleItems.push(`${formatCount(process.handles)} 句柄`);
+  }
+  if (process.num_fds !== null && process.num_fds !== undefined) {
+    processScaleItems.push(`${formatCount(process.num_fds)} 文件描述符`);
+  }
+  const processScale = processScaleItems.join(' · ');
 
   setPerformanceReadout('performance-cpu-readout',
     `${formatPercent(cpu.percent)} · ${formatCount(cpu.count)} 逻辑核心${systemLoad}`);
@@ -1835,6 +1960,10 @@ function renderPerformanceStatistics(data) {
   setPerformanceStat('cpu-load', processCpu);
   setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
   setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
+  const handlesFact = $('performance-fact-handles');
+  if (handlesFact) {
+    handlesFact.hidden = process.handles === null || process.handles === undefined;
+  }
   setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
   setPerformanceStat('memory-used', formatBytes(memory.used));
   setPerformanceStat('memory-available', formatBytes(memory.available));
@@ -1876,7 +2005,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-cpu-chart'), [
     {
       className: 'chart-series-cpu', legendClass: 'legend-cpu', label: 'CPU 使用率',
-      formatValue: formatPercent, values: history.cpu_percent || [],
+      formatValue: formatPercent, values: history.cpu_percent || [], percentage: true,
     },
     {
       className: 'chart-series-machine-load', legendClass: 'legend-machine-load', label: '负载',
@@ -1886,11 +2015,11 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-memory-chart'), [
     {
       className: 'chart-series-memory', legendClass: 'legend-memory', label: '内存使用率',
-      formatValue: formatPercent, values: history.memory_percent || [],
+      formatValue: formatPercent, values: history.memory_percent || [], percentage: true,
     },
     {
       className: 'chart-series-swap', legendClass: 'legend-swap', label: 'Swap 使用率',
-      formatValue: formatPercent, values: history.swap_percent || [],
+      formatValue: formatPercent, values: history.swap_percent || [], percentage: true,
     },
     {
       className: 'chart-series-swap-in', legendClass: 'legend-swap-in', label: '换入',
@@ -1904,7 +2033,7 @@ function renderPerformanceStatistics(data) {
   renderTrend($('performance-disk-usage-chart'), [
     {
       className: 'chart-series-disk', legendClass: 'legend-disk', label: '磁盘占用率',
-      formatValue: formatPercent, values: history.disk_percent || [],
+      formatValue: formatPercent, values: history.disk_percent || [], percentage: true,
     },
   ], 100, history.capacity, { timestamps });
   renderTrend($('performance-disk-io-chart'), [
@@ -1956,9 +2085,9 @@ function renderPerformanceStatistics(data) {
 }
 function uptimeText(milliseconds) {
   const total = Math.max(0, Math.floor(milliseconds / 1000));
-  const days = Math.floor(total / 86400000);
-  const hours = Math.floor(total / 3600000) % 24;
-  const minutes = Math.floor(total / 60000) % 60;
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor(total / 3600) % 24;
+  const minutes = Math.floor(total / 60) % 60;
   const seconds = total % 60;
   const pad = (value) => String(value).padStart(2, '0');
   return `运行时长：${days} 天 ${pad(hours)} 时 ${pad(minutes)} 分 ${pad(seconds)} 秒`;
@@ -4122,10 +4251,18 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('performance-processes-refresh', () => refreshPerformanceProcesses());
+bind('performance-nav-toggle', togglePerformanceNav);
+bind('performance-nav-close', () => setPerformanceNavOpen(false));
+bind('performance-nav-backdrop', () => setPerformanceNavOpen(false));
+document.addEventListener('keydown', trapPerformanceNavFocus);
 bind('plugin-pages-close', closePluginPages);
 document.querySelectorAll('[data-performance-category]').forEach((button) => {
   button.addEventListener('click', () => {
-    setPerformanceCategory(button.dataset.performanceCategory, true);
+    setPerformanceCategory(button.dataset.performanceCategory, {
+      refreshProcesses: true,
+      reveal: true,
+    });
+    setPerformanceNavOpen(false);
   });
   button.addEventListener('keydown', (event) => {
     const direction = {
@@ -4136,7 +4273,10 @@ document.querySelectorAll('[data-performance-category]').forEach((button) => {
     const buttons = [...document.querySelectorAll('[data-performance-category]')];
     const index = buttons.indexOf(button);
     const next = buttons[(index + direction + buttons.length) % buttons.length];
-    setPerformanceCategory(next.dataset.performanceCategory, true);
+    setPerformanceCategory(next.dataset.performanceCategory, {
+      refreshProcesses: true,
+      reveal: true,
+    });
     next.focus();
   });
 });
@@ -4144,7 +4284,13 @@ bind('sidebar-toggle', toggleSidebar);
 bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
 document.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Escape' || !state.sidebarOpen) return;
+  if (ev.key !== 'Escape') return;
+  if (state.performanceNavOpen) {
+    ev.preventDefault();
+    setPerformanceNavOpen(false);
+    return;
+  }
+  if (!state.sidebarOpen) return;
   ev.preventDefault();
   setSidebarOpen(false);
 });
