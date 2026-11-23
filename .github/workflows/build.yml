@@ -420,6 +420,43 @@ jobs:
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
 
+  all-ci-success:
+    name: all-ci-success
+    needs:
+      - lint
+      - test
+      - build-windows-publish
+      - build-windows
+      - build-linux-publish
+      - build-linux
+      - build-macos-publish
+      - build-macos
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required checks succeeded
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ['NEEDS_JSON'])
+          failed = {
+              name: value.get('result')
+              for name, value in results.items()
+              if value.get('result') not in ('success', 'skipped')
+          }
+          if failed:
+              print('Required checks did not succeed:')
+              for name, result in sorted(failed.items()):
+                  print(f'  {name}: {result}')
+              sys.exit(1)
+          print('All required checks succeeded or were skipped.')
+          PY
+
   release-draft:
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag'
