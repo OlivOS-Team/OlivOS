@@ -845,6 +845,8 @@ class server(API.Proc_templet):
                             except Exception:
                                 num_fds_ok = False
             except Exception:
+                # 任一进程读取失败时，文件描述符总数不再完整，避免把部分值当成全量返回。
+                num_fds_ok = False
                 continue
         result['rss'] = max(0, int(rss))
         result['threads'] = threads if threads_ok else None

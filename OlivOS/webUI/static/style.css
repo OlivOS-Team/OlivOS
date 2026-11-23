@@ -2768,6 +2768,8 @@ dialog::backdrop {
   body.sidebar-open {
     overflow: hidden;
   }
+}
+@media (max-width: 800px) {
   body.performance-nav-open {
     overflow: hidden;
   }
@@ -2877,6 +2879,8 @@ dialog::backdrop {
   .performance-category-spark {
     grid-column: 2;
   }
+}
+@media (max-width: 800px), (orientation: portrait) {
   button,
   .button-link,
   .theme-toggle,

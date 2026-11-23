@@ -5,6 +5,7 @@ const tokenStorageKey = 'olivos.webui.token';
 const pageStorageKey = 'olivos.webui.page';
 const sidebarStorageKey = 'olivos.webui.sidebarCollapsed';
 const mobileSidebarQuery = window.matchMedia('(max-width: 800px), (orientation: portrait)');
+const performanceNavMobileQuery = window.matchMedia('(max-width: 800px)');
 
 // 托盘凭证不进入 HTTP URL，读取后立即从浏览器地址/当前历史条目移除。
 function takeLoginTicket() {
@@ -263,6 +264,9 @@ let sidebarReturnFocus = null;
 function sidebarIsMobile() {
   return mobileSidebarQuery.matches;
 }
+function performanceNavIsMobile() {
+  return performanceNavMobileQuery.matches;
+}
 function toggleSidebar() {
   if (sidebarIsMobile()) setSidebarOpen(!state.sidebarOpen);
   else setSidebarCollapsed(!state.sidebarCollapsed);
@@ -317,11 +321,13 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
   if (!open) sidebarReturnFocus = null;
 }
 function syncSidebarMode() {
-  if (!sidebarIsMobile()) {
-    setSidebarOpen(false, { restoreFocus: false });
+  if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
+  updateSidebarToggle();
+}
+function syncPerformanceNavMode() {
+  if (!performanceNavIsMobile()) {
     setPerformanceNavOpen(false, { restoreFocus: false });
   }
-  updateSidebarToggle();
 }
 function initializeSidebar() {
   let collapsed = false;
@@ -337,10 +343,15 @@ function initializeSidebar() {
   } else {
     mobileSidebarQuery.addListener(syncSidebarMode);
   }
+  if (performanceNavMobileQuery.addEventListener) {
+    performanceNavMobileQuery.addEventListener('change', syncPerformanceNavMode);
+  } else {
+    performanceNavMobileQuery.addListener(syncPerformanceNavMode);
+  }
 }
 let performanceNavReturnFocus = null;
 function setPerformanceNavOpen(open, { restoreFocus = true } = {}) {
-  open = sidebarIsMobile() && open;
+  open = performanceNavIsMobile() && open;
   const toggle = $('performance-nav-toggle');
   if (state.performanceNavOpen === open) {
     if (toggle) toggle.setAttribute('aria-expanded', String(open));
@@ -353,9 +364,22 @@ function setPerformanceNavOpen(open, { restoreFocus = true } = {}) {
   state.performanceNavOpen = open;
   document.body.classList.toggle('performance-nav-open', open);
   if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  const drawer = $('performance-nav-drawer');
+  if (drawer) {
+    if (open) {
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('aria-modal', 'true');
+      drawer.setAttribute('aria-labelledby', 'performance-nav-title');
+    } else {
+      drawer.removeAttribute('role');
+      drawer.removeAttribute('aria-modal');
+      drawer.removeAttribute('aria-labelledby');
+    }
+  }
   if (open) {
     const selected = document.querySelector(`[data-performance-category="${state.performanceCategory}"]`);
     window.requestAnimationFrame(() => {
+      if (!state.performanceNavOpen) return;
       revealPerformanceCategory(selected);
       selected?.focus({ preventScroll: true });
     });
@@ -363,6 +387,33 @@ function setPerformanceNavOpen(open, { restoreFocus = true } = {}) {
     performanceNavReturnFocus.focus({ preventScroll: true });
   }
   if (!open) performanceNavReturnFocus = null;
+}
+function performanceNavFocusable() {
+  const drawer = $('performance-nav-drawer');
+  if (!drawer) return [];
+  return [...drawer.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )].filter((node) => !node.disabled && node.tabIndex !== -1 && node.getClientRects().length > 0);
+}
+function trapPerformanceNavFocus(event) {
+  if (event.key !== 'Tab' || !state.performanceNavOpen) return;
+  const focusable = performanceNavFocusable();
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!focusable.includes(active)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus({ preventScroll: true });
+    return;
+  }
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
 }
 function togglePerformanceNav() {
   setPerformanceNavOpen(!state.performanceNavOpen);
@@ -1818,6 +1869,7 @@ function renderPerformanceMini(container, values) {
 }
 function showPerformanceStatisticsUnavailable(reason) {
   state.performanceStatistics = null;
+  if (state.performanceNavOpen) setPerformanceNavOpen(false);
   const content = $('performance-content');
   const note = $('performance-statistics-note');
   const sampled = $('performance-sampled');
@@ -1908,6 +1960,10 @@ function renderPerformanceStatistics(data) {
   setPerformanceStat('cpu-load', processCpu);
   setPerformanceStat('cpu-processes', formatOptionalCount(process.count));
   setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
+  const handlesFact = $('performance-fact-handles');
+  if (handlesFact) {
+    handlesFact.hidden = process.handles === null || process.handles === undefined;
+  }
   setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
   setPerformanceStat('memory-used', formatBytes(memory.used));
   setPerformanceStat('memory-available', formatBytes(memory.available));
@@ -4198,6 +4254,7 @@ bind('performance-processes-refresh', () => refreshPerformanceProcesses());
 bind('performance-nav-toggle', togglePerformanceNav);
 bind('performance-nav-close', () => setPerformanceNavOpen(false));
 bind('performance-nav-backdrop', () => setPerformanceNavOpen(false));
+document.addEventListener('keydown', trapPerformanceNavFocus);
 bind('plugin-pages-close', closePluginPages);
 document.querySelectorAll('[data-performance-category]').forEach((button) => {
   button.addEventListener('click', () => {

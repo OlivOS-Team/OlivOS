@@ -472,6 +472,56 @@ def test_statistics_process_tree_exposes_children_threads_and_cpu_delta(monkeypa
     assert totals['handles'] is None
 
 
+def test_statistics_process_tree_marks_file_descriptors_incomplete_on_process_failure(monkeypatch):
+    # 进程树中任一进程读取失败时，文件描述符总数只能视为不完整，不能返回部分和冒充全量。
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    class FakeProcess(object):
+        def __init__(self, pid, fail=False):
+            self.pid = pid
+            self.fail = fail
+            self.child_items = []
+
+        def oneshot(self):
+            return nullcontext()
+
+        def memory_info(self):
+            if self.fail:
+                raise RuntimeError('process vanished')
+            return SimpleNamespace(rss=1024)
+
+        def cpu_times(self):
+            return SimpleNamespace(user=0.1, system=0.1)
+
+        def num_threads(self):
+            return 1
+
+        def num_handles(self):
+            return 7
+
+        def num_fds(self):
+            return 5
+
+        def children(self, recursive=True):
+            return self.child_items
+
+    root = FakeProcess(100)
+    child = FakeProcess(101, fail=True)
+    root.child_items = [child]
+    monkeypatch.setattr(statisticsAPI.platform, 'system', lambda: 'Test')
+    monkeypatch.setattr(statisticsAPI.psutil, 'Process', lambda pid: root)
+    monitor = make_statistics_monitor()
+
+    totals, cpu_seconds = monitor._process_tree_totals()
+
+    assert totals['count'] == 2
+    assert totals['threads'] == 1
+    assert totals['handles'] is None
+    assert totals['num_fds'] is None
+    assert cpu_seconds == 0.2
+
+
 def test_statistics_process_detail_returns_limited_files_connections_and_memory(monkeypatch):
     # 文件、连接、完整内存与内存映射只在按需详情中读取，并限制单次返回条目数。
     from types import SimpleNamespace
