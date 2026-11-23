@@ -61,6 +61,14 @@ DEFAULT_SERVER = {
 ACTIVE_LISTENERS = {}
 
 
+def port_unavailable(error):
+    """判断绑定失败是否只表示该端口不可用，可以顺延到下一个端口。"""
+    if error.errno in (errno.EADDRINUSE, 10048):
+        return True
+    # Windows 对系统保留端口或被独占绑定的端口返回 WSAEACCES，而不是 WSAEADDRINUSE。
+    return os.name == 'nt' and (error.errno == errno.EACCES or getattr(error, 'winerror', None) == 10013)
+
+
 def apply_environment_config(config):
     """环境变量覆盖监听配置，仅影响当前进程，不写回配置文件。"""
     host = os.environ.get('OLIVOS_WEBUI_HOST')
@@ -651,7 +659,7 @@ class server(OlivOS.API.Proc_templet):
                 except OSError as error:
                     if site in runner.sites:
                         await site.stop()
-                    if error.errno not in (errno.EADDRINUSE, 10048) or port == 65535:
+                    if not port_unavailable(error) or port == 65535:
                         raise
             self.config['port'] = runner.addresses[0][1]
             self.tk_bridge.listen(runner.addresses)
