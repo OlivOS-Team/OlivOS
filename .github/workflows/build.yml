@@ -14,14 +14,14 @@ jobs:
     uses: ./.github/workflows/lint.yml
 
   test:
-    needs: lint
+    needs: all-lint-success
     uses: ./.github/workflows/test.yml
     permissions:
       actions: read
       contents: read
 
   build-windows-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -57,7 +57,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-windows:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-windows.yml
     strategy:
       fail-fast: false 
@@ -234,7 +234,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -279,7 +279,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-linux:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-linux.yml
     strategy:
       fail-fast: false 
@@ -339,7 +339,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos-publish:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
@@ -375,7 +375,7 @@ jobs:
       debug: ${{ matrix.debug }}
 
   build-macos:
-    needs: test
+    needs: all-test-success
     uses: ./.github/workflows/build-task-macos.yml
     strategy:
       fail-fast: false 
@@ -437,9 +437,8 @@ jobs:
 
   all-test-success:
     name: all-test-success
-    # 测试门控同时承接 lint 门控，并拒绝被跳过的测试，保证失败沿链传递。
+    # 测试门控只汇总测试阶段；测试被跳过时视为失败，避免上游门控失败后误判通过。
     needs:
-      - all-lint-success
       - test
     if: always()
     runs-on: ubuntu-latest
@@ -456,10 +455,11 @@ jobs:
   all-build-success:
     name: all-build-success
     needs:
-      - all-test-success
-      - all-publish-build-success
+      - build-windows-publish
       - build-windows
+      - build-linux-publish
       - build-linux
+      - build-macos-publish
       - build-macos
     if: always()
     runs-on: ubuntu-latest
@@ -470,6 +470,7 @@ jobs:
       - uses: ./.github/actions/verify-needs
         with:
           label: build
+          allow-skipped: 'false'
           needs-json: ${{ toJSON(needs) }}
 
   all-publish-build-success:
@@ -492,8 +493,10 @@ jobs:
 
   all-ci-success:
     name: all-ci-success
-    # 总门控只连接 build 门控，使各阶段顺序收敛，避免跨列长线。
+    # 总门控汇总三个阶段门控；阶段顺序由实际 job 依赖保证。
     needs:
+      - all-lint-success
+      - all-test-success
       - all-build-success
     if: always()
     runs-on: ubuntu-latest
