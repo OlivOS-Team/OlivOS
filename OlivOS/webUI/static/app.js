@@ -113,6 +113,7 @@ const state = {
   performanceProcessOpen: {},
   performanceProcessDetailGroups: {},
   performanceCategory: 'cpu',
+  performanceNavOpen: false,
   dashboardTimer: null,
   authGeneration: 0,
   cachedLogin: false,
@@ -300,7 +301,10 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
     updateSidebarToggle();
     return;
   }
-  if (open) sidebarReturnFocus = document.activeElement;
+  if (open) {
+    if (state.performanceNavOpen) setPerformanceNavOpen(false, { restoreFocus: false });
+    sidebarReturnFocus = document.activeElement;
+  }
   state.sidebarOpen = open;
   $('shell').dataset.sidebarOpen = String(open);
   document.body.classList.toggle('sidebar-open', open);
@@ -313,7 +317,10 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
   if (!open) sidebarReturnFocus = null;
 }
 function syncSidebarMode() {
-  if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
+  if (!sidebarIsMobile()) {
+    setSidebarOpen(false, { restoreFocus: false });
+    setPerformanceNavOpen(false, { restoreFocus: false });
+  }
   updateSidebarToggle();
 }
 function initializeSidebar() {
@@ -330,6 +337,35 @@ function initializeSidebar() {
   } else {
     mobileSidebarQuery.addListener(syncSidebarMode);
   }
+}
+let performanceNavReturnFocus = null;
+function setPerformanceNavOpen(open, { restoreFocus = true } = {}) {
+  open = sidebarIsMobile() && open;
+  const toggle = $('performance-nav-toggle');
+  if (state.performanceNavOpen === open) {
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    return;
+  }
+  if (open) {
+    if (state.sidebarOpen) setSidebarOpen(false, { restoreFocus: false });
+    performanceNavReturnFocus = document.activeElement;
+  }
+  state.performanceNavOpen = open;
+  document.body.classList.toggle('performance-nav-open', open);
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  if (open) {
+    const selected = document.querySelector(`[data-performance-category="${state.performanceCategory}"]`);
+    window.requestAnimationFrame(() => {
+      revealPerformanceCategory(selected);
+      selected?.focus({ preventScroll: true });
+    });
+  } else if (restoreFocus && performanceNavReturnFocus?.focus) {
+    performanceNavReturnFocus.focus({ preventScroll: true });
+  }
+  if (!open) performanceNavReturnFocus = null;
+}
+function togglePerformanceNav() {
+  setPerformanceNavOpen(!state.performanceNavOpen);
 }
 function closeStream(name) {
   const entry = state.streams.get(name);
@@ -636,6 +672,7 @@ async function navigate(page) {
   closeSelectMenu();
   state.navigationGeneration++;
   if (state.sidebarOpen) setSidebarOpen(false);
+  if (state.performanceNavOpen) setPerformanceNavOpen(false, { restoreFocus: false });
   state.page = page;
   document.querySelectorAll('.page').forEach((node) => {
     node.hidden = node.id !== page;
@@ -1235,7 +1272,19 @@ function setPerformanceStat(name, value) {
     node.textContent = value;
   });
 }
-function setPerformanceCategory(category, refreshProcesses = false) {
+function revealPerformanceCategory(button) {
+  if (!button) return;
+  const categories = button.closest('.performance-categories');
+  if (!categories ||
+      (categories.scrollWidth <= categories.clientWidth &&
+       categories.scrollHeight <= categories.clientHeight)) {
+    return;
+  }
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto' : 'smooth';
+  button.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+}
+function setPerformanceCategory(category, { refreshProcesses = false, reveal = false } = {}) {
   const selected = performanceCategories.includes(category) ? category : 'cpu';
   const previous = state.performanceCategory;
   state.performanceCategory = selected;
@@ -1246,12 +1295,12 @@ function setPerformanceCategory(category, refreshProcesses = false) {
     button.tabIndex = active ? 0 : -1;
   });
   const activeButton = document.querySelector(`[data-performance-category="${selected}"]`);
-  const categories = activeButton && activeButton.closest('.performance-categories');
-  if (activeButton && categories && categories.scrollWidth > categories.clientWidth) {
-    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      ? 'auto' : 'smooth';
-    activeButton.scrollIntoView({block: 'nearest', inline: 'nearest', behavior});
+  const current = $('performance-nav-current');
+  if (current) {
+    current.textContent =
+      activeButton?.querySelector('.performance-category-name')?.textContent || selected;
   }
+  if (reveal) revealPerformanceCategory(activeButton);
   document.querySelectorAll('[data-performance-view]').forEach((view) => {
     view.hidden = view.dataset.performanceView !== selected;
   });
@@ -4122,10 +4171,17 @@ function eventBatch(items) {
 $('login-form').addEventListener('submit', login);
 bind('logout', logout);
 bind('performance-processes-refresh', () => refreshPerformanceProcesses());
+bind('performance-nav-toggle', togglePerformanceNav);
+bind('performance-nav-close', () => setPerformanceNavOpen(false));
+bind('performance-nav-backdrop', () => setPerformanceNavOpen(false));
 bind('plugin-pages-close', closePluginPages);
 document.querySelectorAll('[data-performance-category]').forEach((button) => {
   button.addEventListener('click', () => {
-    setPerformanceCategory(button.dataset.performanceCategory, true);
+    setPerformanceCategory(button.dataset.performanceCategory, {
+      refreshProcesses: true,
+      reveal: true,
+    });
+    setPerformanceNavOpen(false);
   });
   button.addEventListener('keydown', (event) => {
     const direction = {
@@ -4136,7 +4192,10 @@ document.querySelectorAll('[data-performance-category]').forEach((button) => {
     const buttons = [...document.querySelectorAll('[data-performance-category]')];
     const index = buttons.indexOf(button);
     const next = buttons[(index + direction + buttons.length) % buttons.length];
-    setPerformanceCategory(next.dataset.performanceCategory, true);
+    setPerformanceCategory(next.dataset.performanceCategory, {
+      refreshProcesses: true,
+      reveal: true,
+    });
     next.focus();
   });
 });
@@ -4144,7 +4203,13 @@ bind('sidebar-toggle', toggleSidebar);
 bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
 document.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Escape' || !state.sidebarOpen) return;
+  if (ev.key !== 'Escape') return;
+  if (state.performanceNavOpen) {
+    ev.preventDefault();
+    setPerformanceNavOpen(false);
+    return;
+  }
+  if (!state.sidebarOpen) return;
   ev.preventDefault();
   setSidebarOpen(false);
 });

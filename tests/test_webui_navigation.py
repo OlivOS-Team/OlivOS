@@ -2444,7 +2444,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           detail.scrollHeight <= detail.clientHeight;
     """)
 
-    # 移动端分类栏转为横向滚动，右侧详情单列显示且所有分类都不撑出视口。
+    # 移动端分类导航改用抽屉，右侧详情单列显示且所有分类都不撑出视口。
     set_viewport(browser, 390, 844, mobile_device=True)
     browser.open_sidebar()
     browser.click('[data-page="performance"]')
@@ -2454,12 +2454,23 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     set_viewport(browser, 320, 640, mobile_device=True)
     browser.wait.until(lambda _: driver.execute_script(
         "return document.documentElement.scrollWidth <= innerWidth"))
-    assert driver.execute_script(
-        "return getComputedStyle(document.querySelector('.performance-categories')).flexDirection") == 'row'
+    assert driver.execute_script("""
+        const drawer = document.querySelector('.performance-nav-drawer');
+        const toggle = document.getElementById('performance-nav-toggle');
+        return getComputedStyle(drawer).position === 'fixed' &&
+          getComputedStyle(drawer).visibility === 'hidden' &&
+          getComputedStyle(document.querySelector('.performance-categories')).flexDirection === 'column' &&
+          toggle.getAttribute('aria-expanded') === 'false';
+    """)
     for category in ('cpu', 'memory', 'disk', 'network', 'traffic'):
+        browser.click('#performance-nav-toggle')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return document.body.classList.contains('performance-nav-open') && "
+            "document.getElementById('performance-nav-toggle').getAttribute('aria-expanded') === 'true'"))
         browser.click(f'[data-performance-category="{category}"]')
         browser.wait.until(lambda _: driver.execute_script(
-            "return !document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
+            "return !document.body.classList.contains('performance-nav-open') && "
+            "!document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
             category))
         assert driver.execute_script("""
             const view = [...document.querySelectorAll('[data-performance-view]')]
@@ -2469,23 +2480,47 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             )) && document.documentElement.scrollWidth <= innerWidth;
         """)
 
-    # 进程页在移动端使用卡片、字段网格与分行线程，当前分类应自动滚入横向导航。
+    # 数据刷新只更新抽屉内容，不能把用户正在浏览的滚动位置拉回当前分类。
+    set_viewport(browser, 320, 360, mobile_device=True)
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
+    scroll_after_refresh = driver.execute_script("""
+        const bar = document.querySelector('.performance-categories');
+        bar.scrollTop = bar.scrollHeight;
+        const before = bar.scrollTop;
+        setPerformanceCategory(state.performanceCategory);
+        return {
+          before,
+          after: bar.scrollTop,
+          open: state.performanceNavOpen,
+        };
+    """)
+    assert scroll_after_refresh['before'] > 0
+    assert scroll_after_refresh['after'] == scroll_after_refresh['before']
+    assert scroll_after_refresh['open']
+    browser.click('#performance-nav-close')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.body.classList.contains('performance-nav-open')"))
+    set_viewport(browser, 320, 640, mobile_device=True)
+
+    # 进程页在移动端使用卡片、字段网格与分行线程，选择后抽屉应关闭并更新当前分类。
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=lambda: updated,
         process_tree_snapshot=process_tree_snapshot,
         process_detail_snapshot=process_detail_snapshot)
+    browser.click('#performance-nav-toggle')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.body.classList.contains('performance-nav-open')"))
     driver.execute_script(
         "document.querySelector('[data-performance-category=\"processes\"]').click()")
     browser.wait.until(lambda _: driver.execute_script("""
-        return !document.getElementById('performance-view-processes').hidden &&
+        return !document.body.classList.contains('performance-nav-open') &&
+          !document.getElementById('performance-view-processes').hidden &&
           document.querySelectorAll('#performance-process-tree .process-row').length === 2;
     """))
     browser.wait.until(lambda _: driver.execute_script("""
-        const button = document.querySelector('[data-performance-category="processes"]');
-        const bar = document.querySelector('.performance-categories');
-        const buttonRect = button.getBoundingClientRect();
-        const barRect = bar.getBoundingClientRect();
-        return buttonRect.left >= barRect.left - 1 && buttonRect.right <= barRect.right + 1;
+        return document.getElementById('performance-nav-current').textContent.trim() == '进程';
     """))
     process_layout = driver.execute_script("""
         const row = document.querySelector('#performance-process-tree .process-row');
@@ -2499,7 +2534,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         const refresh = document.getElementById('performance-processes-refresh');
         const heading = document.querySelector('.performance-view-heading-processes');
         const headingValue = document.querySelector('.performance-view-value-processes');
-        const categories = document.querySelector('.performance-categories');
+        const drawer = document.querySelector('.performance-nav-drawer');
         return {
           rowDisplay: getComputedStyle(row).display,
           rowColumns: getComputedStyle(row).gridTemplateColumns.split(' ').filter(Boolean).length,
@@ -2513,7 +2548,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           refreshHeight: refresh.getBoundingClientRect().height,
           headingDisplay: getComputedStyle(heading).display,
           headingAlign: getComputedStyle(headingValue).textAlign,
-          categoriesPosition: getComputedStyle(categories).position,
+          drawerPosition: getComputedStyle(drawer).position,
           fits: document.documentElement.scrollWidth <= innerWidth,
         };
     """)
@@ -2528,7 +2563,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert process_layout['refreshHeight'] >= 40
     assert process_layout['headingDisplay'] == 'grid'
     assert process_layout['headingAlign'] == 'left'
-    assert process_layout['categoriesPosition'] == 'sticky'
+    assert process_layout['drawerPosition'] == 'fixed'
     assert process_layout['fits']
 
 
@@ -2578,6 +2613,7 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
             const root = document.getElementById('performance-view-processes');
             const detail = document.querySelector('.performance-detail');
             const categories = document.querySelector('.performance-categories');
+            const drawer = document.querySelector('.performance-nav-drawer');
             const workbench = document.querySelector('.performance-workbench');
             const viewport = document.documentElement.clientWidth;
             const overflow = [...root.querySelectorAll('*')].filter((node) => {
@@ -2596,6 +2632,7 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
               workbenchColumns: getComputedStyle(workbench).gridTemplateColumns
                 .split(' ').filter(Boolean).length,
               categoriesDirection: getComputedStyle(categories).flexDirection,
+              drawerPosition: getComputedStyle(drawer).position,
               detailWidth: detail.clientWidth,
               detailScrollWidth: detail.scrollWidth,
               categoriesWidth: categories.clientWidth,
@@ -2605,7 +2642,12 @@ def test_performance_process_page_avoids_horizontal_overflow_across_widths(brows
         """)
         assert layout['documentWidth'] <= layout['viewport'] + 1, (width, layout)
         assert layout['workbenchColumns'] == (1 if width <= 1100 else 2), (width, layout)
-        assert layout['categoriesDirection'] == ('row' if width <= 1100 else 'column'), (width, layout)
+        assert layout['categoriesDirection'] == (
+            'row' if 800 < width <= 1100 else 'column'
+        ), (width, layout)
+        assert layout['drawerPosition'] == (
+            'fixed' if width <= 800 else 'sticky' if width <= 1100 else 'static'
+        ), (width, layout)
         assert layout['detailScrollWidth'] <= layout['detailWidth'] + 1, (width, layout['overflow'])
         if width > 1100:
             assert layout['categoriesScrollWidth'] <= layout['categoriesWidth'] + 1, (width, layout)
