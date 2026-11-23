@@ -420,11 +420,39 @@ jobs:
       build-type: ${{ matrix.build-type }}
       debug: ${{ matrix.debug }}
 
-  all-ci-success:
-    name: all-ci-success
+  all-lint-success:
+    name: all-lint-success
     needs:
       - lint
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: lint
+          needs-json: ${{ toJSON(needs) }}
+
+  all-test-success:
+    name: all-test-success
+    needs:
       - test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: test
+          needs-json: ${{ toJSON(needs) }}
+
+  all-build-success:
+    name: all-build-success
+    needs:
       - build-windows-publish
       - build-windows
       - build-linux-publish
@@ -434,28 +462,29 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all required checks succeeded
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import sys
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          label: build
+          needs-json: ${{ toJSON(needs) }}
 
-          results = json.loads(os.environ['NEEDS_JSON'])
-          failed = {
-              name: value.get('result')
-              for name, value in results.items()
-              if value.get('result') not in ('success', 'skipped')
-          }
-          if failed:
-              print('Required checks did not succeed:')
-              for name, result in sorted(failed.items()):
-                  print(f'  {name}: {result}')
-              sys.exit(1)
-          print('All required checks succeeded or were skipped.')
-          PY
+  all-ci-success:
+    name: all-ci-success
+    needs:
+      - all-lint-success
+      - all-test-success
+      - all-build-success
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/verify-needs
+        with:
+          needs-json: ${{ toJSON(needs) }}
 
   release-draft:
     runs-on: ubuntu-latest
