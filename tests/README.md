@@ -74,7 +74,7 @@ node tools/frontend_coverage/report.mjs \
 ```
 
 输出包括 `coverage-final.json`、`lcov.info`、`html/index.html` 和
-`frontend-coverage-summary.json`。CI 在 `ubuntu-latest` 生成权威前端覆盖率，Windows 继续运行浏览器用例但不重复生成；
+`frontend-coverage-summary.json`。CI 在 `ubuntu-latest` 与 `windows-latest` 分别生成前端覆盖率；
 summary job 会把 WebUI JavaScript 覆盖率作为独立栏目展示，不与 Python 覆盖率合成一个百分比。
 每次开启覆盖率的 pytest 会话都会先清空 `raw/`，避免上一次运行的数据混入本次报告；
 即使一个脚本都没有采集到，报告也会生成并标记 `incomplete`，不会把缺失数据当成完整覆盖。
@@ -86,7 +86,7 @@ V8 block 分支数据仅作为参考，暂不设置硬性门槛；先积累稳�
 2026-11-25（北京时间）本地前端基线（Windows、Chrome 157、117 条 browser 用例）：
 行覆盖率 **86.02%**（4278/4973），函数覆盖率 **92.54%**（236/255），
 V8 block 分支参考 **92.53%**（1401/1514）。报告识别并去除了 106 条页面重载产生的残缺重复脚本记录，
-避免残缺记录把未执行行误判为已覆盖。该基线来自本机 Chrome，CI 的 Ubuntu 结果才是权威前端基线；
+避免残缺记录把未执行行误判为已覆盖。该基线来自本机 Chrome，CI 的 Ubuntu 与 Windows 结果分别作为对应平台的权威基线；
 浏览器版本变化可能造成小幅波动。
 
 2026-11-21 本地基线（Windows、Python 3.11、默认离线功能测试，不启用浏览器用例）：
