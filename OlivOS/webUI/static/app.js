@@ -2107,26 +2107,28 @@ function syncProcessChildNodes(parent, next) {
 }
 function reconcileProcessChildNodes(parent, desired) {
   const current = [...parent.childNodes];
-  const keyed = desired.length > 0 &&
-    desired.every((node) => node.nodeType === Node.ELEMENT_NODE &&
-      processTreeNodeKey(node) !== null) &&
-    current.every((node) => node.nodeType === Node.ELEMENT_NODE &&
-      processTreeNodeKey(node) !== null);
-  let next;
-  if (keyed) {
-    const existing = new Map(current.map((node) => [processTreeNodeKey(node), node]));
-    next = desired.map((candidate) => {
-      const key = processTreeNodeKey(candidate);
-      const live = existing.get(key);
-      if (!live) return candidate;
-      existing.delete(key);
-      return reconcileProcessNode(live, candidate);
-    });
-  } else {
-    next = desired.map((candidate, index) => (
-      reconcileProcessNode(current[index], candidate)
-    ));
+  // 详情容器同时包含有 key 的分组和无 key 的摘要、按钮；有 key 的子节点必须始终按 key 复用，
+  // 否则内存信息增减会让分组的事件处理器绑定到其他分组的状态键。
+  const keyed = new Map();
+  const unkeyed = [];
+  for (const node of current) {
+    const key = processTreeNodeKey(node);
+    if (key === null) unkeyed.push(node);
+    else if (!keyed.has(key)) keyed.set(key, node);
   }
+  let unkeyedIndex = 0;
+  const next = desired.map((candidate) => {
+    const key = processTreeNodeKey(candidate);
+    if (key !== null) {
+      const live = keyed.get(key);
+      if (!live) return candidate;
+      keyed.delete(key);
+      return reconcileProcessNode(live, candidate);
+    }
+    const live = unkeyed[unkeyedIndex];
+    unkeyedIndex += 1;
+    return live ? reconcileProcessNode(live, candidate) : candidate;
+  });
   syncProcessChildNodes(parent, next);
 }
 function reconcileProcessNodes(parent, desired) {
