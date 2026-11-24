@@ -1198,6 +1198,34 @@ def test_log_level_summary_uses_custom_chevron(browser):
 
 
 @pytest.mark.browser
+def test_log_output_keeps_bottom_gap_aligned_with_inline_padding(browser):
+    # 宽窄屏下日志面板的底边距离都应与页面左右内边距一致，且不随视口高度或工具栏换行漂移。
+    driver = browser.driver
+    set_viewport(browser, 1440, 900)
+    browser.click('[data-page="logs"]')
+    browser.wait.until(lambda _: browser.find('#logs').is_displayed())
+
+    for width, height in ((1440, 900), (1440, 680), (1024, 768), (801, 720),
+                          (800, 720), (390, 844), (390, 640), (320, 640)):
+        set_viewport(browser, width, height, mobile_device=width <= 800)
+        geometry = driver.execute_script("""
+            const main = document.querySelector('main');
+            const output = document.getElementById('log-output');
+            const rect = output.getBoundingClientRect();
+            return {
+              rightGap: innerWidth - rect.right,
+              bottomGap: innerHeight - rect.bottom,
+              inlinePadding: parseFloat(getComputedStyle(main).paddingRight),
+              height: rect.height,
+            };
+        """)
+        label = f'{width}x{height}'
+        assert abs(geometry['rightGap'] - geometry['inlinePadding']) <= 1, (label, geometry)
+        assert abs(geometry['bottomGap'] - geometry['inlinePadding']) <= 1, (label, geometry)
+        assert geometry['height'] > 250, (label, geometry)
+
+
+@pytest.mark.browser
 @pytest.mark.parametrize('width', [320, 1440])
 def test_login_page_shows_version_beside_theme_toggle(browser, width):
     driver = browser.driver

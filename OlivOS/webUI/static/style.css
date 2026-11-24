@@ -28,6 +28,8 @@
   --shadow-dialog: 0 8px 28px #1823301f;
   --sidebar-width: 208px;
   --sidebar-collapsed-width: 64px;
+  --page-padding-inline: 24px;
+  --page-padding-block: 24px;
   --control-height: 36px;
   --control-height-sm: 30px;
   --control-radius: 8px;
@@ -1077,7 +1079,7 @@ nav h2 {
 main {
   min-width: 0;
   min-height: 0;
-  padding: 24px;
+  padding: var(--page-padding-block) var(--page-padding-inline);
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
@@ -2662,6 +2664,20 @@ td .actions button {
     monospace;
   padding: 12px;
 }
+/* 日志页固定填满页头以下区域，底部留白与页面左右内边距一致；
+   工具栏换行时由输出面板吸收高度变化，避免底边距离随视口漂移。 */
+#logs:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 84px - var(--page-padding-inline));
+}
+#logs .toolbar {
+  flex: 0 0 auto;
+}
+#log-output {
+  flex: 1 1 auto;
+  height: auto;
+}
 .log-line {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -3033,6 +3049,10 @@ dialog::backdrop {
   }
 }
 @media (max-width: 800px), (orientation: portrait) {
+  :root {
+    --page-padding-inline: 14px;
+    --page-padding-block: 20px;
+  }
   button,
   .button-link,
   .theme-toggle,
@@ -3154,7 +3174,7 @@ dialog::backdrop {
     width: 26px;
   }
   main {
-    padding: 20px 14px;
+    padding: var(--page-padding-block) var(--page-padding-inline) var(--page-padding-inline);
     overflow: visible;
     overscroll-behavior-y: auto;
   }
