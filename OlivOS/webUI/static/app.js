@@ -1761,6 +1761,7 @@ function processNodeElement(process, level, rootPid, sampledAt) {
     class: 'process-node',
     role: 'treeitem',
     'aria-level': String(level),
+    'data-process-key': processKey,
   });
   const branch = element('details', null, {
     class: 'process-branch',
@@ -2022,6 +2023,48 @@ function cleanupProcessDetails(data) {
     if (!valid.has(key)) delete state.performanceProcessDetailGroups[key];
   }
 }
+function processTreeShape(node) {
+  if (node.nodeType === Node.TEXT_NODE) return '#';
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  const attrs = [...node.attributes].map((attr) => attr.name).sort().join(',');
+  const children = [...node.childNodes].map(processTreeShape).join(',');
+  return `${node.tagName}[${attrs}](${children})`;
+}
+function mergeProcessTreeNode(existing, desired) {
+  if (desired.nodeType === Node.TEXT_NODE) {
+    if (existing.nodeValue !== desired.nodeValue) existing.nodeValue = desired.nodeValue;
+    return;
+  }
+  if (desired.nodeType !== Node.ELEMENT_NODE) return;
+  for (const attr of [...desired.attributes]) {
+    if (existing.getAttribute(attr.name) !== attr.value) existing.setAttribute(attr.name, attr.value);
+  }
+  for (const attr of [...existing.attributes]) {
+    if (!desired.hasAttribute(attr.name)) existing.removeAttribute(attr.name);
+  }
+  for (let index = 0; index < desired.childNodes.length; index += 1) {
+    mergeProcessTreeNode(existing.childNodes[index], desired.childNodes[index]);
+  }
+}
+function reconcileProcessNodes(parent, desired) {
+  const existing = new Map();
+  for (const node of parent.children) {
+    if (node.dataset.processKey !== undefined) existing.set(node.dataset.processKey, node);
+  }
+  const next = desired.map((candidate) => {
+    const key = candidate.dataset.processKey;
+    const current = existing.get(key);
+    if (!current) return candidate;
+    existing.delete(key);
+    // 结构不变时复用节点，只同步文本和属性，避免轮询刷新打断悬停、选中与展开。
+    if (processTreeShape(current) !== processTreeShape(candidate)) return candidate;
+    mergeProcessTreeNode(current, candidate);
+    return current;
+  });
+  const unchanged = parent.children.length === next.length &&
+    next.every((node, index) => parent.children[index] === node);
+  if (!unchanged) parent.replaceChildren(...next);
+}
 function renderProcessTree(data) {
   const container = $('performance-process-tree');
   if (!container) return;
@@ -2055,15 +2098,17 @@ function renderProcessTree(data) {
     readout.textContent = `${formatCount(data.process_count)} 个进程 · ` +
       `${formatCount(data.thread_count)} 个线程 · ${sampledAtText(data.sampled_at)}`;
   }
-  const list = element('ul', null, {
-    class: 'process-tree-list',
-    role: 'group',
-    'aria-label': 'OlivOS 进程与线程树',
-  });
-  for (const process of data.roots) {
-    list.append(processNodeElement(process, 1, data.root_pid, data.sampled_at));
+  let list = container.querySelector('.process-tree-list');
+  if (!list) {
+    list = element('ul', null, {
+      class: 'process-tree-list',
+      role: 'group',
+      'aria-label': 'OlivOS 进程与线程树',
+    });
+    container.replaceChildren(list);
   }
-  container.replaceChildren(list);
+  reconcileProcessNodes(list, data.roots.map(
+    (process) => processNodeElement(process, 1, data.root_pid, data.sampled_at)));
 }
 let processTreeRequestId = 0;
 async function refreshPerformanceProcesses() {

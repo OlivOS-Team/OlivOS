@@ -111,13 +111,69 @@ def browser(navigation_host, chrome_session):
     # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
     login_wait = WebDriverWait(driver, 30)
 
-    def find(selector):
+    def locate(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
+
+    class Element:
+        """按选择器重新定位的元素包装，避免轮询刷新后句柄失效。"""
+
+        def __init__(self, selector):
+            self.selector = selector
+
+        def raw(self):
+            return locate(self.selector)
+
+        def _retry(self, action):
+            def attempt(_):
+                try:
+                    return True, action(self.raw())
+                except StaleElementReferenceException:
+                    return False, None
+            return wait.until(attempt, '元素在刷新中持续失效：' + self.selector)[1]
+
+        @property
+        def text(self):
+            return self._retry(lambda element: element.text)
+
+        @property
+        def accessible_name(self):
+            return self._retry(lambda element: element.accessible_name)
+
+        def get_attribute(self, name):
+            return self._retry(lambda element: element.get_attribute(name))
+
+        def is_displayed(self):
+            return self._retry(lambda element: element.is_displayed())
+
+        def is_enabled(self):
+            return self._retry(lambda element: element.is_enabled())
+
+        def click(self):
+            click(self.selector)
+
+        def send_keys(self, *keys):
+            self._retry(lambda element: element.send_keys(*keys))
+
+        def find_element(self, by, value):
+            return self.raw().find_element(by, value)
+
+        def find_elements(self, by, value):
+            return self.raw().find_elements(by, value)
+
+        def __eq__(self, other):
+            other = other.raw() if isinstance(other, Element) else other
+            return self.raw() == other
+
+        def __repr__(self):
+            return f'Element({self.selector!r})'
+
+    def find(selector):
+        return Element(selector)
 
     def click(selector):
         def click_when_ready(_):
             # 统计轮询会重建局部节点；点击前重新定位，stale 时交给 wait 重试。
-            element = find(selector)
+            element = locate(selector)
             if not (element.is_displayed() and element.is_enabled()):
                 return False
             try:
@@ -130,7 +186,7 @@ def browser(navigation_host, chrome_session):
     def hover(selector):
         def hover_when_ready(_):
             # 统计轮询会重建进程树等局部节点；悬停前重新定位，stale 时交给 wait 重试。
-            element = find(selector)
+            element = locate(selector)
             if not element.is_displayed():
                 return False
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
@@ -144,10 +200,38 @@ def browser(navigation_host, chrome_session):
     def type_text(selector, text):
         # Chrome 158 对 sandbox iframe 内输入框的可交互性判定更严格，
         # 先点击聚焦，避免直接 send_keys 被 ChromeDriver 拒绝。
-        field = find(selector)
-        wait.until(lambda _: field.is_displayed() and field.is_enabled())
-        field.click()
-        field.send_keys(text)
+        def type_when_ready(_):
+            field = locate(selector)
+            if not (field.is_displayed() and field.is_enabled()):
+                return False
+            try:
+                field.click()
+                field.send_keys(text)
+            except StaleElementReferenceException:
+                return False
+            return True
+        wait.until(type_when_ready)
+
+    def press(selector):
+        def press_when_ready(_):
+            element = locate(selector)
+            if not element.is_displayed():
+                return False
+            try:
+                ActionChains(driver).click_and_hold(element).perform()
+            except StaleElementReferenceException:
+                return False
+            return True
+        wait.until(press_when_ready)
+
+    def release():
+        ActionChains(driver).release().perform()
+
+    def text(selector):
+        return find(selector).text
+
+    def attribute(selector, name):
+        return find(selector).get_attribute(name)
 
     def open_sidebar():
         if not driver.execute_script(
@@ -163,9 +247,9 @@ def browser(navigation_host, chrome_session):
 
     def select(path='webui/index.html', namespace='multi'):
         open_sidebar()
-        entry = find(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
-        driver.execute_script('arguments[0].scrollIntoView({block: "center"})', entry)
-        click(f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]')
+        selector = f'.plugin-link-entry[data-plugin-namespace="{namespace}"][data-plugin-path="{path}"]'
+        driver.execute_script('document.querySelector(arguments[0]).scrollIntoView({block: "center"})', selector)
+        click(selector)
         wait.until(lambda _: driver.execute_script('return !!state.frame && !state.frame.hidden'))
         driver.switch_to.frame(driver.execute_script('return state.frame'))
         wait.until(lambda _: driver.execute_script('return !!window.pageIdentity'))
@@ -184,7 +268,8 @@ def browser(navigation_host, chrome_session):
     find('#token').send_keys(navigation_host.test_password)
     click('#login-form button[type=submit]')
     login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
-    yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, hover=hover, type_text=type_text,
+    yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, hover=hover, press=press, release=release,
+                          text=text, attribute=attribute, type_text=type_text,
                           select=select, open_sidebar=open_sidebar,
                           wait_plugin_events=wait_plugin_events, host=navigation_host)
 
@@ -284,15 +369,15 @@ def test_plugin_navigation_groups_multiple_entries_and_directly_opens_single(bro
 @pytest.mark.browser
 def test_plugin_navigation_always_shows_namespace_and_uses_page_title_for_single(browser):
     browser.driver.switch_to.default_content()
-    multi = browser.find('.plugin-page-group[data-plugin-namespace="multi"]')
-    single = browser.find('.plugin-page-group[data-plugin-namespace="single"]')
-    assert multi.find_element('css selector', '.plugin-group-namespace').text == 'multi'
-    assert single.find_element('css selector', '.plugin-group-name').text == '功能首页'
-    assert single.find_element('css selector', '.plugin-group-namespace').text == 'single'
-    assert single.find_element('css selector', '.plugin-single-entry').get_attribute('title') == '独立插件'
-    child = multi.find_element('css selector', '[data-plugin-path="webui/settings/index.html"]')
-    assert child.get_attribute('title') == '配置管理'
-    assert child.get_attribute('aria-label') == '配置管理（multi）'
+    multi = '.plugin-page-group[data-plugin-namespace="multi"]'
+    single = '.plugin-page-group[data-plugin-namespace="single"]'
+    assert browser.text(f'{multi} .plugin-group-namespace') == 'multi'
+    assert browser.text(f'{single} .plugin-group-name') == '功能首页'
+    assert browser.text(f'{single} .plugin-group-namespace') == 'single'
+    assert browser.attribute(f'{single} .plugin-single-entry', 'title') == '独立插件'
+    child = f'{multi} [data-plugin-path="webui/settings/index.html"]'
+    assert browser.attribute(child, 'title') == '配置管理'
+    assert browser.attribute(child, 'aria-label') == '配置管理（multi）'
 
 
 @pytest.mark.browser
@@ -665,18 +750,16 @@ def test_collapsing_plugin_group_does_not_unload_frames(browser):
 
 @pytest.mark.browser
 def test_plugin_navigation_matches_sidebar_selection_style(browser):
-    from selenium.webdriver.common.action_chains import ActionChains
-
     browser.select()
     driver = browser.driver
     driver.switch_to.default_content()
-    entry = browser.find('#plugin-links .plugin-link-entry.active')
-    category = browser.find('[data-performance-category="overview"]')
+    entry = '#plugin-links .plugin-link-entry.active'
+    category = '[data-performance-category="overview"]'
     time.sleep(0.2)
     # 插件页面入口应对齐导航基准；性能分类复用导航样式，因此用作可见参照。
     active_styles = driver.execute_script("""
-        return [arguments[0], arguments[1]].map((node) => {
-          const style = getComputedStyle(node);
+        return [arguments[0], arguments[1]].map((selector) => {
+          const style = getComputedStyle(document.querySelector(selector));
           return [style.backgroundColor, style.borderColor, style.boxShadow];
         });
     """, entry, category)
@@ -684,7 +767,7 @@ def test_plugin_navigation_matches_sidebar_selection_style(browser):
 
     # 插件入口按下态也应对齐导航基准；性能分类复用同一套按下效果。
     pressed_script = """
-        const style = getComputedStyle(arguments[0]);
+        const style = getComputedStyle(document.querySelector(arguments[0]));
         return {
           background: style.backgroundColor,
           border: style.borderColor,
@@ -692,10 +775,10 @@ def test_plugin_navigation_matches_sidebar_selection_style(browser):
           outline: style.outline,
         };
     """
-    ActionChains(driver).click_and_hold(entry).perform()
+    browser.press(entry)
     time.sleep(0.2)
     entry_pressed = driver.execute_script(pressed_script, entry)
-    ActionChains(driver).release(entry).perform()
+    browser.release()
     time.sleep(0.05)
 
     browser.host.runtime['statistics'] = SimpleNamespace(
@@ -705,11 +788,10 @@ def test_plugin_navigation_matches_sidebar_selection_style(browser):
     browser.click('[data-page="performance"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-content').hidden"))
-    category = browser.find('[data-performance-category="overview"]')
-    ActionChains(driver).click_and_hold(category).perform()
+    browser.press(category)
     time.sleep(0.2)
     category_pressed = driver.execute_script(pressed_script, category)
-    ActionChains(driver).release(category).perform()
+    browser.release()
     assert entry_pressed == category_pressed
 
 
@@ -733,9 +815,11 @@ def test_duplicate_plugin_and_page_names_are_disambiguated(browser):
     assert link.accessible_name == f'配置管理（multi） / {link.get_attribute("href")}'
     browser.select('webui/tools/index.html')
     browser.driver.switch_to.default_content()
-    title = browser.find('[data-plugin-path="webui/tools/index.html"]').find_element('xpath', '..')
-    assert title.find_element('css selector', '.plugin-link-close').get_attribute('title') == (
-        '关闭：多页面插件（multi） / 配置管理（webui/tools/index.html）')
+    close_title = browser.driver.execute_script("""
+        const entry = document.querySelector('[data-plugin-path="webui/tools/index.html"]');
+        return entry.parentElement.querySelector('.plugin-link-close').getAttribute('title');
+    """)
+    assert close_title == '关闭：多页面插件（multi） / 配置管理（webui/tools/index.html）'
 
 
 @pytest.mark.browser
@@ -744,8 +828,11 @@ def test_closing_one_plugin_page_keeps_other_cached_pages(browser):
     browser.driver.switch_to.default_content()
     browser.select('webui/settings/index.html')
     browser.driver.switch_to.default_content()
-    row = browser.find('.plugin-link-entry[data-plugin-namespace="multi"][data-plugin-path="webui/index.html"]')
-    row.find_element('xpath', '..').find_element('css selector', '.plugin-link-close').click()
+    browser.driver.execute_script("""
+        const row = document.querySelector(
+          '.plugin-link-entry[data-plugin-namespace="multi"][data-plugin-path="webui/index.html"]');
+        row.parentElement.querySelector('.plugin-link-close').click();
+    """)
     assert browser.driver.execute_script('return state.frames.size') == 1
     assert browser.find('#page-title').text == '配置管理'
 
@@ -1883,17 +1970,16 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
     cpu_text = metric_card_text(driver, 'CPU')
     assert 'OlivOS 3 进程' in cpu_text and '18 线程' in cpu_text and '0.13 核心' in cpu_text
     assert '| OlivOS 3 进程' in cpu_text
-    cpu_ring = browser.find('.metric-ring-card[data-ring="cpu"] .metric-ring')
-    cpu_secondary_arc = cpu_ring.find_element('css selector', '.metric-ring-secondary')
-    assert abs(float(cpu_ring.get_attribute('data-secondary-percent')) - 1.5625) < 0.0001
-    assert abs(float(cpu_secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
+    cpu_ring = '.metric-ring-card[data-ring="cpu"] .metric-ring'
+    assert abs(float(browser.attribute(cpu_ring, 'data-secondary-percent')) - 1.5625) < 0.0001
+    assert abs(float(browser.attribute(f'{cpu_ring} .metric-ring-secondary', 'stroke-dashoffset')) - 98.4375) < 0.0001
     memory_text = metric_card_text(driver, '内存')
     assert 'OlivOS 256.0 MiB (1.6%)' in memory_text and '| OlivOS 256.0 MiB' in memory_text
     assert '换入' not in memory_text and '换出' not in memory_text
-    memory_ring = browser.find('.metric-ring-card[data-ring="memory"] .metric-ring')
-    memory_secondary_arc = memory_ring.find_element('css selector', '.metric-ring-secondary')
-    assert abs(float(memory_ring.get_attribute('data-secondary-percent')) - 1.5625) < 0.0001
-    assert abs(float(memory_secondary_arc.get_attribute('stroke-dashoffset')) - 98.4375) < 0.0001
+    memory_ring = '.metric-ring-card[data-ring="memory"] .metric-ring'
+    assert abs(float(browser.attribute(memory_ring, 'data-secondary-percent')) - 1.5625) < 0.0001
+    memory_arc = f'{memory_ring} .metric-ring-secondary'
+    assert abs(float(browser.attribute(memory_arc, 'stroke-dashoffset')) - 98.4375) < 0.0001
     # CPU、内存、磁盘使用环形卡，网络和消息卡保留文字卡。
     rings = driver.execute_script("""
         return [...document.querySelectorAll('.metric-ring-card')].map((card) => ({
@@ -2205,8 +2291,6 @@ def test_dashboard_statistics_render_update_and_stay_mobile_safe(browser):
 
 @pytest.mark.browser
 def test_performance_page_renders_category_navigation_and_mobile_layout(browser):
-    from selenium.webdriver.common.action_chains import ActionChains
-
     driver = browser.driver
     browser.host.runtime['statistics'] = SimpleNamespace(
         Proc_type='statistics', snapshot=statistics_snapshot,
@@ -2231,10 +2315,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           shadow: performanceCategory.boxShadow === navigation.boxShadow,
         };
     """) == {'background': True, 'border': True, 'shadow': True}
-    navigation_button = browser.find('#navigation [data-page="performance"]')
-    category_button = browser.find('[data-performance-category="overview"]')
+    navigation_button = '#navigation [data-page="performance"]'
+    category_button = '[data-performance-category="overview"]'
     pressed_script = """
-        const style = getComputedStyle(arguments[0]);
+        const style = getComputedStyle(document.querySelector(arguments[0]));
         return {
           background: style.backgroundColor,
           border: style.borderColor,
@@ -2242,15 +2326,15 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           outline: style.outline,
         };
     """
-    ActionChains(driver).click_and_hold(navigation_button).perform()
+    browser.press(navigation_button)
     time.sleep(0.2)
     navigation_pressed = driver.execute_script(pressed_script, navigation_button)
-    ActionChains(driver).release(navigation_button).perform()
+    browser.release()
     time.sleep(0.05)
-    ActionChains(driver).click_and_hold(category_button).perform()
+    browser.press(category_button)
     time.sleep(0.2)
     category_pressed = driver.execute_script(pressed_script, category_button)
-    ActionChains(driver).release(category_button).perform()
+    browser.release()
     assert category_pressed == navigation_pressed
     assert driver.execute_script("""
         return ['performance-cpu-chart-title', 'performance-memory-chart-title',
@@ -2752,6 +2836,45 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
 
 
 @pytest.mark.browser
+def test_performance_process_tree_refresh_preserves_nodes(browser):
+    # 轮询刷新只同步文本与属性，保留进程/线程节点，避免打断悬停、选中和展开。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page="performance"]')
+    browser.click('[data-performance-category="processes"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return document.querySelectorAll('#performance-process-tree .process-thread').length === 3"))
+    original = driver.execute_script("""
+        window.__processNode = document.querySelector('#performance-process-tree .process-node');
+        window.__threadNode = document.querySelector('#performance-process-tree .process-thread');
+        return window.__threadNode.textContent;
+    """)
+    assert 'CPU 50.0%' in original
+
+    updated = process_tree_snapshot()
+    updated['roots'][0]['threads'][0]['cpu_percent'] = 66.6
+    browser.host.runtime['statistics'].process_tree_snapshot = lambda: updated
+    driver.execute_async_script("""
+        const done = arguments[0];
+        refreshPerformanceProcesses().then(() => done(true), () => done(false));
+    """)
+    state = driver.execute_script("""
+        const thread = document.querySelector('#performance-process-tree .process-thread');
+        return {
+          sameThread: thread === window.__threadNode,
+          sameProcess: document.querySelector('#performance-process-tree .process-node') === window.__processNode,
+          text: thread.textContent,
+        };
+    """)
+    assert state['sameThread'] and state['sameProcess']
+    assert 'CPU 66.6%' in state['text']
+
+
+@pytest.mark.browser
 def test_performance_charts_use_percentage_and_independent_series_scales(browser):
     # 图表缩放是独立行为：百分比图固定 100%，非百分比序列各自缩放，并按线性/对数标尺绘制。
     driver = browser.driver
@@ -2935,8 +3058,9 @@ def test_performance_chart_points_follow_backend_window_shift(browser):
         r'''return state.page === 'performance' && !document.getElementById('performance-content').hidden'''))
 
     def cpu_points():
-        series = browser.find('#performance-cpu-chart .chart-series-cpu')
-        text = driver.execute_script(r'''return arguments[0].getAttribute('points');''', series)
+        text = driver.execute_script(r'''
+            return document.querySelector('#performance-cpu-chart .chart-series-cpu').getAttribute('points');
+        ''')
         return [tuple(map(float, point.split(','))) for point in text.split()]
 
     before = cpu_points()

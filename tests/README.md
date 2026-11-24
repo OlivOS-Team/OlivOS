@@ -28,6 +28,13 @@ PowerShell 使用 `$env:OLIVOS_WEBUI_BROWSER='1'` 后运行同一 pytest 命令�
 这样既保持不同端口的页面隔离，也避免 Windows CI 连续启动浏览器造成随机超时。
 原生 Tk 界面用例只在 Windows 运行，窗口保持隐藏；不启动托盘或真实协议程序。
 
+浏览器用例的元素操作：
+
+- 状态页每 3 秒轮询刷新，局部节点会被替换，测试不要跨语句保存 `WebElement`。
+- 统一使用 `browser.click` / `hover` / `press` / `release` / `text` / `attribute`；
+  `browser.find(...)` 返回按选择器重新定位的包装对象，读取时不会持有过期句柄。
+- 需要传给 `execute_script` 时传选择器，由脚本内重新查询，不要传元素。
+
 ## 覆盖率
 
 ```sh
