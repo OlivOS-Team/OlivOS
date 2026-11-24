@@ -3481,30 +3481,35 @@ def test_plugin_priority_editor_updates_order_and_file(browser):
 
 
 @pytest.mark.browser
-@pytest.mark.parametrize('height', [260, 420, 560, 561, 575, 600, 660, 760, 761, 900])
+@pytest.mark.parametrize('height', [260, 420, 560, 561, 600, 641, 700, 701, 760, 761, 900])
 def test_desktop_sidebar_plugin_list_stays_reachable_across_viewport_heights(browser, height):
     driver = browser.driver
     set_viewport(browser, 1280, height)
     metrics = driver.execute_script('''
         const aside = document.getElementById('sidebar');
-        const phead = document.getElementById('plugin-navigation-head');
+        const scrollBox = aside.querySelector('.sidebar-scroll');
         const plinks = document.getElementById('plugin-links');
         const footer = document.querySelector('.sidebar-footer');
+        const logout = document.getElementById('logout');
         const lastEntry = plinks.querySelector('.plugin-link-entry[data-plugin-namespace="single"]');
         const asideRect = aside.getBoundingClientRect();
-        const headRect = phead.getBoundingClientRect();
+        const scrollRect = scrollBox.getBoundingClientRect();
         const linksRect = plinks.getBoundingClientRect();
         const footerRect = footer.getBoundingClientRect();
+        const logoutRect = logout.getBoundingClientRect();
         const plinksOverflow = getComputedStyle(plinks).overflowY;
-        aside.scrollTop = aside.scrollHeight;
-        const asideMaxScroll = aside.scrollTop;
-        const footerVisible = footer.getBoundingClientRect().bottom <= asideRect.bottom + 1;
+        scrollBox.scrollTop = 0;
+        const footerVisibleWithoutScroll = logoutRect.top >= asideRect.top - 0.5 &&
+          footerRect.bottom <= asideRect.bottom + 0.5;
+        scrollBox.scrollTop = scrollBox.scrollHeight;
+        const boxMaxScroll = scrollBox.scrollTop;
         let lastEntryReachable = false;
         if (plinksOverflow === 'visible') {
           lastEntry.scrollIntoView({block: 'nearest'});
           const rect = lastEntry.getBoundingClientRect();
-          lastEntryReachable = rect.height > 20 && rect.top >= asideRect.top - 1 &&
-            rect.bottom <= asideRect.bottom + 1;
+          const currentScrollRect = scrollBox.getBoundingClientRect();
+          lastEntryReachable = rect.height > 20 && rect.top >= currentScrollRect.top - 1 &&
+            rect.bottom <= currentScrollRect.bottom + 1 && rect.bottom <= footerRect.top + 1;
         } else {
           plinks.scrollTop = plinks.scrollHeight;
           const rect = lastEntry.getBoundingClientRect();
@@ -3513,46 +3518,51 @@ def test_desktop_sidebar_plugin_list_stays_reachable_across_viewport_heights(bro
             rect.bottom <= containerRect.bottom + 1;
           plinks.scrollTop = 0;
         }
-        aside.scrollTop = 0;
+        scrollBox.scrollTop = 0;
         return {
-          asideScroll: asideMaxScroll > 0,
+          boxScroll: boxMaxScroll > 0,
           plinksOverflow,
           plinksClientHeight: plinks.clientHeight,
           plinksScrollHeight: plinks.scrollHeight,
-          noOverlap: headRect.bottom <= footerRect.top + 0.5 && linksRect.bottom <= footerRect.top + 0.5,
-          footerVisible,
+          noOverlap: scrollRect.bottom <= footerRect.top + 0.5 &&
+            (plinksOverflow === 'visible' || linksRect.bottom <= scrollRect.bottom + 0.5),
+          footerVisibleWithoutScroll,
           lastEntryReachable,
         };
     ''')
     assert metrics['noOverlap'], (height, metrics)
-    assert metrics['footerVisible'], (height, metrics)
+    assert metrics['footerVisibleWithoutScroll'], (height, metrics)
     assert metrics['lastEntryReachable'], (height, metrics)
-    if height <= 760:
-        # 较矮桌面视口改为侧栏统一滚动：既不压缩插件列表，也不出现内外双滚动条。
-        assert metrics['asideScroll'], (height, metrics)
+    if height <= 700:
+        # 较矮桌面视口改为底栏上方统一滚动：退出登录始终固定可见，插件列表不压缩也不嵌套双滚动条。
+        assert metrics['boxScroll'], (height, metrics)
         assert metrics['plinksOverflow'] == 'visible', (height, metrics)
         assert metrics['plinksClientHeight'] >= metrics['plinksScrollHeight'] - 1, (height, metrics)
     else:
-        # 高桌面视口维持侧栏固定、插件区内部滚动（足够高时无需滚动）。
-        assert not metrics['asideScroll'], (height, metrics)
+        # 较高桌面视口维持侧栏固定、插件区内部滚动（足够高时无需滚动）。
+        assert not metrics['boxScroll'], (height, metrics)
         assert metrics['plinksOverflow'] == 'auto', (height, metrics)
         assert metrics['plinksClientHeight'] >= 160, (height, metrics)
 
-    if height == 561:
+    if height in (420, 561):
         browser.click('#plugin-navigation-toggle')
         collapsed = driver.execute_script('''
-            const aside = document.getElementById('sidebar');
+            const scrollBox = document.querySelector('#sidebar .sidebar-scroll');
             const pnav = document.getElementById('plugin-navigation');
             const phead = document.getElementById('plugin-navigation-head');
             const footer = document.querySelector('.sidebar-footer');
             return {
-              asideScroll: aside.scrollHeight > aside.clientHeight + 1,
+              boxScroll: scrollBox.scrollHeight > scrollBox.clientHeight + 1,
               headPreserved: pnav.getBoundingClientRect().height >= phead.getBoundingClientRect().height - 1,
               noOverlap: phead.getBoundingClientRect().bottom <= footer.getBoundingClientRect().top + 0.5,
             };
         ''')
         browser.click('#plugin-navigation-toggle')
-        assert collapsed == {'asideScroll': True, 'headPreserved': True, 'noOverlap': True}
+        assert collapsed == {
+            'boxScroll': height == 420,
+            'headPreserved': True,
+            'noOverlap': True,
+        }
 
 
 @pytest.mark.browser
@@ -3563,18 +3573,22 @@ def test_desktop_sidebar_preserves_plugin_list_floor_when_font_scales(browser):
         driver.execute_script('document.body.style.fontSize = "20px"')
         metrics = driver.execute_script('''
             const aside = document.getElementById('sidebar');
+            const scrollBox = aside.querySelector('.sidebar-scroll');
             const plinks = document.getElementById('plugin-links');
             const footer = document.querySelector('.sidebar-footer');
+            const logout = document.getElementById('logout');
             return {
-              asideScroll: aside.scrollHeight > aside.clientHeight + 1,
+              boxScroll: scrollBox.scrollHeight > scrollBox.clientHeight + 1,
               plinksClientHeight: plinks.clientHeight,
-              noOverlap: plinks.getBoundingClientRect().bottom <= footer.getBoundingClientRect().top + 0.5,
+              footerVisible: logout.getBoundingClientRect().bottom <= aside.getBoundingClientRect().bottom + 0.5,
+              noOverlap: scrollBox.getBoundingClientRect().bottom <= footer.getBoundingClientRect().top + 0.5,
             };
         ''')
     finally:
         driver.execute_script('document.body.style.fontSize = ""')
-    assert metrics['asideScroll'], metrics
+    assert metrics['boxScroll'], metrics
     assert metrics['plinksClientHeight'] >= 160, metrics
+    assert metrics['footerVisible'], metrics
     assert metrics['noOverlap'], metrics
 
 
@@ -3587,34 +3601,40 @@ def test_mobile_sidebar_drawer_uses_unified_scroll_on_short_viewport(browser, wi
     try:
         metrics = driver.execute_script('''
             const aside = document.getElementById('sidebar');
+            const scrollBox = aside.querySelector('.sidebar-scroll');
             const plinks = document.getElementById('plugin-links');
             const footer = document.querySelector('.sidebar-footer');
+            const logout = document.getElementById('logout');
             const lastEntry = plinks.querySelector('.plugin-link-entry[data-plugin-namespace="single"]');
             const asideRect = aside.getBoundingClientRect();
-            const noOverlap = plinks.getBoundingClientRect().bottom <= footer.getBoundingClientRect().top + 0.5;
-            aside.scrollTop = aside.scrollHeight;
-            const asideScroll = aside.scrollTop > 0;
-            const footerVisible = footer.getBoundingClientRect().bottom <= asideRect.bottom + 1;
+            const scrollRect = scrollBox.getBoundingClientRect();
+            const footerRect = footer.getBoundingClientRect();
+            const noOverlap = scrollRect.bottom <= footerRect.top + 0.5;
+            scrollBox.scrollTop = 0;
+            const footerVisibleWithoutScroll = logout.getBoundingClientRect().top >= asideRect.top - 0.5 &&
+              footerRect.bottom <= asideRect.bottom + 0.5;
+            scrollBox.scrollTop = scrollBox.scrollHeight;
+            const boxScroll = scrollBox.scrollTop > 0;
             lastEntry.scrollIntoView({block: 'nearest'});
             const entryRect = lastEntry.getBoundingClientRect();
-            const entryVisible = entryRect.height > 20 && entryRect.top >= asideRect.top - 1 &&
-              entryRect.bottom <= asideRect.bottom + 1;
+            const entryVisible = entryRect.height > 20 && entryRect.top >= scrollRect.top - 1 &&
+              entryRect.bottom <= scrollRect.bottom + 1 && entryRect.bottom <= footerRect.top + 1;
             return {
-              asideScroll,
+              boxScroll,
               plinksOverflow: getComputedStyle(plinks).overflowY,
               noOverlap,
-              footerVisible,
+              footerVisibleWithoutScroll,
               entryVisible,
-              noHorizontalOverflow: aside.scrollWidth <= aside.clientWidth + 1,
+              noHorizontalOverflow: scrollBox.scrollWidth <= scrollBox.clientWidth + 1,
             };
         ''')
     finally:
         driver.execute_script('setSidebarOpen(false)')
     assert metrics == {
-        'asideScroll': True,
+        'boxScroll': True,
         'plinksOverflow': 'visible',
         'noOverlap': True,
-        'footerVisible': True,
+        'footerVisibleWithoutScroll': True,
         'entryVisible': True,
         'noHorizontalOverflow': True,
     }
@@ -3630,21 +3650,29 @@ def test_short_viewport_collapsed_sidebar_keeps_controls_within_bounds(browser):
             "return document.getElementById('sidebar').getBoundingClientRect().width < 70"))
         collapsed_metrics = driver.execute_script('''
             const aside = document.getElementById('sidebar');
+            const scrollBox = aside.querySelector('.sidebar-scroll');
+            const footer = aside.querySelector('.sidebar-footer');
             const asideRect = aside.getBoundingClientRect();
             const visibleLeft = asideRect.left + aside.clientLeft;
             const visibleRight = visibleLeft + aside.clientWidth;
-            const controls = [...aside.querySelectorAll('.brand-logo, #navigation button, .sidebar-footer button')];
+            const scrollControls = [...scrollBox.querySelectorAll('.brand-logo, #navigation button')];
+            const footerControls = [...footer.querySelectorAll('button')];
             return {
-              asideScroll: aside.scrollHeight > aside.clientHeight + 1,
-              clipped: controls.filter((node) => {
+              boxScroll: scrollBox.scrollHeight > scrollBox.clientHeight + 1,
+              footerVisible: footer.getBoundingClientRect().bottom <= asideRect.bottom + 0.5,
+              clipped: [...scrollControls, ...footerControls].filter((node) => {
+                const container = footer.contains(node) ? aside : scrollBox;
+                const cRect = container.getBoundingClientRect();
+                const cLeft = Math.max(visibleLeft, cRect.left + container.clientLeft);
+                const cRight = Math.min(visibleRight, cLeft + container.clientWidth);
                 const rect = node.getBoundingClientRect();
-                return rect.left < visibleLeft - 0.5 || rect.right > visibleRight + 0.5;
+                return rect.left < cLeft - 0.5 || rect.right > cRight + 0.5;
               }).length,
             };
         ''')
     finally:
         driver.execute_script('setSidebarCollapsed(false, false)')
-    assert collapsed_metrics == {'asideScroll': True, 'clipped': 0}
+    assert collapsed_metrics == {'boxScroll': True, 'footerVisible': True, 'clipped': 0}
 
 
 @pytest.mark.browser
