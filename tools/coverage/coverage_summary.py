@@ -282,7 +282,7 @@ def _frontend_detail(data):
 
 def _frontend_section(data):
     state = '不完整' if data.get('incomplete') else '完整'
-    return [
+    report = [
         '行：**{:.2f}%**；函数：**{:.2f}%**；分支参考：**{:.2f}%**。'.format(
             _metric_pct(data, 'lines'), _metric_pct(data, 'functions'),
             _metric_pct(data, 'branches'),
@@ -292,8 +292,12 @@ def _frontend_section(data):
             data.get('nodeid_count', 0), data.get('raw_file_count', 0),
             data.get('duplicate_script_count', 0), state,
         ),
-        '',
-    ] + _frontend_detail(data)
+    ]
+    reason = data.get('incomplete_reason')
+    if data.get('incomplete') and reason:
+        report.extend(['', '采集不完整原因：{}。'.format(_markdown_cell(reason))])
+    report.append('')
+    return report + _frontend_detail(data)
 
 
 def _find_frontend_report(directory):
@@ -468,6 +472,18 @@ def _combined_frontend_section(results):
                 '不完整' if data.get('incomplete') else '完整',
             )
         )
+    reasons = []
+    for result in available:
+        data = result['frontend']
+        if not data.get('incomplete') or not data.get('incomplete_reason'):
+            continue
+        reasons.append('`{}`：{}'.format(
+            _markdown_cell(result['name']),
+            _markdown_cell(data.get('incomplete_reason')),
+        ))
+    if reasons:
+        report.extend(['', '采集不完整原因：'])
+        report.extend(['- {}'.format(reason) for reason in reasons])
     report.extend(['', '基于真实浏览器 V8 精确覆盖；分支为 V8 block 参考值，不作为门禁。'])
     return report, True
 

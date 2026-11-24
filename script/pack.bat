@@ -15,6 +15,9 @@ if "%EXIT_CODE%"=="0" (
     if exist ".\dist\OlivOS.exe" (
         copy /y ".\dist\OlivOS.exe" ".\OlivOS.exe" >nul
         if errorlevel 1 set "EXIT_CODE=1"
+    ) else (
+        echo [pack] PyInstaller succeeded but dist\OlivOS.exe is missing.>&2
+        set "EXIT_CODE=1"
     )
 )
 

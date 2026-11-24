@@ -1,9 +1,24 @@
-"""Helpers for collecting WebUI JavaScript coverage from Chrome DevTools Protocol."""
+# -*- encoding: utf-8 -*-
+r'''
+_______________________    ________________
+__  __ \__  /____  _/_ |  / /_  __ \_  ___/
+_  / / /_  /  __  / __ | / /_  / / /____ \
+/ /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
+\____/ /_____/___/  _____/  \____/ /____/
+
+@File      :   tests/frontend_coverage_support.py
+@Author    :   lunzhiPenxil仑质
+@Contact   :   lunzhipenxil@gmail.com
+@License   :   AGPL
+@Copyright :   (C) 2020-2026, OlivOS-Team
+@Desc      :   WebUI 前端覆盖率采集与 raw 数据辅助函数。
+'''
 
 import gzip
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -33,6 +48,20 @@ def coverage_directory():
     if not path.is_absolute():
         path = root / path
     return path.resolve()
+
+
+def reset_raw_coverage(directory):
+    """Remove raw payloads from an earlier run before collecting new coverage."""
+    raw_directory = Path(directory) / 'raw'
+    if raw_directory.is_dir():
+        shutil.rmtree(raw_directory)
+    return raw_directory
+
+
+def prepare_frontend_coverage():
+    """Clear stale raw payloads when coverage collection is requested."""
+    if coverage_enabled():
+        reset_raw_coverage(coverage_directory())
 
 
 def _script_name(url):

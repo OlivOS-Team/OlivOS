@@ -92,9 +92,7 @@ jobs:
           --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json
           --junitxml=test-results/junit.xml
       - name: Generate WebUI JavaScript coverage
-        if: >-
-          always() && matrix.os == 'ubuntu-latest' &&
-          hashFiles('test-results/frontend-coverage/raw/*.json.gz') != ''
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
         run: >-
           node tools/frontend_coverage/report.mjs
           --raw-dir test-results/frontend-coverage/raw

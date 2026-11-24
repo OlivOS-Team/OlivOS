@@ -27,6 +27,7 @@ class ChromeSession:
         self.coverage_open = False
         self.coverage_nodeid = None
         self.coverage_outcome = 'unknown'
+        self.coverage_start_error = None
         self.coverage_errors = []
 
     def set_coverage_context(self, nodeid, outcome='unknown'):
@@ -43,8 +44,10 @@ class ChromeSession:
                 'detailed': True,
             })
         except Exception as exc:
+            self.coverage_start_error = f'Profiler 启动失败：{exc}'
             self.coverage_errors.append(f'start: {exc}')
             return False
+        self.coverage_start_error = None
         self.coverage_open = True
         return True
 
@@ -60,20 +63,48 @@ class ChromeSession:
             return False
         return False
 
+    def _write_incomplete_coverage(self, nodeid, error, ignored_script_count=0):
+        """记录没有有效脚本的采集，避免报告把缺失数据当成完整覆盖。"""
+        self.coverage_errors.append(f'incomplete: {error}')
+        try:
+            return write_coverage_payload(
+                self.coverage_directory,
+                nodeid=nodeid,
+                outcome=self.coverage_outcome,
+                scripts=[],
+                ignored_script_count=ignored_script_count,
+                error=error,
+            )
+        except OSError as write_exc:
+            self.coverage_errors.append(f'write: {write_exc}')
+            return None
+
     def take_coverage(self):
-        if not self.coverage_enabled or self.driver is None or not self.coverage_open:
+        if not self.coverage_enabled or self.driver is None:
             return None
         nodeid = self.coverage_nodeid
         if not nodeid:
             return None
+        if not self.coverage_open:
+            error = self.coverage_start_error or 'Chrome DevTools 覆盖率未启动'
+            return self._write_incomplete_coverage(nodeid, error)
         if not self._select_primary_window():
             self.coverage_errors.append('take: no active browser window')
             return None
         try:
             data = self.driver.execute_cdp_cmd('Profiler.takePreciseCoverage', {})
-            scripts, ignored = filter_coverage_scripts(data.get('result', []))
-            if not scripts:
-                return None
+        except Exception as exc:
+            self.coverage_open = False
+            self.coverage_errors.append(f'take: {exc}')
+            return self._write_incomplete_coverage(nodeid, str(exc))
+        scripts, ignored = filter_coverage_scripts(data.get('result', []))
+        if not scripts:
+            return self._write_incomplete_coverage(
+                nodeid,
+                '未采集到 WebUI 脚本；请确认 Profiler 已在首次导航前启动',
+                ignored_script_count=ignored,
+            )
+        try:
             return write_coverage_payload(
                 self.coverage_directory,
                 nodeid=nodeid,
@@ -81,20 +112,9 @@ class ChromeSession:
                 scripts=scripts,
                 ignored_script_count=ignored,
             )
-        except Exception as exc:
-            self.coverage_open = False
-            self.coverage_errors.append(f'take: {exc}')
-            try:
-                return write_coverage_payload(
-                    self.coverage_directory,
-                    nodeid=nodeid,
-                    outcome=self.coverage_outcome,
-                    scripts=[],
-                    error=str(exc),
-                )
-            except OSError as write_exc:
-                self.coverage_errors.append(f'write: {write_exc}')
-                return None
+        except OSError as exc:
+            self.coverage_errors.append(f'write: {exc}')
+            return None
 
     def open(self):
         from selenium import webdriver

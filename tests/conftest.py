@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from frontend_coverage_support import coverage_enabled
+from frontend_coverage_support import coverage_enabled, prepare_frontend_coverage
+
+
+def pytest_sessionstart(session):
+    """清空上一次运行的前端覆盖率 raw 数据，保证报告只反映本次会话。"""
+    prepare_frontend_coverage()
 
 
 @pytest.fixture(autouse=True)

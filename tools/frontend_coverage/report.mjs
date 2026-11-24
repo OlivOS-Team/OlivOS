@@ -85,17 +85,22 @@ function scriptName(url, files) {
 }
 
 function selectCompleteScripts(scripts, files) {
-  const selected = new Map()
+  const groups = new Map()
   for (const script of scripts || []) {
     const name = scriptName(script.url, files)
     if (!name || !Array.isArray(script.functions) || !script.functions.length) continue
-    const previous = selected.get(name)
-    // 页面重载后同一 URL 可能同时出现完整脚本和残缺脚本，只保留函数记录最完整的一份。
-    if (!previous || script.functions.length > previous.functions.length) {
-      selected.set(name, script)
-    }
+    const records = groups.get(name) || []
+    records.push(script)
+    groups.set(name, records)
   }
-  return [...selected.values()]
+  const selected = []
+  for (const records of groups.values()) {
+    const mostFunctions = Math.max(...records.map((record) => record.functions.length))
+    // 页面重载后同一 URL 可能同时出现完整脚本和残缺脚本：丢弃残缺记录，
+    // 保留所有同等完整的记录，由 Istanbul 合并各自的执行范围。
+    selected.push(...records.filter((record) => record.functions.length === mostFunctions))
+  }
+  return selected
 }
 
 function sourceName(options, name) {
@@ -138,6 +143,19 @@ function compactSummary(summary) {
   }
 }
 
+function emptyMetric() {
+  return { total: 0, covered: 0, skipped: 0, pct: 0 }
+}
+
+function emptySummary() {
+  return {
+    lines: emptyMetric(),
+    statements: emptyMetric(),
+    functions: emptyMetric(),
+    branches: emptyMetric(),
+  }
+}
+
 function gitHead(repoRoot) {
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -171,7 +189,7 @@ async function writeReports(coverageMap, options, metadata) {
     generated_at: new Date().toISOString(),
     git_head: gitHead(options.repoRoot),
     ...metadata,
-    totals: compactSummary(coverageMap.getCoverageSummary()),
+    totals: coverageMap.files().length ? compactSummary(coverageMap.getCoverageSummary()) : emptySummary(),
     files,
   }
   await fs.writeFile(
@@ -185,15 +203,13 @@ async function writeReports(coverageMap, options, metadata) {
 async function main() {
   const options = parseArgs(process.argv)
   const rawFiles = await gzipFiles(options.rawDir)
-  if (!rawFiles.length) {
-    throw new Error(`未找到 raw V8 覆盖文件：${options.rawDir}`)
-  }
 
   const coverageMap = libCoverage.createCoverageMap({})
   const nodeids = new Set()
   const sourceHashes = {}
   let ignoredScriptCount = 0
-  let incomplete = false
+  let incomplete = !rawFiles.length
+  let incompleteReason = rawFiles.length ? null : `未找到 raw V8 覆盖文件：${options.rawDir}`
   let scriptCount = 0
   let duplicateScriptCount = 0
 
@@ -203,6 +219,7 @@ async function main() {
     ignoredScriptCount += Number(payload.ignored_script_count) || 0
     if (payload.error || !Array.isArray(payload.scripts) || !payload.scripts.length) {
       incomplete = true
+      incompleteReason = incompleteReason || payload.error || 'raw 负载中没有脚本数据'
       continue
     }
     const scripts = selectCompleteScripts(payload.scripts, options.files)
@@ -211,6 +228,7 @@ async function main() {
       const converted = await convertScript(options, script)
       if (!converted) {
         incomplete = true
+        incompleteReason = incompleteReason || `无法转换脚本：${script.url || script.name || '未知脚本'}`
         continue
       }
       coverageMap.merge(converted.coverage)
@@ -221,10 +239,15 @@ async function main() {
 
   const required = sourceName(options, 'app.js')
   if (!coverageMap.files().includes(required)) {
-    throw new Error(`未采集到 ${required}；请确认 Profiler 在首次导航前启动`)
+    incomplete = true
+    incompleteReason = incompleteReason || `未采集到 ${required}；请确认 Profiler 在首次导航前启动`
   }
   for (const name of options.files) {
-    if (!coverageMap.files().includes(sourceName(options, name))) incomplete = true
+    const source = sourceName(options, name)
+    if (!coverageMap.files().includes(source)) {
+      incomplete = true
+      incompleteReason = incompleteReason || `未采集到 ${source}`
+    }
   }
 
   const summary = await writeReports(coverageMap, options, {
@@ -234,11 +257,13 @@ async function main() {
     duplicate_script_count: duplicateScriptCount,
     ignored_script_count: ignoredScriptCount,
     incomplete,
+    incomplete_reason: incompleteReason,
     source_sha256: sourceHashes,
   })
+  const state = incomplete ? `（不完整：${incompleteReason}）` : ''
   process.stdout.write(
     `WebUI JavaScript 覆盖率：${summary.totals.lines.pct}% 行，` +
-    `${summary.totals.functions.pct}% 函数，${nodeids.size} 条测试节点\n`,
+    `${summary.totals.functions.pct}% 函数，${nodeids.size} 条测试节点${state}\n`,
   )
 }
 
