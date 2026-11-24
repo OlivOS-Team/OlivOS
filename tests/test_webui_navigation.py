@@ -3079,6 +3079,35 @@ def test_performance_chart_points_follow_backend_window_shift(browser):
 
 
 @pytest.mark.browser
+def test_performance_one_minute_traffic_mini_uses_window_capacity(browser):
+    # 1 分钟流量窗口按 5 秒分桶只有 12 个点，缩略图必须按窗口容量铺满，不能固定留 60 个槽位。
+    driver = browser.driver
+    snapshot = statistics_snapshot()
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=lambda: snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return state.page === 'performance' && !document.getElementById('performance-content').hidden'''))
+
+    traffic_window = snapshot['traffic']['windows']['1m']
+    assert traffic_window['capacity'] == 12
+    browser.click('#performance-window-switch button:first-child')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return state.performanceWindow === '1m' '''))
+    points = driver.execute_script(r'''
+        const line = document.querySelector('[data-performance-mini=traffic] .mini-line');
+        return line.getAttribute('points').trim().split(/ +/).map(
+          (point) => Number(point.split(',')[0]));
+    ''')
+    assert len(points) == traffic_window['capacity']
+    assert points[0] == 2
+    assert points[-1] == 98
+
+
+@pytest.mark.browser
 def test_performance_chart_backfills_empty_leading_buckets(browser):
     # 窗口左侧尚未采样的空桶由最早有效值回填，不能补成 0 把折线压到底部。
     driver = browser.driver

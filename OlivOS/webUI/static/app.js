@@ -2136,13 +2136,13 @@ async function refreshPerformanceProcesses() {
     renderProcessTree(data);
   }
 }
-function renderPerformanceMini(container, values, { zeroPadding = false } = {}) {
+function renderPerformanceMini(container, values, { zeroPadding = false, capacity = 60 } = {}) {
   if (!container) return;
   const width = 100;
   const height = 22;
   const padding = 2;
-  const capacity = 60;
-  const sampled = resampleTrendValues(values, capacity, { zeroPadding });
+  const windowCapacity = Math.max(2, Math.floor(Number(capacity)) || 60);
+  const sampled = resampleTrendValues(values, windowCapacity, { zeroPadding });
   if (!sampled.hasData && !zeroPadding) {
     container.replaceChildren();
     return;
@@ -2150,7 +2150,7 @@ function renderPerformanceMini(container, values, { zeroPadding = false } = {}) 
   const numeric = sampled.values;
   const percentage = ['cpu', 'memory', 'disk'].includes(container.dataset.performanceMini);
   const maximum = percentage ? 100 : Math.max(1, ...numeric);
-  const xFor = (index) => padding + (width - padding * 2) * (index / (capacity - 1));
+  const xFor = (index) => padding + (width - padding * 2) * (index / (windowCapacity - 1));
   const yFor = (value) => (
     height - padding - (height - padding * 2) * Math.min(1, value / maximum)
   );
@@ -2219,6 +2219,8 @@ function renderPerformanceStatistics(data) {
     ? trafficWindowHistory(selectedTrafficWindow)
     : (traffic.history || []);
   const trafficCapacity = selectedTrafficWindow?.capacity ?? traffic.history_capacity;
+  const performanceMiniCapacity = Number(history.capacity) || 60;
+  const trafficMiniCapacity = Number(trafficCapacity) || 60;
   const trafficInterval = Number(
     selectedTrafficWindow?.interval ?? traffic.bucket_seconds);
   const includeDate = performanceWindowUsesDate.has(state.performanceWindow);
@@ -2367,18 +2369,24 @@ function renderPerformanceStatistics(data) {
   renderPerformanceInterfaces(network.interfaces);
 
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="cpu"]'), history.cpu_percent || []);
+    document.querySelector('[data-performance-mini="cpu"]'), history.cpu_percent || [],
+    {capacity: performanceMiniCapacity});
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="memory"]'), history.memory_percent || []);
+    document.querySelector('[data-performance-mini="memory"]'), history.memory_percent || [],
+    {capacity: performanceMiniCapacity});
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="disk"]'), history.disk_percent || []);
+    document.querySelector('[data-performance-mini="disk"]'), history.disk_percent || [],
+    {capacity: performanceMiniCapacity});
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || []);
+    document.querySelector('[data-performance-mini="network"]'), history.network_recv_bps || [],
+    {capacity: performanceMiniCapacity});
   renderPerformanceMini(
     document.querySelector('[data-performance-mini="traffic"]'),
-    trafficBucketValues(traffic, 'inbound', trafficHistory), {zeroPadding: true});
+    trafficBucketValues(traffic, 'inbound', trafficHistory),
+    {zeroPadding: true, capacity: trafficMiniCapacity});
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="processes"]'), history.process_count || []);
+    document.querySelector('[data-performance-mini="processes"]'), history.process_count || [],
+    {capacity: performanceMiniCapacity});
 
   renderTrend($('performance-cpu-chart'), [
     {
