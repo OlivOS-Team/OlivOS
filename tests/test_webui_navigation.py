@@ -147,7 +147,7 @@ def browser(navigation_host, chrome_session):
                 try:
                     return True, action(self.raw())
                 except StaleElementReferenceException:
-                    return False, None
+                    return False
             return wait.until(attempt, '元素在刷新中持续失效：' + self.selector)[1]
 
         @property
@@ -187,9 +187,9 @@ def browser(navigation_host, chrome_session):
                             restore_field_value(field, initial_value)
                     attempted = True
                     field.send_keys(*keys)
-                    return True, None
+                    return True
                 except StaleElementReferenceException:
-                    return False, None
+                    return False
             wait.until(attempt)
 
         def find_element(self, by, value):
@@ -1195,6 +1195,34 @@ def test_log_level_summary_uses_custom_chevron(browser):
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('log-filter').open"))
     browser.wait.until(lambda _: chevron()['transform'] != closed['transform'])
+
+
+@pytest.mark.browser
+def test_log_output_keeps_bottom_gap_aligned_with_inline_padding(browser):
+    # 宽窄屏下日志面板的底边距离都应与页面左右内边距一致，且不随视口高度或工具栏换行漂移。
+    driver = browser.driver
+    set_viewport(browser, 1440, 900)
+    browser.click('[data-page="logs"]')
+    browser.wait.until(lambda _: browser.find('#logs').is_displayed())
+
+    for width, height in ((1440, 900), (1440, 680), (1024, 768), (801, 720),
+                          (800, 720), (390, 844), (390, 640), (320, 640)):
+        set_viewport(browser, width, height, mobile_device=width <= 800)
+        geometry = driver.execute_script("""
+            const main = document.querySelector('main');
+            const output = document.getElementById('log-output');
+            const rect = output.getBoundingClientRect();
+            return {
+              rightGap: innerWidth - rect.right,
+              bottomGap: innerHeight - rect.bottom,
+              inlinePadding: parseFloat(getComputedStyle(main).paddingRight),
+              height: rect.height,
+            };
+        """)
+        label = f'{width}x{height}'
+        assert abs(geometry['rightGap'] - geometry['inlinePadding']) <= 1, (label, geometry)
+        assert abs(geometry['bottomGap'] - geometry['inlinePadding']) <= 1, (label, geometry)
+        assert geometry['height'] > 250, (label, geometry)
 
 
 @pytest.mark.browser
@@ -2992,6 +3020,68 @@ def test_performance_process_tree_refresh_preserves_live_toggle_state(browser):
         return {same: current === branch, open: current.open};
     ''')
     assert state == {'same': True, 'open': False}
+
+
+@pytest.mark.browser
+def test_performance_process_detail_groups_reconcile_by_key(browser):
+    # 内存信息出现或消失时，详情分组必须按 data 键复用，避免事件处理器写入其他分组的状态键。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.click('[data-performance-category=processes]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return document.querySelectorAll('#performance-process-tree .process-thread').length === 3'''))
+    browser.click('#performance-process-tree .process-detail-button')
+    browser.wait.until(lambda _: driver.execute_script(
+        """return document.querySelector('.process-detail [data-process-detail-group="files"]') !== null"""))
+    driver.execute_script('''
+        const detail = document.querySelector('.process-detail');
+        const groups = {};
+        for (const name of ['files', 'connections', 'maps']) {
+          groups[name] = detail.querySelector(`[data-process-detail-group="${name}"]`);
+        }
+        groups.files.open = true;
+        window.__detailGroups = {key: detail.dataset.processDetail, groups};
+    ''')
+    browser.wait.until(lambda _: driver.execute_script('''
+        const key = window.__detailGroups.key;
+        return state.performanceProcessDetailGroups[key]?.files === true;
+    '''))
+    result = driver.execute_script('''
+        const {key, groups} = window.__detailGroups;
+        const entry = state.performanceProcessDetails[key];
+        const memory = entry.data.memory_full;
+        const snapshot = () => {
+          const detail = document.querySelector(
+            `.process-detail[data-process-detail="${CSS.escape(key)}"]`);
+          const group = (name) => detail.querySelector(
+            `[data-process-detail-group="${name}"]`);
+          return {
+            files: group('files') === groups.files,
+            connections: group('connections') === groups.connections,
+            maps: group('maps') === groups.maps,
+            filesOpen: group('files').open,
+          };
+        };
+        entry.data.memory_full = {};
+        renderProcessTree(state.performanceProcesses);
+        const withoutMemory = snapshot();
+        entry.data.memory_full = memory;
+        renderProcessTree(state.performanceProcesses);
+        return {
+          withoutMemory,
+          withMemory: snapshot(),
+          groupState: state.performanceProcessDetailGroups[key],
+        };
+    ''')
+    expected = {'files': True, 'connections': True, 'maps': True, 'filesOpen': True}
+    assert result['withoutMemory'] == expected
+    assert result['withMemory'] == expected
+    assert result['groupState']['files'] is True
 
 
 @pytest.mark.browser
