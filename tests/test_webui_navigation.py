@@ -101,6 +101,7 @@ def navigation_host(tmp_path):
 @pytest.fixture
 def browser(navigation_host, chrome_session):
     from selenium.common.exceptions import StaleElementReferenceException
+    from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
@@ -125,6 +126,20 @@ def browser(navigation_host, chrome_session):
                 return False
             return True
         wait.until(click_when_ready)
+
+    def hover(selector):
+        def hover_when_ready(_):
+            # 统计轮询会重建进程树等局部节点；悬停前重新定位，stale 时交给 wait 重试。
+            element = find(selector)
+            if not element.is_displayed():
+                return False
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+            try:
+                ActionChains(driver).move_to_element(element).perform()
+            except StaleElementReferenceException:
+                return False
+            return True
+        wait.until(hover_when_ready)
 
     def type_text(selector, text):
         # Chrome 158 对 sandbox iframe 内输入框的可交互性判定更严格，
@@ -169,7 +184,7 @@ def browser(navigation_host, chrome_session):
     find('#token').send_keys(navigation_host.test_password)
     click('#login-form button[type=submit]')
     login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
-    yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, type_text=type_text,
+    yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, hover=hover, type_text=type_text,
                           select=select, open_sidebar=open_sidebar,
                           wait_plugin_events=wait_plugin_events, host=navigation_host)
 
@@ -2363,11 +2378,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert '起始 python311.dll+0x4A2C' in first_thread
 
     # 线程行悬停时整行高亮，便于在长线程列表中横向对齐各列字段。
-    driver.execute_script(
-        "document.querySelector('#performance-process-tree .process-thread')"
-        ".scrollIntoView({block: 'center'});")
-    ActionChains(driver).move_to_element(
-        browser.find('#performance-process-tree .process-thread')).perform()
+    browser.hover('#performance-process-tree .process-thread')
     browser.wait.until(lambda _: driver.execute_script("""
         const row = document.querySelector('#performance-process-tree .process-thread');
         const background = getComputedStyle(row).backgroundColor;
