@@ -378,17 +378,30 @@ p {
   transition: grid-template-columns 180ms ease;
 }
 aside {
-  padding: 24px 16px;
   background: var(--panel);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 20px;
   min-height: 0;
+  overflow: hidden;
+}
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 16px 16px;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
-aside > * {
+.sidebar-scroll:hover,
+.sidebar-scroll:focus-within {
+  scrollbar-color: var(--muted) transparent;
+}
+.sidebar-scroll > * {
   flex-shrink: 0;
 }
 .sidebar-head {
@@ -479,13 +492,21 @@ nav h2 {
   margin: 0 14px 5px;
 }
 #plugin-navigation {
-  min-height: 0;
+  min-height: var(--control-height);
   flex-shrink: 1;
+}
+/* 高视口下若固定项增高（如缩放/新增导航项），插件列表仍保底可浏览高度，
+   避免被压扁至 0px 且外层侧栏无滚动条的死区。 */
+#plugin-navigation:has(#plugin-links:not([hidden]) > p) {
+  min-height: calc(var(--control-height) + 40px);
+}
+#plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
+  min-height: calc(var(--control-height) + 160px);
 }
 #plugin-links {
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -597,6 +618,7 @@ nav h2 {
 #plugin-navigation-group {
   display: flex;
   flex-direction: column;
+  flex: 0 1 auto;
   margin: 0;
   padding: 0;
   border: 0;
@@ -667,10 +689,13 @@ nav h2 {
   transform: rotate(-90deg);
 }
 .sidebar-footer {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: auto;
+  padding: 12px 16px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
 }
 .theme-control {
   display: flex;
@@ -957,13 +982,14 @@ nav h2 {
   /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
      收起后不会出现「内容先消失、面板再跳一下」的观感。 */
   aside,
+  .sidebar-scroll,
+  .sidebar-footer,
   .brand,
   #navigation button,
   .sidebar-footer > .sidebar-action {
-    /* 只补 padding / gap，同时保留按钮原有的配色反馈过渡，
-       否则 hover、active 的背景与边框会变成瞬时切换。 */
+    /* 只补横向 padding / gap，避免竖向断点切换时延迟高度重排，同时保留按钮原有的配色反馈过渡。 */
     transition:
-      padding 180ms ease,
+      padding-inline 180ms ease,
       gap 180ms ease,
       background-color 120ms ease,
       border-color 120ms ease,
@@ -984,6 +1010,11 @@ nav h2 {
   }
   #shell[data-sidebar-collapsed='true'] aside {
     align-items: center;
+    overflow-x: hidden;
+  }
+  #shell[data-sidebar-collapsed='true'] .sidebar-scroll {
+    width: 100%;
+    align-items: center;
     padding-right: 8px;
     padding-left: 8px;
     overflow-x: hidden;
@@ -994,6 +1025,11 @@ nav h2 {
   }
   #shell[data-sidebar-collapsed='true'] .brand {
     gap: 0;
+  }
+  #shell[data-sidebar-collapsed='true'] aside .brand-logo {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
   }
   #shell[data-sidebar-collapsed='true'] .brand-text,
   #shell[data-sidebar-collapsed='true'] .nav-label,
@@ -1007,13 +1043,15 @@ nav h2 {
   #shell[data-sidebar-collapsed='true'] .sidebar-footer {
     width: 100%;
     align-items: center;
+    padding-right: 8px;
+    padding-left: 8px;
     gap: 8px;
   }
   /* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
      宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
   #shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
     width: 100%;
-    min-width: 44px;
+    min-width: 0;
     height: 44px;
     min-height: 44px;
     padding: 0;
@@ -1722,7 +1760,7 @@ body.performance-nav-open .performance-nav-toggle svg {
   box-shadow: var(--shadow-small);
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -1824,7 +1862,7 @@ body.performance-nav-open .performance-nav-toggle svg {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -2737,6 +2775,8 @@ details[open] > summary::before {
 dialog {
   width: min(750px, calc(100vw - 30px));
   max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   border: 1px solid var(--control-border);
   border-radius: var(--control-radius);
   color: var(--control-text);
@@ -2773,6 +2813,8 @@ dialog::backdrop {
   summary::before,
   #shell,
   aside,
+  .sidebar-scroll,
+  .sidebar-footer,
   .brand,
   .brand-text,
   .nav-label,
@@ -2866,20 +2908,13 @@ dialog::backdrop {
 #plugin-frame-container iframe {
   width: 100%;
   height: calc(100dvh - 140px);
+  min-height: 260px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 #plugin-frame-container iframe[hidden] {
   display: none;
-}
-@media (min-width: 801px) and (max-height: 560px) {
-  #plugin-navigation {
-    flex-shrink: 0;
-  }
-  #plugin-links {
-    max-height: 40dvh;
-  }
 }
 @media (max-width: 800px), (orientation: portrait) {
   body.sidebar-open {
@@ -3037,16 +3072,10 @@ dialog::backdrop {
     width: min(84vw, 320px);
     max-width: 100%;
     height: 100dvh;
-    gap: 20px;
-    padding:
-      calc(16px + env(safe-area-inset-top))
-      16px
-      calc(16px + env(safe-area-inset-bottom));
+    padding: 0;
     border-right: 1px solid var(--line);
     border-bottom: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
+    overflow: hidden;
     box-shadow: var(--shadow-dialog);
     transform: translateX(-102%);
     visibility: hidden;
@@ -3054,6 +3083,20 @@ dialog::backdrop {
     transition:
       transform 180ms ease,
       visibility 0s linear 180ms;
+  }
+  .sidebar-scroll {
+    gap: 20px;
+    padding:
+      calc(16px + env(safe-area-inset-top))
+      16px
+      12px;
+    overflow-x: hidden;
+  }
+  .sidebar-footer {
+    padding:
+      12px
+      16px
+      calc(16px + env(safe-area-inset-bottom));
   }
   #shell[data-sidebar-open='true'] aside {
     transform: translateX(0);
@@ -3097,10 +3140,11 @@ dialog::backdrop {
   }
   #plugin-links {
     flex: 1;
+    min-height: 0;
     max-height: none;
     overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: auto;
   }
   #plugin-links :is(button, a) {
     width: 100%;
@@ -3119,6 +3163,64 @@ dialog::backdrop {
   }
   .output {
     height: 55dvh;
+  }
+}
+/* 视口较矮时收紧侧栏纵向留白，并将品牌头/主导航/插件列表统一在底栏上方滚动，
+   底栏（主题切换与退出登录）始终固定在侧栏底部，无需翻到插件列表最末端即可退出。 */
+@media (max-height: 760px) {
+  .sidebar-scroll {
+    gap: 12px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: 12px;
+  }
+  #navigation {
+    gap: 4px;
+  }
+  #navigation button {
+    padding: 7px 14px;
+  }
+  .sidebar-footer {
+    gap: 8px;
+    padding-top: 10px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-height: 700px) {
+  #plugin-navigation,
+  #plugin-navigation:has(#plugin-links:not([hidden]) > p),
+  #plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  #plugin-navigation-group {
+    height: auto;
+  }
+  #plugin-links {
+    flex: none;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (max-height: 240px) {
+  aside {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .sidebar-scroll {
+    flex: 0 0 auto;
+    overflow-y: visible;
+  }
+}
+@media (min-width: 801px) and (max-width: 1100px) and (max-height: 440px) {
+  .performance-nav-drawer {
+    position: static;
+  }
+}
+@media (max-height: 440px) {
+  dialog {
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
   }
 }
 @media (max-width: 480px) {
