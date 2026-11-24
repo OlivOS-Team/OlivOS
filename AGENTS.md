@@ -98,7 +98,7 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 | `OlivOS/thirdPartyModule/*` | 内置第三方实现（blivedm、mhyVilaProto）；不基于 PyPI 引入的第三方模块统一放这里，flake8 与覆盖率均排除。 |
 | `plugin/{app,conf,data,tmp}` | 插件目录；`app` 放源码或 `.opk`，运行期数据在 `data/<namespace>/`。 |
 | `conf/` | `account.json`、`config.json`（补丁配置）；`basic.json`、`webui_auth.json` 由运行期生成，旧 `webui_token.txt` 首次升级时迁移。 |
-| `script/` | 本地启动、运行和遗留批处理脚本。 |
+| `script/` | 打包产物启动器与本地启动、清理、PyInstaller 打包辅助脚本；构建工具在 `tools/`。 |
 | `tools/` | CI 检查、覆盖率汇总、前端覆盖率报告、WebUI 内嵌和打包构建工具。 |
 | `tests/` | pytest 功能测试，策略见 `tests/README.md`。 |
 | `hook/` | PyInstaller 运行时 hook。 |
