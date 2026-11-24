@@ -4,6 +4,12 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from frontend_coverage_support import (
+    coverage_directory,
+    coverage_enabled,
+    filter_coverage_scripts,
+    write_coverage_payload,
+)
 from OlivOS.webUI import authAPI, serverAPI
 
 
@@ -16,6 +22,99 @@ class ChromeSession:
     def __init__(self, profile):
         self.profile = Path(profile)
         self.driver = None
+        self.coverage_enabled = coverage_enabled()
+        self.coverage_directory = coverage_directory()
+        self.coverage_open = False
+        self.coverage_nodeid = None
+        self.coverage_outcome = 'unknown'
+        self.coverage_start_error = None
+        self.coverage_errors = []
+
+    def set_coverage_context(self, nodeid, outcome='unknown'):
+        self.coverage_nodeid = nodeid
+        self.coverage_outcome = outcome
+
+    def start_coverage(self):
+        if not self.coverage_enabled or self.driver is None or self.coverage_open:
+            return False
+        try:
+            self.driver.execute_cdp_cmd('Profiler.enable', {})
+            self.driver.execute_cdp_cmd('Profiler.startPreciseCoverage', {
+                'callCount': True,
+                'detailed': True,
+            })
+        except Exception as exc:
+            self.coverage_start_error = f'Profiler 启动失败：{exc}'
+            self.coverage_errors.append(f'start: {exc}')
+            return False
+        self.coverage_start_error = None
+        self.coverage_open = True
+        return True
+
+    def _select_primary_window(self):
+        if self.driver is None:
+            return False
+        try:
+            handles = self.driver.window_handles
+            if handles:
+                self.driver.switch_to.window(handles[0])
+                return True
+        except Exception:
+            return False
+        return False
+
+    def _write_incomplete_coverage(self, nodeid, error, ignored_script_count=0):
+        """记录没有有效脚本的采集，避免报告把缺失数据当成完整覆盖。"""
+        self.coverage_errors.append(f'incomplete: {error}')
+        try:
+            return write_coverage_payload(
+                self.coverage_directory,
+                nodeid=nodeid,
+                outcome=self.coverage_outcome,
+                scripts=[],
+                ignored_script_count=ignored_script_count,
+                error=error,
+            )
+        except OSError as write_exc:
+            self.coverage_errors.append(f'write: {write_exc}')
+            return None
+
+    def take_coverage(self):
+        if not self.coverage_enabled or self.driver is None:
+            return None
+        nodeid = self.coverage_nodeid
+        if not nodeid:
+            return None
+        if not self.coverage_open:
+            error = self.coverage_start_error or 'Chrome DevTools 覆盖率未启动'
+            return self._write_incomplete_coverage(nodeid, error)
+        if not self._select_primary_window():
+            self.coverage_errors.append('take: no active browser window')
+            return None
+        try:
+            data = self.driver.execute_cdp_cmd('Profiler.takePreciseCoverage', {})
+        except Exception as exc:
+            self.coverage_open = False
+            self.coverage_errors.append(f'take: {exc}')
+            return self._write_incomplete_coverage(nodeid, str(exc))
+        scripts, ignored = filter_coverage_scripts(data.get('result', []))
+        if not scripts:
+            return self._write_incomplete_coverage(
+                nodeid,
+                '未采集到 WebUI 脚本；请确认 Profiler 已在首次导航前启动',
+                ignored_script_count=ignored,
+            )
+        try:
+            return write_coverage_payload(
+                self.coverage_directory,
+                nodeid=nodeid,
+                outcome=self.coverage_outcome,
+                scripts=scripts,
+                ignored_script_count=ignored,
+            )
+        except OSError as exc:
+            self.coverage_errors.append(f'write: {exc}')
+            return None
 
     def open(self):
         from selenium import webdriver
@@ -33,6 +132,7 @@ class ChromeSession:
             options.binary_location = os.environ['OLIVOS_CHROME_BINARY']
         path = os.environ.get('OLIVOS_CHROMEDRIVER')
         self.driver = webdriver.Chrome(service=Service(executable_path=path) if path else None, options=options)
+        self.start_coverage()
         return self.driver
 
     def ensure_window(self):
@@ -52,6 +152,7 @@ class ChromeSession:
             self.driver.switch_to.window(handle)
             self.driver.close()
         self.driver.switch_to.window(primary)
+        self.start_coverage()
         return self.driver
 
     def prepare(self, url):
@@ -71,9 +172,12 @@ class ChromeSession:
         return driver
 
     def close(self):
-        driver, self.driver = self.driver, None
+        driver = self.driver
         if driver is None:
             return
+        self.take_coverage()
+        self.coverage_open = False
+        self.driver = None
         try:
             driver.quit()
         except Exception:

@@ -42,20 +42,59 @@ python -m pytest --cov=OlivOS --cov-branch --cov-context=test \
   --cov-report=term --cov-report=xml:test-results/coverage.xml \
   --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json \
   --junitxml=test-results/junit.xml
-python script/coverage_summary.py test-results/coverage.json test-results/junit.xml
+python tools/coverage/coverage_summary.py test-results/coverage.json test-results/junit.xml
 ```
 
 HTML 入口为 `test-results/html/index.html`，可查看每个文件执行过/未执行的行、缺失分支，
 以及经过该行的测试上下文。XML 供覆盖率工具读取，JSON 用于统计，JUnit XML 提供通过、失败、
 错误、跳过数量和失败用例清单。
 CI 中各平台先上传 `coverage.json` 与 `junit.xml`，再由单独的 summary job 下载后运行
-`python script/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
+`python tools/coverage/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
 跨平台测试统计总表、覆盖率总表、跨平台合计以及可折叠的平台明细。
 
 统计范围为整个 `OlivOS/` Python 代码，含未执行的协议适配器和平台专用代码。
 仅排除第三方内置库、二进制/图片内嵌数据和生成的 `staticData.py`，不排除难测的业务代码。
-Python 覆盖率不计量 JavaScript；前端行为由真实浏览器用例验证。
+Python 覆盖率不计量 JavaScript；WebUI 前端覆盖率由真实浏览器用例通过 Chrome DevTools Protocol
+单独采集，详见下一节。
 不同平台的报告分别保存，不能简单平均成一个全平台覆盖率。
+
+### WebUI JavaScript 覆盖率
+
+前端覆盖率使用 V8 Precise Coverage，不修改生产静态资源。只有同时开启浏览器测试和覆盖率开关时才会采集；
+默认测试不会增加这项开销：
+
+```powershell
+$env:OLIVOS_WEBUI_BROWSER='1'
+$env:OLIVOS_WEBUI_COVERAGE='1'
+python -m pytest -m browser
+```
+
+采集结果先写入 `test-results/frontend-coverage/raw/*.json.gz`，再使用 Node 22 转换：
+
+```sh
+npm ci --prefix tools/frontend_coverage
+npm test --prefix tools/frontend_coverage
+node tools/frontend_coverage/report.mjs \
+  --raw-dir test-results/frontend-coverage/raw \
+  --static-root OlivOS/webUI/static \
+  --out-dir test-results/frontend-coverage
+```
+
+输出包括 `coverage-final.json`、`lcov.info`、`html/index.html` 和
+`frontend-coverage-summary.json`。CI 在 `ubuntu-latest` 与 `windows-latest` 分别生成前端覆盖率；
+summary job 会把 WebUI JavaScript 覆盖率作为独立栏目展示，不与 Python 覆盖率合成一个百分比。
+每次开启覆盖率的 pytest 会话都会先清空 `raw/`，避免上一次运行的数据混入本次报告；
+即使一个脚本都没有采集到，报告也会生成并标记 `incomplete`，不会把缺失数据当成完整覆盖。
+
+当前范围为 `OlivOS/webUI/static/app.js` 与 `theme.js`。`timezone-cities-zh.js` 是静态数据，
+`service-worker.js` 属于独立 Service Worker target，插件页面脚本属于插件作者代码，均不在首期范围。
+V8 block 分支数据仅作为参考，暂不设置硬性门槛；先积累稳定基线，再评估改动行覆盖率或逐文件门槛。
+
+2026-11-25（北京时间）本地前端基线（Windows、Chrome 157、117 条 browser 用例）：
+行覆盖率 **86.02%**（4278/4973），函数覆盖率 **92.54%**（236/255），
+V8 block 分支参考 **92.53%**（1401/1514）。报告识别并去除了 106 条页面重载产生的残缺重复脚本记录，
+避免残缺记录把未执行行误判为已覆盖。该基线来自本机 Chrome，CI 的 Ubuntu 与 Windows 结果分别作为对应平台的权威基线；
+浏览器版本变化可能造成小幅波动。
 
 2026-11-21 本地基线（Windows、Python 3.11、默认离线功能测试，不启用浏览器用例）：
 **3378 项通过，85 项跳过**。语句覆盖率 **65.24%**（22872/35056），

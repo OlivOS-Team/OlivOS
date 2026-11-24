@@ -242,6 +242,74 @@ def _load_coverage(path):
         return None
 
 
+def _load_frontend_summary(path):
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get('totals'), dict):
+        return None
+    return data
+
+
+def _metric_pct(data, name):
+    metric = (data.get('totals') or {}).get(name) or {}
+    try:
+        return float(metric.get('pct', 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _frontend_detail(data):
+    report = [
+        '| 文件 | 行覆盖率 | 函数覆盖率 | 分支参考 |',
+        '| --- | ---: | ---: | ---: |',
+    ]
+    files = data.get('files') or {}
+    for name, details in sorted(files.items()):
+        report.append(
+            '| `{}` | {:.2f}% | {:.2f}% | {:.2f}% |'.format(
+                _markdown_cell(name, limit=160),
+                float((details.get('lines') or {}).get('pct', 0)),
+                float((details.get('functions') or {}).get('pct', 0)),
+                float((details.get('branches') or {}).get('pct', 0)),
+            )
+        )
+    return report
+
+
+def _frontend_section(data):
+    state = '不完整' if data.get('incomplete') else '完整'
+    report = [
+        '行：**{:.2f}%**；函数：**{:.2f}%**；分支参考：**{:.2f}%**。'.format(
+            _metric_pct(data, 'lines'), _metric_pct(data, 'functions'),
+            _metric_pct(data, 'branches'),
+        ),
+        '',
+        '测试节点：{}；raw 文件：{}；去重残缺脚本：{}；采集状态：{}。'.format(
+            data.get('nodeid_count', 0), data.get('raw_file_count', 0),
+            data.get('duplicate_script_count', 0), state,
+        ),
+    ]
+    reason = data.get('incomplete_reason')
+    if data.get('incomplete') and reason:
+        report.extend(['', '采集不完整原因：{}。'.format(_markdown_cell(reason))])
+    report.append('')
+    return report + _frontend_detail(data)
+
+
+def _find_frontend_report(directory):
+    direct = directory / 'frontend-coverage-summary.json'
+    if direct.is_file():
+        return direct
+    nested = directory / 'frontend-coverage' / 'frontend-coverage-summary.json'
+    if nested.is_file():
+        return nested
+    return None
+
+
 def build_report(coverage_path, junit_path=None):
     coverage_path = Path(coverage_path)
     if junit_path is None:
@@ -254,7 +322,11 @@ def build_report(coverage_path, junit_path=None):
         report.append('覆盖率报告不可用；请检查测试步骤中的收集或运行失败。')
     else:
         report.extend(_coverage_section(data))
-    return '\n'.join(report) + '\n', data is not None
+    frontend = _load_frontend_summary(_find_frontend_report(coverage_path.parent))
+    if frontend is not None:
+        report.extend(['', '## WebUI JavaScript 覆盖率', ''])
+        report.extend(_frontend_section(frontend))
+    return '\n'.join(report) + '\n', data is not None or frontend is not None
 
 
 def _find_report(directory, filename):
@@ -288,20 +360,25 @@ def collect_results(root):
         return []
     directories = [path for path in root.iterdir() if path.is_dir()]
     directories.sort(key=_platform_order_key)
-    if (root / 'coverage.json').is_file() or (root / 'junit.xml').is_file():
+    if any((root / name).is_file() for name in (
+            'coverage.json', 'junit.xml', 'frontend-coverage-summary.json')):
         directories.insert(0, root)
-    elif not directories and (_find_report(root, 'coverage.json') or _find_report(root, 'junit.xml')):
+    elif not directories and (
+            _find_report(root, 'coverage.json') or _find_report(root, 'junit.xml') or
+            _find_report(root, 'frontend-coverage-summary.json')):
         directories.append(root)
     results = []
     for directory in directories:
         coverage_path = _find_report(directory, 'coverage.json')
         junit_path = _find_report(directory, 'junit.xml')
-        if coverage_path is None and junit_path is None:
+        frontend_path = _find_report(directory, 'frontend-coverage-summary.json')
+        if coverage_path is None and junit_path is None and frontend_path is None:
             continue
         results.append({
             'name': _result_name(directory),
             'coverage': _load_coverage(coverage_path) if coverage_path is not None else None,
             'tests': _junit_summary(junit_path),
+            'frontend': _load_frontend_summary(frontend_path) if frontend_path is not None else None,
         })
     return results
 
@@ -373,6 +450,44 @@ def _combined_coverage_section(results):
     return report, True
 
 
+def _combined_frontend_section(results):
+    available = [
+        result for result in results if result.get('frontend') is not None
+    ]
+    if not available:
+        return [], False
+    report = [
+        '| 平台 | 行覆盖率 | 函数覆盖率 | 分支参考 | 文件 | 测试节点 | 去重残缺脚本 | 采集 |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
+    ]
+    for result in available:
+        data = result['frontend']
+        report.append(
+            '| `{}` | {:.2f}% | {:.2f}% | {:.2f}% | {} | {} | {} | {} |'.format(
+                _markdown_cell(result['name']),
+                _metric_pct(data, 'lines'), _metric_pct(data, 'functions'),
+                _metric_pct(data, 'branches'), len(data.get('files') or {}),
+                data.get('nodeid_count', 0),
+                data.get('duplicate_script_count', 0),
+                '不完整' if data.get('incomplete') else '完整',
+            )
+        )
+    reasons = []
+    for result in available:
+        data = result['frontend']
+        if not data.get('incomplete') or not data.get('incomplete_reason'):
+            continue
+        reasons.append('`{}`：{}'.format(
+            _markdown_cell(result['name']),
+            _markdown_cell(data.get('incomplete_reason')),
+        ))
+    if reasons:
+        report.extend(['', '采集不完整原因：'])
+        report.extend(['- {}'.format(reason) for reason in reasons])
+    report.extend(['', '基于真实浏览器 V8 精确覆盖；分支为 V8 block 参考值，不作为门禁。'])
+    return report, True
+
+
 def _combined_detail_section(results):
     report = []
     for result in results:
@@ -386,6 +501,11 @@ def _combined_detail_section(results):
                 parts.extend([''])
             parts.extend(['**覆盖率明细**', ''])
             parts.extend(_coverage_detail(result['coverage']))
+        if result.get('frontend') is not None:
+            if parts:
+                parts.extend([''])
+            parts.extend(['**WebUI JavaScript 覆盖率明细**', ''])
+            parts.extend(_frontend_detail(result['frontend']))
         if not parts:
             continue
         name = _markdown_cell(result['name'])
@@ -403,11 +523,15 @@ def build_combined_report(results):
     report.extend(['', '### 覆盖率', ''])
     coverage_report, coverage_available = _combined_coverage_section(results)
     report.extend(coverage_report)
+    frontend_report, frontend_available = _combined_frontend_section(results)
+    if frontend_available:
+        report.extend(['', '## WebUI JavaScript 覆盖率（全部平台）', ''])
+        report.extend(frontend_report)
     details = _combined_detail_section(results)
     if details:
         report.extend(['', '### 平台明细', ''])
         report.extend(details)
-    return '\n'.join(report) + '\n', coverage_available
+    return '\n'.join(report) + '\n', coverage_available or frontend_available
 
 
 def main():

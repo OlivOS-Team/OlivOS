@@ -1,1 +1,2 @@
-./python/bin/python ./main.py
+#!/bin/sh
+exec ./python/bin/python ./main.py

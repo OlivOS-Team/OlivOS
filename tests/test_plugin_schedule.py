@@ -669,7 +669,7 @@ def test_successful_update_download_enters_boot_even_without_plugin_loader(monke
 
 
 def test_nuitka_bundles_dynamic_timezone_packages_and_propagates_failure(monkeypatch):
-    from script import nuitka_build
+    from tools.build import nuitka_build
 
     monkeypatch.setattr(nuitka_build, 'get_all_site_packages', lambda: [])
     run = Mock(side_effect=nuitka_build.subprocess.CalledProcessError(1, ['nuitka']))

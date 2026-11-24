@@ -5,6 +5,13 @@ from pathlib import Path
 
 import pytest
 
+from frontend_coverage_support import coverage_enabled, prepare_frontend_coverage
+
+
+def pytest_sessionstart(session):
+    """清空上一次运行的前端覆盖率 raw 数据，保证报告只反映本次会话。"""
+    prepare_frontend_coverage()
+
 
 @pytest.fixture(autouse=True)
 def isolated_installation(tmp_path, monkeypatch):
@@ -27,6 +34,32 @@ def chrome_session(tmp_path_factory):
         yield session
     finally:
         session.close()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if report.when == 'call':
+        item._frontend_coverage_outcome = report.outcome
+
+
+@pytest.fixture(autouse=True)
+def frontend_browser_coverage(request):
+    if not coverage_enabled() or request.node.get_closest_marker('browser') is None:
+        yield
+        return
+    session = request.getfixturevalue('chrome_session')
+    session.set_coverage_context(request.node.nodeid)
+    try:
+        yield
+    finally:
+        outcome = getattr(request.node, '_frontend_coverage_outcome', 'unknown')
+        session.set_coverage_context(request.node.nodeid, outcome)
+        try:
+            session.take_coverage()
+        finally:
+            session.set_coverage_context(None)
 
 
 def pytest_collection_modifyitems(items):

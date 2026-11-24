@@ -1,1 +1,0 @@
-screen -D -r OlivOS

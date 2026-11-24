@@ -61,7 +61,7 @@ jobs:
       uses: actions/cache@v6
       with:
         path: .nuitka-cache
-        key: nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-${{ hashFiles('pyproject.toml', 'setup.py', 'script/nuitka_build.py') }}
+        key: nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-${{ hashFiles('pyproject.toml', 'setup.py', 'tools/build/nuitka_build.py') }}
         restore-keys: |
           nuitka-${{ runner.os }}-${{ inputs.python-version }}-${{ inputs.python-arch }}-
     
@@ -83,7 +83,7 @@ jobs:
         PYTHON="${{ github.workspace }}/python/bin/python"
         echo "PYTHON=${PYTHON}" >> $GITHUB_OUTPUT
         "${PYTHON}" -m pip install --upgrade pip
-        "${PYTHON}" ./script/embed_webui.py
+        "${PYTHON}" ./tools/build/embed_webui.py
         "${PYTHON}" -m pip install .[extend,${{ inputs.build-type }}${{ inputs.python-version == 'pypy3.11' && ',pypy' || '' }}]
         cp ./OlivOS/hook.py ./OlivOS/hook_bak.py
         cp ./OlivOS/hook_pack_debug.py ./OlivOS/hook.py
@@ -91,7 +91,7 @@ jobs:
           "${PYTHON}" -m PyInstaller ./OlivOS.spec
         elif [[ ${{ inputs.build-type == 'nuitka' && '1' || '0' }} -eq 1 ]]; then
           export OLIVOS_NUITKA_JOBS=$(getconf _NPROCESSORS_ONLN)
-          "${PYTHON}" ./script/nuitka_build.py
+          "${PYTHON}" ./tools/build/nuitka_build.py
         fi
         mkdir OlivOS-PKG
         if [[ ${{ inputs.build-type == 'pack' && '1' || '0' }} -eq 1 ]]; then
