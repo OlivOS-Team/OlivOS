@@ -387,6 +387,12 @@ aside {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+aside:hover,
+aside:focus-within {
+  scrollbar-color: var(--muted) transparent;
 }
 aside > * {
   flex-shrink: 0;
@@ -479,13 +485,21 @@ nav h2 {
   margin: 0 14px 5px;
 }
 #plugin-navigation {
-  min-height: 0;
+  min-height: var(--control-height);
   flex-shrink: 1;
+}
+/* 高视口下若固定项增高（如缩放/新增导航项），插件列表仍保底可浏览高度，
+   避免被压扁至 0px 且外层侧栏无滚动条的死区。 */
+#plugin-navigation:has(#plugin-links:not([hidden]) > p) {
+  min-height: calc(var(--control-height) + 40px);
+}
+#plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
+  min-height: calc(var(--control-height) + 160px);
 }
 #plugin-links {
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -597,6 +611,7 @@ nav h2 {
 #plugin-navigation-group {
   display: flex;
   flex-direction: column;
+  flex: 0 1 auto;
   margin: 0;
   padding: 0;
   border: 0;
@@ -995,6 +1010,11 @@ nav h2 {
   #shell[data-sidebar-collapsed='true'] .brand {
     gap: 0;
   }
+  #shell[data-sidebar-collapsed='true'] aside .brand-logo {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
   #shell[data-sidebar-collapsed='true'] .brand-text,
   #shell[data-sidebar-collapsed='true'] .nav-label,
   #shell[data-sidebar-collapsed='true'] .sidebar-action-label {
@@ -1013,7 +1033,7 @@ nav h2 {
      宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
   #shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
     width: 100%;
-    min-width: 44px;
+    min-width: 0;
     height: 44px;
     min-height: 44px;
     padding: 0;
@@ -1722,7 +1742,7 @@ body.performance-nav-open .performance-nav-toggle svg {
   box-shadow: var(--shadow-small);
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -1824,7 +1844,7 @@ body.performance-nav-open .performance-nav-toggle svg {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -2737,6 +2757,8 @@ details[open] > summary::before {
 dialog {
   width: min(750px, calc(100vw - 30px));
   max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   border: 1px solid var(--control-border);
   border-radius: var(--control-radius);
   color: var(--control-text);
@@ -2866,20 +2888,13 @@ dialog::backdrop {
 #plugin-frame-container iframe {
   width: 100%;
   height: calc(100dvh - 140px);
+  min-height: 260px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 #plugin-frame-container iframe[hidden] {
   display: none;
-}
-@media (min-width: 801px) and (max-height: 560px) {
-  #plugin-navigation {
-    flex-shrink: 0;
-  }
-  #plugin-links {
-    max-height: 40dvh;
-  }
 }
 @media (max-width: 800px), (orientation: portrait) {
   body.sidebar-open {
@@ -3097,10 +3112,11 @@ dialog::backdrop {
   }
   #plugin-links {
     flex: 1;
+    min-height: 0;
     max-height: none;
     overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: auto;
   }
   #plugin-links :is(button, a) {
     width: 100%;
@@ -3119,6 +3135,36 @@ dialog::backdrop {
   }
   .output {
     height: 55dvh;
+  }
+}
+/* 视口较矮时改为整个侧栏统一滚动：既消除插件列表被压缩又无滚动条的临界死区，
+   也避免在窄侧栏里嵌套双滚动条并保证展开后的插件列表完整可读。 */
+@media (max-height: 760px) {
+  #plugin-navigation,
+  #plugin-navigation:has(#plugin-links:not([hidden]) > p),
+  #plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  #plugin-navigation-group {
+    height: auto;
+  }
+  #plugin-links {
+    flex: none;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (min-width: 801px) and (max-width: 1100px) and (max-height: 440px) {
+  .performance-nav-drawer {
+    position: static;
+  }
+}
+@media (max-height: 440px) {
+  dialog {
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
   }
 }
 @media (max-width: 480px) {
