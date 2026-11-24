@@ -114,6 +114,25 @@ def browser(navigation_host, chrome_session):
     def locate(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
 
+    def plain_text_keys(keys):
+        # WebDriver 的特殊键位于私有区，普通文本才需要做幂等重放。
+        return all(
+            isinstance(key, str) and all(
+                not ('\ue000' <= char <= '\ue05f') for char in key)
+            for key in keys
+        )
+
+    def restore_field_value(field, value):
+        driver.execute_script('''
+            const node = arguments[0];
+            const proto = node.tagName === 'TEXTAREA'
+              ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+            setter.call(node, arguments[1]);
+            node.dispatchEvent(new Event('input', {bubbles: true}));
+            node.dispatchEvent(new Event('change', {bubbles: true}));
+        ''', field, value)
+
     class Element:
         """按选择器重新定位的元素包装，避免轮询刷新后句柄失效。"""
 
@@ -152,7 +171,26 @@ def browser(navigation_host, chrome_session):
             click(self.selector)
 
         def send_keys(self, *keys):
-            self._retry(lambda element: element.send_keys(*keys))
+            text_only = plain_text_keys(keys)
+            initial_value = None
+            attempted = False
+
+            def attempt(_):
+                nonlocal initial_value, attempted
+                try:
+                    field = self.raw()
+                    tag = field.tag_name.lower()
+                    if text_only and tag in ('input', 'textarea'):
+                        if initial_value is None:
+                            initial_value = field.get_attribute('value') or ''
+                        elif attempted:
+                            restore_field_value(field, initial_value)
+                    attempted = True
+                    field.send_keys(*keys)
+                    return True, None
+                except StaleElementReferenceException:
+                    return False, None
+            wait.until(attempt)
 
         def find_element(self, by, value):
             return self.raw().find_element(by, value)
@@ -173,10 +211,10 @@ def browser(navigation_host, chrome_session):
     def click(selector):
         def click_when_ready(_):
             # 统计轮询会重建局部节点；点击前重新定位，stale 时交给 wait 重试。
-            element = locate(selector)
-            if not (element.is_displayed() and element.is_enabled()):
-                return False
             try:
+                element = locate(selector)
+                if not (element.is_displayed() and element.is_enabled()):
+                    return False
                 element.click()
             except StaleElementReferenceException:
                 return False
@@ -186,11 +224,11 @@ def browser(navigation_host, chrome_session):
     def hover(selector):
         def hover_when_ready(_):
             # 统计轮询会重建进程树等局部节点；悬停前重新定位，stale 时交给 wait 重试。
-            element = locate(selector)
-            if not element.is_displayed():
-                return False
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
             try:
+                element = locate(selector)
+                if not element.is_displayed():
+                    return False
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
                 ActionChains(driver).move_to_element(element).perform()
             except StaleElementReferenceException:
                 return False
@@ -200,24 +238,16 @@ def browser(navigation_host, chrome_session):
     def type_text(selector, text):
         # Chrome 158 对 sandbox iframe 内输入框的可交互性判定更严格，
         # 先点击聚焦，避免直接 send_keys 被 ChromeDriver 拒绝。
-        def type_when_ready(_):
-            field = locate(selector)
-            if not (field.is_displayed() and field.is_enabled()):
-                return False
-            try:
-                field.click()
-                field.send_keys(text)
-            except StaleElementReferenceException:
-                return False
-            return True
-        wait.until(type_when_ready)
+        field = find(selector)
+        field.click()
+        field.send_keys(text)
 
     def press(selector):
         def press_when_ready(_):
-            element = locate(selector)
-            if not element.is_displayed():
-                return False
             try:
+                element = locate(selector)
+                if not element.is_displayed():
+                    return False
                 ActionChains(driver).click_and_hold(element).perform()
             except StaleElementReferenceException:
                 return False
@@ -2872,6 +2902,139 @@ def test_performance_process_tree_refresh_preserves_nodes(browser):
     """)
     assert state['sameThread'] and state['sameProcess']
     assert 'CPU 66.6%' in state['text']
+
+
+@pytest.mark.browser
+def test_performance_process_tree_refresh_preserves_nodes_when_structure_changes(browser):
+    # 新增线程、子进程或根进程时，只插入新增节点，不能把未变化节点从 DOM 中摘下来。
+    driver = browser.driver
+    snapshot = process_tree_snapshot()
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=lambda: snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.click('[data-performance-category=processes]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return document.querySelectorAll('#performance-process-tree .process-thread').length === 3'''))
+    driver.execute_script('''
+        const nodes = document.querySelectorAll('#performance-process-tree .process-node');
+        window.__rootNode = nodes[0];
+        window.__childNode = nodes[1];
+        window.__threadNode = document.querySelector('#performance-process-tree .process-thread');
+    ''')
+
+    updated = process_tree_snapshot()
+    root = updated['roots'][0]
+    root['threads'].append({
+        'id': 1004, 'user': 0.0, 'system': 0.0, 'cpu_percent': 5.0,
+        'name': 'extra', 'state': 'S', 'start_time': PROCESS_ROOT_CREATED_AT + 5,
+    })
+    root['thread_count'] = 3
+    updated['roots'].append({
+        'pid': 2000, 'ppid': 1, 'name': 'helper.exe', 'status': 'running',
+        'username': 'tester', 'create_time': PROCESS_ROOT_CREATED_AT - 5,
+        'memory_rss': 32 * 1024 ** 2, 'memory_vms': 64 * 1024 ** 2,
+        'thread_count': 0, 'threads': [], 'threads_truncated': False, 'children': [],
+    })
+    updated['process_count'] = 3
+    updated['thread_count'] = 4
+    browser.host.runtime['statistics'].process_tree_snapshot = lambda: updated
+    driver.execute_async_script('''
+        const done = arguments[0];
+        refreshPerformanceProcesses().then(() => done(true), () => done(false));
+    ''')
+    state = driver.execute_script('''
+        const roots = [...document.querySelectorAll(
+          '#performance-process-tree .process-tree-list > .process-node')];
+        return {
+          sameRoot: roots[0] === window.__rootNode,
+          sameChild: roots[0].querySelector('.process-node') === window.__childNode,
+          sameThread: document.querySelector('#performance-process-tree .process-thread') ===
+            window.__threadNode,
+          rootCount: roots.length,
+          childCount: roots[0].querySelectorAll('.process-children > .process-node').length,
+          threadCount: document.querySelectorAll('#performance-process-tree .process-thread').length,
+        };
+    ''')
+    assert state == {
+        'sameRoot': True,
+        'sameChild': True,
+        'sameThread': True,
+        'rootCount': 2,
+        'childCount': 1,
+        'threadCount': 4,
+    }
+
+
+@pytest.mark.browser
+def test_performance_process_tree_refresh_preserves_live_toggle_state(browser):
+    # 刷新先于排队的 toggle 处理器执行时，必须保留 details 的实时 open 状态，不能被旧快照覆盖。
+    driver = browser.driver
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=process_tree_snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.click('[data-performance-category=processes]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return document.querySelectorAll('#performance-process-tree .process-thread').length === 3'''))
+
+    state = driver.execute_script('''
+        const branch = document.querySelector('#performance-process-tree .process-branch');
+        const key = branch.dataset.processBranch;
+        branch.open = false;
+        state.performanceProcessOpen[key] = true;
+        renderProcessTree(state.performanceProcesses);
+        const current = document.querySelector('#performance-process-tree .process-branch');
+        return {same: current === branch, open: current.open};
+    ''')
+    assert state == {'same': True, 'open': False}
+
+
+@pytest.mark.browser
+def test_performance_process_tree_refresh_replaces_process_when_identity_changes(browser):
+    # 同 PID、同结构但启动时间变化表示旧进程退出且新进程复用身份，必须换节点以重新绑定处理器。
+    driver = browser.driver
+    snapshot = process_tree_snapshot()
+    browser.host.runtime['statistics'] = SimpleNamespace(
+        Proc_type='statistics', snapshot=statistics_snapshot,
+        process_tree_snapshot=lambda: snapshot,
+        process_detail_snapshot=process_detail_snapshot)
+    browser.open_sidebar()
+    browser.click('[data-page=performance]')
+    browser.click('[data-performance-category=processes]')
+    browser.wait.until(lambda _: driver.execute_script(
+        r'''return document.querySelectorAll('#performance-process-tree .process-thread').length === 3'''))
+    driver.execute_script('''
+        const root = document.querySelector(
+          '#performance-process-tree .process-tree-list > .process-node');
+        window.__replacedRoot = root;
+        window.__replacedKey = root.dataset.processKey;
+    ''')
+
+    updated = process_tree_snapshot()
+    updated['roots'][0]['create_time'] = PROCESS_ROOT_CREATED_AT + 10
+    browser.host.runtime['statistics'].process_tree_snapshot = lambda: updated
+    driver.execute_async_script('''
+        const done = arguments[0];
+        refreshPerformanceProcesses().then(() => done(true), () => done(false));
+    ''')
+    state = driver.execute_script('''
+        const root = document.querySelector(
+          '#performance-process-tree .process-tree-list > .process-node');
+        return {
+          sameRoot: root === window.__replacedRoot,
+          changedKey: root.dataset.processKey !== window.__replacedKey,
+          branchKey: root.querySelector('.process-branch').dataset.processBranch,
+          nodeKey: root.dataset.processKey,
+        };
+    ''')
+    assert state['sameRoot'] is False
+    assert state['changedKey'] is True
+    assert state['branchKey'] == state['nodeKey']
 
 
 @pytest.mark.browser

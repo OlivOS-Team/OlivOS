@@ -1716,8 +1716,17 @@ function formatIoPriority(value) {
   return value.value === null || value.value === undefined
     ? `等级 ${value.class}` : `等级 ${value.class}:${value.value}`;
 }
+function processThreadKey(thread) {
+  const id = thread && thread.id !== null && thread.id !== undefined ? thread.id : '?';
+  const start = thread && thread.start_time !== null && thread.start_time !== undefined
+    ? thread.start_time : '';
+  return `${id}:${start}`;
+}
 function processThreadElement(thread) {
-  const row = element('li', null, { class: 'process-thread' });
+  const row = element('li', null, {
+    class: 'process-thread',
+    'data-thread-key': processThreadKey(thread),
+  });
   const names = [];
   if (thread.name) names.push(thread.name);
   if (thread.python_name && thread.python_name !== thread.name) names.push(thread.python_name);
@@ -1799,7 +1808,10 @@ function processNodeElement(process, level, rootPid, sampledAt) {
   }
   row.append(element('span', meta.join(' · '), { class: 'process-meta' }));
   const body = element('div', null, { class: 'process-body' });
-  const facts = element('div', null, { class: 'process-facts' });
+  const facts = element('div', null, {
+    class: 'process-facts',
+    'data-process-section': 'facts',
+  });
   const createTime = Number(process.create_time);
   const uptime = Number.isFinite(createTime) ? Math.max(0, Number(sampledAt) - createTime) : 0;
   facts.append(
@@ -1839,29 +1851,48 @@ function processNodeElement(process, level, rootPid, sampledAt) {
   }
   if (process.io) facts.append(processFact('磁盘 I/O', formatIoCounters(process.io)));
   body.append(facts);
-  if (process.exe) body.append(processCommand('可执行文件', process.exe));
-  if (process.cmdline) body.append(processCommand('命令行', process.cmdline));
+  if (process.exe) {
+    const command = processCommand('可执行文件', process.exe);
+    command.dataset.processSection = 'exe';
+    body.append(command);
+  }
+  if (process.cmdline) {
+    const command = processCommand('命令行', process.cmdline);
+    command.dataset.processSection = 'cmdline';
+    body.append(command);
+  }
   if (Array.isArray(process.threads)) {
     if (process.threads.length) {
       const threads = element('ul', null, {
         class: 'process-threads',
         role: 'group',
         'aria-label': `PID ${formatCount(process.pid)} 的线程`,
+        'data-process-section': 'threads',
       });
       for (const thread of process.threads) threads.append(processThreadElement(thread));
       body.append(threads);
       if (process.threads_truncated) {
-        body.append(element('p', '部分线程的扩展信息未读取。', { class: 'process-empty' }));
+        body.append(element('p', '部分线程的扩展信息未读取。', {
+          class: 'process-empty',
+          'data-process-section': 'threads-truncated',
+        }));
       }
     } else {
-      body.append(element('p', '未读取到线程。', { class: 'process-empty' }));
+      body.append(element('p', '未读取到线程。', {
+        class: 'process-empty',
+        'data-process-section': 'threads-empty',
+      }));
     }
   } else {
-    body.append(element('p', '线程信息不可用。', { class: 'process-empty' }));
+    body.append(element('p', '线程信息不可用。', {
+      class: 'process-empty',
+      'data-process-section': 'threads-unavailable',
+    }));
   }
   const detail = element('div', null, {
     class: 'process-detail',
     'data-process-detail': processKey,
+    'data-process-section': 'detail',
   });
   body.append(detail);
   renderProcessDetail(detail, process);
@@ -1870,6 +1901,7 @@ function processNodeElement(process, level, rootPid, sampledAt) {
       class: 'process-children',
       role: 'group',
       'aria-label': `PID ${formatCount(process.pid)} 的子进程`,
+      'data-process-section': 'children',
     });
     for (const child of process.children) {
       children.append(processNodeElement(child, level + 1, rootPid, sampledAt));
@@ -2023,47 +2055,82 @@ function cleanupProcessDetails(data) {
     if (!valid.has(key)) delete state.performanceProcessDetailGroups[key];
   }
 }
-function processTreeShape(node) {
-  if (node.nodeType === Node.TEXT_NODE) return '#';
-  if (node.nodeType !== Node.ELEMENT_NODE) return '';
-  const attrs = [...node.attributes].map((attr) => attr.name).sort().join(',');
-  const children = [...node.childNodes].map(processTreeShape).join(',');
-  return `${node.tagName}[${attrs}](${children})`;
+function processTreeNodeKey(node) {
+  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+  if (node.dataset.processKey !== undefined) return node.dataset.processKey;
+  if (node.dataset.threadKey !== undefined) return node.dataset.threadKey;
+  if (node.dataset.processSection !== undefined) return node.dataset.processSection;
+  if (node.dataset.processDetailGroup !== undefined) return node.dataset.processDetailGroup;
+  return null;
 }
-function mergeProcessTreeNode(existing, desired) {
-  if (desired.nodeType === Node.TEXT_NODE) {
-    if (existing.nodeValue !== desired.nodeValue) existing.nodeValue = desired.nodeValue;
-    return;
-  }
-  if (desired.nodeType !== Node.ELEMENT_NODE) return;
+function mergeProcessElement(existing, desired) {
+  // details 的 open 是用户刚操作的实时状态；toggle 事件可能还在排队，不能按旧快照回写。
+  const preserveOpen = existing.tagName === 'DETAILS';
   for (const attr of [...desired.attributes]) {
+    if (preserveOpen && attr.name === 'open') continue;
     if (existing.getAttribute(attr.name) !== attr.value) existing.setAttribute(attr.name, attr.value);
   }
   for (const attr of [...existing.attributes]) {
+    if (preserveOpen && attr.name === 'open') continue;
     if (!desired.hasAttribute(attr.name)) existing.removeAttribute(attr.name);
   }
-  for (let index = 0; index < desired.childNodes.length; index += 1) {
-    mergeProcessTreeNode(existing.childNodes[index], desired.childNodes[index]);
+}
+function reconcileProcessNode(current, desired) {
+  if (desired.nodeType === Node.TEXT_NODE) {
+    if (current && current.nodeType === Node.TEXT_NODE) {
+      if (current.nodeValue !== desired.nodeValue) current.nodeValue = desired.nodeValue;
+      return current;
+    }
+    return desired;
+  }
+  if (desired.nodeType !== Node.ELEMENT_NODE) return desired;
+  if (!current || current.nodeType !== Node.ELEMENT_NODE || current.tagName !== desired.tagName) {
+    return desired;
+  }
+  mergeProcessElement(current, desired);
+  reconcileProcessChildNodes(current, [...desired.childNodes]);
+  return current;
+}
+function syncProcessChildNodes(parent, next) {
+  const keep = new Set(next);
+  for (const child of [...parent.childNodes]) {
+    if (!keep.has(child)) child.remove();
+  }
+  let reference = parent.firstChild;
+  for (const child of next) {
+    if (child === reference) {
+      reference = reference.nextSibling;
+      continue;
+    }
+    parent.insertBefore(child, reference);
   }
 }
-function reconcileProcessNodes(parent, desired) {
-  const existing = new Map();
-  for (const node of parent.children) {
-    if (node.dataset.processKey !== undefined) existing.set(node.dataset.processKey, node);
+function reconcileProcessChildNodes(parent, desired) {
+  const current = [...parent.childNodes];
+  const keyed = desired.length > 0 &&
+    desired.every((node) => node.nodeType === Node.ELEMENT_NODE &&
+      processTreeNodeKey(node) !== null) &&
+    current.every((node) => node.nodeType === Node.ELEMENT_NODE &&
+      processTreeNodeKey(node) !== null);
+  let next;
+  if (keyed) {
+    const existing = new Map(current.map((node) => [processTreeNodeKey(node), node]));
+    next = desired.map((candidate) => {
+      const key = processTreeNodeKey(candidate);
+      const live = existing.get(key);
+      if (!live) return candidate;
+      existing.delete(key);
+      return reconcileProcessNode(live, candidate);
+    });
+  } else {
+    next = desired.map((candidate, index) => (
+      reconcileProcessNode(current[index], candidate)
+    ));
   }
-  const next = desired.map((candidate) => {
-    const key = candidate.dataset.processKey;
-    const current = existing.get(key);
-    if (!current) return candidate;
-    existing.delete(key);
-    // 结构不变时复用节点，只同步文本和属性，避免轮询刷新打断悬停、选中与展开。
-    if (processTreeShape(current) !== processTreeShape(candidate)) return candidate;
-    mergeProcessTreeNode(current, candidate);
-    return current;
-  });
-  const unchanged = parent.children.length === next.length &&
-    next.every((node, index) => parent.children[index] === node);
-  if (!unchanged) parent.replaceChildren(...next);
+  syncProcessChildNodes(parent, next);
+}
+function reconcileProcessNodes(parent, desired) {
+  reconcileProcessChildNodes(parent, desired);
 }
 function renderProcessTree(data) {
   const container = $('performance-process-tree');
