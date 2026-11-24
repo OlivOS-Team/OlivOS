@@ -93,16 +93,27 @@ def test_write_coverage_payload_uses_gzip_and_preserves_metadata(tmp_path):
     assert path.parent.name == 'raw' and path.suffix == '.gz'
 
 
-def test_chrome_session_starts_precise_coverage_before_navigation(tmp_path):
-    # Profiler 必须先于任何页面导航启动，否则顶层脚本和未执行函数会缺失。
+def test_chrome_session_starts_precise_coverage_before_navigation(tmp_path, monkeypatch):
+    # 必须实际走浏览器打开流程：Profiler 在首次导航前启动，否则首页脚本会缺失。
+    from selenium import webdriver
+
+    class RecordingDriver(FakeDriver):
+        def get(self, url):
+            self.commands.append(('navigate', url))
+
+    driver = RecordingDriver()
+    monkeypatch.delenv('OLIVOS_CHROMEDRIVER', raising=False)
+    monkeypatch.delenv('OLIVOS_CHROME_BINARY', raising=False)
+    monkeypatch.setattr(webdriver, 'Chrome', lambda service=None, options=None: driver)
     session = ChromeSession(tmp_path)
-    session.driver = FakeDriver()
     session.coverage_enabled = True
     session.coverage_directory = tmp_path / 'coverage'
-    assert session.start_coverage() is True
-    assert session.driver.commands == [
+    assert session.open() is driver
+    driver.get('http://127.0.0.1:2048/')
+    assert driver.commands == [
         ('Profiler.enable', {}),
         ('Profiler.startPreciseCoverage', {'callCount': True, 'detailed': True}),
+        ('navigate', 'http://127.0.0.1:2048/'),
     ]
 
 
@@ -173,24 +184,6 @@ def test_chrome_session_writes_incomplete_payload_when_no_scripts_match(tmp_path
     assert payload['scripts'] == []
     assert payload['ignored_script_count'] == 1
     assert '未采集到 WebUI 脚本' in payload['error']
-
-
-def test_chrome_session_open_starts_coverage_before_returning(tmp_path, monkeypatch):
-    # 浏览器打开流程必须在返回驱动前启动 Profiler，确保首页脚本也被采集。
-    from selenium import webdriver
-
-    driver = FakeDriver()
-    monkeypatch.delenv('OLIVOS_CHROMEDRIVER', raising=False)
-    monkeypatch.delenv('OLIVOS_CHROME_BINARY', raising=False)
-    monkeypatch.setattr(webdriver, 'Chrome', lambda service=None, options=None: driver)
-    session = ChromeSession(tmp_path)
-    session.coverage_enabled = True
-    session.coverage_directory = tmp_path / 'coverage'
-    assert session.open() is driver
-    assert driver.commands == [
-        ('Profiler.enable', {}),
-        ('Profiler.startPreciseCoverage', {'callCount': True, 'detailed': True}),
-    ]
 
 
 def test_reset_raw_coverage_removes_previous_run(tmp_path):
