@@ -3621,7 +3621,7 @@ def test_mobile_sidebar_drawer_uses_unified_scroll_on_short_viewport(browser, wi
 
 
 @pytest.mark.browser
-def test_short_viewport_keeps_collapsed_sidebar_plugin_frame_and_dialog_usable(browser):
+def test_short_viewport_collapsed_sidebar_keeps_controls_within_bounds(browser):
     driver = browser.driver
     set_viewport(browser, 1280, 420)
     try:
@@ -3631,42 +3631,53 @@ def test_short_viewport_keeps_collapsed_sidebar_plugin_frame_and_dialog_usable(b
         collapsed_metrics = driver.execute_script('''
             const aside = document.getElementById('sidebar');
             const asideRect = aside.getBoundingClientRect();
+            const visibleLeft = asideRect.left + aside.clientLeft;
+            const visibleRight = visibleLeft + aside.clientWidth;
             const controls = [...aside.querySelectorAll('.brand-logo, #navigation button, .sidebar-footer button')];
             return {
               asideScroll: aside.scrollHeight > aside.clientHeight + 1,
-              clipped: controls.filter(node => node.getBoundingClientRect().right >
-                asideRect.left + aside.clientWidth + 0.5).length,
+              clipped: controls.filter((node) => {
+                const rect = node.getBoundingClientRect();
+                return rect.left < visibleLeft - 0.5 || rect.right > visibleRight + 0.5;
+              }).length,
             };
         ''')
     finally:
         driver.execute_script('setSidebarCollapsed(false, false)')
     assert collapsed_metrics == {'asideScroll': True, 'clipped': 0}
 
+
+@pytest.mark.browser
+def test_short_viewport_plugin_frame_keeps_minimum_readable_height(browser):
+    driver = browser.driver
     set_viewport(browser, 1280, 260)
     browser.select()
     driver.switch_to.default_content()
-    short_page = driver.execute_script('''
+    frame_metrics = driver.execute_script('''
         const main = document.querySelector('main');
-        const frame = state.frame;
-        const dialog = document.getElementById('account-dialog');
-        dialog.showModal();
-        const dialogRect = dialog.getBoundingClientRect();
-        const dialogResult = {
-          dialogFits: dialogRect.height <= innerHeight,
-          dialogOverflow: getComputedStyle(dialog).overflowY,
-          dialogScroll: dialog.scrollHeight > dialog.clientHeight + 1,
-        };
-        dialog.close();
         return {
-          frameHeight: Math.round(frame.getBoundingClientRect().height),
+          frameHeight: Math.round(state.frame.getBoundingClientRect().height),
           mainScroll: main.scrollHeight > main.clientHeight + 1,
-          ...dialogResult,
         };
     ''')
-    assert short_page['frameHeight'] >= 250, short_page
-    assert short_page['mainScroll'], short_page
-    assert (
-        short_page['dialogFits']
-        and short_page['dialogOverflow'] == 'auto'
-        and short_page['dialogScroll']
-    ), short_page
+    assert frame_metrics['frameHeight'] >= 250, frame_metrics
+    assert frame_metrics['mainScroll'], frame_metrics
+
+
+@pytest.mark.browser
+def test_short_viewport_dialog_fits_viewport_and_scrolls(browser):
+    driver = browser.driver
+    set_viewport(browser, 1280, 260)
+    dialog_metrics = driver.execute_script('''
+        const dialog = document.getElementById('account-dialog');
+        dialog.showModal();
+        const rect = dialog.getBoundingClientRect();
+        const result = {
+          fitsViewport: rect.top >= -0.5 && rect.bottom <= innerHeight + 0.5 && rect.height <= innerHeight,
+          overflowY: getComputedStyle(dialog).overflowY,
+          canScroll: dialog.scrollHeight > dialog.clientHeight + 1,
+        };
+        dialog.close();
+        return result;
+    ''')
+    assert dialog_metrics == {'fitsViewport': True, 'overflowY': 'auto', 'canScroll': True}
