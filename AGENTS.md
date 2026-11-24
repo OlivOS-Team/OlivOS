@@ -50,8 +50,8 @@ pip install .[test]          # pytest / pytest-cov / selenium（Windows 用 .[te
 
 python main.py               # 启动
 python -m pytest             # 全量功能测试（默认离线，不需要真实账号）
-python script/flake8_check.py            # CI 使用的风格检查，输出 flake8_output.log
-python script/embed_webui.py             # 重新内嵌 WebUI 前端资源到 staticData.py
+python tools/lint/flake8_check.py        # CI 使用的风格检查，输出 flake8_output.log
+python tools/build/embed_webui.py        # 重新内嵌 WebUI 前端资源到 staticData.py
 ```
 
 浏览器用例（真实 Chrome）与覆盖率统计：
@@ -66,13 +66,13 @@ python -m pytest --cov=OlivOS --cov-branch --cov-context=test \
   --cov-report=term --cov-report=xml:test-results/coverage.xml \
   --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json \
   --junitxml=test-results/junit.xml
-python script/coverage_summary.py test-results/coverage.json test-results/junit.xml
+python tools/coverage/coverage_summary.py test-results/coverage.json test-results/junit.xml
 # CI 汇总 job 下载各平台 artifact 后生成一份跨平台报告
-python script/coverage_summary.py --combined test-summary
+python tools/coverage/coverage_summary.py --combined test-summary
 ```
 
 CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），任何一个前置阶段失败后面都不会跑。
-`staticData.py` 是不入 Git 的打包回退生成物；前端源码可直接服务，打包前运行 `script/embed_webui.py`。
+`staticData.py` 是不入 Git 的打包回退生成物；前端源码可直接服务，打包前运行 `tools/build/embed_webui.py`。
 
 ## 3. 仓库结构
 
@@ -98,7 +98,8 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 | `OlivOS/thirdPartyModule/*` | 内置第三方实现（blivedm、mhyVilaProto）；不基于 PyPI 引入的第三方模块统一放这里，flake8 与覆盖率均排除。 |
 | `plugin/{app,conf,data,tmp}` | 插件目录；`app` 放源码或 `.opk`，运行期数据在 `data/<namespace>/`。 |
 | `conf/` | `account.json`、`config.json`（补丁配置）；`basic.json`、`webui_auth.json` 由运行期生成，旧 `webui_token.txt` 首次升级时迁移。 |
-| `script/` | 打包、flake8 检查、WebUI 资源内嵌、覆盖率汇总脚本。 |
+| `script/` | 本地启动、运行和遗留批处理脚本。 |
+| `tools/` | CI 检查、覆盖率汇总、前端覆盖率报告、WebUI 内嵌和打包构建工具。 |
 | `tests/` | pytest 功能测试，策略见 `tests/README.md`。 |
 | `hook/` | PyInstaller 运行时 hook。 |
 
@@ -353,7 +354,7 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 
 ## 11. 代码风格
 
-以 **flake8** 为准（CI 只跑 flake8，`python script/flake8_check.py` 实际执行
+以 **flake8** 为准（CI 只跑 flake8，`python tools/lint/flake8_check.py` 实际执行
 `python -m flake8 ./`）：
 
 - `max-line-length = 120`，`extend-ignore = E203`。
@@ -393,13 +394,13 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 
 | 改动 | 建议命令 |
 | --- | --- |
-| 任意改动 | `python script/flake8_check.py` |
+| 任意改动 | `python tools/lint/flake8_check.py` |
 | adapter / SDK / 事件映射 / 消息 | `python -m pytest tests/test_sdk_events.py tests/test_adapters.py tests/test_messages.py` |
 | 插件加载、调度、插件 WebUI 资源 | `python -m pytest tests/test_plugin_dispatch.py tests/test_opk_webui_lifecycle.py tests/test_webui_plugin_template.py` |
 | 启动、配置合并、账号 | `python -m pytest tests/test_boot_and_metadata.py tests/test_accounts.py tests/test_legacy_config.py` |
 | WebUI | `python -m pytest tests/test_webui.py tests/test_webui_auth.py tests/test_webui_navigation.py tests/test_webui_environment.py tests/test_webui_passwords.py tests/test_native_webui_passwords.py`（浏览器用例加 `-m browser` 与环境变量） |
 | 日志 / 原生终端 / 原生账号 | `python -m pytest tests/test_logging.py tests/test_native_terminal.py tests/test_native_accounts.py` |
-| `OlivOS/webUI/static/*` | `python script/embed_webui.py` 并核对生成资源；`OlivOS/webUI/staticData.py` 保持忽略，不提交 |
+| `OlivOS/webUI/static/*` | `python tools/build/embed_webui.py` 并核对生成资源；`OlivOS/webUI/staticData.py` 保持忽略，不提交 |
 
 注意事项：
 
@@ -433,7 +434,7 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
     会与现有体系并存并互相冲突。
 12. **顺手大重构。** 修 bug 时批量改名、换风格、动无关文件，会让评审无法判断兼容性风险。
 13. **CWD 假设。** 所有运行期路径相对工作目录；`import OlivOS` 还会创建 `plugin/`、`lib/` 目录。
-14. **手改生成物/内嵌数据。** `OlivOS/webUI/staticData.py` 必须由 `script/embed_webui.py` 生成；
+14. **手改生成物/内嵌数据。** `OlivOS/webUI/staticData.py` 必须由 `tools/build/embed_webui.py` 生成；
     `OlivOS/thirdPartyModule/*` 与 `OlivOS/core/inlineData/data.py` 不属于常规改动范围。
 15. **误解 `remote=` 参数。** `API.Event` 多数公共方法的 `remote=True` 目前是占位
     （`pass` 或返回 `None`），并没有实现远程调用。
@@ -442,7 +443,7 @@ CI 顺序为 **Lint → Test → Build**（`.github/workflows/build.yml`），�
 ## 14. 交付前检查
 
 - `git status --short` 与 `git diff`：只包含预期改动，没有无关文件、没有运行产物、没有全文件重排。
-- 新增/修改的公共行为有对应回归测试，且本地跑过相关测试与 `python script/flake8_check.py`。
+- 新增/修改的公共行为有对应回归测试，且本地跑过相关测试与 `python tools/lint/flake8_check.py`。
 - 改动 adapter 或消息逻辑时，确认所有受影响的 `model` / `sdk` 分支都被考虑到。
 - 改动 `OlivOS/webUI/static/*` 时，`OlivOS/webUI/staticData.py` 已重新生成。
 - 提交信息符合 Conventional Commits；不提交 `conf/basic.json`、token、日志、`data/`、`plugin/*` 运行内容。

@@ -35,14 +35,14 @@ python -m pytest --cov=OlivOS --cov-branch --cov-context=test \
   --cov-report=term --cov-report=xml:test-results/coverage.xml \
   --cov-report=html:test-results/html --cov-report=json:test-results/coverage.json \
   --junitxml=test-results/junit.xml
-python script/coverage_summary.py test-results/coverage.json test-results/junit.xml
+python tools/coverage/coverage_summary.py test-results/coverage.json test-results/junit.xml
 ```
 
 HTML 入口为 `test-results/html/index.html`，可查看每个文件执行过/未执行的行、缺失分支，
 以及经过该行的测试上下文。XML 供覆盖率工具读取，JSON 用于统计，JUnit XML 提供通过、失败、
 错误、跳过数量和失败用例清单。
 CI 中各平台先上传 `coverage.json` 与 `junit.xml`，再由单独的 summary job 下载后运行
-`python script/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
+`python tools/coverage/coverage_summary.py --combined test-summary`，在同一个 job summary 中生成
 跨平台测试统计总表、覆盖率总表、跨平台合计以及可折叠的平台明细。
 
 统计范围为整个 `OlivOS/` Python 代码，含未执行的协议适配器和平台专用代码。

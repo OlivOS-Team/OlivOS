@@ -137,4 +137,4 @@ jobs:
           pattern: test-summary-*
           path: test-summary
       - name: Summarize tests and coverage
-        run: python script/coverage_summary.py --combined test-summary
+        run: python tools/coverage/coverage_summary.py --combined test-summary

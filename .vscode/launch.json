@@ -12,7 +12,7 @@
             "name": "格式检查: 全量",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/script/flake8_check.py",
+            "program": "${workspaceFolder}/tools/lint/flake8_check.py",
             "args": ["--exit-zero"],
             "console": "internalConsole",
             "justMyCode": false

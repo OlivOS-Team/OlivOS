@@ -6,7 +6,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 / /_/ /_  /____/ /  __ |/ / / /_/ /____/ /
 \____/ /_____/___/  _____/  \____/ /____/
 
-@File      :   script/embed_webui.py
+@File      :   tools/build/embed_webui.py
 @Author    :   lunzhiPenxil仑质
 @Contact   :   lunzhipenxil@gmail.com
 @License   :   AGPL
@@ -21,7 +21,7 @@ import base64
 import json
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[1] / 'OlivOS/webUI'
+root = Path(__file__).resolve().parents[2] / 'OlivOS/webUI'
 target = root / 'staticData.py'
 metadata = json.loads((root / 'static/static-files.json').read_text(encoding='utf-8'))
 names = (metadata['entry'], *metadata['root'], *metadata['static'])
@@ -42,7 +42,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \\
 @Desc      :   None
 \'\'\'
 
-# 免构建前端的内嵌资源；由 script/embed_webui.py 生成，不入 Git 跟踪。
+# 免构建前端的内嵌资源；由 tools/build/embed_webui.py 生成，不入 Git 跟踪。
 
 import base64
 from pathlib import Path
