@@ -2664,12 +2664,18 @@ td .actions button {
     monospace;
   padding: 12px;
 }
-/* 日志页固定填满页头以下区域，底部留白与页面左右内边距一致；
-   工具栏换行时由输出面板吸收高度变化，避免底边距离随视口漂移。 */
+/* 日志页占满页头以下的内容区：高度交给弹性布局和页面内边距分配，
+   不再按视口高度硬算；工具栏换行时由输出面板吸收高度变化，底部留白恒等于页面内边距。
+   只在日志页把 main 变成纵向弹性容器，其它页面的布局与滚动方式保持不变。 */
+main:has(> #logs:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+}
 #logs:not([hidden]) {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 84px - var(--page-padding-inline));
+  flex: 1 1 0;
+  min-height: 0;
 }
 #logs .toolbar {
   flex: 0 0 auto;
@@ -2677,6 +2683,9 @@ td .actions button {
 #log-output {
   flex: 1 1 auto;
   height: auto;
+  /* 视口极矮时允许收缩到 .output 的 250px 下限以下：
+     宁可面板变矮、内容在面板内滚动，也不要顶出底边、破坏与页面内边距的对齐。 */
+  min-height: 0;
 }
 .log-line {
   white-space: pre-wrap;
@@ -3177,6 +3186,11 @@ dialog::backdrop {
     padding: var(--page-padding-block) var(--page-padding-inline) var(--page-padding-inline);
     overflow: visible;
     overscroll-behavior-y: auto;
+  }
+  /* 窄屏下 main 高度随内容自适应，弹性布局分不到剩余高度，
+     所以只在日志页把 main 撑成一屏高，其余页面继续走整页滚动。 */
+  main:has(> #logs:not([hidden])) {
+    height: 100dvh;
   }
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
