@@ -2684,7 +2684,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           const template = getComputedStyle(grid).gridTemplateColumns;
           const repeated = template.match(/^repeat\\((\\d+),/);
           const facts = [...grid.children].filter(
-            (node) => node.classList.contains('performance-fact'));
+            (node) => node.classList.contains('performance-fact') && !node.hidden);
           const fillers = facts.filter(
             (node) => node.classList.contains('performance-fact-empty'));
           return {
@@ -2700,7 +2700,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
         });
     """)
     expected_counts = {
-        'overview': 6, 'cpu': 9, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8,
+        'overview': 6, 'cpu': 8, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8,
     }
     for item in fact_layout:
         assert item['count'] == expected_counts[item['category']]
@@ -2715,7 +2715,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           const template = getComputedStyle(grid).gridTemplateColumns;
           const repeated = template.match(/^repeat\\((\\d+),/);
           const columns = repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length;
-          return columns === 2 && grid.children.length % 2 === 0;
+          const facts = [...grid.children].filter(
+            (node) => node.classList.contains('performance-fact') && !node.hidden);
+          return columns === 2 && facts.length % 2 === 0;
         });
     """))
     narrow_fact_layout = driver.execute_script("""
@@ -2725,7 +2727,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
           const template = getComputedStyle(grid).gridTemplateColumns;
           const repeated = template.match(/^repeat\\((\\d+),/);
           const facts = [...grid.children].filter(
-            (node) => node.classList.contains('performance-fact'));
+            (node) => node.classList.contains('performance-fact') && !node.hidden);
           const fillers = facts.filter(
             (node) => node.classList.contains('performance-fact-empty'));
           return {

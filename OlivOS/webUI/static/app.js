@@ -1578,7 +1578,7 @@ function syncPerformanceFactGrids() {
       Number(getComputedStyle(grid).getPropertyValue('--performance-fact-columns')) || 3,
     );
     const count = [...grid.children].filter(
-      (child) => child.classList.contains('performance-fact'),
+      (child) => child.classList.contains('performance-fact') && !child.hidden,
     ).length;
     const missing = (columns - (count % columns)) % columns;
     for (let index = 0; index < missing; index += 1) {
@@ -2384,7 +2384,11 @@ function renderPerformanceStatistics(data) {
   setPerformanceStat('cpu-threads', formatOptionalCount(process.threads));
   const handlesFact = $('performance-fact-handles');
   if (handlesFact) {
-    handlesFact.hidden = process.handles === null || process.handles === undefined;
+    const handlesHidden = process.handles === null || process.handles === undefined;
+    if (handlesFact.hidden !== handlesHidden) {
+      handlesFact.hidden = handlesHidden;
+      schedulePerformanceFactGridSync();
+    }
   }
   setPerformanceStat('cpu-handles', formatOptionalCount(process.handles));
   setPerformanceStat('memory-used', formatBytes(memory.used));
