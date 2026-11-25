@@ -1469,6 +1469,12 @@ header h1 {
 .chart-series-load {
   stroke: var(--chart-process-cpu);
 }
+.chart-series-process-count {
+  stroke: var(--accent);
+}
+.chart-series-process-thread-count {
+  stroke: var(--brand);
+}
 .chart-series-machine-load {
   stroke: var(--chart-machine-load);
 }
@@ -1639,6 +1645,12 @@ header h1 {
 }
 .legend-load {
   color: var(--chart-process-cpu);
+}
+.legend-process-count {
+  color: var(--accent);
+}
+.legend-process-thread-count {
+  color: var(--brand);
 }
 .legend-machine-load {
   color: var(--chart-machine-load);

@@ -1680,6 +1680,9 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
             'network_recv_bps', 'network_sent_bps', 'process_count', 'process_rss',
             'process_cpu_percent', 'process_threads', 'process_handles',
         )}
+        # 进程与线程数量使用独立序列，便于验证缩略图确实使用线程数而非进程数。
+        series['process_count'] = [3, 3, 4]
+        series['process_threads'] = [18, 19, 20]
         series = {key: padded(item, capacity, 'first') for key, item in series.items()}
         return {
             'interval': interval,
@@ -2446,6 +2449,19 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     ''')
     assert [item['maximum'] for item in percentage_minis] == [100, 100, 100]
     assert all(item['y'] > 10 for item in percentage_minis)
+    process_summary = driver.execute_script(
+        'return document.querySelector(`[data-performance-summary=processes]`).textContent')
+    assert '3 进程' in process_summary
+    assert '18 线程' in process_summary
+    process_mini = driver.execute_script('''
+        const svg = document.querySelector(`[data-performance-mini=processes] svg`);
+        return {maximum: Number(svg.dataset.maximum),
+                points: svg.querySelector('.mini-line').getAttribute('points')};
+    ''')
+    assert process_mini['maximum'] == 20
+    assert process_mini['points']
+    assert browser.find('#performance-process-count-readout').get_attribute(
+        'textContent') == '3 进程 · 18 线程'
     network_summary = driver.execute_script(
         "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
     assert '↓ 8.0 KiB/s' in network_summary
@@ -2600,6 +2616,9 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             ('#performance-traffic-chart', ['12 条', '15 条']),
             ('#performance-failure-chart', ['失败事件', '0 条']),
         ],
+        'processes': [
+            ('#performance-process-count-chart', ['进程数', '4', '线程数', '20']),
+        ],
     }
     for category, cases in tooltip_cases.items():
         browser.click(f'[data-performance-category="{category}"]')
@@ -2645,7 +2664,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script(
         "return document.getElementById('performance-fact-handles').hidden")
     assert driver.execute_script(
-        "return document.querySelectorAll('#performance-content .performance-panel').length") == 15
+        "return document.querySelectorAll('#performance-content .performance-panel').length") == 16
 
     # 所有事实网格需按当前列数补齐占位项，末行空槽应与普通事实单元格同色。
     set_viewport(browser, 1280, 800)
