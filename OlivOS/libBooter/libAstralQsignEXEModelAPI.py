@@ -153,7 +153,7 @@ class server(OlivOS.API.Proc_templet):
                 log_data = re.sub(r'\033\[[\d;]*m?', '', log_data)
                 self.log(2, log_data, [('AstralQsign', 'default')])
             except Exception as e:
-                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libAstralQsignEXEModel failed: %s\n%s' % [
+                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libAstralQsignEXEModel failed: {0}\n{1}', [
                         str(e),
                         traceback.format_exc()
                     ],

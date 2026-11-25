@@ -239,7 +239,7 @@ class server(OlivOS.API.Proc_templet):
                     ('onebot', 'default')
                 ])
             except Exception as e:
-                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libCWCBEXEModel failed: %s\n%s' % [
+                self.log(4, OlivOS.L10NAPI.getTrans('OlivOS libCWCBEXEModel failed: {0}\n{1}', [
                         str(e),
                         traceback.format_exc()
                     ],
