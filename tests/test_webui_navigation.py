@@ -1974,6 +1974,14 @@ def hover_chart(driver, selector, ratio):
         return {
           hidden: tooltip.hidden,
           text: tooltip.textContent,
+          rows: [...tooltip.querySelectorAll('.chart-tooltip-row')].map((row) => {
+            const label = row.querySelector('.chart-tooltip-label');
+            const value = row.querySelector('.chart-tooltip-value');
+            return {
+              label: label ? label.textContent : '',
+              value: value ? value.textContent : '',
+            };
+          }),
           cursorVisible: getComputedStyle(cursor).display !== 'none',
         };
     """, selector, ratio)
@@ -2451,8 +2459,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert all(item['y'] > 10 for item in percentage_minis)
     process_summary = driver.execute_script(
         'return document.querySelector(`[data-performance-summary=processes]`).textContent')
-    assert '3 进程' in process_summary
-    assert '18 线程' in process_summary
+    assert process_summary == '3 进程 · 18 线程'
     process_mini = driver.execute_script('''
         const svg = document.querySelector(`[data-performance-mini=processes] svg`);
         return {maximum: Number(svg.dataset.maximum),
@@ -2617,8 +2624,12 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             ('#performance-failure-chart', ['失败事件', '0 条']),
         ],
         'processes': [
-            ('#performance-process-count-chart', ['进程数', '4', '线程数', '20']),
+            ('#performance-process-count-chart', ['进程数', '线程数']),
         ],
+    }
+    # 进程趋势图按“标签 → 数值”逐行精确比对，避免 '4'/'20' 命中 '14'/'120' 等错误计数。
+    exact_tooltip_rows = {
+        '#performance-process-count-chart': [('进程数', '4'), ('线程数', '20')],
     }
     for category, cases in tooltip_cases.items():
         browser.click(f'[data-performance-category="{category}"]')
@@ -2637,6 +2648,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             assert tooltip['hidden'] is False, (category, selector)
             for fragment in fragments:
                 assert fragment in tooltip['text'], (category, selector, fragment, tooltip['text'])
+            expected_rows = exact_tooltip_rows.get(selector)
+            if expected_rows is not None:
+                rows = [(row['label'], row['value']) for row in tooltip['rows']]
+                assert rows == expected_rows, (category, selector, rows)
     browser.click('[data-performance-category="cpu"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-cpu').hidden"))
