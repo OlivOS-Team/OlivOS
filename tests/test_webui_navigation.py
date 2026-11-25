@@ -2675,74 +2675,62 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script(
         "return document.querySelectorAll('#performance-content .performance-panel').length") == 16
 
-    # 所有事实网格需按当前列数补齐占位项，末行空槽应与普通事实单元格同色。
-    set_viewport(browser, 1280, 800)
-    fact_layout = driver.execute_script("""
-        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
-          const grid = document.querySelector(
-            `#performance-view-${category} .performance-fact-grid`);
-          const template = getComputedStyle(grid).gridTemplateColumns;
-          const repeated = template.match(/^repeat\\((\\d+),/);
-          const facts = [...grid.children].filter(
-            (node) => node.classList.contains('performance-fact'));
-          const fillers = facts.filter(
-            (node) => node.classList.contains('performance-fact-empty'));
-          return {
-            category,
-            count: facts.length - fillers.length,
-            rendered: facts.length,
-            columns: repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length,
-            factBackground: getComputedStyle(facts[0]).backgroundColor,
-            fillerBackground: fillers.length
-              ? getComputedStyle(fillers[0]).backgroundColor
-              : null,
-          };
-        });
-    """)
+    # 所有事实网格需按当前列数补齐占位项，占位项必须实际渲染且与普通事实单元格同色。
+    categories = ('overview', 'cpu', 'memory', 'disk', 'network', 'traffic')
     expected_counts = {
-        'overview': 6, 'cpu': 9, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8,
+        'overview': 6, 'cpu': 8, 'memory': 13, 'disk': 10, 'network': 8, 'traffic': 8,
     }
-    for item in fact_layout:
-        assert item['count'] == expected_counts[item['category']]
-        assert item['columns'] == 3
-        assert item['rendered'] % item['columns'] == 0
-        assert item['fillerBackground'] in (None, item['factBackground'])
+
+    def select_fact_category(category):
+        browser.click(f'[data-performance-category="{category}"]')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return !document.querySelector('[data-performance-view=\"' + arguments[0] + '\"]').hidden",
+            category))
+        # 等待视口变化触发的占位同步帧执行完成。
+        driver.execute_async_script(
+            'requestAnimationFrame(() => requestAnimationFrame(() => arguments[0]()));')
+
+    def measure_fact_grid(category):
+        return driver.execute_script("""
+            const category = arguments[0];
+            const grid = document.querySelector(
+              `#performance-view-${category} .performance-fact-grid`);
+            const template = getComputedStyle(grid).gridTemplateColumns;
+            const repeated = template.match(/^repeat\\((\\d+),/);
+            const visible = (node) => !node.hidden && getComputedStyle(node).display !== 'none';
+            const facts = [...grid.children].filter(
+              (node) => node.classList.contains('performance-fact') && visible(node));
+            const fillers = facts.filter(
+              (node) => node.classList.contains('performance-fact-empty'));
+            return {
+              count: facts.length - fillers.length,
+              rendered: facts.length,
+              columns: repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length,
+              factBackground: getComputedStyle(facts[0]).backgroundColor,
+              fillerBackground: fillers.length
+                ? getComputedStyle(fillers[0]).backgroundColor
+                : null,
+              fillersLaidOut: fillers.every((node) => {
+                const rect = node.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+              }),
+            };
+        """, category)
+
+    def assert_fact_layout(expected_columns):
+        for category in categories:
+            select_fact_category(category)
+            item = measure_fact_grid(category)
+            assert item['count'] == expected_counts[category], category
+            assert item['columns'] == expected_columns, category
+            assert item['rendered'] % item['columns'] == 0, category
+            assert item['fillerBackground'] in (None, item['factBackground']), category
+            assert item['fillersLaidOut'], category
+
+    set_viewport(browser, 1280, 800)
+    assert_fact_layout(3)
     set_viewport(browser, 900, 800)
-    browser.wait.until(lambda _: driver.execute_script("""
-        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].every((category) => {
-          const grid = document.querySelector(
-            `#performance-view-${category} .performance-fact-grid`);
-          const template = getComputedStyle(grid).gridTemplateColumns;
-          const repeated = template.match(/^repeat\\((\\d+),/);
-          const columns = repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length;
-          return columns === 2 && grid.children.length % 2 === 0;
-        });
-    """))
-    narrow_fact_layout = driver.execute_script("""
-        return ['overview', 'cpu', 'memory', 'disk', 'network', 'traffic'].map((category) => {
-          const grid = document.querySelector(
-            `#performance-view-${category} .performance-fact-grid`);
-          const template = getComputedStyle(grid).gridTemplateColumns;
-          const repeated = template.match(/^repeat\\((\\d+),/);
-          const facts = [...grid.children].filter(
-            (node) => node.classList.contains('performance-fact'));
-          const fillers = facts.filter(
-            (node) => node.classList.contains('performance-fact-empty'));
-          return {
-            category,
-            rendered: facts.length,
-            columns: repeated ? Number(repeated[1]) : template.split(' ').filter(Boolean).length,
-            factBackground: getComputedStyle(facts[0]).backgroundColor,
-            fillerBackground: fillers.length
-              ? getComputedStyle(fillers[0]).backgroundColor
-              : null,
-          };
-        });
-    """)
-    for item in narrow_fact_layout:
-        assert item['columns'] == 2
-        assert item['rendered'] % item['columns'] == 0
-        assert item['fillerBackground'] in (None, item['factBackground'])
+    assert_fact_layout(2)
 
     # 桌面端左右两栏各自滚动，内容不足时不应占出滚动条。
     set_viewport(browser, 1280, 420)
