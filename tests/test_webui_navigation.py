@@ -11,7 +11,7 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import resourceAPI
-from webui_test_support import make_host
+from webui_test_support import login_ui, make_host
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -108,8 +108,6 @@ def browser(navigation_host, chrome_session):
     url = f"http://127.0.0.1:{navigation_host.config['port']}"
     driver = chrome_session.prepare(url)
     wait = WebDriverWait(driver, 10)
-    # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
-    login_wait = WebDriverWait(driver, 30)
 
     def locate(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
@@ -293,11 +291,7 @@ def browser(navigation_host, chrome_session):
             'Promise.resolve(state.pluginEventChain).then(() => done(true), () => done(true));')
 
     driver.get(url)
-    login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
-                     '登录页输入框未出现')
-    find('#token').send_keys(navigation_host.test_password)
-    click('#login-form button[type=submit]')
-    login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
+    login_ui(driver, navigation_host.test_password)
     yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, hover=hover, press=press, release=release,
                           text=text, attribute=attribute, type_text=type_text,
                           select=select, open_sidebar=open_sidebar,

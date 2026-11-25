@@ -26,6 +26,8 @@ PowerShell 使用 `$env:OLIVOS_WEBUI_BROWSER='1'` 后运行同一 pytest 命令�
 已有浏览器/驱动可通过 `OLIVOS_CHROME_BINARY`、`OLIVOS_CHROMEDRIVER` 指定路径。
 浏览器 fixture 在每个测试模块内复用同一个 Chrome 进程，并在用例开始前关闭遗留标签页；
 这样既保持不同端口的页面隔离，也避免 Windows CI 连续启动浏览器造成随机超时。
+浏览器登录统一走 `webui_test_support.login_ui`：登录初始化卡住时会刷新重试一次，
+最终失败会带上登录页错误、按钮状态和地址，避免只看到无上下文的 TimeoutException。
 原生 Tk 界面用例只在 Windows 运行，窗口保持隐藏；不启动托盘或真实协议程序。
 
 浏览器用例的元素操作：
