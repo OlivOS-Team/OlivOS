@@ -681,6 +681,19 @@
                   <strong class="performance-view-value performance-view-value-processes"
                           data-performance-summary="processes-detail"></strong>
                 </div>
+                <section class="panel performance-panel performance-panel-compact"
+                         aria-labelledby="performance-process-count-chart-title">
+                  <div class="panel-heading">
+                    <h3 id="performance-process-count-chart-title">进程数与线程数</h3>
+                  </div>
+                  <div id="performance-process-count-chart" class="statistics-chart performance-chart-compact"
+                       role="img" aria-label="OlivOS 进程数与线程数趋势"></div>
+                  <p id="performance-process-count-readout" class="performance-readout"></p>
+                  <div class="chart-legend">
+                    <span><i class="legend-dot legend-process-count"></i>进程数</span>
+                    <span><i class="legend-dot legend-process-thread-count"></i>线程数</span>
+                  </div>
+                </section>
                 <section class="panel performance-panel performance-process-panel"
                          aria-labelledby="performance-processes-title">
                   <div class="panel-heading">

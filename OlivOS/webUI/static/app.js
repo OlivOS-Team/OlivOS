@@ -2305,10 +2305,9 @@ function renderPerformanceStatistics(data) {
   const swap = memory.swap_percent === null || memory.swap_percent === undefined
     ? '—'
     : formatPercent(memory.swap_percent);
-  const processScaleItems = [
-    `${formatCount(process.count)} 进程`,
-    `${formatOptionalCount(process.threads)} 线程`,
-  ];
+  const processSummary = `${formatCount(process.count)} 进程 · ` +
+    `${formatOptionalCount(process.threads)} 线程`;
+  const processScaleItems = [processSummary];
   if (process.handles !== null && process.handles !== undefined) {
     processScaleItems.push(`${formatCount(process.handles)} 句柄`);
   }
@@ -2343,6 +2342,7 @@ function renderPerformanceStatistics(data) {
     `下行 ${formatRate(network.recv_bps)} · 上行 ${formatRate(network.sent_bps)}`);
   setPerformanceReadout('performance-load-readout',
     `OlivOS 负载 ${processCpu} · ${processScale}`);
+  setPerformanceReadout('performance-process-count-readout', processSummary);
   setPerformanceReadout('performance-process-memory-readout',
     `${formatBytes(process.rss)} · ${processScale}`);
   setPerformanceReadout('performance-traffic-readout',
@@ -2359,7 +2359,7 @@ function renderPerformanceStatistics(data) {
     `↓ ${formatRate(network.recv_bps)} · ↑ ${formatRate(network.sent_bps)}`);
   setPerformanceSummary('traffic',
     `↓ ${formatCount(traffic.inbound_per_minute)} / ↑ ${formatCount(traffic.outbound_per_minute)}`);
-  setPerformanceSummary('processes', `${formatCount(process.count)} 进程`);
+  setPerformanceSummary('processes', processSummary);
   setPerformanceSummary('processes-detail', processScale);
 
   setPerformanceStat('cpu-model', formatOptionalText(system.cpu_model));
@@ -2454,7 +2454,7 @@ function renderPerformanceStatistics(data) {
     trafficBucketValues(traffic, 'inbound', trafficHistory),
     {zeroPadding: true, capacity: trafficMiniCapacity});
   renderPerformanceMini(
-    document.querySelector('[data-performance-mini="processes"]'), history.process_count || [],
+    document.querySelector('[data-performance-mini="processes"]'), history.process_threads || [],
     {capacity: performanceMiniCapacity});
 
   renderTrend($('performance-cpu-chart'), [
@@ -2515,6 +2515,16 @@ function renderPerformanceStatistics(data) {
     {
       className: 'chart-series-load', legendClass: 'legend-load', label: 'OlivOS 负载',
       formatValue: formatCpuCores, values: history.process_cpu_percent || [],
+    },
+  ], null, history.capacity, { timestamps, includeDate });
+  renderTrend($('performance-process-count-chart'), [
+    {
+      className: 'chart-series-process-count', legendClass: 'legend-process-count', label: '进程数',
+      formatValue: formatCount, values: history.process_count || [],
+    },
+    {
+      className: 'chart-series-process-thread-count', legendClass: 'legend-process-thread-count',
+      label: '线程数', formatValue: formatCount, values: history.process_threads || [],
     },
   ], null, history.capacity, { timestamps, includeDate });
   renderTrend($('performance-process-memory-chart'), [

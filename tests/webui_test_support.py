@@ -198,3 +198,59 @@ def make_host(*args, password=FIXTURE_PASSWORD, **kwargs):
     assert response.status_code == 200
     host.test_token = response.json['browser_token']
     return host
+
+
+def login_ui(driver, password, timeout=30, attempts=2):
+    """在已打开的登录页完成登录，初始化卡住时刷新重试。
+
+    Windows CI 的首个浏览器用例曾出现点击登录后 30 秒仍未进入主界面；
+    重试前采集登录页状态，最终失败时能把错误提示和按钮状态带进断言。
+    """
+    from selenium.common.exceptions import TimeoutException
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    wait = WebDriverWait(driver, timeout)
+
+    def snapshot():
+        return driver.execute_script('''
+            const shell = document.getElementById('shell');
+            const login = document.getElementById('login');
+            const error = document.getElementById('login-error');
+            const submit = document.querySelector('#login-form button[type=submit]');
+            return {
+              href: location.href,
+              readyState: document.readyState,
+              loggedIn: Boolean(shell && !shell.hidden),
+              loginVisible: Boolean(login && !login.hidden),
+              error: error ? error.textContent : '',
+              submitDisabled: submit ? submit.disabled : null,
+            };
+        ''')
+
+    def ready(_):
+        token = driver.find_element(By.ID, 'token')
+        return token if token.is_displayed() and token.is_enabled() else False
+
+    def settled(_):
+        state = snapshot()
+        return state if state['loggedIn'] or state['error'] else False
+
+    last = None
+    for attempt in range(attempts):
+        if attempt:
+            # 请求未返回时登录按钮会持续禁用，只有刷新页面才能重新发起。
+            driver.refresh()
+        token = wait.until(ready, '登录页输入框未出现')
+        token.clear()
+        token.send_keys(password)
+        driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
+        try:
+            last = wait.until(settled, '登录后主界面未出现')
+        except TimeoutException:
+            last = snapshot()
+            continue
+        if last['loggedIn']:
+            return
+        # 登录页给出了错误提示：刷新后仍按同一凭据重试，最终失败会保留该提示。
+    raise AssertionError(f'登录后主界面未出现：{last}')

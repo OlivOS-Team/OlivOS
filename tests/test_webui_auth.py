@@ -12,7 +12,7 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import authAPI, serverAPI
-from webui_test_support import make_host
+from webui_test_support import login_ui, make_host
 
 
 @pytest.fixture
@@ -228,8 +228,6 @@ def test_plugin_navigation_auth_failure_can_notify_parent_without_credentials(ho
 @pytest.mark.parametrize('reset_between', [False, True])
 def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between, chrome_session):
     pytest.importorskip('selenium')
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
 
     host.config.update(host='127.0.0.1', port=0)
     worker = threading.Thread(target=host.run, daemon=True)
@@ -239,11 +237,7 @@ def test_obsolete_login_cannot_finish_a_new_attempt(host, reset_between, chrome_
         url = f"http://127.0.0.1:{host.config['port']}"
         driver = chrome_session.prepare(url)
         driver.get(url)
-        wait = WebDriverWait(driver, 30)
-        wait.until(lambda d: d.find_element(By.ID, 'token').is_displayed())
-        driver.find_element(By.ID, 'token').send_keys(host.test_password)
-        driver.find_element(By.CSS_SELECTOR, '#login-form button[type=submit]').click()
-        wait.until(lambda d: d.find_element(By.ID, 'shell').is_displayed())
+        login_ui(driver, host.test_password)
         result = driver.execute_async_script('''
             const done = arguments[arguments.length - 1];
             const resetBetween = arguments[0];
@@ -301,21 +295,12 @@ def browser_auth(host, chrome_session):
     def open_browser():
         ui.driver = chrome_session.open()
         ui.wait = WebDriverWait(ui.driver, 10)
-        # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
-        ui.login_wait = WebDriverWait(ui.driver, 30)
 
     def find(selector):
         return ui.driver.find_element(By.CSS_SELECTOR, selector)
 
     def login():
-        ui.login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
-                            '登录页输入框未出现')
-        find('#token').send_keys(host.test_password)
-        ui.login_wait.until(lambda _: find('#login-form button[type=submit]').is_displayed()
-                            and find('#login-form button[type=submit]').is_enabled(),
-                            '登录按钮未就绪')
-        find('#login-form button[type=submit]').click()
-        ui.login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
+        login_ui(ui.driver, host.test_password)
 
     def logged_out():
         ui.wait.until(lambda _: find('#login').is_displayed() and find('#login-form button[type=submit]').is_enabled())
@@ -331,7 +316,6 @@ def browser_auth(host, chrome_session):
         ui.url = start(host)
         ui.driver = chrome_session.prepare(ui.url)
         ui.wait = WebDriverWait(ui.driver, 10)
-        ui.login_wait = WebDriverWait(ui.driver, 30)
         ui.driver.get(ui.url)
         login()
         yield ui

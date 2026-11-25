@@ -11,7 +11,7 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import resourceAPI
-from webui_test_support import make_host
+from webui_test_support import login_ui, make_host
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -108,8 +108,6 @@ def browser(navigation_host, chrome_session):
     url = f"http://127.0.0.1:{navigation_host.config['port']}"
     driver = chrome_session.prepare(url)
     wait = WebDriverWait(driver, 10)
-    # Windows CI 连续启动 Chrome 时，首屏脚本偶尔会超过 10 秒才就绪；只放宽登录初始化。
-    login_wait = WebDriverWait(driver, 30)
 
     def locate(selector):
         return driver.find_element(By.CSS_SELECTOR, selector)
@@ -293,11 +291,7 @@ def browser(navigation_host, chrome_session):
             'Promise.resolve(state.pluginEventChain).then(() => done(true), () => done(true));')
 
     driver.get(url)
-    login_wait.until(lambda _: find('#token').is_displayed() and find('#token').is_enabled(),
-                     '登录页输入框未出现')
-    find('#token').send_keys(navigation_host.test_password)
-    click('#login-form button[type=submit]')
-    login_wait.until(lambda _: find('#shell').is_displayed(), '登录后主界面未出现')
+    login_ui(driver, navigation_host.test_password)
     yield SimpleNamespace(driver=driver, wait=wait, find=find, click=click, hover=hover, press=press, release=release,
                           text=text, attribute=attribute, type_text=type_text,
                           select=select, open_sidebar=open_sidebar,
@@ -1680,6 +1674,9 @@ def statistics_snapshot(inbound=120, outbound=45, inbound_per_minute=5.0,
             'network_recv_bps', 'network_sent_bps', 'process_count', 'process_rss',
             'process_cpu_percent', 'process_threads', 'process_handles',
         )}
+        # 进程与线程数量使用独立序列，便于验证缩略图确实使用线程数而非进程数。
+        series['process_count'] = [3, 3, 4]
+        series['process_threads'] = [18, 19, 20]
         series = {key: padded(item, capacity, 'first') for key, item in series.items()}
         return {
             'interval': interval,
@@ -1971,6 +1968,14 @@ def hover_chart(driver, selector, ratio):
         return {
           hidden: tooltip.hidden,
           text: tooltip.textContent,
+          rows: [...tooltip.querySelectorAll('.chart-tooltip-row')].map((row) => {
+            const label = row.querySelector('.chart-tooltip-label');
+            const value = row.querySelector('.chart-tooltip-value');
+            return {
+              label: label ? label.textContent : '',
+              value: value ? value.textContent : '',
+            };
+          }),
           cursorVisible: getComputedStyle(cursor).display !== 'none',
         };
     """, selector, ratio)
@@ -2446,6 +2451,18 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     ''')
     assert [item['maximum'] for item in percentage_minis] == [100, 100, 100]
     assert all(item['y'] > 10 for item in percentage_minis)
+    process_summary = driver.execute_script(
+        'return document.querySelector(`[data-performance-summary=processes]`).textContent')
+    assert process_summary == '3 进程 · 18 线程'
+    process_mini = driver.execute_script('''
+        const svg = document.querySelector(`[data-performance-mini=processes] svg`);
+        return {maximum: Number(svg.dataset.maximum),
+                points: svg.querySelector('.mini-line').getAttribute('points')};
+    ''')
+    assert process_mini['maximum'] == 20
+    assert process_mini['points']
+    assert browser.find('#performance-process-count-readout').get_attribute(
+        'textContent') == '3 进程 · 18 线程'
     network_summary = driver.execute_script(
         "return document.querySelector('[data-performance-summary=\"network\"]').textContent")
     assert '↓ 8.0 KiB/s' in network_summary
@@ -2600,6 +2617,13 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             ('#performance-traffic-chart', ['12 条', '15 条']),
             ('#performance-failure-chart', ['失败事件', '0 条']),
         ],
+        'processes': [
+            ('#performance-process-count-chart', ['进程数', '线程数']),
+        ],
+    }
+    # 进程趋势图按“标签 → 数值”逐行精确比对，避免 '4'/'20' 命中 '14'/'120' 等错误计数。
+    exact_tooltip_rows = {
+        '#performance-process-count-chart': [('进程数', '4'), ('线程数', '20')],
     }
     for category, cases in tooltip_cases.items():
         browser.click(f'[data-performance-category="{category}"]')
@@ -2618,6 +2642,10 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
             assert tooltip['hidden'] is False, (category, selector)
             for fragment in fragments:
                 assert fragment in tooltip['text'], (category, selector, fragment, tooltip['text'])
+            expected_rows = exact_tooltip_rows.get(selector)
+            if expected_rows is not None:
+                rows = [(row['label'], row['value']) for row in tooltip['rows']]
+                assert rows == expected_rows, (category, selector, rows)
     browser.click('[data-performance-category="cpu"]')
     browser.wait.until(lambda _: driver.execute_script(
         "return !document.getElementById('performance-view-cpu').hidden"))
@@ -2645,7 +2673,7 @@ def test_performance_page_renders_category_navigation_and_mobile_layout(browser)
     assert driver.execute_script(
         "return document.getElementById('performance-fact-handles').hidden")
     assert driver.execute_script(
-        "return document.querySelectorAll('#performance-content .performance-panel').length") == 15
+        "return document.querySelectorAll('#performance-content .performance-panel').length") == 16
 
     # 所有事实网格需按当前列数补齐占位项，末行空槽应与普通事实单元格同色。
     set_viewport(browser, 1280, 800)
