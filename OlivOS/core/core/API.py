@@ -3906,6 +3906,9 @@ class StoppableThread(threading.Thread):
 
     def terminate(self):
         if self.root is not None:
+            stop_event = getattr(self.root, '_control_rx_stop', None)
+            if stop_event is not None:
+                stop_event.set()
             try:
                 self.root.on_terminate()
             except Exception:
@@ -3978,19 +3981,29 @@ class Proc_templet(object):
         pass
 
     def run_total(self):
+        stop_event = threading.Event()
+        self._control_rx_stop = stop_event
         t_this = StoppableThread(
             name=self.Proc_name + '+on_control_rx',
             target=self.on_control_rx_init,
             args=()
         )
         t_this.daemon = self.deamon
+        self._control_rx_thread = t_this
         t_this.start()
-        self.run()
+        try:
+            self.run()
+        finally:
+            stop_event.set()
 
     def on_control_rx_init(self):
-        while True:
+        stop_event = getattr(self, '_control_rx_stop', None)
+        while stop_event is None or not stop_event.is_set():
             if self.Proc_info.control_rx_queue.empty():
-                time.sleep(0.02)
+                if stop_event is not None:
+                    stop_event.wait(0.02)
+                else:
+                    time.sleep(0.02)
             else:
                 try:
                     packet = self.Proc_info.control_rx_queue.get(block=False)

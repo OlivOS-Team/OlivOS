@@ -56,10 +56,10 @@ def _make_post_bot(bot_id=3520767439):
     return bot
 
 
-def _wait_for_port(port, timeout=5.0):
+def _wait_for_server(server, port, timeout=5.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if OlivOS.accountAPI.isInuse('127.0.0.1', port):
+        if server._wsgi_server is not None and OlivOS.accountAPI.isInuse('127.0.0.1', port):
             return True
         time.sleep(0.02)
     return False
@@ -80,7 +80,8 @@ def _post_heartbeat(port, bot_id):
         headers={'Content-Type': 'application/json'},
         method='POST',
     )
-    with urllib.request.urlopen(req, timeout=3.0) as resp:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(req, timeout=5.0) as resp:
         return resp.status, resp.read()
 
 
@@ -174,9 +175,12 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
         bot_info_dict=accounts,
     )
     proc_dict['OlivOS_flask_post_rx'] = server1
-    proc_proc_dict['OlivOS_flask_post_rx'] = server1.start_unity('threading')
+    thread1 = server1.start_unity('threading')
+    proc_proc_dict['OlivOS_flask_post_rx'] = thread1
+    started_threads = [thread1]
+    started_servers = [server1]
     try:
-        assert _wait_for_port(port), 'first flask server did not bind port'
+        assert _wait_for_server(server1, port), 'first flask server did not bind port'
 
         status_code, body = _post_heartbeat(port, bot.id)
         assert status_code == 200 and body == b'200'
@@ -194,6 +198,12 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
         OlivOS.bootAPI.stop_component('OlivOS_flask_post_rx', proc_dict, proc_proc_dict)
         assert proc_dict == {} and proc_proc_dict == {}
         assert OlivOS.flaskServerAPI.http_post_activity()[bot.hash] < 0
+        threading.Thread.join(thread1, timeout=3.0)
+        assert not thread1.is_alive()
+        ctrl1 = getattr(server1, '_control_rx_thread', None)
+        if ctrl1 is not None:
+            threading.Thread.join(ctrl1, timeout=3.0)
+            assert not ctrl1.is_alive()
 
         # 热重载重建新组件：立即重新绑定同一端口并接管在线状态。
         server2 = OlivOS.flaskServerAPI.server(
@@ -206,8 +216,11 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
             bot_info_dict=accounts,
         )
         proc_dict['OlivOS_flask_post_rx'] = server2
-        proc_proc_dict['OlivOS_flask_post_rx'] = server2.start_unity('threading')
-        assert _wait_for_port(port), 'restarted flask server did not rebind same port'
+        thread2 = server2.start_unity('threading')
+        proc_proc_dict['OlivOS_flask_post_rx'] = thread2
+        started_threads.append(thread2)
+        started_servers.append(server2)
+        assert _wait_for_server(server2, port), 'restarted flask server did not rebind same port'
 
         status_code, body = _post_heartbeat(port, bot.id)
         assert status_code == 200 and body == b'200'
@@ -216,6 +229,12 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
     finally:
         if 'OlivOS_flask_post_rx' in proc_dict:
             OlivOS.bootAPI.stop_component('OlivOS_flask_post_rx', proc_dict, proc_proc_dict)
+        for thread in started_threads:
+            threading.Thread.join(thread, timeout=3.0)
+        for server in started_servers:
+            ctrl = getattr(server, '_control_rx_thread', None)
+            if ctrl is not None:
+                threading.Thread.join(ctrl, timeout=3.0)
 
 
 def test_account_fix_reallocates_port_when_occupied_by_external_process():
@@ -387,7 +406,8 @@ def test_boot_post_init_stops_existing_instance_even_without_stop_type(monkeypat
 
 def test_webui_commit_accounts_keeps_running_flask_post_port(monkeypatch, tmp_path):
     """WebUI 保存账号时必须将 host.runtime 传给 accountFix，避免自身占用端口被判冲突。"""
-    from OlivOS.webUI import pageAPI, serverAPI
+    from OlivOS.webUI import pageAPI
+    from webui_test_support import make_host
 
     bot = _make_post_bot()
     account_path = tmp_path / 'account.json'
@@ -403,7 +423,7 @@ def test_webui_commit_accounts_keeps_running_flask_post_port(monkeypatch, tmp_pa
     )
     runtime = {'OlivOS_flask_post_rx': parent_proc}
     control_queue = queue.Queue()
-    host = serverAPI.server(
+    host = make_host(
         control_queue=control_queue,
         bot_info_dict={bot.hash: bot},
         account_path=str(account_path),

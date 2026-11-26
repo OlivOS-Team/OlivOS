@@ -14,6 +14,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import socket
 import threading
 import time
 import traceback
@@ -297,10 +298,16 @@ class server(OlivOS.API.Proc_templet):
                 self.Proc_config['Flask_server_host'],
                 self.Proc_config['Flask_server_port']
             )
+            server_name = (
+                socket.gethostname()
+                if tmp_listen[0] in ('0.0.0.0', '::', '')
+                else str(tmp_listen[0])
+            )
             server = pywsgi.WSGIServer(
                 tmp_listen,
                 self.Proc_config['Flask_app'],
-                log=None
+                log=None,
+                environ={'SERVER_NAME': server_name}
             )
             done = threading.Event()
             watcher = None
@@ -325,7 +332,6 @@ class server(OlivOS.API.Proc_templet):
                                     watcher.stop()
                                 except Exception:
                                     pass
-                                done.set()
 
                         watcher.start(_stop_in_loop)
                     self._stop_watcher = watcher
@@ -353,5 +359,5 @@ class server(OlivOS.API.Proc_templet):
                         watcher.close()
                     except Exception:
                         pass
-                done.set()
                 self.on_terminate()
+                done.set()
