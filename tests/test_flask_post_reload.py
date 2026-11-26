@@ -455,9 +455,10 @@ def test_webui_commit_accounts_keeps_running_flask_post_port(monkeypatch, tmp_pa
         host.on_terminate()
 
 
-def test_running_logger_and_plugin_remain_picklable_for_windows_spawn():
+def test_running_logger_and_plugin_remain_picklable_for_windows_spawn(monkeypatch):
     """线程模式已运行的 logger 被 OlivOS_plugin 持有时，仍须可被 spawn 子进程序列化。"""
     ctx = multiprocessing.get_context('spawn')
+    monkeypatch.setattr(OlivOS.API, 'multiprocessing', ctx)
     logger_queue = ctx.Queue()
     control_queue = ctx.Queue()
     rx_queue = ctx.Queue()
@@ -508,9 +509,10 @@ def test_running_logger_and_plugin_remain_picklable_for_windows_spawn():
             assert not ctrl.is_alive()
 
 
-def test_flask_post_server_remains_picklable_for_processing_mode():
+def test_flask_post_server_remains_picklable_for_processing_mode(monkeypatch):
     """flaskServerAPI.server 在 processing 模式下须可被 spawn 子进程序列化并恢复锁。"""
     ctx = multiprocessing.get_context('spawn')
+    monkeypatch.setattr(OlivOS.API, 'multiprocessing', ctx)
     bot = _make_post_bot()
     server = OlivOS.flaskServerAPI.server(
         Proc_name='OlivOS_flask_post_rx',
