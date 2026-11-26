@@ -3937,7 +3937,13 @@ class StoppableThread(threading.Thread):
             raise SystemError("PyThreadState_SetAsyncExc failed")
 
     def stop_thread(self):
-        self._async_raise(self.ident, SystemExit)
+        if not self.is_alive() or self.ident is None:
+            return
+        try:
+            self._async_raise(self.ident, SystemExit)
+        except ValueError:
+            # 线程可能在 on_terminate() 关闭监听后已自行退出，此时无需再强行注入异常。
+            pass
 
 
 class Proc_templet(object):

@@ -178,7 +178,21 @@ class Account(object):
         }
 
 
-def accountFix(basic_conf_models, bot_info_dict, logger_proc):
+def _owns_post_port(model_name, port, active_procs=None):
+    """判断 post 服务端口是否正被当前实例的同名组件持有，避免热重载误判端口冲突。"""
+    if isinstance(active_procs, dict):
+        proc = active_procs.get(model_name)
+        if (
+            proc is not None
+            and getattr(proc, 'Proc_config', {}).get('Flask_server_port') == port
+            and not getattr(proc, '_stop_requested', False)
+        ):
+            return True
+    owns = getattr(OlivOS.flaskServerAPI, 'owns_port', None)
+    return bool(callable(owns) and owns(model_name, port))
+
+
+def accountFix(basic_conf_models, bot_info_dict, logger_proc, active_procs=None):
     res = {}
     with free_port_selector() as g:  # 在端口选择过程中使用上下文
         for basic_conf_models_this in basic_conf_models:
@@ -187,9 +201,10 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
                 and basic_conf_models[basic_conf_models_this]['server']['auto'] is True
             ):
                 basic_conf_models[basic_conf_models_this]['server']['host'] = '0.0.0.0'
-                if isInuse(
-                        '127.0.0.1',
-                        basic_conf_models[basic_conf_models_this]['server']['port']
+                target_port = basic_conf_models[basic_conf_models_this]['server']['port']
+                if (
+                    not _owns_post_port(basic_conf_models_this, target_port, active_procs)
+                    and isInuse('127.0.0.1', target_port)
                 ):
                     basic_conf_models[basic_conf_models_this]['server']['port'] = g.get_free_port()
             if (
@@ -244,15 +259,13 @@ def accountFix(basic_conf_models, bot_info_dict, logger_proc):
 
 
 def isInuse(ip, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    flag = True
-    try:
-        s.connect((ip, port))
-        s.shutdown(2)
-        flag = True
-    except Exception:
-        flag = False
-    return flag
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        try:
+            s.connect((ip, port))
+            s.shutdown(2)
+            return True
+        except Exception:
+            return False
 
 
 class free_port_selector:

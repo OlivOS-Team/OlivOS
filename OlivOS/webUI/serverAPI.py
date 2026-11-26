@@ -477,7 +477,9 @@ class server(OlivOS.API.Proc_templet):
                     pending['result'] = ({'error': '账号已被其他窗口修改，请刷新后重试'}, 409)
                     return
                 accounts = pageAPI.parse_accounts(pending['body'], current)
-                accounts = OlivOS.accountAPI.accountFix(basic_models, accounts, self)
+                accounts = OlivOS.accountAPI.accountFix(
+                    basic_models, accounts, self, active_procs=self.runtime
+                )
                 self.account_path.parent.mkdir(parents=True, exist_ok=True)
                 if self.account_path.exists():
                     backup = self.account_path.with_name(self.account_path.name + '.webui-backup')

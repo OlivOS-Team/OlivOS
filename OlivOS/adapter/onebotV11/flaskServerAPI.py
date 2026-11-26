@@ -14,7 +14,9 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
 @Desc      :   None
 '''
 
+import threading
 import time
+import traceback
 
 from gevent import pywsgi
 from flask import Flask
@@ -45,6 +47,19 @@ def http_post_activity():
             if prev is None or abs(last_seen) > abs(prev):
                 merged[bot_hash] = last_seen
     return merged
+
+
+def owns_port(proc_name, port):
+    """判断本进程中已运行的 HTTP 上报服务是否正在占用指定端口。"""
+    for server in list(_http_post_servers):
+        if (
+            getattr(server, 'Proc_name', None) == proc_name
+            and getattr(server, 'Proc_config', {}).get('Flask_server_port') == port
+            and not getattr(server, '_stop_requested', False)
+            and getattr(server, '_wsgi_server', None) is not None
+        ):
+            return True
+    return False
 
 
 gCheckList = [
@@ -86,7 +101,7 @@ class server(OlivOS.API.Proc_templet):
         OlivOS.API.Proc_templet.__init__(
             self,
             Proc_name=Proc_name,
-            Proc_type='Flask_rx',
+            Proc_type='flask_post_rx',
             scan_interval=scan_interval,
             dead_interval=dead_interval,
             rx_queue=None,
@@ -101,6 +116,14 @@ class server(OlivOS.API.Proc_templet):
         self.Proc_config['Flask_server_host'] = Flask_host
         self.Proc_config['Flask_server_port'] = Flask_port
         self.Proc_config['config'] = self.config_T(debug_mode)
+        # 监听对象要在热停止时显式 stop：StoppableThread.terminate 只会异步抛 SystemExit，
+        # gevent 循环阻塞在等待 I/O 时收不到，旧监听会继续霸占端口并被新实例顶出活动登记表。
+        self._wsgi_lock = threading.Lock()
+        self._wsgi_server = None
+        self._wsgi_thread_ident = None
+        self._stop_watcher = None
+        self._stop_done = None
+        self._stop_requested = False
         # 记录各 HTTP 上报账号最近活动时间，供 WebUI 判断在线状态。
         post_accounts = {
             bot_hash: bot for bot_hash, bot in (bot_info_dict or {}).items()
@@ -158,7 +181,34 @@ class server(OlivOS.API.Proc_templet):
         """返回各 HTTP 上报账号最近一次收到上报的时间，0 表示本次运行未收到。"""
         return self.activity.snapshot()
 
+    def _stop_wsgi_server(self):
+        with self._wsgi_lock:
+            self._stop_requested = True
+            tmp_server = self._wsgi_server
+            tmp_watcher = self._stop_watcher
+            tmp_done = self._stop_done
+            same_thread = self._wsgi_thread_ident == threading.get_ident()
+            self._wsgi_server = None
+            self._stop_watcher = None
+            self._stop_done = None
+            self._wsgi_thread_ident = None
+            if tmp_server is not None and not same_thread and tmp_watcher is not None:
+                try:
+                    tmp_watcher.send()
+                except Exception:
+                    tmp_watcher = None
+        if tmp_server is None:
+            return
+        if not same_thread and tmp_watcher is not None and tmp_done is not None:
+            if tmp_done.wait(timeout=3.0):
+                return
+        try:
+            tmp_server.stop()
+        except Exception:
+            traceback.print_exc()
+
     def on_terminate(self):
+        self._stop_wsgi_server()
         self.deregister()
 
     def on_parent_terminate(self):
@@ -206,10 +256,7 @@ class server(OlivOS.API.Proc_templet):
                     pass
                 return '200'
 
-    def run(self):
-        self.app()
-        self.set_config()
-        self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
+    def _log_running(self):
         self.log(
             2, OlivOS.L10NAPI.getTrans(
                 'OlivOS flask server [{0}] is running on port [{1}]', [
@@ -231,18 +278,80 @@ class server(OlivOS.API.Proc_templet):
                 modelName
             )
         )
+
+    def run(self):
+        self.app()
+        self.set_config()
+        self.Proc_config['Flask_app'].config.from_object(self.Proc_config['config'])
         if self.Proc_config['config'].debug_mode:
-            self.Proc_config['Flask_app'].run(
-                host=self.Proc_config['Flask_server_host'],
-                port=self.Proc_config['Flask_server_port']
-            )
+            self._log_running()
+            try:
+                self.Proc_config['Flask_app'].run(
+                    host=self.Proc_config['Flask_server_host'],
+                    port=self.Proc_config['Flask_server_port']
+                )
+            finally:
+                self.on_terminate()
         else:
+            tmp_listen = (
+                self.Proc_config['Flask_server_host'],
+                self.Proc_config['Flask_server_port']
+            )
             server = pywsgi.WSGIServer(
-                (
-                    self.Proc_config['Flask_server_host'],
-                    self.Proc_config['Flask_server_port']
-                ),
+                tmp_listen,
                 self.Proc_config['Flask_app'],
                 log=None
             )
-            server.serve_forever()
+            done = threading.Event()
+            watcher = None
+            try:
+                with self._wsgi_lock:
+                    if self._stop_requested:
+                        return
+                    server.start()
+                    self._wsgi_server = server
+                    self._wsgi_thread_ident = threading.get_ident()
+                    loop = getattr(server, 'loop', None)
+                    if loop is not None and hasattr(loop, 'async_'):
+                        watcher = loop.async_(ref=False)
+
+                        def _stop_in_loop():
+                            try:
+                                server.stop()
+                            except Exception:
+                                traceback.print_exc()
+                            finally:
+                                try:
+                                    watcher.stop()
+                                except Exception:
+                                    pass
+                                done.set()
+
+                        watcher.start(_stop_in_loop)
+                    self._stop_watcher = watcher
+                    self._stop_done = done
+            except Exception as error:
+                self.log(
+                    3,
+                    f"OlivOS flask server [{self.Proc_config['Flask_name']}] 无法监听 "
+                    f"[{tmp_listen[0]}:{tmp_listen[1]}]: {type(error).__name__}: {error}"
+                )
+                self.on_terminate()
+                raise
+            self._log_running()
+            try:
+                server.serve_forever()
+            finally:
+                with self._wsgi_lock:
+                    self._wsgi_server = None
+                    self._stop_watcher = None
+                    self._stop_done = None
+                    self._wsgi_thread_ident = None
+                if watcher is not None:
+                    try:
+                        watcher.stop()
+                        watcher.close()
+                    except Exception:
+                        pass
+                done.set()
+                self.on_terminate()
