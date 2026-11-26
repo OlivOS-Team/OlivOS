@@ -429,14 +429,9 @@ def getAccountEditorMetadata():
             'QQ/NapCat/9.9.19': '需要已经安装不低于9.9.19版本QQ',
             'QQ/NapCat/9.9.11': '需要已经安装不高于9.9.11版本QQ',
             'QQ/NapCat/旧': '使用本方法需要已经安装较新版本QQ',
-            'QQ官方/公域/V2': '请确保已经添加IP白名单',
             'QQ官方/公域/V2/Webhook': '请确保此BOT接入方式为Webhook',
-            'QQ官方/公域/V2/纯频道': '请确保已经添加IP白名单',
             'QQ官方/公域/V2/纯频道/Webhook': '请确保此BOT接入方式为Webhook',
-            'QQ官方/公域/V2/指定intents': '请确保已经添加IP白名单',
-            'QQ官方/私域/V2': '请确保已经添加IP白名单',
             'QQ官方/私域/V2/Webhook': '请确保此BOT接入方式为Webhook',
-            'QQ官方/私域/V2/指定intents': '请确保已经添加IP白名单',
             'QQ官方/沙盒/V2/Webhook': '请确保此BOT接入方式为Webhook'
         },
         'type_clear_note_list': {

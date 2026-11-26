@@ -251,6 +251,7 @@ class server(OlivOS.API.Proc_templet):
             retired = list(self.sockets)
             self.sockets.clear()
             self.tk_bridge.revoke()
+        self.qr_bind_manager.cancel_all()
         if retired and self.loop and self.loop.is_running():
             try:
                 # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。

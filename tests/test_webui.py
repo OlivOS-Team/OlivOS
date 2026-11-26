@@ -148,8 +148,10 @@ def test_qqguild_bind_releases_credentials_once_without_logging_or_saving(host, 
     assert all(base64.b64encode(key).decode() not in repr(records) for key in remote.keys.values())
 
 
-@pytest.mark.parametrize('end', ['cancel', 'expire', 'terminate'])
+@pytest.mark.parametrize('end', ['cancel', 'expire', 'terminate', 'reset_password'])
 def test_qqguild_bind_expired_or_cancelled_has_no_qr_or_credentials(host, client, monkeypatch, end):
+    from OlivOS.webUI import authAPI
+
     remote = QQBindRemote(monkeypatch)
     path = QR_BIND + '/' + client.post(QR_BIND).json['bind_id']
     if end == 'cancel':
@@ -157,11 +159,19 @@ def test_qqguild_bind_expired_or_cancelled_has_no_qr_or_credentials(host, client
         assert response.json == {'ok': True} and response.headers['Cache-Control'] == 'no-store'
     elif end == 'expire':
         remote.status = 3
+    elif end == 'reset_password':
+        host.reset_password(authAPI.password_record('rotated-qr-password'))
+        login = host.app.test_client().post('/api/login', json={'password': 'rotated-qr-password'})
+        assert login.status_code == 200
+        client.environ_base['HTTP_X_AUTH_TOKEN'] = login.json['browser_token']
     else:
         host.on_terminate()
     result = client.get(path)
     assert result.json['status'] == 3 and 'credentials' not in result.json
     assert client.get(path + '/qrcode').status_code == 404
+    if end == 'reset_password':
+        # 密码重置仅取消旧会话，不影响新登录后的扫码服务。
+        assert client.post(QR_BIND).status_code == 200
 
 
 def test_qqguild_bind_upstream_error_is_sanitized(client, monkeypatch):

@@ -29,6 +29,7 @@ class QQBindRemote:
         self.status = 1
         self.app_id = '12345678'
         self.app_secret = secrets.token_urlsafe(24)
+        self.credentials = None
         self.keys = {}
         monkeypatch.setattr(requests, 'post', self.post)
 
@@ -41,10 +42,22 @@ class QQBindRemote:
             key = self.keys[json['task_id']]
             data = {'status': self.status}
             if self.status == 2:
-                iv = os.urandom(12)
-                sealed = iv + AESGCM(key).encrypt(iv, self.app_secret.encode(), None)
-                data.update(bot_appid=self.app_id, user_openid='fixture-openid',
-                            bot_encrypt_secret=base64.b64encode(sealed).decode('ascii'))
+                if self.credentials is not None:
+                    entries = []
+                    for item_id, item_secret in self.credentials:
+                        iv = os.urandom(12)
+                        sealed = iv + AESGCM(key).encrypt(iv, item_secret.encode(), None)
+                        entries.append({
+                            'bot_appid': item_id,
+                            'user_openid': 'fixture-openid',
+                            'bot_encrypt_secret': base64.b64encode(sealed).decode('ascii'),
+                        })
+                    data.update(user_openid='fixture-openid', credentials=entries)
+                else:
+                    iv = os.urandom(12)
+                    sealed = iv + AESGCM(key).encrypt(iv, self.app_secret.encode(), None)
+                    data.update(bot_appid=self.app_id, user_openid='fixture-openid',
+                                bot_encrypt_secret=base64.b64encode(sealed).decode('ascii'))
         else:
             raise AssertionError('unexpected outbound HTTP request')
         return self.response({'retcode': 0, 'data': data})

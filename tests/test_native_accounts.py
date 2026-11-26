@@ -191,7 +191,8 @@ def _until(root, condition):
 @pytest.fixture
 def qq_http(monkeypatch):
     # 仅替换 QQ HTTP 边界；渲染、加解密、会话清理和本机控制总线均使用真实实现。
-    state = SimpleNamespace(status=2, calls=[], entered=threading.Event(), proceed=threading.Event())
+    state = SimpleNamespace(
+        status=2, calls=[], entered=threading.Event(), proceed=threading.Event(), credentials=None)
     state.proceed.set()
     key = None
 
@@ -207,10 +208,25 @@ def qq_http(monkeypatch):
             assert url == 'https://q.qq.com/lite/poll_bind_result' and json['task_id'] == 'offline-native-qr'
             data = {'status': state.status}
             if state.status == 2:
-                nonce = os.urandom(12)
-                encrypted = AESGCM(key).encrypt(nonce, b'offline-native-secret', None)
-                data.update(bot_appid='10001', bot_encrypt_secret=base64.b64encode(nonce + encrypted).decode('ascii'),
-                            user_openid='offline-user')
+                if state.credentials is not None:
+                    entries = []
+                    for item_id, item_secret in state.credentials:
+                        nonce = os.urandom(12)
+                        encrypted = AESGCM(key).encrypt(nonce, item_secret.encode('utf-8'), None)
+                        entries.append({
+                            'bot_appid': item_id,
+                            'bot_encrypt_secret': base64.b64encode(nonce + encrypted).decode('ascii'),
+                            'user_openid': 'offline-user',
+                        })
+                    data.update(user_openid='offline-user', credentials=entries)
+                else:
+                    nonce = os.urandom(12)
+                    encrypted = AESGCM(key).encrypt(nonce, b'offline-native-secret', None)
+                    data.update(
+                        bot_appid='10001',
+                        bot_encrypt_secret=base64.b64encode(nonce + encrypted).decode('ascii'),
+                        user_openid='offline-user',
+                    )
         return SimpleNamespace(status_code=200, json=lambda: {'retcode': 0, 'data': data})
 
     monkeypatch.setattr(OlivOS.qqGuildv2QrBindAPI.requests, 'post', post)
@@ -473,7 +489,99 @@ def test_native_expired_qr_stops_polling_and_disables_stale_links(hidden_root, q
     qq_http.status = 3
     callback = Mock()
     dialog = OlivOS.multiLoginUIAPI.QrBindDialog(hidden_root, callback)
+    assert os.path.exists('./resource/tmp_favoricon.ico')
     _until(hidden_root, lambda: '过期' in dialog.status_label['text'])
     assert dialog.after_id is None and dialog.photo is None
     assert dialog.copy_button.instate(['disabled']) and dialog.open_button.instate(['disabled'])
     callback.assert_not_called()
+
+
+@pytest.mark.parametrize('action', ['create', 'update'])
+def test_native_editor_scan_blocks_silent_overwrite_on_collision(hidden_root, qq_http, action):
+    existing = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='qqGuildv2_link', platform_platform='qqGuild', platform_model='public',
+        server_type='websocket', server_auto=True, port=0, access_token='keep-old-secret')
+    other = OlivOS.API.bot_info_T(
+        id=20002, platform_sdk='qqGuildv2_link', platform_platform='qqGuild', platform_model='public',
+        server_type='websocket', server_auto=True, port=0, access_token='other-secret')
+    accounts = {existing.hash: existing}
+    if action == 'update':
+        accounts[other.hash] = other
+    host, control = _host(accounts)
+    if action == 'create':
+        form = _form(host, 'QQ官方/公域/V2')
+    else:
+        form = OlivOS.multiLoginUIAPI.TreeEditUI(
+            'update', host.UIData['Account_data'], hash_key=other.hash,
+            edit_commit_callback=host.tree_edit_commit, parent=host.UIObject['root'])
+        form.start()
+    root = form.UIObject['edit_root']
+    form.UIObject['edit_root_Button_qqguild_qr_bind'].invoke()
+    dialog = root.grab_current()
+    _until(hidden_root, lambda: not dialog.winfo_exists())
+    assert root.winfo_exists()
+    assert '已存在' in form.UIObject['edit_root_qr_hint']['text']
+    assert host.UIData['Account_data'][existing.hash].post_info.access_token == 'keep-old-secret'
+    assert control.empty()
+
+
+def test_native_quick_scan_and_editor_handle_multiple_credentials(hidden_root, qq_http):
+    qq_http.credentials = [('10001', 'secret-one'), ('10002', 'secret-two')]
+    host, control = _host({})
+    root = host.UIObject['root']
+    host.UIObject['root_new_menu'].invoke(1)
+    _until(hidden_root, lambda: not root.winfo_exists())
+    packets = [control.get_nowait() for _ in range(4)]
+    saved = packets[1].key['data']
+    assert {(str(bot.id), bot.post_info.access_token) for bot in saved.values()} == {
+        ('10001', 'secret-one'), ('10002', 'secret-two'),
+    }
+
+    host2, control2 = _host({})
+    form = _form(host2, 'QQ官方/公域/V2')
+    edit_root = form.UIObject['edit_root']
+    form.UIObject['edit_root_Button_qqguild_qr_bind'].invoke()
+    dialog = edit_root.grab_current()
+    _until(hidden_root, lambda: not dialog.winfo_exists())
+    assert edit_root.winfo_exists()
+    assert form.UIData['edit_root_Entry_ID_StringVar'].get() == '10001'
+    assert form.UIData['edit_root_Entry_Server_access_token_StringVar'].get() == 'secret-one'
+    assert '10002' in form.UIObject['edit_root_qr_hint']['text']
+    assert control2.empty()
+
+
+def test_native_reopen_syncs_clean_draft_and_confirms_stale_dirty_draft(hidden_root, monkeypatch):
+    bot1 = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='terminal_link', platform_platform='terminal', platform_model='default')
+    bot2 = OlivOS.API.bot_info_T(
+        id=10002, platform_sdk='terminal_link', platform_platform='terminal', platform_model='default')
+    control = queue.Queue()
+    OlivOS.multiLoginUIAPI.run_HostUI_asayc({bot1.hash: bot1}, control)
+    window = hidden_root.children['account_manager']
+    host = window._olivos_host_ui
+    assert set(host.UIData['Account_data']) == {bot1.hash}
+
+    # 未编辑时重新打开窗口，应自动同步外部最新账号列表。
+    bot1_updated = OlivOS.API.bot_info_T(
+        id=10001, platform_sdk='terminal_link', platform_platform='terminal', platform_model='default')
+    bot1_updated.debug_mode = True
+    OlivOS.multiLoginUIAPI.run_HostUI_asayc({bot1_updated.hash: bot1_updated, bot2.hash: bot2}, control)
+    assert set(host.UIData['Account_data']) == {bot1.hash, bot2.hash}
+    assert host.UIData['Account_data'][bot1.hash].debug_mode is True
+    assert host.UIData['external_updated'] is False
+
+    # 有未提交本地修改时，外部变更不应静默覆盖草稿，提交前必须弹出覆盖确认。
+    host.UIData['Account_data'][bot1.hash].enable = False
+    host.UIData['account_dirty'] = True
+    OlivOS.multiLoginUIAPI.run_HostUI_asayc({bot1_updated.hash: bot1_updated}, control)
+    assert host.UIData['external_updated'] is True
+    assert bot2.hash in host.UIData['Account_data']
+    assert host.UIData['Account_data'][bot1.hash].enable is False
+
+    confirm = Mock(side_effect=[False, True])
+    monkeypatch.setattr(OlivOS.multiLoginUIAPI.messagebox, 'askyesno', confirm)
+    host.account_data_commit()
+    assert window.winfo_exists() and control.empty() and not host.UIData['flag_commit']
+    host.account_data_commit()
+    assert not window.winfo_exists() and host.UIData['flag_commit'] and not control.empty()
+    assert confirm.call_count == 2

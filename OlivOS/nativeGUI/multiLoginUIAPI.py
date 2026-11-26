@@ -42,6 +42,26 @@ dictColorContext = {
 }
 
 
+def _account_snapshot(account_data):
+    snapshot = {}
+    for key, bot in (account_data or {}).items():
+        post = getattr(bot, 'post_info', None)
+        snapshot[key] = (
+            str(getattr(bot, 'id', '')),
+            bool(getattr(bot, 'enable', True)),
+            str(getattr(bot, 'password', '')),
+            tuple(sorted((getattr(bot, 'platform', None) or {}).items())),
+            bool(getattr(post, 'auto', False)),
+            str(getattr(post, 'type', '')),
+            str(getattr(post, 'host', '')),
+            getattr(post, 'port', 0),
+            str(getattr(post, 'access_token', '')),
+            repr(getattr(bot, 'extends', None)),
+            bool(getattr(bot, 'debug_mode', False)),
+        )
+    return snapshot
+
+
 def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
     if platform.system() == 'Windows':
         try:
@@ -49,6 +69,9 @@ def run_HostUI_asayc(plugin_bot_info_dict, control_queue):
             owner = tkinter._default_root
             existing = owner.children.get('account_manager') if owner is not None else None
             if existing is not None:
+                host_ui = getattr(existing, '_olivos_host_ui', None)
+                if host_ui is not None:
+                    host_ui.sync_external_accounts(plugin_bot_info_dict)
                 existing.deiconify()
                 (existing.grab_current() or existing).lift()
                 return
@@ -174,6 +197,12 @@ class QrBindDialog(tkinter.Toplevel):
         self.protocol('WM_DELETE_WINDOW', self.destroy)
         self.bind('<Escape>', lambda _event: self.destroy())
         self.bind('<Destroy>', self._on_destroy)
+        try:
+            if not os.path.exists('./resource/tmp_favoricon.ico'):
+                releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
+            self.iconbitmap('./resource/tmp_favoricon.ico')
+        except (tkinter.TclError, OSError):
+            pass
         self.grab_set()
         self.after_id = self.after(200, self._update_status)
         self.worker = threading.Thread(target=_run_qr_bind, args=(self.manager, self.stopped, self.events), daemon=True)
@@ -217,10 +246,10 @@ class QrBindDialog(tkinter.Toplevel):
                 self.open_button.state(['disabled'])
                 return
             elif data['status'] == 2:
-                credentials = data['credentials'][0]
+                credentials = data['credentials']
                 callback = self.on_complete
                 self.destroy()
-                callback(credentials['app_id'], credentials['app_secret'])
+                callback(credentials)
                 return
             else:
                 self.status_label.configure(text='等待手机 QQ 扫码确认…')
@@ -274,10 +303,24 @@ class HostUI(object):
         self.res = False
         # 运行中的编辑使用独立草稿，取消窗口时不能修改宿主账号对象。
         self.UIData['Account_data'] = copy.deepcopy(Account_data) if asaycMode else Account_data
+        self.UIData['base_snapshot'] = _account_snapshot(self.UIData['Account_data'])
+        self.UIData['external_updated'] = False
         self.UIData['flag_commit'] = False
         self.UIData['account_dirty'] = False
         self.UIConfig.update(dictColorContext)
         releaseBase64Data('./resource', 'tmp_favoricon.ico', OlivOS.data.favoricon)
+
+    def sync_external_accounts(self, latest_account_data):
+        latest_snapshot = _account_snapshot(latest_account_data)
+        if latest_snapshot == self.UIData['base_snapshot']:
+            return
+        if not self.UIData['account_dirty']:
+            self.UIData['Account_data'] = copy.deepcopy(latest_account_data) if self.asaycMode else latest_account_data
+            self.UIData['base_snapshot'] = latest_snapshot
+            self.UIData['external_updated'] = False
+            self.tree_load()
+        else:
+            self.UIData['external_updated'] = True
 
     def log(self, log_level, log_message):
         if self.logger_proc is not None:
@@ -288,6 +331,7 @@ class HostUI(object):
             self.UIObject['root'] = tkinter.Tk()
         else:
             self.UIObject['root'] = tkinter.Toplevel(name='account_manager')
+        self.UIObject['root']._olivos_host_ui = self
         self.UIObject['root'].title('OlivOS 登录管理器 - %s' % OlivOS.infoAPI.OlivOS_Version_Title)
         self.UIObject['root'].geometry('518x400')
         self.UIObject['root'].resizable(
@@ -618,25 +662,33 @@ class HostUI(object):
             return
         QrBindDialog(root, self._commit_qr_account)
 
-    def _commit_qr_account(self, app_id, app_secret):
-        row = OlivOS.qqGuildv2QrBindAPI.build_qqguild_v2_ws_account(app_id, app_secret)
-        server = row['server']
-        bot = OlivOS.API.bot_info_T(
-            id=row['id'], password=row['password'], server_auto=server['auto'], server_type=server['type'],
-            host=server['host'], port=server['port'], access_token=server['access_token'],
-            platform_sdk=row['sdk_type'], platform_platform=row['platform_type'], platform_model=row['model_type']
+    def _commit_qr_account(self, credentials, app_secret=None):
+        items = (
+            [{'app_id': credentials, 'app_secret': app_secret}]
+            if not isinstance(credentials, list) else credentials
         )
         accounts = self.UIData['Account_data']
-        # bot.hash 的身份键是 ID + SDK + 平台，不含模型或连接类型。
-        if bot.hash in accounts:
-            if not messagebox.askyesno(
-                '更新已有账号', f'账号 {bot.id} 已存在。是否仅更新 AppSecret 并保存？', parent=self.UIObject['root']
-            ):
-                return
-            accounts[bot.hash].post_info.access_token = server['access_token']
-        else:
-            accounts[bot.hash] = bot
-        self.account_data_commit()
+        changed = False
+        for item in items:
+            row = OlivOS.qqGuildv2QrBindAPI.build_qqguild_v2_ws_account(item['app_id'], item['app_secret'])
+            server = row['server']
+            bot = OlivOS.API.bot_info_T(
+                id=row['id'], password=row['password'], server_auto=server['auto'], server_type=server['type'],
+                host=server['host'], port=server['port'], access_token=server['access_token'],
+                platform_sdk=row['sdk_type'], platform_platform=row['platform_type'], platform_model=row['model_type']
+            )
+            # bot.hash 的身份键是 ID + SDK + 平台，不含模型或连接类型。
+            if bot.hash in accounts:
+                if not messagebox.askyesno(
+                    '更新已有账号', f'账号 {bot.id} 已存在。是否仅更新 AppSecret 并保存？', parent=self.UIObject['root']
+                ):
+                    continue
+                accounts[bot.hash].post_info.access_token = server['access_token']
+            else:
+                accounts[bot.hash] = bot
+            changed = True
+        if changed:
+            self.account_data_commit()
 
     def tree_rightKey(self, event):
         self.UIObject['tree_rightkey_menu'].delete(0, tkinter.END)
@@ -933,6 +985,11 @@ class HostUI(object):
         self.tree_load()
 
     def account_data_commit(self):
+        if self.UIData.get('external_updated') and not messagebox.askyesno(
+            '账号已被其他窗口修改', '账号列表在打开期间已被外部更新，是否仍以当前草稿覆盖保存？',
+            parent=self.UIObject['root']
+        ):
+            return
         self.UIData['flag_commit'] = True
         self.res = True
         if type(self.callbackData) is dict:
@@ -1266,13 +1323,30 @@ class TreeEditUI(object):
 
         self.UIObject['edit_root'].iconbitmap('./resource/tmp_favoricon.ico')
 
-    def _fill_qr_credentials(self, app_id, app_secret):
+    def _fill_qr_credentials(self, credentials, app_secret=None):
+        items = (
+            [{'app_id': credentials, 'app_secret': app_secret}]
+            if not isinstance(credentials, list) else credentials
+        )
+        app_id = items[0]['app_id']
+        secret = items[0]['app_secret']
+        extra_ids = [str(item['app_id']) for item in items[1:]]
         self.UIData['edit_root_Entry_ID_StringVar'].set(app_id)
-        self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(app_secret)
+        self.UIData['edit_root_Entry_Server_access_token_StringVar'].set(secret)
         server_type = self.UIData['edit_root_Combobox_Server_type_StringVar'].get()
+        sdk = self.UIData['edit_root_Combobox_sdk_StringVar'].get()
+        platform_name = self.UIData['edit_root_Combobox_platform_StringVar'].get()
         model = self.UIData['edit_root_Combobox_model_StringVar'].get()
         port_text = self.UIData['edit_root_Entry_Server_port_StringVar'].get().strip()
         is_intents = model.endswith('_intents')
+        target_id = int(app_id) if str(app_id).isdigit() else str(app_id)
+        target_hash = OlivOS.API.bot_info_T(
+            id=target_id, platform_sdk=sdk, platform_platform=platform_name, platform_model=model
+        ).hash
+        has_collision = (
+            target_hash in self.UIData['Account_data']
+            and (self.action == 'create' or target_hash != self.hash_key)
+        )
         if server_type == 'post':
             # Webhook 预设已在 ID 变量上绑定刷新；自定义组合使用同一刷新流程。
             if self._webhook_id_trace is None:
@@ -1284,6 +1358,10 @@ class TreeEditUI(object):
             hint = '已填入凭据，请填写有效的 Intents 后点击保存。'
         elif port_text and (not port_text.isdigit() or (not is_intents and int(port_text) > 65535)):
             hint = '已填入凭据，请核对端口后点击保存。'
+        elif has_collision:
+            hint = f'已填入凭据，但账号 {app_id} 已存在，请核对后再点击保存。'
+        elif extra_ids:
+            hint = f'已填入 {app_id}，其余账号（{"、".join(extra_ids)}）请使用快捷扫码创建。'
         else:
             self.tree_edit_commit()
             return

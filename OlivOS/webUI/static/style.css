@@ -496,26 +496,14 @@ nav h2 {
   margin: 0 14px 5px;
 }
 #plugin-navigation {
-  min-height: var(--control-height);
-  flex-shrink: 1;
-}
-/* 高视口下若固定项增高（如缩放/新增导航项），插件列表仍保底可浏览高度，
-   避免被压扁至 0px 且外层侧栏无滚动条的死区。 */
-#plugin-navigation:has(#plugin-links:not([hidden]) > p) {
-  min-height: calc(var(--control-height) + 40px);
-}
-#plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
-  min-height: calc(var(--control-height) + 160px);
+  flex: 0 0 auto;
+  min-height: 0;
 }
 #plugin-links {
+  flex: none;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-#plugin-links:hover {
-  scrollbar-color: var(--muted) transparent;
+  max-height: none;
+  overflow: visible;
 }
 #plugin-links p {
   margin: 8px 14px;
@@ -2457,6 +2445,9 @@ body.performance-nav-open .performance-nav-toggle svg {
   .performance-fact-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .process-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .account-status-list {
   margin: 6px 0 12px;
@@ -2495,10 +2486,26 @@ body.performance-nav-open .performance-nav-toggle svg {
   border-radius: var(--control-radius) 0 0 var(--control-radius);
 }
 #add-account-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: var(--control-height);
-  padding-inline: 8px;
+  padding: 0;
   border-left: 0;
   border-radius: 0 var(--control-radius) var(--control-radius) 0;
+}
+#add-account-menu-toggle svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 140ms ease;
+}
+#add-account-menu-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 #account-add-menu {
   position: absolute;
@@ -3214,19 +3221,17 @@ dialog::backdrop {
     place-items: center;
   }
   #plugin-navigation {
-    flex: 1 1 160px;
-    min-height: 160px;
+    flex: 0 0 auto;
+    min-height: 0;
   }
   #plugin-navigation-group {
-    height: 100%;
+    height: auto;
   }
   #plugin-links {
-    flex: 1;
+    flex: none;
     min-height: 0;
     max-height: none;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
+    overflow: visible;
   }
   #plugin-links :is(button, a) {
     width: 100%;
@@ -3240,6 +3245,21 @@ dialog::backdrop {
   #plugin-links a {
     min-height: 44px;
   }
+  #logs .log-filter-control {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  #logs #log-filter {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #logs #log-filter > summary {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   main {
     padding: var(--page-padding-block) var(--page-padding-inline) var(--page-padding-inline);
     overflow: visible;
@@ -3249,6 +3269,14 @@ dialog::backdrop {
      所以只在日志页把 main 撑成一屏高，其余页面继续走整页滚动。 */
   main:has(> #logs:not([hidden])) {
     height: 100dvh;
+    padding-top: var(--page-padding-inline);
+  }
+  main:has(> #logs:not([hidden])) header {
+    margin-bottom: 10px;
+  }
+  #logs .toolbar {
+    gap: 8px 10px;
+    margin-bottom: 10px;
   }
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3277,23 +3305,6 @@ dialog::backdrop {
     gap: 8px;
     padding-top: 10px;
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
-}
-@media (max-height: 700px) {
-  #plugin-navigation,
-  #plugin-navigation:has(#plugin-links:not([hidden]) > p),
-  #plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
-    flex: 0 0 auto;
-    min-height: 0;
-  }
-  #plugin-navigation-group {
-    height: auto;
-  }
-  #plugin-links {
-    flex: none;
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
   }
 }
 @media (min-width: 801px) and (max-width: 1100px) and (max-height: 440px) {

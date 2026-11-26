@@ -229,6 +229,21 @@ def test_cancel_is_idempotent_and_unknown_handles_do_not_call_qq(manager, post):
     assert bytes(key) == bytes(32)
 
 
+def test_cancel_all_wipes_active_sessions_and_keeps_manager_usable(manager, post):
+    handles = [manager.create_session()['bind_id'] for _ in range(2)]
+    keys = [manager._sessions[handle].aes_key_bytes for handle in handles]
+    post.reset_mock()
+    manager.cancel_all()
+    for handle, key in zip(handles, keys):
+        assert bytes(key) == bytes(32)
+        assert manager.poll_session(handle)['status'] == 3
+        with pytest.raises(KeyError):
+            manager.get_qr_png(handle)
+    post.assert_not_called()
+    fresh = manager.create_session()['bind_id']
+    assert fresh not in handles and manager.get_qr_png(fresh).startswith(b'\x89PNG\r\n\x1a\n')
+
+
 def test_ttl_wipes_an_abandoned_session_without_any_api_calls(post):
     mgr = qr.QrBindManager(ttl=0.5)
     try:

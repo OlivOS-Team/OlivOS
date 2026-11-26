@@ -275,6 +275,11 @@ class QrBindManager:
             if session is not None:
                 self._discard_locked(session)
 
+    def cancel_all(self):
+        with self._changed:
+            for session in tuple(self._sessions.values()):
+                self._discard_locked(session)
+
     def close(self):
         with self._changed:
             self._closed = True

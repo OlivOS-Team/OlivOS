@@ -89,6 +89,7 @@ const state = {
   terminalLogs: [],
   limit: 500,
   dirty: false,
+  accountEditGeneration: 0,
   showPath: false,
   editing: null,
   draft: null,
@@ -2694,6 +2695,7 @@ async function refreshStatus() {
 
 function dirty() {
   state.dirty = true;
+  state.accountEditGeneration += 1;
   $('accounts-dirty').textContent = '有未应用的修改';
 }
 async function loadAccounts() {
@@ -2702,6 +2704,7 @@ async function loadAccounts() {
   state.savedAccounts = clone(result.account);
   state.revision = result.revision;
   state.dirty = false;
+  state.accountEditGeneration += 1;
   $('accounts-dirty').textContent = '';
   renderAccounts();
 }
@@ -3489,28 +3492,40 @@ async function copyWebhook() {
   }
   notify('回调地址已复制');
 }
-async function createScannedAccount({ app_id, app_secret }) {
-  const account = clone(state.schema.qqguild_qr_account);
-  const existing = state.accounts.find((row) => row.sdk_type === account.sdk_type &&
-    row.platform_type === account.platform_type && String(row.id) === String(app_id));
-  if (existing) {
-    if (!confirm(`账号 ${app_id} 已存在。仅更新 AppSecret 并保存？`)) return;
-    existing.server.access_token = app_secret;
-  } else {
-    account.id = app_id;
-    account.server.access_token = app_secret;
-    state.accounts.push(account);
+async function createScannedAccount(credentials) {
+  const items = Array.isArray(credentials) ? credentials : [credentials];
+  let changed = false;
+  for (const { app_id, app_secret } of items) {
+    const account = clone(state.schema.qqguild_qr_account);
+    const existing = state.accounts.find((row) => row.sdk_type === account.sdk_type &&
+      row.platform_type === account.platform_type && String(row.id) === String(app_id));
+    if (existing) {
+      if (!confirm(`账号 ${app_id} 已存在。仅更新 AppSecret 并保存？`)) continue;
+      existing.server.access_token = app_secret;
+    } else {
+      account.id = app_id;
+      account.server.access_token = app_secret;
+      state.accounts.push(account);
+    }
+    changed = true;
   }
+  if (!changed) return;
   dirty();
   renderAccounts();
   await saveAccounts();
 }
 
-function fillScannedAccount({ app_id, app_secret }) {
+function fillScannedAccount(credentials) {
+  const items = Array.isArray(credentials) ? credentials : [credentials];
+  const { app_id, app_secret } = items[0];
+  const extraIds = items.slice(1).map((item) => item.app_id);
   if (!$('account-dialog').open || $('account-qr-bind-bar').hidden) return;
   const form = $('account-form');
   form.querySelector('[data-field="id"]').value = state.draft.id = app_id;
   form.querySelector('[data-field="server.access_token"]').value = state.draft.server.access_token = app_secret;
+  if (extraIds.length) {
+    notify(`扫码返回了多个机器人，当前编辑器仅填入 ${app_id}，其余账号（${extraIds.join('、')}）请使用「QQ 官方扫码创建」。`);
+  }
   if (state.draft.server.type === 'post') {
     $('account-error').textContent = '已填入凭据，请核对 Webhook 回调地址后点击「确定」。';
     return refreshWebhook();
@@ -3537,6 +3552,7 @@ async function saveAccounts() {
   if (!state.dirty) return;
   const submit = $('save-accounts');
   submit.disabled = true;
+  const submittedGeneration = state.accountEditGeneration;
   try {
     const accounts = clone(state.accounts);
     for (const row of accounts) {
@@ -3547,13 +3563,17 @@ async function saveAccounts() {
       method: 'POST',
       body: { account: accounts, revision: state.revision },
     });
-    state.accounts = result.account;
     state.savedAccounts = clone(result.account);
     state.revision = result.revision;
-    state.dirty = false;
-    $('accounts-dirty').textContent = '';
-    renderAccounts();
-    notify('账号已保存，连接配置正在热更新。');
+    if (state.accountEditGeneration === submittedGeneration) {
+      state.accounts = result.account;
+      state.dirty = false;
+      $('accounts-dirty').textContent = '';
+      renderAccounts();
+      notify('账号已保存，连接配置正在热更新。');
+    } else {
+      notify('已保存先前的修改；保存期间有新的本地编辑，请再次点击「保存并应用」。');
+    }
   } finally {
     submit.disabled = false;
   }
@@ -3783,11 +3803,13 @@ async function pollQrBind(qr, interval) {
     const result = await api(qr.path, { signal: qr.controller.signal });
     if (!qrIsOpen(qr)) return;
     if (result.status === 2) {
-      const credential = result.credentials?.[0];
-      if (!credential?.app_id || !credential.app_secret) throw new Error('未收到机器人凭据，请刷新二维码重试。');
+      const credentials = Array.isArray(result.credentials)
+        ? result.credentials.filter((item) => item?.app_id && item?.app_secret)
+        : [];
+      if (!credentials.length) throw new Error('未收到机器人凭据，请刷新二维码重试。');
       closeQRCode();
       try {
-        await qr.apply(credential);
+        await qr.apply(credentials);
       } catch (error) {
         notifyError(error);
       }
