@@ -124,7 +124,7 @@ const state = {
   checkingAuth: false,
   sessionRefresh: null,
   sessionCheckedAt: 0,
-  sidebarCollapsed: null, // 未选择时桌面展开、移动端收起。
+  sidebarCollapsed: false,
   sidebarOpen: false,
   actions: { reload: null, update: null },
   pluginReload: null,
@@ -277,18 +277,23 @@ function toggleSidebar() {
   else setSidebarCollapsed(!state.sidebarCollapsed);
 }
 function updateSidebarToggle() {
+  const sidebar = $('sidebar');
   const mobile = sidebarIsMobile();
   const expanded = mobile ? state.sidebarOpen : !state.sidebarCollapsed;
-  const label = expanded ? '收起侧边栏' : '展开侧边栏';
-  $('shell').dataset.sidebarCollapsed = String(!expanded);
+  const label = mobile
+    ? state.sidebarOpen ? '关闭侧边栏' : '打开侧边栏'
+    : state.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏';
   document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
     toggle.setAttribute('aria-expanded', String(expanded));
     toggle.setAttribute('aria-label', label);
     toggle.title = label;
   });
+  if (mobile) sidebar.setAttribute('aria-hidden', String(!state.sidebarOpen));
+  else sidebar.removeAttribute('aria-hidden');
 }
 function setSidebarCollapsed(collapsed, persist = true) {
   state.sidebarCollapsed = collapsed;
+  $('shell').dataset.sidebarCollapsed = String(collapsed);
   if (persist) {
     try {
       localStorage.setItem(sidebarStorageKey, String(collapsed));
@@ -298,7 +303,7 @@ function setSidebarCollapsed(collapsed, persist = true) {
   }
   updateSidebarToggle();
 }
-function setSidebarOpen(open, { restoreFocus = true, persist = true } = {}) {
+function setSidebarOpen(open, { restoreFocus = true } = {}) {
   open = sidebarIsMobile() && open;
   if (!open) closeSelectMenu();
   if (state.sidebarOpen === open) {
@@ -312,8 +317,7 @@ function setSidebarOpen(open, { restoreFocus = true, persist = true } = {}) {
   state.sidebarOpen = open;
   $('shell').dataset.sidebarOpen = String(open);
   document.body.classList.toggle('sidebar-open', open);
-  if (persist && sidebarIsMobile()) setSidebarCollapsed(!open);
-  else updateSidebarToggle();
+  updateSidebarToggle();
   if (open) {
     $('sidebar-close').focus({ preventScroll: true });
   } else if (restoreFocus && sidebarReturnFocus?.focus) {
@@ -322,7 +326,8 @@ function setSidebarOpen(open, { restoreFocus = true, persist = true } = {}) {
   if (!open) sidebarReturnFocus = null;
 }
 function syncSidebarMode() {
-  setSidebarOpen(!$('shell').hidden && state.sidebarCollapsed === false, { restoreFocus: false, persist: false });
+  if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
+  updateSidebarToggle();
 }
 function syncPerformanceNavMode() {
   if (!performanceNavIsMobile()) {
@@ -330,13 +335,14 @@ function syncPerformanceNavMode() {
   }
 }
 function initializeSidebar() {
+  let collapsed = false;
   try {
-    const saved = localStorage.getItem(sidebarStorageKey);
-    if (saved !== null) state.sidebarCollapsed = saved === 'true';
+    collapsed = localStorage.getItem(sidebarStorageKey) === 'true';
   } catch {
-    // 无存储时按当前视口使用默认布局。
+    // 禁用存储时保持默认展开。
   }
-  syncSidebarMode();
+  setSidebarCollapsed(collapsed, false);
+  setSidebarOpen(false, { restoreFocus: false });
   if (mobileSidebarQuery.addEventListener) {
     mobileSidebarQuery.addEventListener('change', syncSidebarMode);
   } else {
@@ -508,7 +514,6 @@ async function login(ev, token = null, ticket = null) {
     $('login').hidden = true;
     $('loading').hidden = true;
     $('shell').hidden = false;
-    syncSidebarMode();
     if (state.page === 'logs') renderLogs();
     else if (state.page === 'terminals') {
       renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
@@ -566,7 +571,7 @@ function resetLogin(message = '') {
   closeAccountMenu();
   state.authGeneration++;
   state.navigationGeneration++;
-  setSidebarOpen(false, { restoreFocus: false, persist: false });
+  setSidebarOpen(false, { restoreFocus: false });
   cachedToken('');
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);

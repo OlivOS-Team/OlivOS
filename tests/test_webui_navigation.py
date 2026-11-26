@@ -267,16 +267,13 @@ def browser(navigation_host, chrome_session):
         if not driver.execute_script(
                 'return matchMedia("(max-width: 800px), (orientation: portrait)").matches'):
             return
-        wait.until(lambda _: driver.execute_script('''
-            const sidebar = document.getElementById('sidebar');
-            return sidebar.getAnimations().every(animation => animation.playState === 'finished');
-        '''))
-        if not driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
-            click('#sidebar-toggle')
-        # 窄栏和展开栏都贴着左边界；等宽度过渡完成后再检查文字和插件列表的布局。
+        if driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
+            return
+        click('#sidebar-toggle')
         wait.until(lambda _: driver.execute_script('''
             const sidebar = document.getElementById('sidebar');
             return document.getElementById('shell').dataset.sidebarOpen === 'true' &&
+              sidebar.getBoundingClientRect().left >= -1 &&
               sidebar.getAnimations().every(animation => animation.playState === 'finished');
         '''))
 
@@ -308,7 +305,8 @@ def browser(navigation_host, chrome_session):
 def set_viewport(browser, width, height, *, mobile_device=False):
     """切换视口，并等侧边栏完成移动端/桌面端模式同步。
 
-    matchMedia 的 change 异步派发；等待折叠属性与当前视口一致再测几何位置。
+    matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
+    aria-hidden 要等监听器跑完才更新；只等 matchMedia 就断言会读到上一档视口的旧值。
     """
     driver = browser.driver
     # 侧边栏媒体查询还包含纵向视口，宽大于 800px 的竖屏同样属于移动侧栏模式。
@@ -318,10 +316,11 @@ def set_viewport(browser, width, height, *, mobile_device=False):
     browser.wait.until(lambda _: driver.execute_script(
         '''
         const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
-        const collapsed = state.sidebarCollapsed ?? mobile;
         const sidebar = document.getElementById('sidebar');
-        return mobile === arguments[0] && state.sidebarOpen === (mobile && !collapsed) &&
-            document.getElementById('shell').dataset.sidebarCollapsed === String(collapsed) &&
+        const synced = mobile
+            ? sidebar.getAttribute('aria-hidden') === 'true'
+            : !sidebar.hasAttribute('aria-hidden');
+        return mobile === arguments[0] && synced &&
             sidebar.getAnimations().every(animation => animation.playState === 'finished');
         ''', mobile))
 
@@ -1827,20 +1826,19 @@ def test_desktop_sidebar_collapse_transitions_instead_of_jumping(browser):
 
 
 @pytest.mark.browser
-def test_mobile_sidebar_rail_expands_and_returns_focus(browser):
+def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
     driver = browser.driver
     set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
-    assert browser.find('#sidebar').get_attribute('aria-hidden') != 'true'
-    assert browser.find('#sidebar .brand-logo').is_displayed()
-    browser.click('[data-page="accounts"]')
-    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
 
     browser.click('#sidebar-toggle')
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'true'
-    assert browser.find('#sidebar').get_attribute('aria-hidden') != 'true'
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'false'
     assert driver.execute_script('return document.body.classList.contains("sidebar-open")')
     assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
     assert driver.execute_script(
@@ -1889,31 +1887,20 @@ def test_mobile_sidebar_closes_after_navigation(browser):
 
 @pytest.mark.browser
 @pytest.mark.parametrize('width', [320, 390])
-def test_mobile_sidebar_rail_and_overlay_fit_viewport(browser, width):
+def test_mobile_sidebar_drawer_fits_viewport(browser, width):
     driver = browser.driver
     set_viewport(browser, width, 844)
-    browser.wait.until(lambda _: driver.execute_script('''
-        const rail = document.getElementById('sidebar').getBoundingClientRect();
-        return rail.left === 0 && rail.width === 64 &&
-          document.querySelector('main').getBoundingClientRect().left === rail.right;
-    '''))
-    assert driver.execute_script('''
-        const controls = document.querySelectorAll('#navigation button, .sidebar-footer button, #sidebar-toggle');
-        return [...controls].every(el => el.getBoundingClientRect().height >= 44) &&
-          document.documentElement.scrollWidth <= innerWidth;
-    ''')
     browser.open_sidebar()
     assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
-    browser.wait.until(lambda _: driver.execute_script('''
+    assert driver.execute_script('''
         const sidebar = document.getElementById('sidebar').getBoundingClientRect();
-        const main = document.querySelector('main').getBoundingClientRect();
-        return sidebar.width > 160 && sidebar.right <= innerWidth && main.left === 64 &&
+        return sidebar.right <= innerWidth && sidebar.width <= innerWidth &&
           document.querySelector('.sidebar-head').getBoundingClientRect().top === 0;
-    '''))
+    ''')
 
 
 @pytest.mark.browser
-def test_sidebar_viewport_switch_preserves_choice_without_desktop_backdrop(browser):
+def test_sidebar_viewport_switch_clears_mobile_state(browser):
     driver = browser.driver
     set_viewport(browser, 390, 844)
     browser.open_sidebar()
@@ -1928,10 +1915,9 @@ def test_sidebar_viewport_switch_preserves_choice_without_desktop_backdrop(brows
         "return document.getElementById('sidebar').getBoundingClientRect().width") > 150
 
     set_viewport(browser, 390, 844)
-    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'true'
-    browser.click('#sidebar-close')
-    set_viewport(browser, 1440, 900)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
+    assert driver.execute_script(
+        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
 
 
 @pytest.mark.browser

@@ -970,94 +970,98 @@ nav h2 {
 #sidebar-backdrop {
   display: none;
 }
-aside,
-.sidebar-scroll,
-.sidebar-footer,
-.brand,
-#navigation button,
-.sidebar-footer > .sidebar-action {
-  /* 只补横向 padding / gap，避免竖向断点切换时延迟高度重排，同时保留按钮原有的配色反馈过渡。 */
-  transition:
-    padding-inline 180ms ease,
-    gap 180ms ease,
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
-}
-.brand-text,
-.nav-label,
-.sidebar-action-label {
-  max-width: 220px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: max-width 180ms ease, opacity 140ms ease;
-}
-#shell[data-sidebar-collapsed='true'] {
-  grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
-}
-#shell[data-sidebar-collapsed='true'] aside {
-  align-items: center;
-  overflow-x: hidden;
-}
-#shell[data-sidebar-collapsed='true'] .sidebar-scroll {
-  width: 100%;
-  align-items: center;
-  padding-right: 8px;
-  padding-left: 8px;
-  overflow-x: hidden;
-}
-#shell[data-sidebar-collapsed='true'] .sidebar-head {
-  width: 100%;
-  padding-inline: 8px;
-  justify-content: center;
-}
-#shell[data-sidebar-collapsed='true'] .brand {
-  gap: 0;
-}
-#shell[data-sidebar-collapsed='true'] aside .brand-logo {
-  max-width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-}
-#shell[data-sidebar-collapsed='true'] .brand-text,
-#shell[data-sidebar-collapsed='true'] .nav-label,
-#shell[data-sidebar-collapsed='true'] .sidebar-action-label {
-  max-width: 0;
-  opacity: 0;
-}
-#shell[data-sidebar-collapsed='true'] #plugin-navigation {
-  display: none;
-}
-#shell[data-sidebar-collapsed='true'] .sidebar-footer {
-  width: 100%;
-  align-items: center;
-  padding-right: 8px;
-  padding-left: 8px;
-  gap: 8px;
-}
-/* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
-   宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
-#shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
-  width: 100%;
-  min-width: 0;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
-}
-#shell[data-sidebar-collapsed='true'] #navigation {
-  width: 100%;
-  align-items: center;
-}
-#shell[data-sidebar-collapsed='true'] #navigation button {
-  width: 100%;
-  min-height: 44px;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
+@media (min-width: 801px) and (orientation: landscape) {
+  /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
+     收起后不会出现「内容先消失、面板再跳一下」的观感。 */
+  aside,
+  .sidebar-scroll,
+  .sidebar-footer,
+  .brand,
+  #navigation button,
+  .sidebar-footer > .sidebar-action {
+    /* 只补横向 padding / gap，避免竖向断点切换时延迟高度重排，同时保留按钮原有的配色反馈过渡。 */
+    transition:
+      padding-inline 180ms ease,
+      gap 180ms ease,
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .brand-text,
+  .nav-label,
+  .sidebar-action-label {
+    max-width: 220px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 180ms ease, opacity 140ms ease;
+  }
+  #shell[data-sidebar-collapsed='true'] {
+    grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
+  }
+  #shell[data-sidebar-collapsed='true'] aside {
+    align-items: center;
+    overflow-x: hidden;
+  }
+  #shell[data-sidebar-collapsed='true'] .sidebar-scroll {
+    width: 100%;
+    align-items: center;
+    padding-right: 8px;
+    padding-left: 8px;
+    overflow-x: hidden;
+  }
+  #shell[data-sidebar-collapsed='true'] .sidebar-head {
+    width: 100%;
+    padding-inline: 8px;
+    justify-content: center;
+  }
+  #shell[data-sidebar-collapsed='true'] .brand {
+    gap: 0;
+  }
+  #shell[data-sidebar-collapsed='true'] aside .brand-logo {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  #shell[data-sidebar-collapsed='true'] .brand-text,
+  #shell[data-sidebar-collapsed='true'] .nav-label,
+  #shell[data-sidebar-collapsed='true'] .sidebar-action-label {
+    max-width: 0;
+    opacity: 0;
+  }
+  #shell[data-sidebar-collapsed='true'] #plugin-navigation {
+    display: none;
+  }
+  #shell[data-sidebar-collapsed='true'] .sidebar-footer {
+    width: 100%;
+    align-items: center;
+    padding-right: 8px;
+    padding-left: 8px;
+    gap: 8px;
+  }
+  /* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
+     宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
+  #shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+  #shell[data-sidebar-collapsed='true'] #navigation {
+    width: 100%;
+    align-items: center;
+  }
+  #shell[data-sidebar-collapsed='true'] #navigation button {
+    width: 100%;
+    min-height: 44px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
 }
 .login-card .theme-control {
   border-top: 1px solid var(--line);
@@ -2445,9 +2449,6 @@ body.performance-nav-open .performance-nav-toggle svg {
   .performance-fact-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  .process-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 .account-status-list {
   margin: 6px 0 12px;
@@ -3132,7 +3133,6 @@ dialog::backdrop {
 }
 @media (max-width: 800px), (orientation: portrait) {
   :root {
-    --control-height: 44px;
     --page-padding-inline: 14px;
     --page-padding-block: 20px;
   }
@@ -3152,7 +3152,7 @@ dialog::backdrop {
     min-height: 44px;
   }
   .select-menu-option {
-    min-height: 44px;
+    min-height: 40px;
   }
   .sidebar-close,
   .sidebar-toggle,
@@ -3164,12 +3164,10 @@ dialog::backdrop {
     height: 44px;
   }
   #shell {
-    grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     height: auto;
     min-height: 100dvh;
-  }
-  main {
-    grid-column: 2;
   }
   aside {
     position: fixed;
@@ -3177,13 +3175,28 @@ dialog::backdrop {
     top: 0;
     bottom: 0;
     left: 0;
-    width: var(--sidebar-collapsed-width);
+    width: min(84vw, 320px);
+    max-width: 100%;
     height: 100dvh;
-    transition: width 180ms ease;
+    padding: 0;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+    overflow: hidden;
+    box-shadow: var(--shadow-dialog);
+    transform: translateX(-102%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 180ms ease,
+      visibility 0s linear 180ms;
   }
   .sidebar-head {
-    padding: calc(16px + env(safe-area-inset-top)) 10px 0;
-    gap: 4px;
+    padding: calc(16px + env(safe-area-inset-top)) 16px 0;
+  }
+  .sidebar-scroll {
+    gap: 20px;
+    padding: 16px 16px 12px;
+    overflow-x: hidden;
   }
   .sidebar-footer {
     padding:
@@ -3192,8 +3205,12 @@ dialog::backdrop {
       calc(16px + env(safe-area-inset-bottom));
   }
   #shell[data-sidebar-open='true'] aside {
-    width: min(84vw, var(--sidebar-width));
-    box-shadow: var(--shadow-dialog);
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 180ms ease,
+      visibility 0s;
   }
   #sidebar-backdrop {
     display: block;
@@ -3216,7 +3233,7 @@ dialog::backdrop {
       opacity 180ms ease,
       visibility 0s;
   }
-  #shell[data-sidebar-open='true'] .sidebar-close {
+  .sidebar-close {
     display: grid;
     place-items: center;
   }
@@ -3237,30 +3254,8 @@ dialog::backdrop {
     width: 100%;
     white-space: normal;
   }
-  #plugin-pages-close,
   #plugin-links .plugin-link-close {
-    width: 44px;
-    min-height: 44px;
-  }
-  #plugin-links a {
-    min-height: 44px;
-  }
-  #logs .log-filter-control {
-    flex: 1 1 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-  #logs #log-filter {
-    flex: 1 1 0;
-    max-width: 100%;
-    min-width: 0;
-  }
-  #logs #log-filter > summary {
-    display: block;
-    line-height: calc(var(--control-height) - 16px);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: 26px;
   }
   main {
     padding: var(--page-padding-block) var(--page-padding-inline) var(--page-padding-inline);
@@ -3271,14 +3266,6 @@ dialog::backdrop {
      所以只在日志页把 main 撑成一屏高，其余页面继续走整页滚动。 */
   main:has(> #logs:not([hidden])) {
     height: 100dvh;
-    padding-top: var(--page-padding-inline);
-  }
-  main:has(> #logs:not([hidden])) header {
-    margin-bottom: 10px;
-  }
-  #logs .toolbar {
-    gap: 8px 10px;
-    margin-bottom: 10px;
   }
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3321,8 +3308,11 @@ dialog::backdrop {
   }
 }
 @media (max-width: 480px) {
+  aside {
+    width: min(88vw, 320px);
+  }
   .cards {
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .metric-card .metric-value {
     font-size: 18px;
@@ -3330,6 +3320,7 @@ dialog::backdrop {
   .card {
     padding: 12px;
   }
+  /* 320px 宽的屏上两列各只剩约 116px 内容宽度，缩一档字号避免版本号被折断。 */
   .card strong {
     font-size: 22px;
   }
