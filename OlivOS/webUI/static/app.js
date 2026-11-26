@@ -65,6 +65,8 @@ const state = {
   accounts: [],
   savedAccounts: [],
   accountConnections: {},
+  selectedAccounts: new Set(),
+  accountDragging: null,
   revision: '',
   schema: null,
   plugins: {},
@@ -191,13 +193,11 @@ function notifyError(error) {
 }
 async function api(path, options = {}, discardObsolete = null) {
   const generation = state.authGeneration;
-  const authMessage = options.authMessage;
-  const requestOptions = { ...options };
-  delete requestOptions.authMessage;
+  const { authMessage, jsonText, ...requestOptions } = options;
   const headers = { 'X-Auth-Token': state.token, ...requestOptions.headers };
-  if (requestOptions.body !== undefined) {
+  if (jsonText !== undefined || requestOptions.body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    requestOptions.body = JSON.stringify(requestOptions.body);
+    requestOptions.body = jsonText ?? JSON.stringify(requestOptions.body);
   }
   let response;
   try {
@@ -569,6 +569,8 @@ async function logout() {
 function resetLogin(message = '') {
   closeQRCode();
   closeAccountMenu();
+  finishAccountDrag(false, false);
+  state.selectedAccounts.clear();
   state.authGeneration++;
   state.navigationGeneration++;
   setSidebarOpen(false, { restoreFocus: false });
@@ -732,6 +734,9 @@ async function navigate(page) {
   closeSelectMenu();
   closeAccountMenu();
   if (page !== state.page) {
+    finishAccountDrag(false, false);
+    $('account-import-dialog').close();
+    $('account-copy-fallback-dialog').close();
     closeQRCode();
     if ($('account-dialog').open) $('account-dialog').close();
   }
@@ -2695,7 +2700,39 @@ async function refreshStatus() {
     renderStatistics(status.statistics);
   }
   state.accountConnections = status.account_connections || {};
-  if (state.page === 'accounts') renderAccounts();
+  if (state.page === 'accounts' && !state.accountDragging) renderAccounts();
+}
+
+const accountRowIds = new WeakMap();
+const replacedAccounts = new WeakSet();
+let lastAccountRowId = 0;
+
+function accountRowId(account) {
+  if (!accountRowIds.has(account)) accountRowIds.set(account, ++lastAccountRowId);
+  return accountRowIds.get(account);
+}
+
+function replaceAccount(index, account) {
+  const old = state.accounts[index];
+  accountRowIds.set(account, accountRowId(old));
+  if (replacedAccounts.has(old)) replacedAccounts.add(account);
+  state.accounts[index] = account;
+}
+
+function updateAccountSelection() {
+  const count = state.selectedAccounts.size;
+  const all = $('accounts-select-all');
+  all.disabled = state.accounts.length === 0;
+  all.checked = count > 0 && count === state.accounts.length;
+  all.indeterminate = count > 0 && !all.checked;
+  const copy = $('export-accounts-copy');
+  copy.textContent = count ? `复制所选 (${count})` : '复制所选';
+  copy.disabled = $('export-accounts-menu-toggle').disabled = count === 0;
+  if (!count && activeAccountMenu?.id === 'account-export-split') closeAccountMenu();
+}
+
+function selectedAccounts() {
+  return state.accounts.filter((row) => state.selectedAccounts.has(accountRowId(row)));
 }
 
 function dirty() {
@@ -2706,6 +2743,7 @@ function dirty() {
 async function loadAccounts() {
   const result = await api('/api/accounts');
   state.accounts = result.account;
+  state.selectedAccounts.clear();
   state.savedAccounts = clone(result.account);
   state.revision = result.revision;
   state.dirty = false;
@@ -2714,15 +2752,52 @@ async function loadAccounts() {
   renderAccounts();
 }
 function renderAccounts() {
+  finishAccountDrag(false, false);
   const rows = $('account-rows');
+  const active = document.activeElement;
+  const focusClass = ['account-drag-handle', 'account-select'].find((name) => active?.classList.contains(name));
+  const focusRow = focusClass ? active.closest('tr')?.dataset.accountRowId : null;
   rows.replaceChildren();
   if (!state.accounts.length) {
     const row = element('tr');
-    row.append(element('td', '暂无账号，请新增账号。', { colspan: 5 }));
+    row.append(element('td', '暂无账号，请新增账号。', { colspan: 6 }));
     rows.append(row);
   }
   state.accounts.forEach((account, index) => {
     const row = element('tr');
+    const rowId = accountRowId(account);
+    row.dataset.accountRowId = rowId;
+    const controls = element('div', null, { class: 'account-row-controls' });
+    const handle = element('button', '⠿', {
+      type: 'button', class: 'account-drag-handle', 'aria-label': `调整账号 ${account.id} 的顺序`,
+      title: '拖动调整顺序，或按方向键上移 / 下移',
+    });
+    handle.onpointerdown = (event) => startAccountDrag(event, index);
+    handle.onpointermove = moveAccountDrag;
+    handle.onpointerup = (event) => endAccountDrag(event, true);
+    handle.onpointercancel = handle.onlostpointercapture = (event) => endAccountDrag(event, false);
+    handle.onkeydown = (event) => {
+      const direction = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+      if (!direction || state.accountDragging) return;
+      event.preventDefault();
+      if (reorderAccounts(index, index + direction)) {
+        renderAccounts();
+        document.activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    };
+    const select = element('input', null, {
+      type: 'checkbox', class: 'account-select', 'aria-label': `选择账号 ${account.id}`,
+    });
+    select.checked = state.selectedAccounts.has(rowId);
+    select.onchange = () => {
+      if (select.checked) state.selectedAccounts.add(rowId);
+      else state.selectedAccounts.delete(rowId);
+      updateAccountSelection();
+    };
+    controls.append(handle, select);
+    const controlCell = element('td', null, { class: 'account-controls-cell' });
+    controlCell.append(controls);
+    row.append(controlCell);
     const enabled = element('input', null, {
       type: 'checkbox',
       class: 'switch',
@@ -2750,11 +2825,13 @@ function renderAccounts() {
     actions.append(
       button('查看', () => viewAccount(index)),
       button('编辑', () => editAccount(index)),
+      button('复制', () => copyAccounts([account])),
       button(
         '删除',
         () => {
           if (confirm(`删除账号 ${account.id}？保存并应用后生效。`)) {
             state.accounts.splice(index, 1);
+            state.selectedAccounts.delete(rowId);
             dirty();
             renderAccounts();
           }
@@ -2769,8 +2846,385 @@ function renderAccounts() {
       if (!ev.target.closest('button, input')) editAccount(index);
     };
     rows.append(row);
+    if (String(rowId) === focusRow) row.querySelector(`.${focusClass}`).focus({ preventScroll: true });
   });
+  updateAccountSelection();
 }
+
+function reorderAccounts(from, to) {
+  if (from === to || to < 0 || to >= state.accounts.length) return false;
+  const [account] = state.accounts.splice(from, 1);
+  state.accounts.splice(to, 0, account);
+  dirty();
+  return true;
+}
+
+function startAccountDrag(event, from) {
+  if (!event.isPrimary || event.button !== 0 || state.accountDragging || state.accounts.length < 2) return;
+  const handle = event.currentTarget;
+  const rows = $('account-rows');
+  const main = rows.closest('main');
+  handle.setPointerCapture(event.pointerId);
+  handle.focus({ preventScroll: true });
+  event.preventDefault();
+  state.accountDragging = {
+    handle, rows: rows.rows, from, to: from, pointerId: event.pointerId, startY: event.clientY,
+    scroll: main.scrollHeight > main.clientHeight ? main : document.scrollingElement,
+    active: false, y: event.clientY, frame: null, marker: null,
+  };
+}
+
+function markAccountDrop(drag) {
+  let first = 0;
+  let last = drag.rows.length;
+  while (first < last) {
+    const index = (first + last) >> 1;
+    const bounds = drag.rows[index].getBoundingClientRect();
+    const middle = (bounds.top + bounds.bottom) / 2;
+    if (drag.y < middle || (drag.y === middle && index < drag.from)) last = index;
+    else first = index + 1;
+  }
+  const to = first > drag.from ? first - 1 : first;
+  if (to === drag.to) return;
+  drag.marker?.classList.remove('account-drop-before', 'account-drop-after');
+  drag.to = to;
+  drag.marker = to === drag.from ? null : drag.rows[to];
+  drag.marker?.classList.add(to < drag.from ? 'account-drop-before' : 'account-drop-after');
+}
+
+function scrollAccountDrag(drag) {
+  drag.frame = null;
+  const root = drag.scroll === document.scrollingElement;
+  const bounds = root ? null : drag.scroll.getBoundingClientRect();
+  const top = Math.max(0, bounds?.top ?? 0);
+  const bottom = Math.min(window.innerHeight, bounds?.bottom ?? window.innerHeight);
+  const edge = 52;
+  const distance = drag.y < top + edge ? drag.y - top - edge : Math.max(0, drag.y - bottom + edge);
+  const before = drag.scroll.scrollTop;
+  drag.scroll.scrollTop += Math.sign(distance) * Math.min(24, Math.ceil(Math.abs(distance) / 3));
+  if (drag.scroll.scrollTop !== before) {
+    markAccountDrop(drag);
+    drag.frame = requestAnimationFrame(() => scrollAccountDrag(drag));
+  }
+}
+
+function moveAccountDrag(event) {
+  const drag = state.accountDragging;
+  if (drag?.pointerId !== event.pointerId) return;
+  drag.y = event.clientY;
+  if (!drag.active) {
+    if (Math.abs(drag.y - drag.startY) < 4) return;
+    drag.active = true;
+    drag.rows[drag.from].classList.add('account-row-dragging');
+  }
+  markAccountDrop(drag);
+  if (drag.frame === null) drag.frame = requestAnimationFrame(() => scrollAccountDrag(drag));
+}
+
+function endAccountDrag(event, commit) {
+  const drag = state.accountDragging;
+  if (drag?.pointerId !== event.pointerId) return;
+  if (commit && drag.active) {
+    drag.y = event.clientY;
+    markAccountDrop(drag);
+  }
+  finishAccountDrag(commit);
+}
+
+function finishAccountDrag(commit, repaint = true) {
+  const drag = state.accountDragging;
+  if (!drag) return;
+  state.accountDragging = null;
+  if (drag.frame !== null) cancelAnimationFrame(drag.frame);
+  if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
+  drag.rows[drag.from].classList.remove('account-row-dragging');
+  drag.marker?.classList.remove('account-drop-before', 'account-drop-after');
+  if (commit && drag.active) reorderAccounts(drag.from, drag.to);
+  if (repaint) renderAccounts();
+}
+
+function portableAccount(account) {
+  const row = clone(account);
+  delete row.hash;
+  const servers = row.extends?.['qsign-server'];
+  if (Array.isArray(servers)) {
+    for (const server of servers) {
+      if (server && typeof server === 'object') delete server._source_index;
+    }
+  }
+  return row;
+}
+
+function accountExportText(accounts) {
+  return JSON.stringify({ account: accounts.map(portableAccount) }, null, 2);
+}
+
+function legacyCopyAccounts(text) {
+  const previousFocus = document.activeElement;
+  const field = element('textarea', null, { class: 'account-copy-buffer', readonly: '' });
+  field.value = text;
+  document.body.append(field);
+  try {
+    field.focus({ preventScroll: true });
+    field.select();
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    field.remove();
+    previousFocus?.focus({ preventScroll: true });
+  }
+}
+
+async function copyAccounts(accounts) {
+  if (!accounts.length) return;
+  const text = accountExportText(accounts);
+  const auth = state.authGeneration;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    if (auth !== state.authGeneration || state.page !== 'accounts') return;
+    if (!legacyCopyAccounts(text)) {
+      const field = $('account-copy-fallback-text');
+      field.value = text;
+      $('account-copy-fallback-dialog').showModal();
+      field.focus();
+      field.select();
+      return;
+    }
+  }
+  if (auth === state.authGeneration) notify(`已复制 ${accounts.length} 个账号。`);
+}
+
+function downloadAccounts() {
+  const accounts = selectedAccounts();
+  if (!accounts.length) return;
+  const url = URL.createObjectURL(new Blob([accountExportText(accounts)], { type: 'application/json' }));
+  const link = element('a', null, { href: url, download: 'account.json' });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let accountImport = null;
+
+function accountIdentity(row) {
+  return JSON.stringify([String(row.id), row.sdk_type, row.platform_type]);
+}
+
+function accountImportMatches() {
+  return new Map(state.accounts.map((row, index) => [accountIdentity(row), { row, index }]));
+}
+
+function accountImportDiff(old, account) {
+  const local = portableAccount(old);
+  const ordered = (value) => JSON.stringify(value, (_, field) => {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) return field;
+    return Object.fromEntries(Object.keys(field).sort().map((key) => [key, field[key]]));
+  });
+  const changed = [
+    ['model_type', '型号'], ['password', '密码'], ['server', '连接配置'],
+    ['extends', '扩展配置'], ['enable', '启用状态'], ['debug', '调试模式'],
+  ].filter(([key]) => ordered(local[key]) !== ordered(account[key])).map(([, label]) => label);
+  return changed.length ? `将替换：${changed.join('、')}` : '配置相同';
+}
+
+function accountImportMessage(text, focusSource = false) {
+  const message = $('account-import-error');
+  message.textContent = text;
+  message.hidden = !text;
+  if (focusSource) {
+    $('account-import-source').open = true;
+    $('account-import-text').focus();
+  }
+}
+
+function updateAccountImportConfirm() {
+  let added = 0;
+  let overwritten = 0;
+  for (const entry of accountImport?.items || []) {
+    if (!entry.checked) continue;
+    if (entry.old) overwritten++;
+    else added++;
+  }
+  const confirm = $('account-import-confirm');
+  confirm.textContent = `确认导入（新增 ${added}，覆盖 ${overwritten}）`;
+  confirm.disabled = added + overwritten === 0;
+}
+
+function clearAccountImportPreview() {
+  accountImport.items = [];
+  $('account-import-summary').hidden = true;
+  $('account-import-list').replaceChildren();
+  updateAccountImportConfirm();
+}
+
+function openAccountImport() {
+  const dialog = $('account-import-dialog');
+  accountImport = { request: 0, items: [], duplicates: 0 };
+  clearAccountImportPreview();
+  $('account-import-text').value = '';
+  $('account-import-source').open = false;
+  accountImportMessage('正在读取账号…');
+  if (!dialog.open) dialog.showModal();
+  return accountImport;
+}
+
+function accountImportCurrent(session, request) {
+  return accountImport === session && session.request === request && $('account-import-dialog').open;
+}
+
+function renderAccountImportPreview(session, matches) {
+  const list = $('account-import-list');
+  list.replaceChildren();
+  let added = 0;
+  let duplicates = 0;
+  let invalid = 0;
+  for (const entry of session.items) {
+    const { account, identity, error, source } = entry;
+    entry.old = matches.get(identity)?.row;
+    if (!account) invalid++;
+    else if (entry.old) duplicates++;
+    else added++;
+    const item = element('li', null, { 'data-state': !account ? 'invalid' : entry.old ? 'duplicate' : 'new' });
+    const title = element('label', null, { class: 'account-import-choice' });
+    const select = element('input', null, { type: 'checkbox' });
+    select.disabled = !account;
+    select.checked = entry.checked;
+    select.onchange = () => {
+      entry.checked = select.checked;
+      updateAccountImportConfirm();
+    };
+    const display = (key) => ['string', 'number'].includes(typeof source?.[key]) ? String(source[key]) : '—';
+    title.append(
+      select,
+      element('span', !account ? '无效' : entry.old ? '重复 · 覆盖' : '新增', { class: 'account-import-badge' }),
+      element('strong', `账号 ${display('id')}`),
+    );
+    item.append(title, element('p', `${display('platform_type')} · ${display('sdk_type')} / ${display('model_type')}`));
+    if (error || entry.old) item.append(element('p', error || accountImportDiff(entry.old, account)));
+    list.append(item);
+  }
+  const merged = session.duplicates ? ` · 已合并批内重复 ${session.duplicates} 条` : '';
+  $('account-import-counts').textContent =
+    `总数 ${session.items.length + session.duplicates} · 新增 ${added} · 重复 ${duplicates} · 无效 ${invalid}${merged}`;
+  $('account-import-summary').hidden = false;
+  $('account-import-conflict-actions').hidden = !duplicates;
+  updateAccountImportConfirm();
+}
+
+async function previewAccountImport(session, text) {
+  const request = ++session.request;
+  clearAccountImportPreview();
+  const jsonText = text.trim();
+  let payload;
+  try {
+    payload = JSON.parse(jsonText);
+  } catch {
+    accountImportMessage('内容不是有效的 JSON。请粘贴账号 JSON 后点击「解析 JSON」。', true);
+    return;
+  }
+  accountImportMessage('正在校验账号…');
+  try {
+    // 原样提交，避免浏览器重新序列化时把长数字账号 ID 四舍五入。
+    const preview = await api('/api/accounts/import/preview', { method: 'POST', jsonText });
+    if (!accountImportCurrent(session, request)) return;
+    const source = payload && Object.hasOwn(payload, 'payload') ? payload.payload : payload;
+    const rows = Array.isArray(source) ? source : source.account || [source];
+    session.duplicates = preview.batch_duplicates;
+    session.items = preview.items.map((item) => ({
+      account: item.account, identity: item.valid ? accountIdentity(item.account) : null,
+      error: item.error, source: item.valid ? item.account : rows[item.source_index], checked: item.valid,
+    }));
+    renderAccountImportPreview(session, accountImportMatches());
+    const valid = session.items.some((item) => item.checked);
+    accountImportMessage(valid ? '' : '没有可导入的账号。可修正 JSON 后重新解析。', !valid);
+  } catch (error) {
+    if (accountImportCurrent(session, request) && !error.authHandled && !error.authObsolete) {
+      accountImportMessage(`${error.message}。可粘贴账号 JSON 后点击「解析 JSON」。`, true);
+    }
+  }
+}
+
+async function importAccountsFromClipboard() {
+  closeAccountMenu(true);
+  const session = openAccountImport();
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    if (accountImportCurrent(session, 0)) {
+      accountImportMessage('无法读取剪贴板，请手动粘贴账号 JSON 后点击「解析 JSON」。', true);
+    }
+    return;
+  }
+  if (!accountImportCurrent(session, 0)) return;
+  $('account-import-text').value = text;
+  await previewAccountImport(session, text);
+}
+
+async function importAccountsFromFile(event) {
+  const input = event.currentTarget;
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  const session = openAccountImport();
+  if (file.size > 1024 * 1024) {
+    accountImportMessage('JSON 文件超过 1 MB，请拆分文件后再导入。', true);
+    return;
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    if (accountImportCurrent(session, 0)) accountImportMessage('无法读取 JSON 文件。', true);
+    return;
+  }
+  if (!accountImportCurrent(session, 0)) return;
+  $('account-import-text').value = text;
+  await previewAccountImport(session, text);
+}
+
+function setAccountImportConflicts(checked) {
+  const inputs = $('account-import-list').querySelectorAll('input');
+  accountImport.items.forEach((entry, index) => {
+    if (entry.old) inputs[index].checked = entry.checked = checked;
+  });
+  updateAccountImportConfirm();
+}
+
+function confirmAccountImport() {
+  const session = accountImport;
+  const matches = accountImportMatches();
+  if (session.items.some((entry) => entry.old !== matches.get(entry.identity)?.row)) {
+    renderAccountImportPreview(session, matches);
+    accountImportMessage('账号列表已更新，请重新核对导入预览。');
+    return;
+  }
+  let imported = 0;
+  for (const entry of session.items) {
+    if (!entry.checked) continue;
+    const existing = matches.get(entry.identity);
+    const account = entry.account;
+    if (existing) {
+      if (existing.row.hash) {
+        account.hash = existing.row.hash;
+        replacedAccounts.add(account);
+      }
+      replaceAccount(existing.index, account);
+    } else {
+      state.accounts.push(account);
+    }
+    imported++;
+  }
+  if (!imported) return;
+  dirty();
+  renderAccounts();
+  $('account-import-dialog').close();
+  notify(`已将 ${imported} 个账号导入草稿。`);
+}
+
 async function viewAccount(index) {
   const account = state.accounts[index];
   const saved = state.savedAccounts.find((row) => row.hash === account.hash);
@@ -3255,18 +3709,31 @@ function presetFor(row) {
       p.server.type === row.server.type,
   );
 }
+let activeAccountMenu = null;
+
 function closeAccountMenu(restoreFocus = false) {
-  if ($('account-add-menu').hidden) return;
-  $('account-add-menu').hidden = true;
-  $('add-account-menu-toggle').setAttribute('aria-expanded', 'false');
-  if (restoreFocus) $('add-account-menu-toggle').focus();
+  if (!activeAccountMenu) return;
+  const menu = activeAccountMenu.querySelector('.account-split-menu');
+  const toggle = activeAccountMenu.querySelector('.account-split-toggle');
+  activeAccountMenu = null;
+  menu.hidden = true;
+  toggle.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) toggle.focus();
 }
 
-function openAccountMenu() {
+function openAccountMenu(split) {
+  const toggle = split.querySelector('.account-split-toggle');
+  if (toggle.disabled) return;
   closeSelectMenu();
-  $('account-add-menu').hidden = false;
-  $('add-account-menu-toggle').setAttribute('aria-expanded', 'true');
-  $('account-add-general').focus();
+  closeAccountMenu();
+  const menu = split.querySelector('.account-split-menu');
+  activeAccountMenu = split;
+  menu.hidden = false;
+  const left = split.getBoundingClientRect().left;
+  const right = document.documentElement.clientWidth - 8;
+  menu.style.left = `${Math.min(0, right - left - menu.offsetWidth)}px`;
+  toggle.setAttribute('aria-expanded', 'true');
+  menu.firstElementChild.focus();
 }
 
 function editAccount(index) {
@@ -3554,31 +4021,35 @@ function fillScannedAccount(credentials) {
 }
 
 async function saveAccounts() {
-  if (!state.dirty) return;
+  if (!state.dirty || state.accountDragging) return;
   const submit = $('save-accounts');
   submit.disabled = true;
   const submittedGeneration = state.accountEditGeneration;
   try {
     const accounts = clone(state.accounts);
+    const replaceHashes = state.accounts.filter((row) => row.hash && replacedAccounts.has(row)).map((row) => row.hash);
     for (const row of accounts) {
       if (row.password === '********') delete row.password;
       if (row.server.access_token === '********') delete row.server.access_token;
     }
+    const body = { account: accounts, revision: state.revision };
+    if (replaceHashes.length) body.replace_hashes = replaceHashes;
     const result = await api('/api/accounts', {
       method: 'POST',
-      body: { account: accounts, revision: state.revision },
+      body,
     });
     state.savedAccounts = clone(result.account);
     state.revision = result.revision;
     if (state.accountEditGeneration === submittedGeneration) {
       state.accounts = result.account;
+      state.selectedAccounts.clear();
       state.dirty = false;
       $('accounts-dirty').textContent = '';
-      renderAccounts();
       notify('账号已保存，连接配置正在热更新。');
     } else {
       notify('已保存先前的修改；保存期间有新的本地编辑，请再次点击「保存并应用」。');
     }
+    renderAccounts();
   } finally {
     submit.disabled = false;
   }
@@ -4983,6 +5454,12 @@ bind('sidebar-close', () => setSidebarOpen(false));
 bind('sidebar-backdrop', () => setSidebarOpen(false));
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
+  if (state.accountDragging || activeAccountMenu) {
+    ev.preventDefault();
+    if (state.accountDragging) finishAccountDrag(false);
+    else closeAccountMenu(true);
+    return;
+  }
   if (state.performanceNavOpen) {
     ev.preventDefault();
     setPerformanceNavOpen(false);
@@ -5005,7 +5482,6 @@ document
   .querySelectorAll('[data-close]')
   .forEach((node) => node.addEventListener('click', () => $(node.dataset.close).close()));
 bind('add-account', () => editAccount(null));
-bind('add-account-menu-toggle', () => $('account-add-menu').hidden ? openAccountMenu() : closeAccountMenu(true));
 bind('account-add-general', () => {
   closeAccountMenu(true);
   editAccount(null);
@@ -5027,18 +5503,69 @@ $('account-dialog').addEventListener('close', () => {
 });
 for (const event of ['pointerdown', 'focusin']) {
   document.addEventListener(event, (ev) => {
-    if (!$('account-add-menu').hidden && !ev.target.closest('#account-add-split')) closeAccountMenu();
+    if (activeAccountMenu && !activeAccountMenu.contains(ev.target)) closeAccountMenu();
   });
 }
-$('account-add-split').addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && !$('account-add-menu').hidden) {
-    ev.preventDefault();
-    closeAccountMenu(true);
-  } else if (['ArrowDown', 'ArrowUp'].includes(ev.key)) {
-    ev.preventDefault();
-    if ($('account-add-menu').hidden) openAccountMenu();
-    else (ev.target === $('account-add-general') ? $('account-add-qr') : $('account-add-general')).focus();
+for (const split of document.querySelectorAll('.account-split')) {
+  split.querySelector('.account-split-toggle').addEventListener('click', () => {
+    if (activeAccountMenu === split) closeAccountMenu(true);
+    else openAccountMenu(split);
+  });
+  split.addEventListener('keydown', (event) => {
+    const direction = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+    if (!direction || split.querySelector('.account-split-toggle').disabled) return;
+    event.preventDefault();
+    if (activeAccountMenu !== split) {
+      openAccountMenu(split);
+    } else {
+      const items = [...split.querySelectorAll('[role="menuitem"]')];
+      const index = items.indexOf(event.target);
+      items[index < 0 ? 0 : (index + direction + items.length) % items.length].focus();
+    }
+  });
+}
+window.addEventListener('resize', () => closeAccountMenu());
+bind('accounts-select-all', (event) => {
+  const checked = event.currentTarget.checked;
+  state.selectedAccounts.clear();
+  for (const row of state.accounts) {
+    if (checked) state.selectedAccounts.add(accountRowId(row));
   }
+  for (const input of $('account-rows').querySelectorAll('.account-select')) input.checked = checked;
+  updateAccountSelection();
+}, 'change');
+bind('export-accounts-copy', () => copyAccounts(selectedAccounts()));
+bind('account-export-clipboard', () => {
+  closeAccountMenu(true);
+  return copyAccounts(selectedAccounts());
+});
+bind('account-export-file', () => {
+  closeAccountMenu(true);
+  downloadAccounts();
+});
+bind('account-import-clipboard', importAccountsFromClipboard);
+bind('account-import-file-trigger', () => {
+  closeAccountMenu(true);
+  $('account-import-file').click();
+});
+bind('account-import-file', importAccountsFromFile, 'change');
+bind('account-import-text', () => {
+  accountImport.request++;
+  clearAccountImportPreview();
+  accountImportMessage('');
+}, 'input');
+bind('account-import-parse', () => previewAccountImport(accountImport, $('account-import-text').value));
+bind('account-import-check-conflicts', () => setAccountImportConflicts(true));
+bind('account-import-uncheck-conflicts', () => setAccountImportConflicts(false));
+bind('account-import-confirm', confirmAccountImport);
+$('account-import-dialog').addEventListener('close', () => {
+  if ($('account-import-dialog').open || !accountImport) return;
+  clearAccountImportPreview();
+  accountImport = null;
+  $('account-import-text').value = '';
+});
+$('account-copy-fallback-dialog').addEventListener('close', () => {
+  if (!$('account-copy-fallback-dialog').open) $('account-copy-fallback-text').value = '';
 });
 bind('refresh-accounts', () => {
   if (!state.dirty || confirm('放弃尚未应用的修改并刷新？')) return loadAccounts();
@@ -5099,7 +5626,7 @@ $('account-form').addEventListener('submit', (ev) => {
   try {
     collectFields();
     if (state.editing === null) state.accounts.push(clone(state.draft));
-    else state.accounts[state.editing] = clone(state.draft);
+    else replaceAccount(state.editing, clone(state.draft));
     dirty();
     renderAccounts();
     $('account-dialog').close();

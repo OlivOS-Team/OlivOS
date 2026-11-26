@@ -711,17 +711,35 @@
         </section>
         <section id="accounts" class="page" hidden>
           <div class="toolbar">
-            <div id="account-add-split">
-              <button id="add-account" type="button">新增账号</button>
-              <button id="add-account-menu-toggle" type="button" aria-label="更多新增账号方式"
-                      aria-haspopup="menu" aria-controls="account-add-menu" aria-expanded="false">
+            <div id="account-add-split" class="account-split">
+              <button id="add-account" class="account-split-primary" type="button">新增账号</button>
+              <button id="add-account-menu-toggle" class="account-split-toggle" type="button"
+                      aria-label="更多新增账号方式" aria-haspopup="menu" aria-controls="account-add-menu"
+                      aria-expanded="false">
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path d="M4 6l4 4 4-4" />
                 </svg>
               </button>
-              <div id="account-add-menu" role="menu" aria-label="新增账号方式" hidden>
+              <div id="account-add-menu" class="account-split-menu" role="menu" aria-label="新增账号方式" hidden>
                 <button id="account-add-general" type="button" role="menuitem">新增账号（通用）</button>
                 <button id="account-add-qr" type="button" role="menuitem">QQ 官方扫码创建</button>
+                <button id="account-import-clipboard" type="button" role="menuitem">从剪贴板导入</button>
+                <button id="account-import-file-trigger" type="button" role="menuitem">从 JSON 文件导入</button>
+              </div>
+            </div>
+            <input id="account-import-file" type="file" accept=".json,application/json" hidden />
+            <div id="account-export-split" class="account-split">
+              <button id="export-accounts-copy" class="account-split-primary" type="button" disabled>复制所选</button>
+              <button id="export-accounts-menu-toggle" class="account-split-toggle" type="button"
+                      aria-label="更多导出方式" aria-haspopup="menu" aria-controls="account-export-menu"
+                      aria-expanded="false" disabled>
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M4 6l4 4 4-4" />
+                </svg>
+              </button>
+              <div id="account-export-menu" class="account-split-menu" role="menu" aria-label="导出账号方式" hidden>
+                <button id="account-export-clipboard" type="button" role="menuitem">复制所选到剪贴板</button>
+                <button id="account-export-file" type="button" role="menuitem">导出所选为 JSON 文件</button>
               </div>
             </div>
             <button id="refresh-accounts">刷新</button>
@@ -732,6 +750,9 @@
             <table>
               <thead>
                 <tr>
+                  <th class="account-controls-cell">
+                    <input id="accounts-select-all" type="checkbox" aria-label="全选账号" disabled />
+                  </th>
                   <th>启用</th>
                   <th>账号</th>
                   <th>平台</th>
@@ -869,6 +890,43 @@
       <p id="account-info-note" hidden>有未应用的修改</p>
       <div class="dialog-actions">
         <button type="button" data-close="account-info-dialog">关闭</button>
+      </div>
+    </dialog>
+    <dialog id="account-import-dialog" aria-labelledby="account-import-title">
+      <div class="dialog-title">
+        <h2 id="account-import-title">导入账号</h2>
+        <button type="button" data-close="account-import-dialog" aria-label="关闭">×</button>
+      </div>
+      <details id="account-import-source">
+        <summary>手动粘贴 JSON</summary>
+        <label for="account-import-text">账号 JSON</label>
+        <textarea id="account-import-text" rows="6" spellcheck="false" autocomplete="off"></textarea>
+        <button id="account-import-parse" type="button">解析 JSON</button>
+      </details>
+      <p id="account-import-error" role="status" hidden></p>
+      <div id="account-import-summary" hidden>
+        <p id="account-import-counts" role="status"></p>
+        <div id="account-import-conflict-actions" class="toolbar" hidden>
+          <button id="account-import-check-conflicts" type="button">全部覆盖重复</button>
+          <button id="account-import-uncheck-conflicts" type="button">跳过全部重复</button>
+        </div>
+      </div>
+      <ul id="account-import-list" aria-label="账号导入预览"></ul>
+      <p class="hint">确认只更新草稿，点击「保存并应用」后才会写入配置。</p>
+      <div class="dialog-actions">
+        <button type="button" data-close="account-import-dialog">取消</button>
+        <button id="account-import-confirm" class="primary" type="button" disabled>确认导入（新增 0，覆盖 0）</button>
+      </div>
+    </dialog>
+    <dialog id="account-copy-fallback-dialog" aria-labelledby="account-copy-fallback-title">
+      <div class="dialog-title">
+        <h2 id="account-copy-fallback-title">手动复制账号</h2>
+        <button type="button" data-close="account-copy-fallback-dialog" aria-label="关闭">×</button>
+      </div>
+      <p class="hint">浏览器未能写入剪贴板。请复制下方已选中的 JSON，内容含账号凭据。</p>
+      <textarea id="account-copy-fallback-text" aria-label="待复制的账号 JSON" rows="8" readonly></textarea>
+      <div class="dialog-actions">
+        <button type="button" data-close="account-copy-fallback-dialog">关闭</button>
       </div>
     </dialog>
     <dialog id="account-dialog">
