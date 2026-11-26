@@ -344,6 +344,8 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                     ].platform['model'] in OlivOS.flaskServerAPI.gCheckList:
                                         if plugin_bot_info_dict[bot_info_key].post_info.type == 'post':
                                             flag_need_enable = True
+                            if basic_conf_models_this['name'] in Proc_dict:
+                                stop_component(basic_conf_models_this['name'], Proc_dict, Proc_Proc_dict)
                             if not flag_need_enable:
                                 continue
                             Proc_dict[basic_conf_models_this['name']] = OlivOS.flaskServerAPI.server(
@@ -586,6 +588,7 @@ _  / / /_  /  __  / __ | / /_  / / /____ \
                                 basic_conf_models=basic_conf_models,
                                 bot_info_dict=account_bot_info_dict,
                                 logger_proc=Proc_dict[basic_conf_models_this['logger_proc']],
+                                active_procs=Proc_dict,
                             )
                             plugin_bot_info_dict = OlivOS.accountAPI.Account.getEnabledAccountData(
                                 account_bot_info_dict

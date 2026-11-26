@@ -100,6 +100,7 @@ class server(OlivOS.API.Proc_templet):
         self.started_at = time.monotonic()
         self.lock = threading.RLock()
         self.tk_bridge = tkBridgeAPI.WebBridge(self)
+        self.qr_bind_manager = OlivOS.qqGuildv2QrBindAPI.QrBindManager()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
         # 配置写坏时退回默认值，避免 WebUI 连带整个实例启动失败
@@ -250,6 +251,7 @@ class server(OlivOS.API.Proc_templet):
             retired = list(self.sockets)
             self.sockets.clear()
             self.tk_bridge.revoke()
+        self.qr_bind_manager.cancel_all()
         if retired and self.loop and self.loop.is_running():
             try:
                 # 本机管理线程等待连接关闭确认后，才向终端/托盘报告操作完成。
@@ -475,7 +477,9 @@ class server(OlivOS.API.Proc_templet):
                     pending['result'] = ({'error': '账号已被其他窗口修改，请刷新后重试'}, 409)
                     return
                 accounts = pageAPI.parse_accounts(pending['body'], current)
-                accounts = OlivOS.accountAPI.accountFix(basic_models, accounts, self)
+                accounts = OlivOS.accountAPI.accountFix(
+                    basic_models, accounts, self, active_procs=self.runtime
+                )
                 self.account_path.parent.mkdir(parents=True, exist_ok=True)
                 if self.account_path.exists():
                     backup = self.account_path.with_name(self.account_path.name + '.webui-backup')
@@ -696,6 +700,7 @@ class server(OlivOS.API.Proc_templet):
                     next_bridge_maintenance = now + 0.25
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
+            self.qr_bind_manager.close()
             self.tk_bridge.stop()
             if self.local_manager is not None:
                 self.local_manager.close()
@@ -748,6 +753,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.stop_event.set()
+        self.qr_bind_manager.close()
         self.tk_bridge.stop()
         if self.local_manager is not None:
             self.local_manager.close()

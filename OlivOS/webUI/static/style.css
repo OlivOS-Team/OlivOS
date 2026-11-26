@@ -393,7 +393,7 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 16px 16px;
+  padding: 20px 16px 16px;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
@@ -407,6 +407,8 @@ aside {
   flex-shrink: 0;
 }
 .sidebar-head {
+  flex: 0 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 16px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -494,26 +496,14 @@ nav h2 {
   margin: 0 14px 5px;
 }
 #plugin-navigation {
-  min-height: var(--control-height);
-  flex-shrink: 1;
-}
-/* 高视口下若固定项增高（如缩放/新增导航项），插件列表仍保底可浏览高度，
-   避免被压扁至 0px 且外层侧栏无滚动条的死区。 */
-#plugin-navigation:has(#plugin-links:not([hidden]) > p) {
-  min-height: calc(var(--control-height) + 40px);
-}
-#plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
-  min-height: calc(var(--control-height) + 160px);
+  flex: 0 0 auto;
+  min-height: 0;
 }
 #plugin-links {
+  flex: none;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-#plugin-links:hover {
-  scrollbar-color: var(--muted) transparent;
+  max-height: none;
+  overflow: visible;
 }
 #plugin-links p {
   margin: 8px 14px;
@@ -980,7 +970,7 @@ nav h2 {
 #sidebar-backdrop {
   display: none;
 }
-@media (min-width: 801px) {
+@media (min-width: 801px) and (orientation: landscape) {
   /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
      收起后不会出现「内容先消失、面板再跳一下」的观感。 */
   aside,
@@ -1023,6 +1013,7 @@ nav h2 {
   }
   #shell[data-sidebar-collapsed='true'] .sidebar-head {
     width: 100%;
+    padding-inline: 8px;
     justify-content: center;
   }
   #shell[data-sidebar-collapsed='true'] .brand {
@@ -2488,6 +2479,58 @@ body.performance-nav-open .performance-nav-toggle svg {
   gap: 12px;
   margin-bottom: 16px;
 }
+#account-add-split {
+  position: relative;
+  display: inline-flex;
+}
+#add-account {
+  border-radius: var(--control-radius) 0 0 var(--control-radius);
+}
+#add-account-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-height);
+  padding: 0;
+  border-left: 0;
+  border-radius: 0 var(--control-radius) var(--control-radius) 0;
+}
+#add-account-menu-toggle svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 140ms ease;
+}
+#add-account-menu-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+#account-add-menu {
+  position: absolute;
+  z-index: 10;
+  inset: calc(100% + 4px) auto auto 0;
+  display: grid;
+  width: max-content;
+  padding: 4px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  background: var(--popover);
+  box-shadow: var(--menu-shadow);
+  transform-origin: top left;
+  animation: select-menu-in 100ms ease-out;
+}
+#account-add-menu button {
+  text-align: start;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+#account-add-menu button:is(:hover, :focus-visible) {
+  background: var(--control-bg-hover);
+}
 .plugin-toolbar {
   margin-bottom: 6px;
 }
@@ -2845,6 +2888,7 @@ dialog::backdrop {
   .switch::before,
   .select-chevron::before,
   .select-menu,
+  #account-add-menu,
   input[type='checkbox']:not(.switch)::before,
   input[type='radio']::before,
   summary::before,
@@ -2934,6 +2978,20 @@ dialog::backdrop {
   flex-direction: column;
   gap: 10px;
 }
+#account-qr-bind-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+}
+#account-qr-bind-bar .hint {
+  margin: 2px 0 0;
+}
 #qr-dialog {
   width: min(420px, calc(100vw - 30px));
 }
@@ -2941,6 +2999,10 @@ dialog::backdrop {
   width: 100%;
   height: auto;
   background: white;
+}
+#qr-status {
+  margin-block: 12px;
+  color: var(--muted);
 }
 #plugin-frame-container iframe {
   width: 100%;
@@ -3083,6 +3145,9 @@ dialog::backdrop {
   textarea {
     min-height: 44px;
   }
+  #add-account-menu-toggle {
+    min-width: 44px;
+  }
   label.check {
     min-height: 44px;
   }
@@ -3125,12 +3190,12 @@ dialog::backdrop {
       transform 180ms ease,
       visibility 0s linear 180ms;
   }
+  .sidebar-head {
+    padding: calc(16px + env(safe-area-inset-top)) 16px 0;
+  }
   .sidebar-scroll {
     gap: 20px;
-    padding:
-      calc(16px + env(safe-area-inset-top))
-      16px
-      12px;
+    padding: 16px 16px 12px;
     overflow-x: hidden;
   }
   .sidebar-footer {
@@ -3173,19 +3238,17 @@ dialog::backdrop {
     place-items: center;
   }
   #plugin-navigation {
-    flex: 1 1 160px;
-    min-height: 160px;
+    flex: 0 0 auto;
+    min-height: 0;
   }
   #plugin-navigation-group {
-    height: 100%;
+    height: auto;
   }
   #plugin-links {
-    flex: 1;
+    flex: none;
     min-height: 0;
     max-height: none;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
+    overflow: visible;
   }
   #plugin-links :is(button, a) {
     width: 100%;
@@ -3211,12 +3274,14 @@ dialog::backdrop {
     height: 55dvh;
   }
 }
-/* 视口较矮时收紧侧栏纵向留白，并将品牌头/主导航/插件列表统一在底栏上方滚动，
-   底栏（主题切换与退出登录）始终固定在侧栏底部，无需翻到插件列表最末端即可退出。 */
+/* 矮视口收紧头尾留白，把可用高度留给中段导航。 */
 @media (max-height: 760px) {
+  .sidebar-head {
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
   .sidebar-scroll {
     gap: 12px;
-    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-top: 12px;
     padding-bottom: 12px;
   }
   #navigation {
@@ -3229,33 +3294,6 @@ dialog::backdrop {
     gap: 8px;
     padding-top: 10px;
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
-}
-@media (max-height: 700px) {
-  #plugin-navigation,
-  #plugin-navigation:has(#plugin-links:not([hidden]) > p),
-  #plugin-navigation:has(#plugin-links:not([hidden]) .plugin-page-group) {
-    flex: 0 0 auto;
-    min-height: 0;
-  }
-  #plugin-navigation-group {
-    height: auto;
-  }
-  #plugin-links {
-    flex: none;
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
-  }
-}
-@media (max-height: 240px) {
-  aside {
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-  }
-  .sidebar-scroll {
-    flex: 0 0 auto;
-    overflow-y: visible;
   }
 }
 @media (min-width: 801px) and (max-width: 1100px) and (max-height: 440px) {

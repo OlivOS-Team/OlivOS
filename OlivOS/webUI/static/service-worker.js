@@ -85,6 +85,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// 只代宿主页面完成卸载时的绑定清理；浏览器可在普通 fetch 发出前销毁该页面。
+// 不缓存令牌、请求或响应，插件页面也不能借此指定请求目标。
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data?.type !== 'olivos:cancel-qr-bind' || event.source?.type !== 'window') return;
+  const source = new URL(event.source.url);
+  if (source.origin !== self.location.origin || source.pathname !== '/' ||
+      typeof data.path !== 'string' || !/^\/api\/accounts\/qqguild\/qr-bind\/[\w-]+$/.test(data.path) ||
+      typeof data.token !== 'string') return;
+  event.waitUntil(fetch(data.path, {
+    method: 'DELETE', headers: { 'X-Auth-Token': data.token }, cache: 'no-store', redirect: 'error',
+  }).catch(() => {}));
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || request.headers.has('range')) return;

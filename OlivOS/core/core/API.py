@@ -24,6 +24,7 @@ import inspect
 import ctypes
 import html
 import os
+import weakref
 
 from functools import wraps
 from urllib import parse
@@ -3898,6 +3899,19 @@ class Event(object):
             self.__set_msg_emoji_like(message_id, emoji_id, is_set, group_id, flag_log)
 
 
+# 进程内运行期控制线程状态放在弱引用表，避免在组件实例上挂载不可 pickle 的
+# threading.Event / Thread，导致 Windows spawn 模式启动子进程（如 OlivOS_plugin
+# 携带已运行的 logger_proc）时触发 ForkingPickler TypeError。
+_proc_control_rx_lock = threading.Lock()
+_proc_control_rx_runtime = weakref.WeakKeyDictionary()
+
+
+def get_control_rx_thread(proc):
+    with _proc_control_rx_lock:
+        runtime = _proc_control_rx_runtime.get(proc)
+    return runtime['thread'] if runtime is not None else None
+
+
 class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(StoppableThread, self).__init__(*args, **kwargs)
@@ -3906,6 +3920,10 @@ class StoppableThread(threading.Thread):
 
     def terminate(self):
         if self.root is not None:
+            with _proc_control_rx_lock:
+                runtime = _proc_control_rx_runtime.get(self.root)
+            if runtime is not None:
+                runtime['stop'].set()
             try:
                 self.root.on_terminate()
             except Exception:
@@ -3937,7 +3955,13 @@ class StoppableThread(threading.Thread):
             raise SystemError("PyThreadState_SetAsyncExc failed")
 
     def stop_thread(self):
-        self._async_raise(self.ident, SystemExit)
+        if not self.is_alive() or self.ident is None:
+            return
+        try:
+            self._async_raise(self.ident, SystemExit)
+        except ValueError:
+            # 线程可能在 on_terminate() 关闭监听后已自行退出，此时无需再强行注入异常。
+            pass
 
 
 class Proc_templet(object):
@@ -3972,19 +3996,37 @@ class Proc_templet(object):
         pass
 
     def run_total(self):
+        stop_event = threading.Event()
         t_this = StoppableThread(
             name=self.Proc_name + '+on_control_rx',
             target=self.on_control_rx_init,
             args=()
         )
         t_this.daemon = self.deamon
+        with _proc_control_rx_lock:
+            _proc_control_rx_runtime[self] = {
+                'stop': stop_event,
+                'thread': t_this,
+            }
         t_this.start()
-        self.run()
+        try:
+            self.run()
+        except SystemExit as exc:
+            if exc.code is not None:
+                raise
+        finally:
+            stop_event.set()
 
     def on_control_rx_init(self):
-        while True:
+        with _proc_control_rx_lock:
+            runtime = _proc_control_rx_runtime.get(self)
+        stop_event = runtime['stop'] if runtime is not None else None
+        while stop_event is None or not stop_event.is_set():
             if self.Proc_info.control_rx_queue.empty():
-                time.sleep(0.02)
+                if stop_event is not None:
+                    stop_event.wait(0.02)
+                else:
+                    time.sleep(0.02)
             else:
                 try:
                     packet = self.Proc_info.control_rx_queue.get(block=False)

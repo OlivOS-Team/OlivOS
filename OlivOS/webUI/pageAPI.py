@@ -219,6 +219,7 @@ def account_schema():
             'webhook': sdk == 'qqGuildv2_link' and connection == 'post',
         })
     return {'hierarchy': hierarchy, 'presets': presets,
+            'qqguild_qr_account': OlivOS.qqGuildv2QrBindAPI.build_qqguild_v2_ws_account('', ''),
             'server_types': OlivOS.accountMetadataAPI.accountTypeDataList_server_type,
             'qsign_protocols': OlivOS.accountMetadataAPI.accountQsignProtocols,
             'qsign_limit': 10,
@@ -657,6 +658,10 @@ def register_routes(host):
     def invalid_request(error):
         return jsonify(error=str(error)), 400
 
+    @app.errorhandler(OlivOS.qqGuildv2QrBindAPI.QrBindError)
+    def qr_bind_error(error):
+        return jsonify(error=str(error)), error.http_status
+
     @app.errorhandler(OSError)
     def io_error(error):
         return jsonify(error='无法读取文件，请检查路径和权限'), 500
@@ -753,6 +758,35 @@ def register_routes(host):
             parse_accounts(body, load_accounts(host))
         result, code = host.submit_accounts(body)
         return jsonify(result), code
+
+    @app.post('/api/accounts/qqguild/qr-bind')
+    def qr_bind_create():
+        session = host.qr_bind_manager.create_session()
+        with host.lock:
+            if not host.browser_valid(request.headers['X-Auth-Token']):
+                host.qr_bind_manager.cancel_session(session['bind_id'])
+                return jsonify(error='登录已失效，请重新登录'), 401
+        return jsonify(session)
+
+    @app.get('/api/accounts/qqguild/qr-bind/<bind_id>/qrcode')
+    def qr_bind_png(bind_id):
+        try:
+            png = host.qr_bind_manager.get_qr_png(bind_id)
+        except KeyError:
+            return jsonify(error='二维码已失效，请刷新'), 404
+        return app.response_class(png, mimetype='image/png')
+
+    @app.route('/api/accounts/qqguild/qr-bind/<bind_id>', methods=['GET', 'DELETE'])
+    def qr_bind_result(bind_id):
+        if request.method == 'DELETE':
+            host.qr_bind_manager.cancel_session(bind_id)
+            return jsonify(ok=True)
+        result = host.qr_bind_manager.poll_session(bind_id)
+        # 上游请求返回前用户可能已退出或重置密码；勿向已撤销的登录交付凭据。
+        with host.lock:
+            if not host.browser_valid(request.headers['X-Auth-Token']):
+                return jsonify(error='登录已失效，请重新登录'), 401
+        return jsonify(result)
 
     @app.get('/api/accounts/schema')
     def schema():
