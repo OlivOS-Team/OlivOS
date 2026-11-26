@@ -3247,15 +3247,17 @@ dialog::backdrop {
   }
   #logs .log-filter-control {
     flex: 1 1 100%;
+    max-width: 100%;
     min-width: 0;
   }
   #logs #log-filter {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    max-width: 100%;
     min-width: 0;
   }
   #logs #log-filter > summary {
-    display: flex;
-    align-items: center;
+    display: block;
+    line-height: calc(var(--control-height) - 16px);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
