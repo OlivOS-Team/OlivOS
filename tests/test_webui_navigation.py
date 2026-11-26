@@ -11,7 +11,7 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import resourceAPI
-from webui_test_support import login_ui, make_host
+from webui_test_support import QQBindRemote, login_ui, make_host
 
 
 PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
@@ -72,6 +72,8 @@ def navigation_host(tmp_path):
                 packet = host.Proc_info.control_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
+            if packet.action == 'webui_accounts':
+                host.commit_accounts(packet.key['request_id'], {})
             if packet.action != 'send':
                 continue
             data = packet.key.get('data', {})
@@ -265,13 +267,14 @@ def browser(navigation_host, chrome_session):
         if not driver.execute_script(
                 'return matchMedia("(max-width: 800px), (orientation: portrait)").matches'):
             return
-        if driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
-            return
-        click('#sidebar-toggle')
-        wait.until(lambda _: driver.execute_script(
-            "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
-        wait.until(lambda _: driver.execute_script(
-            "return document.getElementById('sidebar').getBoundingClientRect().left >= -1"))
+        if not driver.execute_script("return document.getElementById('shell').dataset.sidebarOpen === 'true'"):
+            click('#sidebar-toggle')
+        # 窄栏和展开栏都贴着左边界；等宽度过渡完成后再检查文字和插件列表的布局。
+        wait.until(lambda _: driver.execute_script('''
+            const sidebar = document.getElementById('sidebar');
+            return document.getElementById('shell').dataset.sidebarOpen === 'true' &&
+              sidebar.getAnimations().every(animation => animation.playState === 'finished');
+        '''))
 
     def select(path='webui/index.html', namespace='multi'):
         open_sidebar()
@@ -301,8 +304,7 @@ def browser(navigation_host, chrome_session):
 def set_viewport(browser, width, height, *, mobile_device=False):
     """切换视口，并等侧边栏完成移动端/桌面端模式同步。
 
-    matchMedia 命中是同步的，但它派发的 change 事件是异步的，aria-expanded /
-    aria-hidden 要等监听器跑完才更新；只等 matchMedia 就断言会读到上一档视口的旧值。
+    matchMedia 的 change 异步派发；等待折叠属性与当前视口一致再测几何位置。
     """
     driver = browser.driver
     # 侧边栏媒体查询还包含纵向视口，宽大于 800px 的竖屏同样属于移动侧栏模式。
@@ -312,11 +314,9 @@ def set_viewport(browser, width, height, *, mobile_device=False):
     browser.wait.until(lambda _: driver.execute_script(
         '''
         const mobile = matchMedia('(max-width: 800px), (orientation: portrait)').matches;
-        const sidebar = document.getElementById('sidebar');
-        const synced = mobile
-            ? sidebar.getAttribute('aria-hidden') === 'true'
-            : !sidebar.hasAttribute('aria-hidden');
-        return mobile === arguments[0] && synced;
+        const collapsed = state.sidebarCollapsed ?? mobile;
+        return mobile === arguments[0] && state.sidebarOpen === (mobile && !collapsed) &&
+            document.getElementById('shell').dataset.sidebarCollapsed === String(collapsed);
         ''', mobile))
 
 
@@ -1300,6 +1300,289 @@ def test_account_dialog_custom_select_is_not_covered_by_modal(browser):
     ''')
 
 
+@pytest.fixture
+def account_qr(browser, monkeypatch):
+    """记录实际 Flask 请求的路径和状态，不截取密钥、请求正文或账号响应。"""
+    remote = QQBindRemote(monkeypatch)
+    calls = []
+    app = browser.host.app
+    dispatch = app.wsgi_app
+
+    def observe(environ, start_response):
+        def started(status, headers, exc_info=None):
+            calls.append((environ['REQUEST_METHOD'], environ['PATH_INFO'], status.split()[0]))
+            return start_response(status, headers, exc_info)
+
+        return dispatch(environ, started)
+
+    monkeypatch.setattr(app, 'wsgi_app', observe)
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
+    return SimpleNamespace(remote=remote, calls=calls)
+
+
+def choose_account_preset(browser, title):
+    from selenium.webdriver.common.by import By
+    browser.click('#account-preset')
+    browser.driver.find_element(By.XPATH, f'//*[@role="option"][normalize-space(.)="{title}"]').click()
+    assert browser.attribute('#account-preset', 'value') == title
+
+
+def quick_account_qr(browser):
+    browser.click('#add-account-menu-toggle')
+    browser.click('#account-add-qr')
+
+
+def account_confirm(browser, text, accept=True):
+    from selenium.webdriver.support import expected_conditions as ec
+    alert = browser.wait.until(ec.alert_is_present())
+    assert text in alert.text
+    if accept:
+        alert.accept()
+    else:
+        alert.dismiss()
+
+
+def qr_blob(browser):
+    return browser.wait.until(lambda _: browser.driver.execute_script('''
+        const image = document.querySelector('#qr-image');
+        return image.complete && image.naturalWidth && image.src.startsWith('blob:') && image.src;
+    '''))
+
+
+def assert_revoked_blob(browser, url):
+    assert browser.driver.execute_async_script('''
+        const image = new Image(), done = arguments[1];
+        image.onload = () => done(false);
+        image.onerror = () => done(true);
+        image.src = arguments[0];
+    ''', url)
+
+
+@pytest.mark.browser
+def test_account_split_menu_and_qr_preset_visibility(browser, account_qr):
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    toggle = browser.find('#add-account-menu-toggle')
+    toggle.click()
+    items = browser.find('#account-add-menu').find_elements(By.XPATH, './*')
+    assert [item.text for item in items] == ['新增账号（通用）', 'QQ 官方扫码创建']
+    assert toggle.get_attribute('aria-expanded') == 'true'
+    browser.find('#account-add-general').send_keys(Keys.ESCAPE)
+    assert not browser.find('#account-add-menu').is_displayed()
+    assert browser.driver.switch_to.active_element == toggle.raw()
+    toggle.click()
+    browser.click('#page-title')
+    assert toggle.get_attribute('aria-expanded') == 'false'
+    toggle.click()
+    browser.click('#account-add-general')
+    assert not browser.find('#account-add-menu').is_displayed()
+    bar = browser.find('#account-qr-bind-bar')
+    assert not bar.is_displayed()  # 默认 NapCat
+    for preset, visible in [('QQ官方/公域/V2', True), ('QQ官方/公域/V1', False),
+                            ('QQ官方/沙盒/V2/Webhook', True), ('QQ官方/私域/V2/指定intents', True)]:
+        choose_account_preset(browser, preset)
+        assert bar.is_displayed() is visible
+    assert not account_qr.remote.keys
+
+
+@pytest.mark.browser
+def test_mobile_account_split_keeps_two_touch_targets_and_menu_in_view(browser, account_qr):
+    set_viewport(browser, 320, 568)
+    browser.click('#add-account-menu-toggle')
+    assert browser.driver.execute_script('''
+        const bounds = (id) => document.getElementById(id).getBoundingClientRect();
+        const add = bounds('add-account'), toggle = bounds('add-account-menu-toggle');
+        const menu = bounds('account-add-menu');
+        return add.height >= 44 && toggle.height >= 44 && toggle.width >= 44 &&
+          Math.abs(add.right - toggle.left) < 1 && menu.left >= 0 && menu.right <= innerWidth;
+    ''')
+
+
+@pytest.mark.browser
+def test_qr_quick_account_saves_then_updates_only_confirmed_secret(browser, account_qr):
+    remote = account_qr.remote
+    path = browser.host.account_path
+    remote.status = 2
+    quick_account_qr(browser)
+    browser.wait.until(lambda _: path.is_file() and not browser.text('#accounts-dirty'))
+    original, = json.loads(path.read_text(encoding='utf-8'))['account']
+    assert str(original['id']) == remote.app_id
+    assert (original['sdk_type'], original['platform_type'], original['model_type'], original['enable']) == (
+        'qqGuildv2_link', 'qqGuild', 'public', True)
+    assert (original['server']['type'], original['server']['auto'], original['server']['access_token']) == (
+        'websocket', True, remote.app_secret)
+
+    # 同一 AppID 可以已有非默认预设；快捷入口只应修改它的密钥。
+    browser.click('#account-rows .actions button:nth-child(2)')
+    choose_account_preset(browser, 'QQ官方/私域/V2')
+    browser.click('#account-debug')
+    browser.click('#account-form button[type="submit"]')
+    browser.click('#account-rows [role="switch"]')
+    remote.app_secret += '-rotated'
+    quick_account_qr(browser)
+    account_confirm(browser, '一并保存', accept=False)
+    assert len(remote.keys) == 1 and not browser.find('#qr-dialog').is_displayed()
+    quick_account_qr(browser)
+    account_confirm(browser, '一并保存')
+    account_confirm(browser, '仅更新 AppSecret', accept=False)
+    assert json.loads(path.read_text(encoding='utf-8'))['account'] == [original]
+    assert browser.text('#accounts-dirty')
+
+    quick_account_qr(browser)
+    account_confirm(browser, '一并保存')
+    account_confirm(browser, '仅更新 AppSecret')
+    browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
+    original.update(enable=False, debug=True, model_type='private')
+    original['server']['access_token'] = remote.app_secret
+    assert json.loads(path.read_text(encoding='utf-8'))['account'] == [original]
+    assert account_qr.calls.count(('POST', '/api/accounts', '200')) == 2
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize(('preset', 'review'), [
+    ('QQ官方/私域/V2', ''), ('QQ官方/公域/V2/Webhook', 'Webhook'), ('QQ官方/沙盒/V2/指定intents', 'intents'),
+])
+def test_account_qr_editor_stages_until_manual_save(browser, account_qr, preset, review):
+    remote = account_qr.remote
+    path = browser.host.account_path
+    browser.click('#add-account')
+    choose_account_preset(browser, preset)
+    browser.click('#account-qr-fill')
+    qr_blob(browser)
+    assert browser.attribute('#qr-link', 'href').startswith('https://q.qq.com/qqbot/openclaw/connect.html?')
+    remote.status = 2
+    browser.wait.until(lambda _: not browser.find('#qr-dialog').is_displayed())
+    if review:
+        assert browser.find('#account-dialog').is_displayed()
+        assert review in browser.text('#account-error')
+        assert browser.attribute('#account-form [data-field="id"]', 'value') == remote.app_id
+        assert browser.attribute('#account-form [data-field="server.access_token"]', 'value') == remote.app_secret
+        if review == 'Webhook':
+            browser.wait.until(lambda _: browser.attribute('#webhook-url', 'value').endswith('/' + remote.app_id))
+        else:
+            browser.type_text('#account-form [data-field="server.port"]', '33554432')
+        browser.click('#account-form button[type="submit"]')
+    assert not browser.find('#account-dialog').is_displayed()
+    assert remote.app_id in browser.text('#account-rows') and browser.text('#accounts-dirty')
+    assert not path.exists() and not any(call[:2] == ('POST', '/api/accounts') for call in account_qr.calls)
+    browser.click('#save-accounts')
+    browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
+    row, = json.loads(path.read_text(encoding='utf-8'))['account']
+    assert str(row['id']) == remote.app_id and row['server']['access_token'] == remote.app_secret
+    if review == 'intents':
+        assert row['server']['port'] == 33554432
+
+
+@pytest.mark.browser
+def test_account_qr_expiry_refresh_keeps_editor_callback_and_revokes_image(browser, account_qr):
+    browser.click('#add-account')
+    choose_account_preset(browser, 'QQ官方/公域/V2/指定intents')
+    browser.type_text('#account-form [data-field="server.port"]', '4096')
+    browser.click('#account-qr-fill')
+    first = qr_blob(browser)
+    account_qr.remote.status = 3
+    browser.wait.until(lambda _: '过期' in browser.text('#qr-status'))
+    assert not browser.find('#qr-link').is_displayed() and not browser.find('#qr-image').is_displayed()
+    assert_revoked_blob(browser, first)
+    account_qr.remote.status = 1
+    browser.click('#qr-refresh')
+    assert qr_blob(browser) != first
+    account_qr.remote.status = 2
+    browser.wait.until(lambda _: not browser.find('#account-dialog').is_displayed())
+    assert account_qr.remote.app_id in browser.text('#account-rows')
+    assert not browser.host.account_path.exists()
+    assert len(account_qr.remote.keys) == 2
+    browser.click('#refresh-accounts')
+    account_confirm(browser, '放弃尚未应用')
+    browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('pending', ['create_bind_task', 'poll_bind_result'])
+def test_account_qr_cancel_inflight_never_applies_late_result(browser, account_qr, monkeypatch, pending):
+    import requests
+    entered, release = threading.Event(), threading.Event()
+    remote = account_qr.remote
+    remote.status = 2
+
+    def slow_post(url, **kwargs):
+        if url.endswith('/' + pending):
+            entered.set()
+            assert release.wait(15)
+        return remote.post(url, **kwargs)
+
+    monkeypatch.setattr(requests, 'post', slow_post)
+    quick_account_qr(browser)
+    try:
+        assert entered.wait(8)
+        image = qr_blob(browser) if pending == 'poll_bind_result' else None
+        browser.click('#qr-actions [data-close="qr-dialog"]')
+        assert not browser.find('#qr-dialog').is_displayed()
+    finally:
+        release.set()
+    browser.wait.until(lambda _: any(method == 'DELETE' and '/qr-bind/' in path and status == '200'
+                                     for method, path, status in account_qr.calls))
+    if image:
+        assert_revoked_blob(browser, image)
+    assert not browser.host.account_path.exists() and not browser.text('#accounts-dirty')
+    assert remote.app_id not in browser.text('#account-rows')
+
+
+@pytest.mark.browser
+def test_terminal_qr_keeps_original_link_and_releases_image_on_escape(browser, tmp_path):
+    import qrcode
+    from selenium.webdriver.common.keys import Keys
+
+    bot = OlivOS.API.bot_info_T(id=23456, platform_sdk='onebot', platform_platform='qq',
+                                platform_model='napcat_show_new')
+    host = browser.host
+    with host.lock:
+        host.accounts[bot.hash] = bot
+    image = tmp_path / 'data/terminal-qr.png'
+    image.parent.mkdir(exist_ok=True)
+    qrcode.make('fixture-terminal').save(image)
+    url = f'http://127.0.0.1:{host.config["port"]}/api/health'
+
+    def emit(event, **fields):
+        host.consume(OlivOS.API.Control.packet('send', {'data': {
+            'action': 'napcat', 'event': event, 'hash': bot.hash, **fields,
+        }}))
+
+    emit('init')
+    emit('qrcode_url', url=url)
+    browser.wait.until(lambda _: browser.find('#qr-link').is_displayed())
+    emit('qrcode', path=str(image))
+    blob = qr_blob(browser)
+    assert str(bot.id) in browser.text('#qr-title')
+    assert browser.attribute('#qr-link', 'href') == url
+    assert not browser.find('#qr-actions').is_displayed() and not browser.find('#qr-status').is_displayed()
+    browser.find('#qr-dialog [data-close]').send_keys(Keys.ESCAPE)
+    browser.wait.until(lambda _: not browser.find('#qr-dialog').is_displayed())
+    assert_revoked_blob(browser, blob)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('dirty', [False, True], ids=['clean', 'confirmed-dirty'])
+def test_account_qr_page_reload_deletes_session(browser, account_qr, dirty):
+    if dirty:
+        browser.click('#add-account')
+        choose_account_preset(browser, 'QQ官方/公域/V2')
+        browser.type_text('#account-form [data-field="id"]', '444444')
+        browser.click('#account-form button[type="submit"]')
+    quick_account_qr(browser)
+    if dirty:
+        account_confirm(browser, '一并保存')
+    qr_blob(browser)
+    session_path, = [path.removesuffix('/qrcode') for method, path, status in account_qr.calls
+                     if method == 'GET' and path.endswith('/qrcode') and status == '200']
+    browser.driver.refresh()
+    browser.wait.until(lambda _: ('DELETE', session_path, '200') in account_qr.calls)
+    with pytest.raises(KeyError):
+        browser.host.qr_bind_manager.get_qr_png(session_path.rsplit('/', 1)[-1])
+    assert not browser.host.account_path.exists()
+
+
 @pytest.mark.browser
 def test_mobile_custom_select_menu_opens_above_and_fits_viewport(browser):
     driver = browser.driver
@@ -1446,19 +1729,20 @@ def test_desktop_sidebar_collapse_transitions_instead_of_jumping(browser):
 
 
 @pytest.mark.browser
-def test_mobile_sidebar_drawer_opens_closes_and_returns_focus(browser):
+def test_mobile_sidebar_rail_expands_and_returns_focus(browser):
     driver = browser.driver
     set_viewport(browser, 390, 844)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
-    assert driver.execute_script(
-        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
+    assert browser.find('#sidebar').get_attribute('aria-hidden') != 'true'
+    assert browser.find('#sidebar .brand-logo').is_displayed()
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
 
     browser.click('#sidebar-toggle')
     browser.wait.until(lambda _: driver.execute_script(
         "return document.getElementById('shell').dataset.sidebarOpen === 'true'"))
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'true'
-    assert driver.execute_script(
-        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'false'
+    assert browser.find('#sidebar').get_attribute('aria-hidden') != 'true'
     assert driver.execute_script('return document.body.classList.contains("sidebar-open")')
     assert driver.execute_script('return document.activeElement.id') == 'sidebar-close'
     assert driver.execute_script(
@@ -1507,20 +1791,31 @@ def test_mobile_sidebar_closes_after_navigation(browser):
 
 @pytest.mark.browser
 @pytest.mark.parametrize('width', [320, 390])
-def test_mobile_sidebar_drawer_fits_viewport(browser, width):
+def test_mobile_sidebar_rail_and_overlay_fit_viewport(browser, width):
     driver = browser.driver
-    driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
-        'width': width, 'height': 844, 'deviceScaleFactor': 1, 'mobile': False})
+    set_viewport(browser, width, 844)
+    browser.wait.until(lambda _: driver.execute_script('''
+        const rail = document.getElementById('sidebar').getBoundingClientRect();
+        return rail.left === 0 && rail.width === 64 &&
+          document.querySelector('main').getBoundingClientRect().left === rail.right;
+    '''))
+    assert driver.execute_script('''
+        const controls = document.querySelectorAll('#navigation button, .sidebar-footer button, #sidebar-toggle');
+        return [...controls].every(el => el.getBoundingClientRect().height >= 44) &&
+          document.documentElement.scrollWidth <= innerWidth;
+    ''')
     browser.open_sidebar()
     assert driver.execute_script('return document.documentElement.scrollWidth <= innerWidth')
-    assert driver.execute_script('''
+    browser.wait.until(lambda _: driver.execute_script('''
         const sidebar = document.getElementById('sidebar').getBoundingClientRect();
-        return sidebar.right <= innerWidth && sidebar.width <= innerWidth;
-    ''')
+        const main = document.querySelector('main').getBoundingClientRect();
+        return sidebar.width > 160 && sidebar.right <= innerWidth && main.left === 64 &&
+          document.querySelector('.sidebar-head').getBoundingClientRect().top === 0;
+    '''))
 
 
 @pytest.mark.browser
-def test_sidebar_viewport_switch_clears_mobile_state(browser):
+def test_sidebar_viewport_switch_preserves_choice_without_desktop_backdrop(browser):
     driver = browser.driver
     set_viewport(browser, 390, 844)
     browser.open_sidebar()
@@ -1535,9 +1830,10 @@ def test_sidebar_viewport_switch_clears_mobile_state(browser):
         "return document.getElementById('sidebar').getBoundingClientRect().width") > 150
 
     set_viewport(browser, 390, 844)
+    assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'true'
+    browser.click('#sidebar-close')
+    set_viewport(browser, 1440, 900)
     assert browser.find('#sidebar-toggle').get_attribute('aria-expanded') == 'false'
-    assert driver.execute_script(
-        "return document.getElementById('sidebar').getAttribute('aria-hidden')") == 'true'
 
 
 @pytest.mark.browser
@@ -3930,6 +4226,8 @@ def test_desktop_sidebar_plugin_list_stays_reachable_across_viewport_heights(bro
         const linksRect = plinks.getBoundingClientRect();
         const footerRect = footer.getBoundingClientRect();
         const logoutRect = logout.getBoundingClientRect();
+        const logo = aside.querySelector('.brand-logo');
+        const logoTop = logo.getBoundingClientRect().top;
         const plinksOverflow = getComputedStyle(plinks).overflowY;
         scrollBox.scrollTop = 0;
         const footerVisibleWithoutScroll = logoutRect.top >= asideRect.top - 0.5 &&
@@ -3951,8 +4249,10 @@ def test_desktop_sidebar_plugin_list_stays_reachable_across_viewport_heights(bro
             rect.bottom <= containerRect.bottom + 1;
           plinks.scrollTop = 0;
         }
+        const logoPinned = logoTop >= 0 && logoTop === logo.getBoundingClientRect().top;
         scrollBox.scrollTop = 0;
         return {
+          logoPinned,
           boxScroll: boxMaxScroll > 0,
           plinksOverflow,
           plinksClientHeight: plinks.clientHeight,
@@ -3964,6 +4264,7 @@ def test_desktop_sidebar_plugin_list_stays_reachable_across_viewport_heights(bro
         };
     ''')
     assert metrics['noOverlap'], (height, metrics)
+    assert metrics['logoPinned'], (height, metrics)
     assert metrics['footerVisibleWithoutScroll'], (height, metrics)
     assert metrics['lastEntryReachable'], (height, metrics)
     if height <= 700:
@@ -4043,6 +4344,8 @@ def test_mobile_sidebar_drawer_uses_unified_scroll_on_short_viewport(browser, wi
             const scrollRect = scrollBox.getBoundingClientRect();
             const footerRect = footer.getBoundingClientRect();
             const noOverlap = scrollRect.bottom <= footerRect.top + 0.5;
+            const logo = aside.querySelector('.brand-logo');
+            const logoTop = logo.getBoundingClientRect().top;
             scrollBox.scrollTop = 0;
             const footerVisibleWithoutScroll = logout.getBoundingClientRect().top >= asideRect.top - 0.5 &&
               footerRect.bottom <= asideRect.bottom + 0.5;
@@ -4053,6 +4356,7 @@ def test_mobile_sidebar_drawer_uses_unified_scroll_on_short_viewport(browser, wi
             const entryVisible = entryRect.height > 20 && entryRect.top >= scrollRect.top - 1 &&
               entryRect.bottom <= scrollRect.bottom + 1 && entryRect.bottom <= footerRect.top + 1;
             return {
+              logoPinned: logoTop >= 0 && logoTop === logo.getBoundingClientRect().top,
               boxScroll,
               plinksOverflow: getComputedStyle(plinks).overflowY,
               noOverlap,
@@ -4064,6 +4368,7 @@ def test_mobile_sidebar_drawer_uses_unified_scroll_on_short_viewport(browser, wi
     finally:
         driver.execute_script('setSidebarOpen(false)')
     assert metrics == {
+        'logoPinned': True,
         'boxScroll': True,
         'plinksOverflow': 'visible',
         'noOverlap': True,
@@ -4088,7 +4393,7 @@ def test_short_viewport_collapsed_sidebar_keeps_controls_within_bounds(browser):
             const asideRect = aside.getBoundingClientRect();
             const visibleLeft = asideRect.left + aside.clientLeft;
             const visibleRight = visibleLeft + aside.clientWidth;
-            const scrollControls = [...scrollBox.querySelectorAll('.brand-logo, #navigation button')];
+            const scrollControls = [...scrollBox.querySelectorAll('#navigation button')];
             const footerControls = [...footer.querySelectorAll('button')];
             return {
               boxScroll: scrollBox.scrollHeight > scrollBox.clientHeight + 1,

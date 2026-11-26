@@ -103,7 +103,7 @@ const state = {
   externalFrame: null,
   requests: new Map(),
   seenEvents: new Set(),
-  qrURL: null,
+  qr: null,
   timer: null,
   uptimeFrame: null,
   uptimeSnapshot: null,
@@ -123,7 +123,7 @@ const state = {
   checkingAuth: false,
   sessionRefresh: null,
   sessionCheckedAt: 0,
-  sidebarCollapsed: false,
+  sidebarCollapsed: null, // 未选择时桌面展开、移动端收起。
   sidebarOpen: false,
   actions: { reload: null, update: null },
   pluginReload: null,
@@ -188,7 +188,7 @@ function notifyError(error) {
   if (error.authHandled || error.authObsolete) return;
   notify(error.message || String(error));
 }
-async function api(path, options = {}) {
+async function api(path, options = {}, discardObsolete = null) {
   const generation = state.authGeneration;
   const authMessage = options.authMessage;
   const requestOptions = { ...options };
@@ -207,8 +207,10 @@ async function api(path, options = {}) {
   }
   const data = await response.json().catch(() => ({ error: `请求失败 (${response.status})` }));
   // 旧登录状态的响应不再改变当前页面，避免覆盖失效提示或打断重新登录。
-  if (generation !== state.authGeneration)
+  if (generation !== state.authGeneration) {
+    if (response.ok && discardObsolete) discardObsolete(data);
     throw Object.assign(new Error('登录状态已改变'), { authObsolete: true });
+  }
   if (!response.ok) {
     const authHandled = response.status === 401 || response.status === 403;
     let message = data.error || `请求失败 (${response.status})`;
@@ -274,23 +276,18 @@ function toggleSidebar() {
   else setSidebarCollapsed(!state.sidebarCollapsed);
 }
 function updateSidebarToggle() {
-  const sidebar = $('sidebar');
   const mobile = sidebarIsMobile();
   const expanded = mobile ? state.sidebarOpen : !state.sidebarCollapsed;
-  const label = mobile
-    ? state.sidebarOpen ? '关闭侧边栏' : '打开侧边栏'
-    : state.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏';
+  const label = expanded ? '收起侧边栏' : '展开侧边栏';
+  $('shell').dataset.sidebarCollapsed = String(!expanded);
   document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
     toggle.setAttribute('aria-expanded', String(expanded));
     toggle.setAttribute('aria-label', label);
     toggle.title = label;
   });
-  if (mobile) sidebar.setAttribute('aria-hidden', String(!state.sidebarOpen));
-  else sidebar.removeAttribute('aria-hidden');
 }
 function setSidebarCollapsed(collapsed, persist = true) {
   state.sidebarCollapsed = collapsed;
-  $('shell').dataset.sidebarCollapsed = String(collapsed);
   if (persist) {
     try {
       localStorage.setItem(sidebarStorageKey, String(collapsed));
@@ -300,7 +297,7 @@ function setSidebarCollapsed(collapsed, persist = true) {
   }
   updateSidebarToggle();
 }
-function setSidebarOpen(open, { restoreFocus = true } = {}) {
+function setSidebarOpen(open, { restoreFocus = true, persist = true } = {}) {
   open = sidebarIsMobile() && open;
   if (!open) closeSelectMenu();
   if (state.sidebarOpen === open) {
@@ -314,7 +311,8 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
   state.sidebarOpen = open;
   $('shell').dataset.sidebarOpen = String(open);
   document.body.classList.toggle('sidebar-open', open);
-  updateSidebarToggle();
+  if (persist && sidebarIsMobile()) setSidebarCollapsed(!open);
+  else updateSidebarToggle();
   if (open) {
     $('sidebar-close').focus({ preventScroll: true });
   } else if (restoreFocus && sidebarReturnFocus?.focus) {
@@ -323,8 +321,7 @@ function setSidebarOpen(open, { restoreFocus = true } = {}) {
   if (!open) sidebarReturnFocus = null;
 }
 function syncSidebarMode() {
-  if (!sidebarIsMobile()) setSidebarOpen(false, { restoreFocus: false });
-  updateSidebarToggle();
+  setSidebarOpen(!$('shell').hidden && state.sidebarCollapsed === false, { restoreFocus: false, persist: false });
 }
 function syncPerformanceNavMode() {
   if (!performanceNavIsMobile()) {
@@ -332,14 +329,13 @@ function syncPerformanceNavMode() {
   }
 }
 function initializeSidebar() {
-  let collapsed = false;
   try {
-    collapsed = localStorage.getItem(sidebarStorageKey) === 'true';
+    const saved = localStorage.getItem(sidebarStorageKey);
+    if (saved !== null) state.sidebarCollapsed = saved === 'true';
   } catch {
-    // 禁用存储时保持默认展开。
+    // 无存储时按当前视口使用默认布局。
   }
-  setSidebarCollapsed(collapsed, false);
-  setSidebarOpen(false, { restoreFocus: false });
+  syncSidebarMode();
   if (mobileSidebarQuery.addEventListener) {
     mobileSidebarQuery.addEventListener('change', syncSidebarMode);
   } else {
@@ -511,6 +507,7 @@ async function login(ev, token = null, ticket = null) {
     $('login').hidden = true;
     $('loading').hidden = true;
     $('shell').hidden = false;
+    syncSidebarMode();
     if (state.page === 'logs') renderLogs();
     else if (state.page === 'terminals') {
       renderOutput($('terminal-output'), state.terminalLogs, $('terminal-scroll').checked);
@@ -554,6 +551,8 @@ async function login(ev, token = null, ticket = null) {
   }
 }
 async function logout() {
+  const removal = closeQRCode();
+  if (removal) await removal;
   const pending = api('/api/logout', {
     method: 'POST',
     body: { session: state.session },
@@ -562,9 +561,11 @@ async function logout() {
   await pending;
 }
 function resetLogin(message = '') {
+  closeQRCode();
+  closeAccountMenu();
   state.authGeneration++;
   state.navigationGeneration++;
-  setSidebarOpen(false, { restoreFocus: false });
+  setSidebarOpen(false, { restoreFocus: false, persist: false });
   cachedToken('');
   state.cachedLogin = false;
   for (const name of [...state.streams.keys()]) closeStream(name);
@@ -723,6 +724,11 @@ function setPageTitle(title) {
 }
 async function navigate(page) {
   closeSelectMenu();
+  closeAccountMenu();
+  if (page !== state.page) {
+    closeQRCode();
+    if ($('account-dialog').open) $('account-dialog').close();
+  }
   state.navigationGeneration++;
   if (state.sidebarOpen) setSidebarOpen(false);
   if (state.performanceNavOpen) setPerformanceNavOpen(false, { restoreFocus: false });
@@ -2910,6 +2916,7 @@ function appendSelectMenuItem(menu, items, option, index, groupDisabled) {
 function openSelectMenu(select) {
   if (!select || select.disabled) return;
   closeSelectMenu();
+  closeAccountMenu();
   select.focus({ preventScroll: true });
   const id = `customSelectMenu${++selectMenuState.sequence}`;
   const menu = element('div', null, { class: 'select-menu' });
@@ -3240,7 +3247,22 @@ function presetFor(row) {
       p.server.type === row.server.type,
   );
 }
+function closeAccountMenu(restoreFocus = false) {
+  if ($('account-add-menu').hidden) return;
+  $('account-add-menu').hidden = true;
+  $('add-account-menu-toggle').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('add-account-menu-toggle').focus();
+}
+
+function openAccountMenu() {
+  closeSelectMenu();
+  $('account-add-menu').hidden = false;
+  $('add-account-menu-toggle').setAttribute('aria-expanded', 'true');
+  $('account-add-general').focus();
+}
+
 function editAccount(index) {
+  closeAccountMenu();
   state.editing = index;
   state.draft =
     index === null
@@ -3388,6 +3410,9 @@ function renderAccountFields() {
     fieldInput(field, $('account-extra-fields'));
   (preset?.extends || []).forEach((field) => fieldInput(field, $('account-fields'), 'data-extend'));
   $('account-note').textContent = preset?.note || '';
+  $('account-qr-bind-bar').hidden = !(
+    state.draft.sdk_type === 'qqGuildv2_link' && state.draft.platform_type === 'qqGuild'
+  );
   const extra = clone(state.draft.extends);
   for (const field of preset?.extends || []) delete extra[field.name];
   if (preset?.qsign) {
@@ -3464,6 +3489,50 @@ async function copyWebhook() {
   }
   notify('回调地址已复制');
 }
+async function createScannedAccount({ app_id, app_secret }) {
+  const account = clone(state.schema.qqguild_qr_account);
+  const existing = state.accounts.find((row) => row.sdk_type === account.sdk_type &&
+    row.platform_type === account.platform_type && String(row.id) === String(app_id));
+  if (existing) {
+    if (!confirm(`账号 ${app_id} 已存在。仅更新 AppSecret 并保存？`)) return;
+    existing.server.access_token = app_secret;
+  } else {
+    account.id = app_id;
+    account.server.access_token = app_secret;
+    state.accounts.push(account);
+  }
+  dirty();
+  renderAccounts();
+  await saveAccounts();
+}
+
+function fillScannedAccount({ app_id, app_secret }) {
+  if (!$('account-dialog').open || $('account-qr-bind-bar').hidden) return;
+  const form = $('account-form');
+  form.querySelector('[data-field="id"]').value = state.draft.id = app_id;
+  form.querySelector('[data-field="server.access_token"]').value = state.draft.server.access_token = app_secret;
+  if (state.draft.server.type === 'post') {
+    $('account-error').textContent = '已填入凭据，请核对 Webhook 回调地址后点击「确定」。';
+    return refreshWebhook();
+  }
+  if (state.draft.server.type !== 'websocket') {
+    $('account-error').textContent = '已填入凭据，请核对连接类型后点击「确定」。';
+    return;
+  }
+  const port = form.querySelector('[data-field="server.port"]');
+  const intents = state.draft.model_type.endsWith('intents');
+  const number = port.value.trim();
+  if ((intents && !number) || (number && (!/^\d+$/.test(number) || (!intents && Number(number) > 65535)))) {
+    $('account-error').textContent = intents
+      ? '已填入凭据，请补全有效的 intents 后点击「确定」。'
+      : '已填入凭据，请核对端口后点击「确定」。';
+    if (port.closest('details')) port.closest('details').open = true;
+    port.focus();
+    return;
+  }
+  form.requestSubmit();
+}
+
 async function saveAccounts() {
   if (!state.dirty) return;
   const submit = $('save-accounts');
@@ -3624,28 +3693,139 @@ function openTerminal(terminal) {
     },
   );
 }
-async function showQRCode(terminal) {
-  $('qr-title').textContent = `请使用账号 ${terminal.id || terminal.hash} 扫码`;
-  if (state.qrURL) URL.revokeObjectURL(state.qrURL);
-  $('qr-image').hidden = !terminal.qrcode;
-  $('qr-link').hidden = !terminal.qrcode_url;
-  if (terminal.qrcode) {
-    const response = await fetch(
-      `/api/terminal/${encodeURIComponent(terminal.model)}/${encodeURIComponent(terminal.hash)}/qrcode`,
-      { headers: { 'X-Auth-Token': state.token } },
-    );
-    if (!response.ok) throw new Error('二维码已失效或不可读取');
-    state.qrURL = URL.createObjectURL(await response.blob());
-    $('qr-image').src = state.qrURL;
-  }
-  if (terminal.qrcode_url && safeURL(terminal.qrcode_url)) $('qr-link').href = terminal.qrcode_url;
-  if (!$('qr-dialog').open) $('qr-dialog').showModal();
+const qrBindPath = '/api/accounts/qqguild/qr-bind';
+
+function deleteQrBind(path, token) {
+  // 卸载时仍发出 DELETE；过期登录的清理响应不应打断新登录。
+  return fetch(path, { method: 'DELETE', headers: { 'X-Auth-Token': token }, keepalive: true })
+    .catch(() => {});
 }
 
-function safeURL(value) {
+function releaseQRCode() {
+  const qr = state.qr;
+  if (!qr) return;
+  state.qr = null;
+  clearTimeout(qr.timer);
+  qr.controller.abort();
+  const removal = qr.path ? deleteQrBind(qr.path, qr.token) : null;
+  if (qr.imageURL) URL.revokeObjectURL(qr.imageURL);
+  $('qr-image').hidden = $('qr-link').hidden = true;
+  $('qr-image').removeAttribute('src');
+  $('qr-link').removeAttribute('href');
+  return removal;
+}
+
+function closeQRCode() {
+  const removal = releaseQRCode();
+  if ($('qr-dialog').open) $('qr-dialog').close();
+  return removal;
+}
+
+function openQRCode(title, apply = null) {
+  releaseQRCode();
+  const qr = { apply, token: state.token, controller: new AbortController() };
+  state.qr = qr;
+  $('qr-title').textContent = title;
+  $('qr-image').hidden = $('qr-link').hidden = true;
+  $('qr-status').hidden = $('qr-actions').hidden = !apply;
+  $('qr-status').textContent = apply ? '正在获取二维码…' : '';
+  if (!$('qr-dialog').open) $('qr-dialog').showModal();
+  return qr;
+}
+
+function qrIsOpen(qr) {
+  return state.qr === qr && $('qr-dialog').open;
+}
+
+async function loadQRImage(qr, path) {
+  const response = await fetch(path, {
+    headers: { 'X-Auth-Token': qr.token }, signal: qr.controller.signal, cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('二维码已失效或不可读取');
+  const blob = await response.blob();
+  if (!qrIsOpen(qr)) return;
+  qr.imageURL = URL.createObjectURL(blob);
+  $('qr-image').src = qr.imageURL;
+  $('qr-image').hidden = false;
+}
+
+function setQRLink(url, origin = null) {
+  if (!safeURL(url, origin)) return;
+  $('qr-link').href = url;
+  $('qr-link').hidden = false;
+}
+
+async function showQRCode(terminal) {
+  if (state.qr?.apply) return; // 终端推送不能取代用户正在确认的官方绑定。
+  const qr = openQRCode(`请使用账号 ${terminal.id || terminal.hash} 扫码`);
+  setQRLink(terminal.qrcode_url);
+  if (!terminal.qrcode) return;
+  try {
+    await loadQRImage(qr, `/api/terminal/${encodeURIComponent(terminal.model)}/${encodeURIComponent(terminal.hash)}/qrcode`);
+  } catch (error) {
+    if (qrIsOpen(qr)) {
+      $('qr-status').hidden = false;
+      $('qr-status').textContent = error.message;
+    }
+  }
+}
+
+function showQrBindError(qr, message) {
+  if (!qrIsOpen(qr)) return;
+  // 停止旧会话并清除失效链接，保留原入口供刷新重试。
+  openQRCode($('qr-title').textContent, qr.apply);
+  $('qr-status').textContent = message;
+}
+
+async function pollQrBind(qr, interval) {
+  if (!qrIsOpen(qr)) return;
+  try {
+    const result = await api(qr.path, { signal: qr.controller.signal });
+    if (!qrIsOpen(qr)) return;
+    if (result.status === 2) {
+      const credential = result.credentials?.[0];
+      if (!credential?.app_id || !credential.app_secret) throw new Error('未收到机器人凭据，请刷新二维码重试。');
+      closeQRCode();
+      try {
+        await qr.apply(credential);
+      } catch (error) {
+        notifyError(error);
+      }
+    } else if (result.status === 0 || result.status === 1) {
+      $('qr-status').textContent = '请使用手机 QQ 扫码并确认绑定。';
+      qr.timer = setTimeout(() => pollQrBind(qr, interval), interval);
+    } else {
+      showQrBindError(qr, '二维码已过期，请刷新二维码。');
+    }
+  } catch (error) {
+    showQrBindError(qr, error.message);
+  }
+}
+
+async function startQrBind(apply) {
+  const qr = openQRCode(apply === createScannedAccount ? 'QQ 官方扫码创建' : 'QQ 官方扫码填入', apply);
+  const pathFor = (result) => `${qrBindPath}/${encodeURIComponent(result.bind_id)}`;
+  try {
+    // 不中断建单：即便用户已取消，也必须接收迟到的 bind_id 并释放服务端会话。
+    const result = await api(qrBindPath, { method: 'POST' }, (late) => deleteQrBind(pathFor(late), qr.token));
+    if (!qrIsOpen(qr)) return deleteQrBind(pathFor(result), qr.token);
+    qr.path = pathFor(result);
+    setQRLink(result.qr_url, 'https://q.qq.com');
+    await loadQRImage(qr, `${qr.path}/qrcode`);
+    if (!qrIsOpen(qr)) return;
+    $('qr-status').textContent = '请使用手机 QQ 扫码并确认绑定。';
+    const interval = result.poll_interval * 1000;
+    qr.timer = setTimeout(() => pollQrBind(qr, interval), interval);
+  } catch (error) {
+    showQrBindError(qr, error.message);
+  }
+}
+
+function safeURL(value, origin = null) {
   try {
     const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username;
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password &&
+      (!origin || url.origin === origin);
   } catch {
     return false;
   }
@@ -4798,6 +4978,41 @@ document
   .querySelectorAll('[data-close]')
   .forEach((node) => node.addEventListener('click', () => $(node.dataset.close).close()));
 bind('add-account', () => editAccount(null));
+bind('add-account-menu-toggle', () => $('account-add-menu').hidden ? openAccountMenu() : closeAccountMenu(true));
+bind('account-add-general', () => {
+  closeAccountMenu(true);
+  editAccount(null);
+});
+bind('account-add-qr', () => {
+  closeAccountMenu(true);
+  if (state.dirty && !confirm('快捷扫码创建会一并保存并应用当前未提交的账号修改，是否继续？')) return;
+  return startQrBind(createScannedAccount);
+});
+bind('account-qr-fill', () => startQrBind(fillScannedAccount));
+bind('qr-refresh', () => {
+  if (state.qr?.apply) return startQrBind(state.qr.apply);
+});
+$('qr-dialog').addEventListener('close', () => {
+  if (!$('qr-dialog').open) releaseQRCode();
+});
+$('account-dialog').addEventListener('close', () => {
+  if (!$('account-dialog').open && state.qr?.apply === fillScannedAccount) closeQRCode();
+});
+for (const event of ['pointerdown', 'focusin']) {
+  document.addEventListener(event, (ev) => {
+    if (!$('account-add-menu').hidden && !ev.target.closest('#account-add-split')) closeAccountMenu();
+  });
+}
+$('account-add-split').addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !$('account-add-menu').hidden) {
+    ev.preventDefault();
+    closeAccountMenu(true);
+  } else if (['ArrowDown', 'ArrowUp'].includes(ev.key)) {
+    ev.preventDefault();
+    if ($('account-add-menu').hidden) openAccountMenu();
+    else (ev.target === $('account-add-general') ? $('account-add-qr') : $('account-add-general')).focus();
+  }
+});
 bind('refresh-accounts', () => {
   if (!state.dirty || confirm('放弃尚未应用的修改并刷新？')) return loadAccounts();
 });
@@ -4981,11 +5196,21 @@ bind('exit', async () => {
 });
 window.addEventListener('beforeunload', (ev) => {
   if (state.dirty) {
+    // 用户可以取消离开：此时不要销毁仍在编辑的绑定。
     ev.preventDefault();
     ev.returnValue = '';
+  } else {
+    // 未触发离开确认时尽早发送；Chromium 可能丢弃仅在 pagehide 发起的 keepalive。
+    closeQRCode();
   }
 });
 window.addEventListener('pagehide', () => {
+  const qr = state.qr;
+  const worker = navigator.serviceWorker?.controller;
+  if (qr?.path && worker?.scriptURL === new URL('/service-worker.js', location.origin).href) {
+    worker.postMessage({ type: 'olivos:cancel-qr-bind', path: qr.path, token: qr.token });
+  }
+  closeQRCode();
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
   clearInterval(state.dashboardTimer);

@@ -1,8 +1,14 @@
 """Create test WebUI instances and reusable browser sessions."""
 
+import base64
+import json
 import os
+import secrets
 from pathlib import Path
 from urllib.parse import urlsplit
+
+import requests
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from frontend_coverage_support import (
     coverage_directory,
@@ -14,6 +20,41 @@ from OlivOS.webUI import authAPI, serverAPI
 
 
 FIXTURE_PASSWORD = 'webui-fixture-password'
+
+
+class QQBindRemote:
+    """只替换 QQ HTTP 端点；会话、AES 解密、PNG、账号保存仍走生产路径。"""
+
+    def __init__(self, monkeypatch):
+        self.status = 1
+        self.app_id = '12345678'
+        self.app_secret = secrets.token_urlsafe(24)
+        self.keys = {}
+        monkeypatch.setattr(requests, 'post', self.post)
+
+    def post(self, url, *, json, **kwargs):
+        if url == 'https://q.qq.com/lite/create_bind_task':
+            task_id = secrets.token_hex(16)
+            self.keys[task_id] = base64.b64decode(json['key'], validate=True)
+            data = {'task_id': task_id}
+        elif url == 'https://q.qq.com/lite/poll_bind_result':
+            key = self.keys[json['task_id']]
+            data = {'status': self.status}
+            if self.status == 2:
+                iv = os.urandom(12)
+                sealed = iv + AESGCM(key).encrypt(iv, self.app_secret.encode(), None)
+                data.update(bot_appid=self.app_id, user_openid='fixture-openid',
+                            bot_encrypt_secret=base64.b64encode(sealed).decode('ascii'))
+        else:
+            raise AssertionError('unexpected outbound HTTP request')
+        return self.response({'retcode': 0, 'data': data})
+
+    @staticmethod
+    def response(body):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = json.dumps(body).encode()
+        return response
 
 
 class ChromeSession:

@@ -100,6 +100,7 @@ class server(OlivOS.API.Proc_templet):
         self.started_at = time.monotonic()
         self.lock = threading.RLock()
         self.tk_bridge = tkBridgeAPI.WebBridge(self)
+        self.qr_bind_manager = OlivOS.qqGuildv2QrBindAPI.QrBindManager()
         self.accounts = copy.deepcopy(bot_info_dict or {})
         self.limit = max(8, min(int(self.config['buffer_limit']), 4096))
         # 配置写坏时退回默认值，避免 WebUI 连带整个实例启动失败
@@ -696,6 +697,7 @@ class server(OlivOS.API.Proc_templet):
                     next_bridge_maintenance = now + 0.25
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
+            self.qr_bind_manager.close()
             self.tk_bridge.stop()
             if self.local_manager is not None:
                 self.local_manager.close()
@@ -748,6 +750,7 @@ class server(OlivOS.API.Proc_templet):
 
     def on_terminate(self):
         self.stop_event.set()
+        self.qr_bind_manager.close()
         self.tk_bridge.stop()
         if self.local_manager is not None:
             self.local_manager.close()

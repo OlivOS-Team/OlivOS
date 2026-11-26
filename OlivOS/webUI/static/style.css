@@ -393,7 +393,7 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 16px 16px;
+  padding: 20px 16px 16px;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
@@ -407,6 +407,8 @@ aside {
   flex-shrink: 0;
 }
 .sidebar-head {
+  flex: 0 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 16px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -980,97 +982,94 @@ nav h2 {
 #sidebar-backdrop {
   display: none;
 }
-@media (min-width: 801px) {
-  /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
-     收起后不会出现「内容先消失、面板再跳一下」的观感。 */
-  aside,
-  .sidebar-scroll,
-  .sidebar-footer,
-  .brand,
-  #navigation button,
-  .sidebar-footer > .sidebar-action {
-    /* 只补横向 padding / gap，避免竖向断点切换时延迟高度重排，同时保留按钮原有的配色反馈过渡。 */
-    transition:
-      padding-inline 180ms ease,
-      gap 180ms ease,
-      background-color 120ms ease,
-      border-color 120ms ease,
-      color 120ms ease,
-      box-shadow 120ms ease;
-  }
-  .brand-text,
-  .nav-label,
-  .sidebar-action-label {
-    max-width: 220px;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    transition: max-width 180ms ease, opacity 140ms ease;
-  }
-  #shell[data-sidebar-collapsed='true'] {
-    grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
-  }
-  #shell[data-sidebar-collapsed='true'] aside {
-    align-items: center;
-    overflow-x: hidden;
-  }
-  #shell[data-sidebar-collapsed='true'] .sidebar-scroll {
-    width: 100%;
-    align-items: center;
-    padding-right: 8px;
-    padding-left: 8px;
-    overflow-x: hidden;
-  }
-  #shell[data-sidebar-collapsed='true'] .sidebar-head {
-    width: 100%;
-    justify-content: center;
-  }
-  #shell[data-sidebar-collapsed='true'] .brand {
-    gap: 0;
-  }
-  #shell[data-sidebar-collapsed='true'] aside .brand-logo {
-    max-width: 100%;
-    height: auto;
-    aspect-ratio: 1;
-  }
-  #shell[data-sidebar-collapsed='true'] .brand-text,
-  #shell[data-sidebar-collapsed='true'] .nav-label,
-  #shell[data-sidebar-collapsed='true'] .sidebar-action-label {
-    max-width: 0;
-    opacity: 0;
-  }
-  #shell[data-sidebar-collapsed='true'] #plugin-navigation {
-    display: none;
-  }
-  #shell[data-sidebar-collapsed='true'] .sidebar-footer {
-    width: 100%;
-    align-items: center;
-    padding-right: 8px;
-    padding-left: 8px;
-    gap: 8px;
-  }
-  /* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
-     宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
-  #shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
-    width: 100%;
-    min-width: 0;
-    height: 44px;
-    min-height: 44px;
-    padding: 0;
-    gap: 0;
-    justify-content: center;
-  }
-  #shell[data-sidebar-collapsed='true'] #navigation {
-    width: 100%;
-    align-items: center;
-  }
-  #shell[data-sidebar-collapsed='true'] #navigation button {
-    width: 100%;
-    min-height: 44px;
-    padding: 0;
-    gap: 0;
-    justify-content: center;
-  }
+aside,
+.sidebar-scroll,
+.sidebar-footer,
+.brand,
+#navigation button,
+.sidebar-footer > .sidebar-action {
+  /* 只补横向 padding / gap，避免竖向断点切换时延迟高度重排，同时保留按钮原有的配色反馈过渡。 */
+  transition:
+    padding-inline 180ms ease,
+    gap 180ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+.brand-text,
+.nav-label,
+.sidebar-action-label {
+  max-width: 220px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 180ms ease, opacity 140ms ease;
+}
+#shell[data-sidebar-collapsed='true'] {
+  grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
+}
+#shell[data-sidebar-collapsed='true'] aside {
+  align-items: center;
+  overflow-x: hidden;
+}
+#shell[data-sidebar-collapsed='true'] .sidebar-scroll {
+  width: 100%;
+  align-items: center;
+  padding-right: 8px;
+  padding-left: 8px;
+  overflow-x: hidden;
+}
+#shell[data-sidebar-collapsed='true'] .sidebar-head {
+  width: 100%;
+  padding-inline: 8px;
+  justify-content: center;
+}
+#shell[data-sidebar-collapsed='true'] .brand {
+  gap: 0;
+}
+#shell[data-sidebar-collapsed='true'] aside .brand-logo {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+#shell[data-sidebar-collapsed='true'] .brand-text,
+#shell[data-sidebar-collapsed='true'] .nav-label,
+#shell[data-sidebar-collapsed='true'] .sidebar-action-label {
+  max-width: 0;
+  opacity: 0;
+}
+#shell[data-sidebar-collapsed='true'] #plugin-navigation {
+  display: none;
+}
+#shell[data-sidebar-collapsed='true'] .sidebar-footer {
+  width: 100%;
+  align-items: center;
+  padding-right: 8px;
+  padding-left: 8px;
+  gap: 8px;
+}
+/* 收起后按钮仍占满侧边栏宽度，图标在按钮内居中：
+   宽度跟着栅格一起动画，不会在点击瞬间横向跳位。 */
+#shell[data-sidebar-collapsed='true'] .sidebar-footer > .sidebar-action {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+#shell[data-sidebar-collapsed='true'] #navigation {
+  width: 100%;
+  align-items: center;
+}
+#shell[data-sidebar-collapsed='true'] #navigation button {
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
 }
 .login-card .theme-control {
   border-top: 1px solid var(--line);
@@ -2488,6 +2487,42 @@ body.performance-nav-open .performance-nav-toggle svg {
   gap: 12px;
   margin-bottom: 16px;
 }
+#account-add-split {
+  position: relative;
+  display: inline-flex;
+}
+#add-account {
+  border-radius: var(--control-radius) 0 0 var(--control-radius);
+}
+#add-account-menu-toggle {
+  min-width: var(--control-height);
+  padding-inline: 8px;
+  border-left: 0;
+  border-radius: 0 var(--control-radius) var(--control-radius) 0;
+}
+#account-add-menu {
+  position: absolute;
+  z-index: 10;
+  inset: calc(100% + 4px) auto auto 0;
+  display: grid;
+  width: max-content;
+  padding: 4px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  background: var(--popover);
+  box-shadow: var(--menu-shadow);
+  transform-origin: top left;
+  animation: select-menu-in 100ms ease-out;
+}
+#account-add-menu button {
+  text-align: start;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+#account-add-menu button:is(:hover, :focus-visible) {
+  background: var(--control-bg-hover);
+}
 .plugin-toolbar {
   margin-bottom: 6px;
 }
@@ -2845,6 +2880,7 @@ dialog::backdrop {
   .switch::before,
   .select-chevron::before,
   .select-menu,
+  #account-add-menu,
   input[type='checkbox']:not(.switch)::before,
   input[type='radio']::before,
   summary::before,
@@ -2934,6 +2970,20 @@ dialog::backdrop {
   flex-direction: column;
   gap: 10px;
 }
+#account-qr-bind-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+}
+#account-qr-bind-bar .hint {
+  margin: 2px 0 0;
+}
 #qr-dialog {
   width: min(420px, calc(100vw - 30px));
 }
@@ -2941,6 +2991,10 @@ dialog::backdrop {
   width: 100%;
   height: auto;
   background: white;
+}
+#qr-status {
+  margin-block: 12px;
+  color: var(--muted);
 }
 #plugin-frame-container iframe {
   width: 100%;
@@ -3071,6 +3125,7 @@ dialog::backdrop {
 }
 @media (max-width: 800px), (orientation: portrait) {
   :root {
+    --control-height: 44px;
     --page-padding-inline: 14px;
     --page-padding-block: 20px;
   }
@@ -3083,11 +3138,14 @@ dialog::backdrop {
   textarea {
     min-height: 44px;
   }
+  #add-account-menu-toggle {
+    min-width: 44px;
+  }
   label.check {
     min-height: 44px;
   }
   .select-menu-option {
-    min-height: 40px;
+    min-height: 44px;
   }
   .sidebar-close,
   .sidebar-toggle,
@@ -3099,10 +3157,12 @@ dialog::backdrop {
     height: 44px;
   }
   #shell {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
     height: auto;
     min-height: 100dvh;
+  }
+  main {
+    grid-column: 2;
   }
   aside {
     position: fixed;
@@ -3110,28 +3170,13 @@ dialog::backdrop {
     top: 0;
     bottom: 0;
     left: 0;
-    width: min(84vw, 320px);
-    max-width: 100%;
+    width: var(--sidebar-collapsed-width);
     height: 100dvh;
-    padding: 0;
-    border-right: 1px solid var(--line);
-    border-bottom: 0;
-    overflow: hidden;
-    box-shadow: var(--shadow-dialog);
-    transform: translateX(-102%);
-    visibility: hidden;
-    pointer-events: none;
-    transition:
-      transform 180ms ease,
-      visibility 0s linear 180ms;
+    transition: width 180ms ease;
   }
-  .sidebar-scroll {
-    gap: 20px;
-    padding:
-      calc(16px + env(safe-area-inset-top))
-      16px
-      12px;
-    overflow-x: hidden;
+  .sidebar-head {
+    padding: calc(16px + env(safe-area-inset-top)) 10px 0;
+    gap: 4px;
   }
   .sidebar-footer {
     padding:
@@ -3140,12 +3185,8 @@ dialog::backdrop {
       calc(16px + env(safe-area-inset-bottom));
   }
   #shell[data-sidebar-open='true'] aside {
-    transform: translateX(0);
-    visibility: visible;
-    pointer-events: auto;
-    transition:
-      transform 180ms ease,
-      visibility 0s;
+    width: min(84vw, var(--sidebar-width));
+    box-shadow: var(--shadow-dialog);
   }
   #sidebar-backdrop {
     display: block;
@@ -3168,7 +3209,7 @@ dialog::backdrop {
       opacity 180ms ease,
       visibility 0s;
   }
-  .sidebar-close {
+  #shell[data-sidebar-open='true'] .sidebar-close {
     display: grid;
     place-items: center;
   }
@@ -3191,8 +3232,13 @@ dialog::backdrop {
     width: 100%;
     white-space: normal;
   }
+  #plugin-pages-close,
   #plugin-links .plugin-link-close {
-    width: 26px;
+    width: 44px;
+    min-height: 44px;
+  }
+  #plugin-links a {
+    min-height: 44px;
   }
   main {
     padding: var(--page-padding-block) var(--page-padding-inline) var(--page-padding-inline);
@@ -3211,12 +3257,14 @@ dialog::backdrop {
     height: 55dvh;
   }
 }
-/* 视口较矮时收紧侧栏纵向留白，并将品牌头/主导航/插件列表统一在底栏上方滚动，
-   底栏（主题切换与退出登录）始终固定在侧栏底部，无需翻到插件列表最末端即可退出。 */
+/* 矮视口收紧头尾留白，把可用高度留给中段导航。 */
 @media (max-height: 760px) {
+  .sidebar-head {
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
   .sidebar-scroll {
     gap: 12px;
-    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-top: 12px;
     padding-bottom: 12px;
   }
   #navigation {
@@ -3248,16 +3296,6 @@ dialog::backdrop {
     overflow: visible;
   }
 }
-@media (max-height: 240px) {
-  aside {
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-  }
-  .sidebar-scroll {
-    flex: 0 0 auto;
-    overflow-y: visible;
-  }
-}
 @media (min-width: 801px) and (max-width: 1100px) and (max-height: 440px) {
   .performance-nav-drawer {
     position: static;
@@ -3270,11 +3308,8 @@ dialog::backdrop {
   }
 }
 @media (max-width: 480px) {
-  aside {
-    width: min(88vw, 320px);
-  }
   .cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   }
   .metric-card .metric-value {
     font-size: 18px;
@@ -3282,7 +3317,6 @@ dialog::backdrop {
   .card {
     padding: 12px;
   }
-  /* 320px 宽的屏上两列各只剩约 116px 内容宽度，缩一档字号避免版本号被折断。 */
   .card strong {
     font-size: 22px;
   }

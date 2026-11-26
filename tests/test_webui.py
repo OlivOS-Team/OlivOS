@@ -34,7 +34,10 @@ import pytest
 
 import OlivOS
 from OlivOS.webUI import assetAPI, pageAPI, serverAPI
-from webui_test_support import make_host
+from webui_test_support import QQBindRemote, make_host
+
+
+QR_BIND = '/api/accounts/qqguild/qr-bind'
 
 
 def account(account_id=10001):
@@ -106,6 +109,69 @@ def test_account_secrets_require_auth_and_are_not_cached(host, client, path):
         actual, expected = actual[key], expected[key]
     assert actual == expected
     assert response.headers['Cache-Control'] == 'no-store'
+
+
+@pytest.mark.parametrize('method,suffix', [('POST', ''), ('GET', '/id/qrcode'), ('GET', '/id'), ('DELETE', '/id')])
+def test_qqguild_bind_requires_browser_token(host, method, suffix):
+    response = host.app.test_client().open(QR_BIND + suffix, method=method)
+    assert response.status_code == 401
+    assert response.headers['Cache-Control'] == 'no-store'
+
+
+def test_qqguild_bind_releases_credentials_once_without_logging_or_saving(host, client, monkeypatch):
+    remote = QQBindRemote(monkeypatch)
+    records = []
+    monkeypatch.setattr(host, 'log', lambda *args: records.append(args))
+    before = host.account_path.read_bytes()
+    created = client.post(QR_BIND)
+    assert created.status_code == 200
+    assert set(created.json) == {'bind_id', 'qr_url', 'expires_in', 'poll_interval'}
+    assert created.json['qr_url'].startswith('https://q.qq.com/qqbot/openclaw/connect.html?')
+    path = QR_BIND + '/' + created.json['bind_id']
+    png = client.get(path + '/qrcode')
+    assert png.mimetype == 'image/png' and png.data.startswith(b'\x89PNG\r\n\x1a\n')
+    waiting = client.get(path)
+    assert waiting.json['status'] == 1 and 'credentials' not in waiting.json
+    remote.status = 2
+    confirmed = client.get(path)
+    assert confirmed.json['status'] == 2
+    assert confirmed.json['credentials'] == [
+        {'app_id': remote.app_id, 'app_secret': remote.app_secret, 'user_openid': 'fixture-openid'}
+    ]
+    replay = client.get(path)
+    assert replay.json['status'] == 3 and 'credentials' not in replay.json
+    assert client.get(path + '/qrcode').status_code == 404
+    for response in (created, png, waiting, confirmed, replay):
+        assert response.headers['Cache-Control'] == 'no-store'
+    assert host.account_path.read_bytes() == before
+    assert records and remote.app_secret not in repr(records)
+    assert all(base64.b64encode(key).decode() not in repr(records) for key in remote.keys.values())
+
+
+@pytest.mark.parametrize('end', ['cancel', 'expire', 'terminate'])
+def test_qqguild_bind_expired_or_cancelled_has_no_qr_or_credentials(host, client, monkeypatch, end):
+    remote = QQBindRemote(monkeypatch)
+    path = QR_BIND + '/' + client.post(QR_BIND).json['bind_id']
+    if end == 'cancel':
+        response = client.delete(path)
+        assert response.json == {'ok': True} and response.headers['Cache-Control'] == 'no-store'
+    elif end == 'expire':
+        remote.status = 3
+    else:
+        host.on_terminate()
+    result = client.get(path)
+    assert result.json['status'] == 3 and 'credentials' not in result.json
+    assert client.get(path + '/qrcode').status_code == 404
+
+
+def test_qqguild_bind_upstream_error_is_sanitized(client, monkeypatch):
+    remote = QQBindRemote(monkeypatch)
+    monkeypatch.setattr(OlivOS.qqGuildv2QrBindAPI.requests, 'post', lambda *args, **kwargs:
+                        remote.response({'retcode': 1, 'msg': remote.app_secret}))
+    response = client.post(QR_BIND)
+    assert response.status_code == 502 and response.json['error']
+    assert response.headers['Cache-Control'] == 'no-store'
+    assert remote.app_secret not in response.get_data(as_text=True)
 
 
 def test_password_persisted_not_regenerated(host):

@@ -125,6 +125,12 @@ if __name__ == '__main__':
     OlivOSTarget.start()
 ```
 
+### QQ 官方机器人扫码接入
+
+在 WebUI「账号」页或 Windows 原生账号管理器，点「新增账号」右侧的箭头，选择「QQ 官方扫码创建」，用手机 QQ 扫描并确认。此入口按 `QQ官方/公域/V2`（WebSocket）直接保存并应用；若列表还有未提交的修改，会先询问是否一并保存。同一账号已存在时，可选择只更新密钥。
+
+需要使用私域、沙盒、Webhook 或指定 intents 时，先在账号编辑器选择对应的 QQ 官方 V2 预设，再扫码填入 AppID 和 AppSecret。普通 WebSocket 配置填齐后会自动关闭编辑器，**此时只是草稿**；Webhook 需核对回调配置，缺少 intents 时需补齐再确认。最后在主界面保存并应用。
+
 ## 插件
 请参考插件默认模板[OlivOSPluginTemplate](https://github.com/OlivOS-Team/OlivOSPluginTemplate)和[官方文档](https://doc.olivos.wiki)进行插件开发。
 
