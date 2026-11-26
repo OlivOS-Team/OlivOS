@@ -295,3 +295,49 @@ def test_save_import_overwrite_still_requires_existing_hash(client, host):
     assert response.status_code == 400
     assert '原账号不存在' in response.json['error']
     assert host.Proc_info.control_queue.empty()
+
+
+@pytest.mark.parametrize('row', [
+    import_row(True),
+    import_row(None),
+    import_row('   '),
+    import_row(password=True),
+    import_row(password=None),
+    import_row(sdk_type='onebot', platform_type='qq', model_type='default',
+               server={'auto': False, 'type': 'post', 'host': 12345, 'port': 5700, 'access_token': 'tok'}),
+    import_row(sdk_type='onebot', platform_type='qq', model_type='default',
+               server={'auto': False, 'type': 'post', 'host': 'http://127.0.0.1', 'port': True, 'access_token': 'tok'}),
+    import_row(sdk_type='onebot', platform_type='qq', model_type='default',
+               server={'auto': False, 'type': 'post', 'host': 'http://127.0.0.1', 'port': None, 'access_token': 'tok'}),
+    import_row(sdk_type='onebot', platform_type='qq', model_type='default',
+               server={'auto': False, 'type': 'post', 'host': 'http://127.0.0.1', 'port': 5700, 'access_token': True}),
+    import_row(server={'auto': True, 'type': 'post', 'host': 'NONEED', 'port': 0, 'access_token': 'NONEED'}),
+    import_row(sdk_type='dingtalk_link', platform_type='dingtalk', model_type='default',
+               server={'auto': True, 'type': 'websocket'}),
+    import_row(extends={'ws_path': 123}),
+    import_row(extends={'http-path': False}),
+], ids=[
+    'bool-id', 'null-id', 'blank-id', 'bool-password', 'null-password',
+    'int-host', 'bool-port', 'null-port', 'bool-token', 'bad-server-type-for-model',
+    'dingtalk-missing-extends', 'non-str-ws-path', 'non-str-http-path',
+])
+def test_preview_and_save_reject_rows_incompatible_with_account_load(client, host, row):
+    before = host.account_path.read_bytes()
+    preview = client.post(PREVIEW, json=row)
+    assert preview.status_code == 200
+    item, = preview.json['items']
+    assert not item['valid'] and item['account'] is None and item['error']
+    assert PASSWORD not in item['error']
+
+    body = client.get(ACCOUNTS).json
+    body['account'].append(row)
+    saved = client.post(ACCOUNTS, json=body)
+    assert saved.status_code == 400
+    assert saved.json['error']
+    assert host.account_path.read_bytes() == before
+    assert host.Proc_info.control_queue.empty()
+
+
+def test_restore_rejects_boolean_qsign_source_index():
+    with pytest.raises(ValueError, match='签名服务器来源索引无效'):
+        pageAPI.restore([{'addr': 'http://localhost:1', 'key': 'k', '_source_index': True}], [])

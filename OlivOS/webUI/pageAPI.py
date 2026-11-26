@@ -142,7 +142,7 @@ def restore(value, previous=None):
         result = []
         for i, item in enumerate(value):
             source_index = item.get('_source_index', i) if isinstance(item, dict) else i
-            if not isinstance(source_index, int) or source_index < -1:
+            if isinstance(source_index, bool) or not isinstance(source_index, int) or source_index < -1:
                 raise ValueError('签名服务器来源索引无效')
             old = previous[source_index] if 0 <= source_index < len(previous) else None
             result.append(restore(item, old))
@@ -257,23 +257,33 @@ def _parse_account_row(row, previous, hierarchy, replace_hashes=()):
             raise ValueError('启用、调试和自动配置必须为布尔值')
     if connection.get('type') not in OlivOS.accountMetadataAPI.accountTypeDataList_server_type:
         raise ValueError('连接类型无效')
-    for value in (row.get('id', ''), row.get('password', ''), connection.get('host', ''),
-                  connection.get('port', ''), connection.get('access_token', '')):
-        if value is not None and not isinstance(value, (str, int)):
-            raise ValueError('账号字段必须为字符串或整数')
+    raw_id = row.get('id', '')
+    raw_password = row.get('password', '')
+    raw_host = connection.get('host', '')
+    raw_port = connection.get('port', '')
+    raw_token = connection.get('access_token', '')
+    if not isinstance(raw_host, str):
+        raise ValueError('主机地址必须为字符串')
+    if (any(isinstance(value, bool) for value in (raw_id, raw_password, raw_port, raw_token))
+            or not isinstance(raw_id, (str, int))
+            or not isinstance(raw_password, (str, int))
+            or not isinstance(raw_port, (str, int))
+            or (raw_token is not None and not isinstance(raw_token, (str, int)))):
+        raise ValueError('账号字段必须为字符串或整数')
     try:
         fields = OlivOS.accountAPI.normalizeAccountFields({
-            'id': str(row.get('id', '')), 'password': row.get('password', ''),
+            'id': str(raw_id), 'password': raw_password,
             'server_auto': str(connection.get('auto', False)), 'server_type': connection['type'],
-            'host': connection.get('host', ''), 'port': str(connection.get('port', '')),
-            'access_token': connection.get('access_token', '') or '',
+            'host': raw_host, 'port': str(raw_port),
+            'access_token': raw_token or '',
             'platform_sdk': sdk, 'platform_platform': platform, 'platform_model': model,
         })
     except (AttributeError, UnicodeError) as error:
         raise ValueError('账号字段格式无效') from error
     if (previous is None or replacing) and MASK in fields.values():
         raise ValueError('新增账号不能使用脱敏占位符')
-    if not fields['id'] or not fields['host'] or fields['port'] == '' or not fields['access_token']:
+    if (fields['id'] == '' or (isinstance(fields['id'], str) and not fields['id'].strip())
+            or not fields['host'] or fields['port'] == '' or not fields['access_token']):
         raise ValueError('请填写账号、主机和端口等必要字段')
     try:
         port = int(fields['port'])
@@ -306,6 +316,18 @@ def _parse_account_row(row, previous, hierarchy, replace_hashes=()):
     ):
         raise ValueError('签名服务器必须为不超过 10 项的地址与 KEY 列表')
     bot.enable, bot.debug_mode = row.get('enable', True), row.get('debug', False)
+    errors = OlivOS.accountAPI._validate_account_config(account_dict(bot))
+    if errors:
+        if old is not None and not replacing and (sdk, platform, model) == tuple(
+            old.platform[key] for key in ('sdk', 'platform', 'model')
+        ):
+            errors = [
+                (field, reason) for field, reason in errors
+                if field not in ('platform_type', 'sdk_type', 'model_type')
+            ]
+        if errors:
+            field, reason = errors[0]
+            raise ValueError(f'{field}：{reason}' if field else reason)
     return bot
 
 

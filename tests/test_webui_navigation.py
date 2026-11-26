@@ -2417,6 +2417,66 @@ def test_account_import_merges_duplicates_sanitizes_and_selectively_replaces_dra
 
 
 @pytest.mark.browser
+def test_account_transfer_review_edge_cases(account_transfer):
+    browser = account_transfer
+    driver = browser.driver
+
+    # 1) 导出菜单展开时点击主按钮「复制所选」必须同时关闭下拉菜单，且异步双触发降级弹窗不抛 InvalidStateError。
+    driver.execute_script('''
+        window.accountCopyRejects = [];
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {
+          writeText: () => new Promise((_, reject) => {
+            window.accountCopyRejects.push(() => reject(new DOMException('Denied', 'NotAllowedError')));
+          }),
+        }});
+        document.execCommand = () => false;
+    ''')
+    browser.click(f'{account_row(1)} .account-select')
+    browser.click('#export-accounts-menu-toggle')
+    wait_account_menu_open(browser, '#account-export-menu')
+    browser.click('#export-accounts-copy')
+    assert not browser.find('#account-export-menu').is_displayed()
+    assert browser.attribute('#export-accounts-menu-toggle', 'aria-expanded') == 'false'
+    browser.click('#export-accounts-copy')
+    browser.wait.until(lambda _: driver.execute_script('return window.accountCopyRejects.length === 2'))
+    driver.execute_script('for (const reject of window.accountCopyRejects) reject();')
+    browser.wait.until(lambda _: browser.find('#account-copy-fallback-dialog').is_displayed())
+    assert not browser.find('#notice').is_displayed()
+    browser.click('#account-copy-fallback-dialog .dialog-actions button')
+    assert not browser.find('#account-copy-fallback-dialog').is_displayed()
+
+    # 2) 未保存的编辑草稿带前导零 ID 和字符串端口时，导出端口应归一化为整数且导入预览能正确识别重复与无差异。
+    browser.click('#add-account')
+    browser.find('#account-form [data-field="id"]').send_keys('0051009')
+    browser.click('#account-form details > summary')
+    browser.type_text('#account-form [data-field="server.host"]', 'http://127.0.0.1')
+    browser.type_text('#account-form [data-field="server.port"]', '5700')
+    browser.type_text('#account-form [data-field="server.access_token"]', 'fixture-token-51009')
+    browser.click('#account-form button[type="submit"]')
+    browser.wait.until(lambda _: not browser.find('#account-dialog').is_displayed())
+    exported = json.loads(driver.execute_script('return accountExportText([state.accounts.at(-1)])'))
+    assert exported['account'][0]['server']['port'] == 5700
+    assert isinstance(exported['account'][0]['server']['port'], int)
+
+    clipboard_import_value(browser, json.dumps([exported['account'][0], {'id': ''}]))
+    open_clipboard_import(browser)
+    preview = browser.wait.until(lambda _: import_list(browser))
+    assert len(preview) == 2
+    assert '重复 · 覆盖' in preview[0]['text'] and '51009' in preview[0]['text'] and '配置相同' in preview[0]['text']
+    assert '无效' in preview[1]['text'] and '账号 —' in preview[1]['text'] and '— · — / —' in preview[1]['text']
+    browser.click(ACCOUNT_IMPORT_CANCEL)
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+
+    # 3) 剪贴板导入超过 1 MB 时在前端直接给出明确提示，不落到 413 通用错误。
+    clipboard_import_value(browser, '{"x":"' + 'a' * (1024 * 1024) + '"}')
+    open_clipboard_import(browser)
+    browser.wait.until(lambda _: re.search(r'1\s*Mi?B|超过', browser.text('#account-import-error')))
+    assert '413' not in browser.text('#account-import-error')
+    browser.click(ACCOUNT_IMPORT_CANCEL)
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+
+
+@pytest.mark.browser
 def test_mobile_custom_select_menu_opens_above_and_fits_viewport(browser):
     driver = browser.driver
     set_viewport(browser, 320, 568)

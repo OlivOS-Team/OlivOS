@@ -570,6 +570,7 @@ function resetLogin(message = '') {
   closeQRCode();
   closeAccountMenu();
   finishAccountDrag(false, false);
+  revokeExportBlobUrls();
   state.selectedAccounts.clear();
   state.authGeneration++;
   state.navigationGeneration++;
@@ -2946,6 +2947,13 @@ function finishAccountDrag(commit, repaint = true) {
 function portableAccount(account) {
   const row = clone(account);
   delete row.hash;
+  if (row.server && typeof row.server.port === 'string') {
+    const port = row.server.port.trim();
+    if (/^\d+$/.test(port)) {
+      const numeric = Number(port);
+      if (Number.isSafeInteger(numeric)) row.server.port = numeric;
+    }
+  }
   const servers = row.extends?.['qsign-server'];
   if (Array.isArray(servers)) {
     for (const server of servers) {
@@ -2977,6 +2985,7 @@ function legacyCopyAccounts(text) {
 }
 
 async function copyAccounts(accounts) {
+  closeAccountMenu();
   if (!accounts.length) return;
   const text = accountExportText(accounts);
   const auth = state.authGeneration;
@@ -2985,9 +2994,10 @@ async function copyAccounts(accounts) {
   } catch {
     if (auth !== state.authGeneration || state.page !== 'accounts') return;
     if (!legacyCopyAccounts(text)) {
+      const dialog = $('account-copy-fallback-dialog');
       const field = $('account-copy-fallback-text');
       field.value = text;
-      $('account-copy-fallback-dialog').showModal();
+      if (!dialog.open) dialog.showModal();
       field.focus();
       field.select();
       return;
@@ -2996,21 +3006,43 @@ async function copyAccounts(accounts) {
   if (auth === state.authGeneration) notify(`已复制 ${accounts.length} 个账号。`);
 }
 
+const exportBlobUrls = new Map();
+
+function revokeExportBlobUrls() {
+  for (const [url, timer] of exportBlobUrls) {
+    clearTimeout(timer);
+    URL.revokeObjectURL(url);
+  }
+  exportBlobUrls.clear();
+}
+
 function downloadAccounts() {
   const accounts = selectedAccounts();
   if (!accounts.length) return;
   const url = URL.createObjectURL(new Blob([accountExportText(accounts)], { type: 'application/json' }));
+  const timer = setTimeout(() => {
+    exportBlobUrls.delete(url);
+    URL.revokeObjectURL(url);
+  }, 60000);
+  exportBlobUrls.set(url, timer);
   const link = element('a', null, { href: url, download: 'account.json' });
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const ACCOUNT_IMPORT_MAX_BYTES = 1024 * 1024;
 let accountImport = null;
 
+function normalizeAccountId(value) {
+  const text = String(value ?? '');
+  const trimmed = text.trim();
+  if (/^[+-]?\d+$/.test(trimmed)) return BigInt(trimmed).toString();
+  return text;
+}
+
 function accountIdentity(row) {
-  return JSON.stringify([String(row.id), row.sdk_type, row.platform_type]);
+  return JSON.stringify([normalizeAccountId(row.id), row.sdk_type, row.platform_type]);
 }
 
 function accountImportMatches() {
@@ -3054,7 +3086,7 @@ function updateAccountImportConfirm() {
 }
 
 function clearAccountImportPreview() {
-  accountImport.items = [];
+  if (accountImport) accountImport.items = [];
   $('account-import-summary').hidden = true;
   $('account-import-list').replaceChildren();
   updateAccountImportConfirm();
@@ -3096,7 +3128,12 @@ function renderAccountImportPreview(session, matches) {
       entry.checked = select.checked;
       updateAccountImportConfirm();
     };
-    const display = (key) => ['string', 'number'].includes(typeof source?.[key]) ? String(source[key]) : '—';
+    const display = (key) => {
+      const value = source?.[key];
+      if (typeof value === 'number') return String(value);
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      return '—';
+    };
     title.append(
       select,
       element('span', !account ? '无效' : entry.old ? '重复 · 覆盖' : '新增', { class: 'account-import-badge' }),
@@ -3115,9 +3152,14 @@ function renderAccountImportPreview(session, matches) {
 }
 
 async function previewAccountImport(session, text) {
+  if (!session) return;
   const request = ++session.request;
   clearAccountImportPreview();
   const jsonText = text.trim();
+  if (new Blob([jsonText]).size > ACCOUNT_IMPORT_MAX_BYTES) {
+    accountImportMessage('导入内容超过 1 MB，请拆分后再导入。', true);
+    return;
+  }
   let payload;
   try {
     payload = JSON.parse(jsonText);
@@ -3170,7 +3212,7 @@ async function importAccountsFromFile(event) {
   input.value = '';
   if (!file) return;
   const session = openAccountImport();
-  if (file.size > 1024 * 1024) {
+  if (file.size > ACCOUNT_IMPORT_MAX_BYTES) {
     accountImportMessage('JSON 文件超过 1 MB，请拆分文件后再导入。', true);
     return;
   }
@@ -3187,6 +3229,7 @@ async function importAccountsFromFile(event) {
 }
 
 function setAccountImportConflicts(checked) {
+  if (!accountImport) return;
   const inputs = $('account-import-list').querySelectorAll('input');
   accountImport.items.forEach((entry, index) => {
     if (entry.old) inputs[index].checked = entry.checked = checked;
@@ -3196,6 +3239,7 @@ function setAccountImportConflicts(checked) {
 
 function confirmAccountImport() {
   const session = accountImport;
+  if (!session) return;
   const matches = accountImportMatches();
   if (session.items.some((entry) => entry.old !== matches.get(entry.identity)?.row)) {
     renderAccountImportPreview(session, matches);
@@ -3731,7 +3775,7 @@ function openAccountMenu(split) {
   menu.hidden = false;
   const left = split.getBoundingClientRect().left;
   const right = document.documentElement.clientWidth - 8;
-  menu.style.left = `${Math.min(0, right - left - menu.offsetWidth)}px`;
+  menu.style.left = `${Math.max(8 - left, Math.min(0, right - left - menu.offsetWidth))}px`;
   toggle.setAttribute('aria-expanded', 'true');
   menu.firstElementChild.focus();
 }
@@ -5550,11 +5594,15 @@ bind('account-import-file-trigger', () => {
 });
 bind('account-import-file', importAccountsFromFile, 'change');
 bind('account-import-text', () => {
+  if (!accountImport) return;
   accountImport.request++;
   clearAccountImportPreview();
   accountImportMessage('');
 }, 'input');
-bind('account-import-parse', () => previewAccountImport(accountImport, $('account-import-text').value));
+bind('account-import-parse', () => {
+  if (!accountImport) return;
+  return previewAccountImport(accountImport, $('account-import-text').value);
+});
 bind('account-import-check-conflicts', () => setAccountImportConflicts(true));
 bind('account-import-uncheck-conflicts', () => setAccountImportConflicts(false));
 bind('account-import-confirm', confirmAccountImport);
@@ -5765,6 +5813,7 @@ window.addEventListener('pagehide', () => {
     worker.postMessage({ type: 'olivos:cancel-qr-bind', path: qr.path, token: qr.token });
   }
   closeQRCode();
+  revokeExportBlobUrls();
   for (const name of [...state.streams.keys()]) closeStream(name);
   clearInterval(state.timer);
   clearInterval(state.dashboardTimer);
