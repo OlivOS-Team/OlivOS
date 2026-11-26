@@ -8,6 +8,7 @@ r'''
 
 import copy
 import json
+import multiprocessing
 import queue
 import socket
 import threading
@@ -200,7 +201,7 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
         assert OlivOS.flaskServerAPI.http_post_activity()[bot.hash] < 0
         threading.Thread.join(thread1, timeout=3.0)
         assert not thread1.is_alive()
-        ctrl1 = getattr(server1, '_control_rx_thread', None)
+        ctrl1 = OlivOS.API.get_control_rx_thread(server1)
         if ctrl1 is not None:
             threading.Thread.join(ctrl1, timeout=3.0)
             assert not ctrl1.is_alive()
@@ -232,7 +233,7 @@ def test_flask_post_hot_reload_keeps_port_releases_socket_and_reports_online():
         for thread in started_threads:
             threading.Thread.join(thread, timeout=3.0)
         for server in started_servers:
-            ctrl = getattr(server, '_control_rx_thread', None)
+            ctrl = OlivOS.API.get_control_rx_thread(server)
             if ctrl is not None:
                 threading.Thread.join(ctrl, timeout=3.0)
 
@@ -452,3 +453,84 @@ def test_webui_commit_accounts_keeps_running_flask_post_port(monkeypatch, tmp_pa
         assert models['OlivOS_flask_post_rx']['server']['port'] == port
     finally:
         host.on_terminate()
+
+
+def test_running_logger_and_plugin_remain_picklable_for_windows_spawn():
+    """线程模式已运行的 logger 被 OlivOS_plugin 持有时，仍须可被 spawn 子进程序列化。"""
+    ctx = multiprocessing.get_context('spawn')
+    logger_queue = ctx.Queue()
+    control_queue = ctx.Queue()
+    rx_queue = ctx.Queue()
+    tx_queue = ctx.Queue()
+    logger_proc = OlivOS.diagnoseAPI.logger(
+        Proc_name='OlivOS_logger',
+        scan_interval=0.01,
+        dead_interval=1,
+        logger_queue=logger_queue,
+        logger_mode=[],
+        logger_vis_level=[2, 3, 4, 5],
+        control_queue=control_queue,
+    )
+    logger_thread = logger_proc.start_unity('threading')
+    try:
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            ctrl = OlivOS.API.get_control_rx_thread(logger_proc)
+            if ctrl is not None and ctrl.is_alive():
+                break
+            time.sleep(0.01)
+        ctrl = OlivOS.API.get_control_rx_thread(logger_proc)
+        assert ctrl is not None and ctrl.is_alive()
+
+        plugin_proc = OlivOS.pluginAPI.shallow(
+            Proc_name='OlivOS_plugin',
+            scan_interval=0.01,
+            dead_interval=1,
+            rx_queue=rx_queue,
+            tx_queue=[tx_queue],
+            control_queue=control_queue,
+            logger_proc=logger_proc,
+            debug_mode=False,
+            plugin_func_dict={},
+            bot_info_dict={},
+        )
+        # 真实通过 spawn 启动子进程，覆盖 Windows popen_spawn_win32 的 ForkingPickler 序列化路径。
+        probe = ctx.Process(target=bool, args=(plugin_proc.run_total,))
+        probe.start()
+        probe.join(timeout=15.0)
+        assert probe.exitcode == 0
+    finally:
+        ctrl = OlivOS.API.get_control_rx_thread(logger_proc)
+        logger_thread.terminate()
+        threading.Thread.join(logger_thread, timeout=3.0)
+        if ctrl is not None:
+            threading.Thread.join(ctrl, timeout=3.0)
+            assert not ctrl.is_alive()
+
+
+def test_flask_post_server_remains_picklable_for_processing_mode():
+    """flaskServerAPI.server 在 processing 模式下须可被 spawn 子进程序列化并恢复锁。"""
+    ctx = multiprocessing.get_context('spawn')
+    bot = _make_post_bot()
+    server = OlivOS.flaskServerAPI.server(
+        Proc_name='OlivOS_flask_post_rx',
+        Flask_namespace='test_flask_pickle',
+        Flask_server_methods=['GET', 'POST'],
+        Flask_host='0.0.0.0',
+        Flask_port=55001,
+        tx_queue=ctx.Queue(),
+        bot_info_dict={bot.hash: bot},
+    )
+    state = server.__getstate__()
+    assert state['_wsgi_lock'] is None and state['_wsgi_server'] is None
+
+    restored = OlivOS.flaskServerAPI.server.__new__(OlivOS.flaskServerAPI.server)
+    restored.__setstate__(state)
+    assert restored._wsgi_lock is not None
+    with restored._wsgi_lock:
+        assert restored._wsgi_server is None
+
+    probe = ctx.Process(target=bool, args=(server.run_total,))
+    probe.start()
+    probe.join(timeout=15.0)
+    assert probe.exitcode == 0

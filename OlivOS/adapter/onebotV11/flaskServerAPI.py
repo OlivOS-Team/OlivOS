@@ -141,6 +141,19 @@ class server(OlivOS.API.Proc_templet):
         ]
         _http_post_servers.append(self)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['_wsgi_lock'] = None
+        state['_wsgi_server'] = None
+        state['_wsgi_thread_ident'] = None
+        state['_stop_watcher'] = None
+        state['_stop_done'] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._wsgi_lock = threading.Lock()
+
     def mark_post_seen(self, sdk_event):
         """记录一次 HTTP 上报，用于 WebUI 的在线判定。"""
         if not sdk_event.active:
