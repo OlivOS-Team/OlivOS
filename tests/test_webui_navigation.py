@@ -1726,6 +1726,16 @@ def account_row(position):
     return f'#account-rows tr:nth-child({position})'
 
 
+def wait_account_menu_open(browser, selector):
+    # .account-split-menu 展开时带有 select-menu-in（opacity 0 -> 1）入场动画，
+    # 等动画结束后再断言 is_displayed() 或发送按键，避免在首帧透明态误判。
+    browser.wait.until(lambda _: browser.driver.execute_script('''
+        const menu = document.querySelector(arguments[0]);
+        return !!menu && !menu.hidden &&
+          menu.getAnimations().every(animation => animation.playState === 'finished');
+    ''', selector) and browser.find(selector).is_displayed())
+
+
 @pytest.fixture
 def account_transfer(browser):
     from OlivOS.webUI import pageAPI
@@ -1755,6 +1765,8 @@ def account_transfer(browser):
 @pytest.mark.browser
 def test_empty_account_table_spans_all_columns_and_disables_selection(browser):
     browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#account-rows td").length === 1'))
     assert browser.driver.execute_script(
         'return document.querySelectorAll("#accounts thead th").length') == 6
     assert browser.attribute('#account-rows td', 'colspan') == '6'
@@ -1784,19 +1796,22 @@ def test_account_selection_and_export_menu_follow_current_rows(account_transfer)
     assert browser.find(copy).is_enabled() and browser.find(toggle).is_enabled()
 
     browser.click('#add-account-menu-toggle')
+    wait_account_menu_open(browser, add_menu)
     browser.click(toggle)
     assert not browser.find(add_menu).is_displayed()
-    assert browser.find(export_menu).is_displayed()
+    wait_account_menu_open(browser, export_menu)
     browser.click('#add-account-menu-toggle')
     assert not browser.find(export_menu).is_displayed()
-    assert browser.find(add_menu).is_displayed()
+    wait_account_menu_open(browser, add_menu)
     browser.click(toggle)
+    wait_account_menu_open(browser, export_menu)
     browser.find('#account-export-clipboard').send_keys(Keys.ESCAPE)
     assert not browser.find(export_menu).is_displayed()
     assert driver.switch_to.active_element == browser.find(toggle).raw()
     browser.click(toggle)
+    wait_account_menu_open(browser, export_menu)
     browser.click('[data-page="plugins"]')
-    assert browser.attribute(toggle, 'aria-expanded') == 'false'
+    browser.wait.until(lambda _: browser.attribute(toggle, 'aria-expanded') == 'false')
     browser.click('[data-page="accounts"]')
     browser.wait.until(lambda _: not browser.find(copy).is_enabled())
 
