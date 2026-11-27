@@ -2479,14 +2479,14 @@ body.performance-nav-open .performance-nav-toggle svg {
   gap: 12px;
   margin-bottom: 16px;
 }
-#account-add-split {
+.account-split {
   position: relative;
   display: inline-flex;
 }
-#add-account {
+.account-split-primary {
   border-radius: var(--control-radius) 0 0 var(--control-radius);
 }
-#add-account-menu-toggle {
+.account-split-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2495,7 +2495,7 @@ body.performance-nav-open .performance-nav-toggle svg {
   border-left: 0;
   border-radius: 0 var(--control-radius) var(--control-radius) 0;
 }
-#add-account-menu-toggle svg {
+.account-split-toggle svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -2505,10 +2505,10 @@ body.performance-nav-open .performance-nav-toggle svg {
   stroke-linejoin: round;
   transition: transform 140ms ease;
 }
-#add-account-menu-toggle[aria-expanded='true'] svg {
+.account-split-toggle[aria-expanded='true'] svg {
   transform: rotate(180deg);
 }
-#account-add-menu {
+.account-split-menu {
   position: absolute;
   z-index: 10;
   inset: calc(100% + 4px) auto auto 0;
@@ -2522,14 +2522,90 @@ body.performance-nav-open .performance-nav-toggle svg {
   transform-origin: top left;
   animation: select-menu-in 100ms ease-out;
 }
-#account-add-menu button {
+.account-split-menu button {
   text-align: start;
   border: 0;
   box-shadow: none;
   background: transparent;
 }
-#account-add-menu button:is(:hover, :focus-visible) {
+.account-split-menu button:is(:hover, :focus-visible) {
   background: var(--control-bg-hover);
+}
+#accounts {
+  --account-handle-size: 30px;
+}
+#accounts table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#accounts .account-controls-cell {
+  width: 1%;
+  padding-inline: 10px;
+}
+.account-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#accounts-select-all {
+  margin-inline-start: calc(var(--account-handle-size) + 8px);
+}
+#accounts-select-all:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#accounts-select-all:indeterminate::before {
+  height: 0;
+  border-left: 0;
+  opacity: 1;
+  transform: none;
+}
+.account-drag-handle {
+  width: var(--account-handle-size);
+  min-height: var(--account-handle-size);
+  padding: 0;
+  font-size: 19px;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+body.account-dragging-active {
+  cursor: grabbing;
+  user-select: none;
+}
+#account-rows.account-rows-sorting tr:not(.account-row-dragging) {
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}
+#account-rows.account-rows-sorting tr:not(.account-row-dragging):hover {
+  background: transparent;
+}
+.account-row-dragging {
+  position: relative;
+  z-index: 2;
+  opacity: 0.96;
+  background: var(--panel);
+  box-shadow: var(--shadow-dialog);
+  will-change: transform;
+}
+.account-row-dragging > td {
+  background: var(--panel);
+  border-bottom-color: var(--primary-border);
+  box-shadow: inset 0 1px 0 var(--primary-border), inset 0 -1px 0 var(--primary-border);
+}
+.account-row-dragging .account-drag-handle {
+  cursor: grabbing;
+}
+.account-row-settling {
+  position: relative;
+  z-index: 2;
+}
+.account-drop-before > td {
+  box-shadow: inset 0 3px var(--accent);
+}
+.account-drop-after > td {
+  box-shadow: inset 0 -3px var(--accent);
 }
 .plugin-toolbar {
   margin-bottom: 6px;
@@ -2679,14 +2755,18 @@ td .actions button {
 }
 .switch {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
   width: 38px;
   height: 22px;
   min-height: 0;
+  margin: 0;
   flex: 0 0 auto;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--control-border);
   border-radius: 999px;
   background: var(--line);
+  vertical-align: middle;
   cursor: pointer;
 }
 .switch::before {
@@ -2888,7 +2968,8 @@ dialog::backdrop {
   .switch::before,
   .select-chevron::before,
   .select-menu,
-  #account-add-menu,
+  .account-split-menu,
+  #account-rows.account-rows-sorting tr,
   input[type='checkbox']:not(.switch)::before,
   input[type='radio']::before,
   summary::before,
@@ -2924,6 +3005,78 @@ dialog::backdrop {
 }
 #account-info-dialog {
   width: min(560px, calc(100vw - 30px));
+}
+#account-import-source {
+  margin: 0 0 12px;
+}
+#account-import-source textarea {
+  margin: 6px 0 8px;
+}
+#account-import-error {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+#account-import-counts {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+#account-import-conflict-actions {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#account-import-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(320px, 42dvh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  list-style: none;
+}
+#account-import-list li {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  overflow-wrap: anywhere;
+}
+#account-import-list li[data-state='invalid'] {
+  border-color: var(--danger-border);
+  background: var(--bg);
+}
+#account-import-list li p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.account-import-choice {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.account-import-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--primary-bg);
+  color: var(--brand);
+  font-size: 12px;
+}
+[data-state='duplicate'] .account-import-badge {
+  color: var(--text);
+  background: var(--bg);
+}
+[data-state='invalid'] .account-import-badge {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.account-copy-buffer {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 .account-details {
   display: grid;
@@ -3145,8 +3298,29 @@ dialog::backdrop {
   textarea {
     min-height: 44px;
   }
-  #add-account-menu-toggle {
+  .account-split-toggle {
     min-width: 44px;
+  }
+  #accounts {
+    --account-handle-size: 44px;
+  }
+  #accounts .account-controls-cell {
+    padding-inline: 8px;
+  }
+  #account-import-dialog,
+  #account-copy-fallback-dialog {
+    padding: 16px;
+  }
+  #account-import-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    background: var(--control-bg);
+  }
+  #account-import-list {
+    max-height: 32dvh;
   }
   label.check {
     min-height: 44px;

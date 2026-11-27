@@ -1383,7 +1383,9 @@ def test_account_split_menu_and_qr_preset_visibility(browser, account_qr):
         return !menu.hidden && menu.getAnimations().every(animation => animation.playState === 'finished');
     '''))
     items = browser.find('#account-add-menu').find_elements(By.XPATH, './*')
-    assert [item.text for item in items] == ['新增账号（通用）', 'QQ 官方扫码创建']
+    assert [item.text for item in items] == [
+        '新增账号（通用）', 'QQ 官方扫码创建', '从剪贴板导入', '从 JSON 文件导入',
+    ]
     assert toggle.get_attribute('aria-expanded') == 'true'
     browser.find('#account-add-general').send_keys(Keys.ESCAPE)
     assert not browser.find('#account-add-menu').is_displayed()
@@ -1681,6 +1683,896 @@ def test_account_save_preserves_concurrent_edits_during_inflight_request(browser
     browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
     saved, = json.loads(browser.host.account_path.read_text(encoding='utf-8'))['account']
     assert saved['debug'] is True
+
+
+ACCOUNT_IDS = (51001, 51002, 51003)
+ACCOUNT_IMPORT = '#account-import-dialog'
+ACCOUNT_IMPORT_CANCEL = f'{ACCOUNT_IMPORT} .dialog-actions [data-close="account-import-dialog"]'
+
+
+def transfer_account(account_id, **fields):
+    row = {
+        'id': account_id, 'sdk_type': 'onebot', 'platform_type': 'qq', 'model_type': 'default',
+        'server': {'auto': False, 'type': 'post', 'host': 'http://127.0.0.1', 'port': 5700,
+                   'access_token': f'fixture-token-{account_id}'},
+        'password': f'fixture-password-{account_id}', 'extends': {}, 'enable': True, 'debug': False,
+    }
+    return dict(row, **fields)
+
+
+def account_file_rows(host):
+    return json.loads(host.account_path.read_text(encoding='utf-8'))['account']
+
+
+def account_table(browser):
+    return browser.driver.execute_script('''
+        return Array.from(document.querySelectorAll('#account-rows tr:has(.account-select)'), row => ({
+          id: row.cells[2].textContent.trim().split(' ')[0],
+          checked: row.querySelector('.account-select').checked,
+          offline: row.cells[2].textContent.includes('离线'),
+        }));
+    ''')
+
+
+def account_order(browser):
+    return [int(row['id']) for row in account_table(browser)]
+
+
+def selected_accounts(browser):
+    return [int(row['id']) for row in account_table(browser) if row['checked']]
+
+
+def account_row(position):
+    return f'#account-rows tr:nth-child({position})'
+
+
+def wait_account_menu_open(browser, selector):
+    # .account-split-menu 展开时带有 select-menu-in（opacity 0 -> 1）入场动画，
+    # 等动画结束后再断言 is_displayed() 或发送按键，避免在首帧透明态误判。
+    browser.wait.until(lambda _: browser.driver.execute_script('''
+        const menu = document.querySelector(arguments[0]);
+        return !!menu && !menu.hidden &&
+          menu.getAnimations().every(animation => animation.playState === 'finished');
+    ''', selector) and browser.find(selector).is_displayed())
+
+
+@pytest.fixture
+def account_transfer(browser):
+    from OlivOS.webUI import pageAPI
+
+    rows = [transfer_account(account_id) for account_id in ACCOUNT_IDS]
+    rows[0]['extends'] = {'retired': 'previous-fixture-value'}
+    host = browser.host
+    path = host.account_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({'account': rows}), encoding='utf-8')
+    with host.lock:
+        host.accounts = pageAPI.load_accounts(host)
+
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: account_order(browser) == list(ACCOUNT_IDS))
+    # 等进入账号页触发的 GET /api/accounts 和随后的 GET /api/status 完成，避免和首个用户操作竞争。
+    browser.wait.until(lambda _: browser.driver.execute_script('''
+        const requests = path => performance.getEntriesByName(new URL(path, location.href).href);
+        const accounts = requests('/api/accounts');
+        const status = requests('/api/status');
+        return accounts.length >= 2 && status.length >= 2 &&
+          status.at(-1).startTime >= accounts.at(-1).responseEnd;
+    '''))
+    return browser
+
+
+@pytest.mark.browser
+def test_empty_account_table_spans_all_columns_and_disables_selection(browser):
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: browser.driver.execute_script(
+        'return document.querySelectorAll("#account-rows td").length === 1'))
+    assert browser.driver.execute_script(
+        'return document.querySelectorAll("#accounts thead th").length') == 6
+    assert browser.attribute('#account-rows td', 'colspan') == '6'
+    assert not browser.find('#accounts-select-all').is_enabled()
+    assert not browser.find('#export-accounts-copy').is_enabled()
+    assert not browser.find('#export-accounts-menu-toggle').is_enabled()
+
+
+@pytest.mark.browser
+def test_account_selection_and_export_menu_follow_current_rows(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    header = '#accounts-select-all'
+    copy = '#export-accounts-copy'
+    toggle = '#export-accounts-menu-toggle'
+    export_menu = '#account-export-menu'
+    add_menu = '#account-add-menu'
+    assert browser.text(copy) == '复制所选'
+    assert not browser.find(copy).is_enabled() and not browser.find(toggle).is_enabled()
+
+    browser.click(f'{account_row(2)} .account-select')
+    assert selected_accounts(browser) == [51002]
+    assert driver.execute_script('return document.querySelector(arguments[0]).indeterminate', header)
+    assert browser.text(copy) == '复制所选 (1)'
+    assert browser.find(copy).is_enabled() and browser.find(toggle).is_enabled()
+
+    browser.click('#add-account-menu-toggle')
+    wait_account_menu_open(browser, add_menu)
+    browser.click(toggle)
+    assert not browser.find(add_menu).is_displayed()
+    wait_account_menu_open(browser, export_menu)
+    browser.click('#add-account-menu-toggle')
+    assert not browser.find(export_menu).is_displayed()
+    wait_account_menu_open(browser, add_menu)
+    browser.click(toggle)
+    wait_account_menu_open(browser, export_menu)
+    browser.find('#account-export-clipboard').send_keys(Keys.ESCAPE)
+    assert not browser.find(export_menu).is_displayed()
+    assert driver.switch_to.active_element == browser.find(toggle).raw()
+    browser.click(toggle)
+    wait_account_menu_open(browser, export_menu)
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: browser.attribute(toggle, 'aria-expanded') == 'false')
+    browser.click('[data-page="accounts"]')
+    browser.wait.until(lambda _: not browser.find(copy).is_enabled())
+
+    browser.click(header)
+    assert selected_accounts(browser) == list(ACCOUNT_IDS)
+    assert browser.attribute(header, 'checked') == 'true'
+    assert not driver.execute_script('return document.querySelector(arguments[0]).indeterminate', header)
+    assert browser.text(copy) == '复制所选 (3)'
+    browser.click(header)
+    assert selected_accounts(browser) == []
+    assert not browser.find(copy).is_enabled() and not browser.find(toggle).is_enabled()
+
+    browser.click(f'{account_row(2)} .account-select')
+    browser.click(f'{account_row(2)} .actions button:nth-child(2)')
+    browser.click('#account-form button[type="submit"]')
+    browser.wait.until(lambda _: not browser.find('#account-dialog').is_displayed())
+    assert selected_accounts(browser) == [51002]
+    browser.click(f'{account_row(2)} .actions button:last-child')
+    account_confirm(browser, '删除账号 51002')
+    assert selected_accounts(browser) == []
+    assert account_order(browser) == [51001, 51003]
+    browser.click(f'{account_row(2)} .account-select')
+    browser.click('#refresh-accounts')
+    account_confirm(browser, '放弃尚未应用')
+    browser.wait.until(lambda _: account_order(browser) == list(ACCOUNT_IDS))
+    assert selected_accounts(browser) == []
+
+
+@pytest.mark.browser
+def test_keyboard_account_sort_keeps_handle_focus_and_persists_file_order(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    first = f'{account_row(1)} .account-drag-handle'
+    second = f'{account_row(2)} .account-drag-handle'
+    revision = driver.execute_script('return state.revision')
+    old_rows = account_file_rows(browser.host)
+    browser.click(f'{account_row(1)} .account-select')
+    browser.find(first).send_keys(Keys.ARROW_UP)
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert not browser.text('#accounts-dirty')
+
+    browser.find(first).send_keys(Keys.ARROW_DOWN)
+    assert account_order(browser) == [51002, 51001, 51003]
+    assert driver.switch_to.active_element == browser.find(second).raw()
+    assert selected_accounts(browser) == [51001]
+    browser.find(second).send_keys(Keys.ARROW_UP)
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert driver.switch_to.active_element == browser.find(first).raw()
+    browser.find(first).send_keys(Keys.ARROW_DOWN)
+    assert browser.text('#accounts-dirty') == '有未应用的修改'
+    assert account_file_rows(browser.host) == old_rows
+
+    browser.click('#save-accounts')
+    browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
+    assert account_file_rows(browser.host) == [old_rows[1], old_rows[0], old_rows[2]]
+    assert [bot.id for bot in browser.host.accounts.values()] == [51002, 51001, 51003]
+    assert driver.execute_script('return state.revision') != revision
+    assert selected_accounts(browser) == []
+    driver.refresh()
+    browser.wait.until(lambda _: browser.find('#accounts').is_displayed())
+    assert account_order(browser) == [51002, 51001, 51003]
+
+
+def observe_account_pointer(browser):
+    browser.driver.execute_script('''
+        document.addEventListener('pointerdown', event => {
+          const handle = event.target.closest('.account-drag-handle');
+          if (handle) window.accountTestPointer = {
+            handle, id: event.pointerId, type: event.pointerType, trusted: event.isTrusted,
+          };
+        }, true);
+    ''')
+
+
+def account_pointer_capture(browser, pointer_type):
+    return browser.driver.execute_script('''
+        const pointer = window.accountTestPointer;
+        return !!pointer && pointer.trusted && pointer.type === arguments[0] &&
+          pointer.handle.hasPointerCapture(pointer.id) &&
+          pointer.handle.closest('tr').classList.contains('account-row-dragging');
+    ''', pointer_type)
+
+
+def account_drag_coordinates(browser):
+    return browser.driver.execute_script('''
+        const row = document.querySelector('#account-rows tr:first-child');
+        const handle = row.querySelector('.account-drag-handle').getBoundingClientRect();
+        const last = document.querySelector('#account-rows tr:last-child').getBoundingClientRect();
+        return [Math.round(handle.left + handle.width / 2), Math.round(handle.top + handle.height / 2),
+          Math.floor(last.top + last.height * 0.8)];
+    ''')
+
+
+def mouse_account_pointer(browser, event_type, x, y):
+    phase = {
+        'mousePressed': {'button': 'left', 'buttons': 1, 'clickCount': 1},
+        # Chromium CDP 的鼠标移动需同时传 button 和 buttons，才能把事件投递给已捕获指针的元素。
+        'mouseMoved': {'button': 'left', 'buttons': 1},
+        'mouseReleased': {'button': 'left', 'buttons': 0, 'clickCount': 1},
+    }
+    browser.driver.execute_cdp_cmd('Input.dispatchMouseEvent', dict(type=event_type, x=x, y=y, **phase[event_type]))
+
+
+@pytest.mark.browser
+def test_account_mouse_drag_uses_threshold_and_captures_outside_handle(account_transfer):
+    browser = account_transfer
+    browser.click(f'{account_row(1)} .account-select')
+    observe_account_pointer(browser)
+    x, y, target = account_drag_coordinates(browser)
+    mouse_account_pointer(browser, 'mousePressed', x, y)
+    try:
+        mouse_account_pointer(browser, 'mouseMoved', x, y + 2)
+        assert not account_pointer_capture(browser, 'mouse')
+    finally:
+        mouse_account_pointer(browser, 'mouseReleased', x, y + 2)
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert not browser.text('#accounts-dirty')
+
+    mouse_account_pointer(browser, 'mousePressed', x, y)
+    try:
+        mouse_account_pointer(browser, 'mouseMoved', x, target)
+        assert account_pointer_capture(browser, 'mouse')
+        assert account_order(browser) == list(ACCOUNT_IDS)
+        assert not browser.text('#accounts-dirty')
+        motion = browser.driver.execute_script('''
+            const rows = [...document.querySelectorAll('#account-rows tr')];
+            const shiftY = (node) => new DOMMatrixReadOnly(getComputedStyle(node).transform).m42;
+            const targetY = (node) => {
+              const match = node.style.transform.match(/translate3d\\([^,]+,\\s*([-\\d.]+)px/);
+              return match ? Number(match[1]) : 0;
+            };
+            return {
+              sorting: document.getElementById('account-rows').classList.contains('account-rows-sorting'),
+              bodyDragging: document.body.classList.contains('account-dragging-active'),
+              draggedY: shiftY(rows[0]),
+              sibling1TargetY: targetY(rows[1]),
+              sibling2TargetY: targetY(rows[2]),
+              siblingTransition: getComputedStyle(rows[1]).transitionProperty,
+            };
+        ''')
+        assert motion['sorting'] and motion['bodyDragging']
+        assert motion['draggedY'] > 20
+        assert motion['sibling1TargetY'] < -20 and motion['sibling2TargetY'] < -20
+        assert 'transform' in motion['siblingTransition']
+    finally:
+        mouse_account_pointer(browser, 'mouseReleased', x, target)
+    assert account_order(browser) == [51002, 51003, 51001]
+    assert selected_accounts(browser) == [51001]
+    assert browser.text('#accounts-dirty') == '有未应用的修改'
+    assert browser.driver.execute_script('''
+        const rows = [...document.querySelectorAll('#account-rows tr')];
+        return !document.getElementById('account-rows').classList.contains('account-rows-sorting') &&
+          !document.body.classList.contains('account-dragging-active') &&
+          rows.every(row => row.style.transform === '');
+    ''')
+
+
+@pytest.mark.browser
+def test_account_sort_animates_reorder_and_respects_reduced_motion(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    driver.execute_script('''
+        const originalAnimate = Element.prototype.animate;
+        window.accountSortAnimations = [];
+        Element.prototype.animate = function(keyframes, options) {
+          if (this.matches('#account-rows tr')) {
+            window.accountSortAnimations.push({
+              rowId: this.dataset.accountRowId,
+              from: keyframes[0]?.transform || '',
+              to: keyframes.at(-1)?.transform || '',
+              duration: options?.duration || 0,
+            });
+          }
+          return originalAnimate.call(this, keyframes, options);
+        };
+    ''')
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-reduced-motion', 'value': 'no-preference'}],
+    })
+    try:
+        browser.find(f'{account_row(1)} .account-drag-handle').send_keys(Keys.ARROW_DOWN)
+        assert account_order(browser) == [51002, 51001, 51003]
+        recorded = driver.execute_script('return window.accountSortAnimations')
+        assert len(recorded) == 2
+        assert all(item['from'].startswith('translate3d(0, ') and item['to'] == 'translate3d(0, 0, 0)'
+                   and item['duration'] > 0 for item in recorded)
+        browser.wait.until(lambda _: driver.execute_script('''
+            const rows = [...document.querySelectorAll('#account-rows tr')];
+            return rows.every(row => !row.classList.contains('account-row-settling') &&
+              row.getAnimations().every(animation => animation.playState === 'finished'));
+        '''))
+
+        driver.execute_script('window.accountSortAnimations = [];')
+        driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+            'features': [{'name': 'prefers-reduced-motion', 'value': 'reduce'}],
+        })
+        browser.find(f'{account_row(2)} .account-drag-handle').send_keys(Keys.ARROW_UP)
+        assert account_order(browser) == list(ACCOUNT_IDS)
+        assert driver.execute_script('return window.accountSortAnimations') == []
+    finally:
+        driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {'features': []})
+
+
+@pytest.mark.browser
+def test_account_drag_defers_status_redraw_and_escape_keeps_selection(account_transfer):
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    browser = account_transfer
+    observe_account_pointer(browser)
+    browser.click(f'{account_row(1)} .account-select')
+    x, y, target = account_drag_coordinates(browser)
+    mouse_account_pointer(browser, 'mousePressed', x, y)
+    try:
+        mouse_account_pointer(browser, 'mouseMoved', x, target)
+        assert account_pointer_capture(browser, 'mouse')
+        # 真正的状态轮询应读到连接变化，但拖动中的行要保持不动，直到 Escape 取消。
+        with browser.host.lock:
+            browser.host.runtime['fixture-link'] = SimpleNamespace(
+                Proc_type='fixture', bot_info=next(iter(browser.host.accounts.values())), active_links=0)
+            browser.host.update_available = True
+        WebDriverWait(browser.driver, 15).until(lambda driver: driver.execute_script('''
+            return document.querySelector('#update-status').textContent.includes('发现可用更新');
+        '''))
+        assert account_pointer_capture(browser, 'mouse')
+        assert not account_table(browser)[0]['offline']
+        assert selected_accounts(browser) == [51001]
+
+        ActionChains(browser.driver).send_keys(Keys.ESCAPE).perform()
+        browser.wait.until(lambda _: account_table(browser)[0]['offline'])
+        assert not account_pointer_capture(browser, 'mouse')
+    finally:
+        mouse_account_pointer(browser, 'mouseReleased', x, target)
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert selected_accounts(browser) == [51001]
+    assert not browser.text('#accounts-dirty')
+
+
+@pytest.mark.browser
+def test_account_drag_scrolls_to_rows_below_the_viewport(account_transfer):
+    browser = account_transfer
+    driver = browser.driver
+    set_viewport(browser, 1000, 315)
+    x, y, target = account_drag_coordinates(browser)
+    bottom = driver.execute_script('return innerHeight')
+    assert y < bottom < target
+    observe_account_pointer(browser)
+    assert driver.execute_script('''
+        return document.elementFromPoint(arguments[0], arguments[1])?.matches('.account-drag-handle');
+    ''', x, y)
+    mouse_account_pointer(browser, 'mousePressed', x, y)
+    try:
+        mouse_account_pointer(browser, 'mouseMoved', x, bottom - 8)
+        assert account_pointer_capture(browser, 'mouse')
+        browser.wait.until(lambda _: driver.execute_script('''
+            const main = document.querySelector('main');
+            const last = document.querySelector('#account-rows tr:last-child');
+            return main.scrollTop > 0 && last.classList.contains('account-drop-after');
+        '''))
+    finally:
+        mouse_account_pointer(browser, 'mouseReleased', x, bottom - 8)
+    assert account_order(browser) == [51002, 51003, 51001]
+
+
+@pytest.mark.browser
+def test_account_touch_drag_can_cancel_and_reorder_at_320px(account_transfer):
+    browser = account_transfer
+    driver = browser.driver
+    set_viewport(browser, 320, 640, mobile_device=True)
+    assert driver.execute_script('''
+        const handle = document.querySelector('#account-rows .account-drag-handle');
+        const check = document.querySelector('#account-rows .account-select');
+        const h = handle.getBoundingClientRect();
+        const c = check.getBoundingClientRect();
+        return innerWidth === 320 && document.documentElement.scrollWidth === innerWidth &&
+          h.left >= 0 && h.right <= c.left && c.right <= innerWidth &&
+          h.width >= 44 && h.height >= 44 && h.top < c.bottom && c.top < h.bottom &&
+          getComputedStyle(handle).touchAction === 'none';
+    ''')
+    observe_account_pointer(browser)
+    x, y, target = account_drag_coordinates(browser)
+
+    def touch(event_type, point_y=None):
+        points = [] if point_y is None else [{'x': x, 'y': point_y, 'id': 0}]
+        driver.execute_cdp_cmd('Input.dispatchTouchEvent', {'type': event_type, 'touchPoints': points})
+
+    driver.execute_cdp_cmd('Emulation.setTouchEmulationEnabled', {'enabled': True, 'maxTouchPoints': 1})
+    try:
+        touch('touchStart', y)
+        touch('touchMove', target)
+        assert account_pointer_capture(browser, 'touch')
+        touch('touchCancel')
+        assert account_order(browser) == list(ACCOUNT_IDS)
+        assert not browser.text('#accounts-dirty')
+        assert not account_pointer_capture(browser, 'touch')
+        browser.wait.until(lambda _: driver.execute_script('''
+            return [...document.querySelectorAll('#account-rows tr')].every(
+              row => row.getAnimations().every(animation => animation.playState === 'finished'));
+        '''))
+
+        touch('touchStart', y)
+        touch('touchMove', target)
+        assert account_pointer_capture(browser, 'touch')
+        touch('touchEnd')
+        assert account_order(browser) == [51002, 51003, 51001]
+        assert browser.text('#accounts-dirty') == '有未应用的修改'
+    finally:
+        driver.execute_cdp_cmd('Emulation.setTouchEmulationEnabled', {'enabled': False})
+
+
+def assert_account_export(text, ids):
+    payload = json.loads(text)
+    assert list(payload) == ['account']
+    assert [int(row['id']) for row in payload['account']] == ids
+    # Windows 剪贴板会转换换行；保留对 JSON 缩进和内容的严格检查。
+    assert text.replace('\r\n', '\n') == json.dumps(payload, indent=2, ensure_ascii=False)
+    for row in payload['account']:
+        assert set(row) == set(transfer_account(row['id']))
+        assert row['password'] == f'fixture-password-{row["id"]}'
+        assert row['server']['access_token'] == f'fixture-token-{row["id"]}'
+
+
+@pytest.mark.browser
+def test_account_row_copy_and_batch_copy_use_browser_clipboard(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    origin = driver.execute_script('return location.origin')
+    driver.execute_cdp_cmd('Browser.grantPermissions', {
+        'origin': origin, 'permissions': ['clipboardReadWrite', 'clipboardSanitizedWrite'],
+    })
+    driver.execute_script('''
+        const execCommand = document.execCommand.bind(document);
+        document.execCommand = (command, ...args) => command === 'copy' ? false : execCommand(command, ...args);
+    ''')
+
+    def expect_copy(ids):
+        browser.wait.until(lambda _: browser.text('#notice-message') == f'已复制 {len(ids)} 个账号。')
+        text = driver.execute_async_script('''
+            const done = arguments[0];
+            navigator.clipboard.readText().then(done, error => done({error: error.message}));
+        ''')
+        assert isinstance(text, str), text
+        assert_account_export(text, ids)
+
+    try:
+        browser.click(f'{account_row(2)} .account-select')
+        row_copy = f'{account_row(1)} .actions button:nth-child(3)'
+        assert browser.text(row_copy) == '复制'
+        browser.click(row_copy)
+        expect_copy([51001])
+        assert selected_accounts(browser) == [51002]
+        assert not browser.find('#account-copy-fallback-dialog').is_displayed()
+
+        browser.click(f'{account_row(1)} .account-select')
+        browser.find(f'{account_row(1)} .account-drag-handle').send_keys(Keys.ARROW_DOWN)
+        browser.click('#export-accounts-copy')
+        expect_copy([51002, 51001])
+        browser.click(f'{account_row(3)} .account-select')
+        browser.click('#export-accounts-menu-toggle')
+        browser.click('#account-export-clipboard')
+        expect_copy([51002, 51001, 51003])
+        open_clipboard_import(browser)
+        preview = browser.wait.until(lambda _: import_list(browser))
+        assert len(preview) == 3
+        for row, account_id in zip(preview, [51002, 51001, 51003]):
+            assert str(account_id) in row['text'] and '重复 · 覆盖' in row['text']
+        assert not browser.find('#account-import-text').is_displayed()
+        browser.click(ACCOUNT_IMPORT_CANCEL)
+    finally:
+        driver.execute_cdp_cmd('Browser.resetPermissions', {})
+
+
+@pytest.mark.browser
+def test_account_export_strips_qsign_editor_metadata(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    browser.click(f'{account_row(1)} .actions button:nth-child(2)')
+    browser.click('#account-form details > summary')
+    server = {'addr': 'http://127.0.0.1:8080', 'key': 'fixture-signing-key'}
+    browser.find('#account-extends').send_keys(Keys.CONTROL, 'a', Keys.NULL, Keys.BACKSPACE)
+    browser.type_text('#account-extends', json.dumps({'qsign-server': [dict(server, _source_index=-1)]}))
+    browser.click('#account-form button[type="submit"]')
+    browser.wait.until(lambda _: not browser.find('#account-dialog').is_displayed())
+    driver.execute_script('''
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: undefined});
+        document.execCommand = () => false;
+    ''')
+    browser.click(f'{account_row(1)} .actions button:nth-child(3)')
+    browser.wait.until(lambda _: browser.find('#account-copy-fallback-dialog').is_displayed())
+    text = browser.attribute('#account-copy-fallback-text', 'value')
+    assert_account_export(text, [51001])
+    assert json.loads(text)['account'][0]['extends']['qsign-server'] == [server]
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('legacy_available', [True, False], ids=['legacy-copy', 'manual-copy'])
+def test_account_copy_falls_back_when_clipboard_write_is_denied(account_transfer, legacy_available):
+    browser = account_transfer
+    driver = browser.driver
+    driver.execute_script('''
+        const legacyAvailable = arguments[0];
+        const execCommand = document.execCommand.bind(document);
+        window.accountTestCopy = [];
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {
+          writeText: () => {
+            window.accountTestCopy.push('writeText');
+            return Promise.reject(new DOMException('Denied', 'NotAllowedError'));
+          },
+        }});
+        document.execCommand = (command, ...args) => {
+          if (command !== 'copy') return execCommand(command, ...args);
+          const field = document.activeElement;
+          window.accountTestCopy.push('execCommand', field.value.slice(field.selectionStart, field.selectionEnd));
+          return legacyAvailable;
+        };
+    ''', legacy_available)
+    browser.click(f'{account_row(1)} .actions button:nth-child(3)')
+    calls = browser.wait.until(lambda _: driver.execute_script(
+        'return window.accountTestCopy.length === 3 && window.accountTestCopy'))
+    assert calls[:2] == ['writeText', 'execCommand']
+    assert_account_export(calls[2], [51001])
+    dialog = '#account-copy-fallback-dialog'
+    if legacy_available:
+        assert not browser.find(dialog).is_displayed()
+    else:
+        browser.wait.until(lambda _: browser.find(dialog).is_displayed())
+        assert driver.execute_script('''
+            const text = document.querySelector('#account-copy-fallback-text');
+            return document.activeElement === text && text.readOnly &&
+              text.selectionStart === 0 && text.selectionEnd === text.value.length && text.value;
+        ''') == calls[2]
+        browser.click(f'{dialog} .dialog-actions button')
+        assert not browser.find(dialog).is_displayed()
+
+
+def clipboard_import_value(browser, value=None, *, denied=False):
+    browser.driver.execute_script('''
+        const [text, denied] = arguments;
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: text === null && !denied
+          ? undefined : {readText: () => denied
+            ? Promise.reject(new DOMException('Denied', 'NotAllowedError')) : Promise.resolve(text)}});
+    ''', value, denied)
+
+
+def open_clipboard_import(browser):
+    browser.click('#add-account-menu-toggle')
+    browser.click('#account-import-clipboard')
+    browser.wait.until(lambda _: browser.find(ACCOUNT_IMPORT).is_displayed())
+
+
+def import_list(browser):
+    return browser.driver.execute_script('''
+        return Array.from(document.querySelectorAll('#account-import-list li'), row => {
+          const box = row.querySelector('input[type="checkbox"]');
+          return {text: row.innerText, checked: box.checked, disabled: box.disabled};
+        });
+    ''')
+
+
+def import_checkbox(preview, account_id):
+    position = next(i for i, row in enumerate(preview, 1) if str(account_id) in row['text'])
+    return f'#account-import-list li:nth-child({position}) input[type="checkbox"]'
+
+
+def upload_account_json(browser, path):
+    from selenium.webdriver.common.by import By
+
+    driver = browser.driver
+    driver.execute_cdp_cmd('Page.setInterceptFileChooserDialog', {'enabled': True})
+    try:
+        browser.click('#add-account-menu-toggle')
+        browser.click('#account-import-file-trigger')
+        # WebDriver 为真实文件输入选择本地文件，应用仍负责读取、校验和清空输入。
+        driver.find_element(By.ID, 'account-import-file').send_keys(str(path.resolve()))
+        browser.wait.until(lambda _: browser.find(ACCOUNT_IMPORT).is_displayed())
+        browser.wait.until(lambda _: not browser.attribute('#account-import-file', 'value'))
+    finally:
+        driver.execute_cdp_cmd('Page.setInterceptFileChooserDialog', {'enabled': False})
+
+
+@pytest.mark.browser
+def test_account_json_download_and_repeated_upload_round_trip(account_transfer, tmp_path):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    downloads = tmp_path / 'downloads'
+    downloads.mkdir()
+    path = downloads / 'account.json'
+    driver.execute_cdp_cmd('Browser.setDownloadBehavior', {'behavior': 'allow', 'downloadPath': str(downloads)})
+    try:
+        browser.find(f'{account_row(1)} .account-drag-handle').send_keys(Keys.ARROW_DOWN)
+        browser.click('#accounts-select-all')
+        browser.click('#export-accounts-menu-toggle')
+        browser.click('#account-export-file')
+        browser.wait.until(lambda _: path.is_file())
+        assert_account_export(path.read_text(encoding='utf-8'), [51002, 51001, 51003])
+    finally:
+        driver.execute_cdp_cmd('Browser.setDownloadBehavior', {'behavior': 'default'})
+
+    for _ in range(2):
+        upload_account_json(browser, path)
+        preview = browser.wait.until(lambda _: import_list(browser))
+        assert len(preview) == 3
+        for row, account_id in zip(preview, [51002, 51001, 51003]):
+            assert str(account_id) in row['text'] and '重复 · 覆盖' in row['text']
+            assert row['checked'] and not row['disabled']
+        browser.click(ACCOUNT_IMPORT_CANCEL)
+        assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+    assert account_order(browser) == [51002, 51001, 51003]
+    assert [row['id'] for row in account_file_rows(browser.host)] == list(ACCOUNT_IDS)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize(('content', 'error'), [
+    (b'not JSON', r'JSON|解析'),
+    (b' ' * (1024 * 1024 + 1), r'1\s*Mi?B|大小|过大|超过'),
+    (b'{"account": {}}', r'account|数组|格式'),
+], ids=['invalid-json', 'oversize', 'invalid-wrapper'])
+def test_account_file_import_reports_invalid_input(account_transfer, tmp_path, content, error):
+    browser = account_transfer
+    path = tmp_path / 'invalid.json'
+    path.write_bytes(content)
+    upload_account_json(browser, path)
+    browser.wait.until(lambda _: re.search(error, browser.text('#account-import-error')))
+    assert import_list(browser) == [] and not browser.find('#account-import-confirm').is_enabled()
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert not browser.text('#accounts-dirty')
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('shape', ['wrapped', 'array', 'single'])
+def test_clipboard_account_import_always_previews_before_staging(account_transfer, shape):
+    browser = account_transfer
+    account_id = 123456789012345678 if shape == 'single' else 51004
+    row = transfer_account(account_id)
+    clipboard_import_value(browser, json.dumps({'wrapped': {'account': [row]}, 'array': [row], 'single': row}[shape]))
+    open_clipboard_import(browser)
+    preview, = browser.wait.until(lambda _: import_list(browser))
+    assert all(text in preview['text'] for text in ('新增', str(account_id), 'qq', 'onebot', 'default'))
+    assert preview['checked'] and not preview['disabled']
+    assert not browser.find('#account-import-text').is_displayed()
+    assert browser.text('#account-import-confirm') == '确认导入（新增 1，覆盖 0）'
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert not browser.text('#accounts-dirty')
+
+    browser.click('#account-import-confirm')
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+    assert account_order(browser) == [*ACCOUNT_IDS, account_id]
+    assert browser.text('#accounts-dirty') == '有未应用的修改'
+    assert [row['id'] for row in account_file_rows(browser.host)] == list(ACCOUNT_IDS)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize(('value', 'denied'), [(None, False), (None, True), ('', False), ('{', False)],
+                         ids=['unavailable', 'permission-denied', 'empty', 'invalid-json'])
+def test_clipboard_account_import_opens_manual_paste_and_can_cancel(account_transfer, value, denied):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    if denied:
+        set_viewport(browser, 320, 640, mobile_device=True)
+    clipboard_import_value(browser, value, denied=denied)
+    open_clipboard_import(browser)
+    browser.wait.until(lambda _: '解析 JSON' in browser.text('#account-import-error'))
+    assert not browser.find('#account-import-confirm').is_enabled()
+    field = '#account-import-text'
+    assert browser.driver.switch_to.active_element == browser.find(field).raw()
+    if denied:
+        assert browser.driver.execute_script('''
+            const rect = document.querySelector('#account-import-dialog').getBoundingClientRect();
+            return innerWidth === 320 && rect.left >= 0 && rect.right <= innerWidth &&
+              rect.top >= 0 && rect.bottom <= innerHeight;
+        ''')
+    browser.find(field).send_keys(Keys.CONTROL, 'a', Keys.NULL, Keys.BACKSPACE)
+    browser.type_text(field, json.dumps(transfer_account(51004)))
+    browser.click('#account-import-parse')
+    preview, = browser.wait.until(lambda _: import_list(browser))
+    assert '新增' in preview['text'] and '51004' in preview['text']
+    assert not browser.text('#account-import-error')
+    browser.click(ACCOUNT_IMPORT_CANCEL)
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+    assert account_order(browser) == list(ACCOUNT_IDS)
+    assert not browser.text('#accounts-dirty')
+
+
+@pytest.mark.browser
+def test_account_import_merges_duplicates_sanitizes_and_selectively_replaces_drafts(account_transfer):
+    browser = account_transfer
+    driver = browser.driver
+    original = account_file_rows(browser.host)
+    local_hash = driver.execute_script('return state.accounts[0].hash')
+
+    # 先建立尚未保存的账号；下一次预览必须和当前草稿而不是磁盘比对。
+    clipboard_import_value(browser, json.dumps(transfer_account(51004)))
+    open_clipboard_import(browser)
+    browser.click('#account-import-confirm')
+    browser.click(f'{account_row(1)} .account-select')
+
+    earlier = transfer_account(51001, password='fixture-discarded-password')
+    latest = transfer_account(51001, hash='fixture-foreign-hash', password='fixture-new-password')
+    latest['server']['access_token'] = 'fixture-new-access-token'
+    added = transfer_account(51005, hash='fixture-new-foreign-hash', extends={
+        'qsign-server': [{'addr': 'http://127.0.0.1:8080', 'key': 'fixture-qsign-key', '_source_index': -99}],
+    })
+    masked = transfer_account(51006, password='********')
+    malformed = transfer_account({'password': 'fixture-invalid-id-password'})
+    payload = [earlier, transfer_account(51002, enable=False), latest, masked, added,
+               transfer_account(51004, debug=True), malformed]
+    clipboard_import_value(browser, json.dumps({'account': payload}))
+    set_viewport(browser, 320, 568, mobile_device=True)
+    open_clipboard_import(browser)
+    preview = browser.wait.until(lambda _: import_list(browser))
+    assert len(preview) == 6
+    assert sum(row['disabled'] for row in preview) == 2
+    assert all(row['checked'] != row['disabled'] for row in preview)
+    assert sum('重复 · 覆盖' in row['text'] for row in preview) == 3
+    assert sum('无效' in row['text'] for row in preview) == 2
+    assert any('新增' in row['text'] and '51005' in row['text'] for row in preview)
+    assert any('51006' in row['text'] and re.search(r'脱敏|占位', row['text']) for row in preview)
+    counts = browser.text('#account-import-counts')
+    assert re.search(r'总数\s*7\s*·\s*新增\s*1\s*·\s*重复\s*3\s*·\s*无效\s*2', counts)
+    assert re.search(r'已合并批内重复\s*1\s*条', counts)
+    assert browser.text('#account-import-confirm') == '确认导入（新增 1，覆盖 3）'
+    assert driver.execute_script('''
+        const confirm = document.querySelector('#account-import-confirm');
+        const rect = confirm.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return innerWidth === 320 && innerHeight === 568 && rect.left >= 0 && rect.right <= innerWidth &&
+          rect.top >= 0 && rect.bottom <= innerHeight && confirm.contains(hit);
+    ''')
+    dialog = browser.text(ACCOUNT_IMPORT)
+    for private in (earlier['password'], latest['password'], latest['server']['access_token'],
+                    original[0]['password'], original[0]['server']['access_token'], 'fixture-qsign-key',
+                    'fixture-invalid-id-password', 'fixture-foreign-hash', '********', 'previous-fixture-value'):
+        assert private not in dialog
+
+    added_checkbox = import_checkbox(preview, 51005)
+    skipped_checkbox = import_checkbox(preview, 51002)
+    browser.click('#account-import-uncheck-conflicts')
+    assert browser.text('#account-import-confirm') == '确认导入（新增 1，覆盖 0）'
+    browser.click(added_checkbox)
+    assert not browser.find('#account-import-confirm').is_enabled()
+    browser.click('#account-import-check-conflicts')
+    assert browser.text('#account-import-confirm') == '确认导入（新增 0，覆盖 3）'
+    browser.click(added_checkbox)
+    browser.click(skipped_checkbox)
+    assert browser.text('#account-import-confirm') == '确认导入（新增 1，覆盖 2）'
+
+    browser.click('#account-import-confirm')
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+    assert account_order(browser) == [*ACCOUNT_IDS, 51004, 51005]
+    assert selected_accounts(browser) == [51001]
+    assert driver.execute_script('return [state.accounts[0].hash, state.accounts.at(-1).hash ?? null]') == [
+        local_hash, None,
+    ]
+    assert browser.text('#accounts-dirty') == '有未应用的修改'
+    assert account_file_rows(browser.host) == original
+
+    browser.click('#save-accounts')
+    browser.wait.until(lambda _: not browser.text('#accounts-dirty'))
+    saved = account_file_rows(browser.host)
+    assert [row['id'] for row in saved] == [*ACCOUNT_IDS, 51004, 51005]
+    assert saved[0]['password'] == latest['password']
+    assert saved[0]['server']['access_token'] == latest['server']['access_token']
+    assert saved[0].get('extends', {}) == {}
+    assert driver.execute_script('return state.accounts[0].hash') == local_hash
+    assert saved[1:3] == original[1:3]
+    assert saved[3]['debug'] is True
+    assert saved[4]['extends']['qsign-server'] == [{'addr': 'http://127.0.0.1:8080', 'key': 'fixture-qsign-key'}]
+    assert selected_accounts(browser) == []
+
+
+@pytest.mark.browser
+def test_account_transfer_review_edge_cases(account_transfer):
+    browser = account_transfer
+    driver = browser.driver
+
+    # 1) 导出菜单展开时点击主按钮「复制所选」必须同时关闭下拉菜单，且异步双触发降级弹窗不抛 InvalidStateError。
+    driver.execute_script('''
+        window.accountCopyRejects = [];
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {
+          writeText: () => new Promise((_, reject) => {
+            window.accountCopyRejects.push(() => reject(new DOMException('Denied', 'NotAllowedError')));
+          }),
+        }});
+        document.execCommand = () => false;
+    ''')
+    browser.click(f'{account_row(1)} .account-select')
+    browser.click('#export-accounts-menu-toggle')
+    wait_account_menu_open(browser, '#account-export-menu')
+    browser.click('#export-accounts-copy')
+    assert not browser.find('#account-export-menu').is_displayed()
+    assert browser.attribute('#export-accounts-menu-toggle', 'aria-expanded') == 'false'
+    browser.click('#export-accounts-copy')
+    browser.wait.until(lambda _: driver.execute_script('return window.accountCopyRejects.length === 2'))
+    driver.execute_script('for (const reject of window.accountCopyRejects) reject();')
+    browser.wait.until(lambda _: browser.find('#account-copy-fallback-dialog').is_displayed())
+    assert not browser.find('#notice').is_displayed()
+    browser.click('#account-copy-fallback-dialog .dialog-actions button')
+    assert not browser.find('#account-copy-fallback-dialog').is_displayed()
+
+    # 2) 未保存的编辑草稿带前导零 ID 和字符串端口时，导出端口应归一化为整数且导入预览能正确识别重复与无差异。
+    browser.click('#add-account')
+    browser.find('#account-form [data-field="id"]').send_keys('0051009')
+    browser.click('#account-form details > summary')
+    browser.type_text('#account-form [data-field="server.host"]', 'http://127.0.0.1')
+    browser.type_text('#account-form [data-field="server.port"]', '5700')
+    browser.type_text('#account-form [data-field="server.access_token"]', 'fixture-token-51009')
+    browser.click('#account-form button[type="submit"]')
+    browser.wait.until(lambda _: not browser.find('#account-dialog').is_displayed())
+    exported = json.loads(driver.execute_script('return accountExportText([state.accounts.at(-1)])'))
+    assert exported['account'][0]['server']['port'] == 5700
+    assert isinstance(exported['account'][0]['server']['port'], int)
+
+    clipboard_import_value(browser, json.dumps([exported['account'][0], {'id': ''}]))
+    open_clipboard_import(browser)
+    preview = browser.wait.until(lambda _: import_list(browser))
+    assert len(preview) == 2
+    assert '重复 · 覆盖' in preview[0]['text'] and '51009' in preview[0]['text'] and '配置相同' in preview[0]['text']
+    assert '无效' in preview[1]['text'] and '账号 —' in preview[1]['text'] and '— · — / —' in preview[1]['text']
+    browser.click(ACCOUNT_IMPORT_CANCEL)
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+
+    # 3) 剪贴板导入超过 1 MB 时在前端直接给出明确提示，不落到 413 通用错误。
+    clipboard_import_value(browser, '{"x":"' + 'a' * (1024 * 1024) + '"}')
+    open_clipboard_import(browser)
+    browser.wait.until(lambda _: re.search(r'1\s*Mi?B|超过', browser.text('#account-import-error')))
+    assert '413' not in browser.text('#account-import-error')
+    browser.click(ACCOUNT_IMPORT_CANCEL)
+    assert not browser.find(ACCOUNT_IMPORT).is_displayed()
+
+    # 4) 账号启用开关圆点在开启与关闭状态下均应垂直居中且左右边距对称。
+    assert driver.execute_script('''
+        const sw = document.querySelector('#account-rows .switch');
+        const track = getComputedStyle(sw);
+        const thumb = getComputedStyle(sw, '::before');
+        const rect = sw.getBoundingClientRect();
+        const borderX = parseFloat(track.borderLeftWidth) + parseFloat(track.borderRightWidth);
+        const borderY = parseFloat(track.borderTopWidth) + parseFloat(track.borderBottomWidth);
+        const padX = parseFloat(track.paddingLeft) + parseFloat(track.paddingRight);
+        const padY = parseFloat(track.paddingTop) + parseFloat(track.paddingBottom);
+        const thumbW = parseFloat(thumb.width);
+        const thumbH = parseFloat(thumb.height);
+        const tx = new DOMMatrixReadOnly(thumb.transform).m41;
+        const leftInset = parseFloat(track.borderLeftWidth) + parseFloat(track.paddingLeft);
+        const rightGapChecked = rect.width - (leftInset + tx + thumbW);
+        return track.display === 'inline-flex' && track.alignItems === 'center' &&
+          Math.abs((rect.height - borderY - padY) - thumbH) < 0.5 &&
+          Math.abs(leftInset - rightGapChecked) < 0.5 &&
+          Math.abs((rect.width - borderX - padX) - (thumbW + tx)) < 0.5;
+    ''')
 
 
 @pytest.mark.browser

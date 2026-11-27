@@ -142,7 +142,7 @@ def restore(value, previous=None):
         result = []
         for i, item in enumerate(value):
             source_index = item.get('_source_index', i) if isinstance(item, dict) else i
-            if not isinstance(source_index, int) or source_index < -1:
+            if isinstance(source_index, bool) or not isinstance(source_index, int) or source_index < -1:
                 raise ValueError('签名服务器来源索引无效')
             old = previous[source_index] if 0 <= source_index < len(previous) else None
             result.append(restore(item, old))
@@ -161,7 +161,8 @@ def account_dict(bot):
 
 
 def account_revision(accounts):
-    content = json.dumps({key: account_dict(bot) for key, bot in accounts.items()}, sort_keys=True)
+    ordered = [dict(account_dict(bot), hash=key) for key, bot in accounts.items()]
+    content = json.dumps(ordered, sort_keys=True)
     return hashlib.sha256(content.encode()).hexdigest()
 
 
@@ -228,76 +229,167 @@ def account_schema():
                        {'name': 'server.access_token', 'title': 'TOKEN'}]}
 
 
-def parse_accounts(body, previous):
-    if not isinstance(body, dict) or not isinstance(body.get('account'), list):
-        raise ValueError('请求必须包含 account 数组')
-    result = {}
-    hierarchy = account_schema()['hierarchy']
-    for row in body['account']:
-        if not isinstance(row, dict):
-            raise ValueError('账号必须为对象')
+def _parse_account_row(row, previous, hierarchy, replace_hashes=()):
+    if not isinstance(row, dict):
+        raise ValueError('账号必须为对象')
+    old = None
+    replacing = False
+    if previous is not None:
         old_hash = row.get('hash')
+        if old_hash is not None and not isinstance(old_hash, str):
+            raise ValueError('账号 hash 必须为字符串')
         old = previous.get(old_hash)
         if old_hash and old is None:
             raise ValueError('原账号不存在，请刷新后重试')
-        row = restore(row, account_dict(old) if old else {})
-        connection = row.get('server', {})
-        if not isinstance(connection, dict):
-            raise ValueError('server 必须为对象')
-        sdk, platform, model = (row.get(key) for key in ('sdk_type', 'platform_type', 'model_type'))
-        if model not in hierarchy.get(sdk, {}).get(platform, []):
-            if not old or (sdk, platform, model) != tuple(old.platform[key] for key in ('sdk', 'platform', 'model')):
-                raise ValueError('SDK、平台与型号组合无效')
-        for value in (row.get('enable', True), row.get('debug', False), connection.get('auto', False)):
-            if not isinstance(value, bool):
-                raise ValueError('启用、调试和自动配置必须为布尔值')
-        if connection.get('type') not in OlivOS.accountMetadataAPI.accountTypeDataList_server_type:
-            raise ValueError('连接类型无效')
-        for value in (row.get('id', ''), row.get('password', ''), connection.get('host', ''),
-                      connection.get('port', ''), connection.get('access_token', '')):
-            if value is not None and not isinstance(value, (str, int)):
-                raise ValueError('账号字段必须为字符串或整数')
+        replacing = old_hash in replace_hashes
+    row = restore(row, account_dict(old) if old is not None and not replacing else None)
+    connection = row.get('server', {})
+    if not isinstance(connection, dict):
+        raise ValueError('server 必须为对象')
+    sdk, platform, model = (row.get(key) for key in ('sdk_type', 'platform_type', 'model_type'))
+    if not all(isinstance(value, str) for value in (sdk, platform, model)):
+        raise ValueError('SDK、平台与型号必须为字符串')
+    if model not in hierarchy.get(sdk, {}).get(platform, []):
+        if not old or (sdk, platform, model) != tuple(old.platform[key] for key in ('sdk', 'platform', 'model')):
+            raise ValueError('SDK、平台与型号组合无效')
+    for value in (row.get('enable', True), row.get('debug', False), connection.get('auto', False)):
+        if not isinstance(value, bool):
+            raise ValueError('启用、调试和自动配置必须为布尔值')
+    if connection.get('type') not in OlivOS.accountMetadataAPI.accountTypeDataList_server_type:
+        raise ValueError('连接类型无效')
+    raw_id = row.get('id', '')
+    raw_password = row.get('password', '')
+    raw_host = connection.get('host', '')
+    raw_port = connection.get('port', '')
+    raw_token = connection.get('access_token', '')
+    if not isinstance(raw_host, str):
+        raise ValueError('主机地址必须为字符串')
+    if (any(isinstance(value, bool) for value in (raw_id, raw_password, raw_port, raw_token))
+            or not isinstance(raw_id, (str, int))
+            or not isinstance(raw_password, (str, int))
+            or not isinstance(raw_port, (str, int))
+            or (raw_token is not None and not isinstance(raw_token, (str, int)))):
+        raise ValueError('账号字段必须为字符串或整数')
+    try:
         fields = OlivOS.accountAPI.normalizeAccountFields({
-            'id': str(row.get('id', '')), 'password': row.get('password', ''),
+            'id': str(raw_id), 'password': raw_password,
             'server_auto': str(connection.get('auto', False)), 'server_type': connection['type'],
-            'host': connection.get('host', ''), 'port': str(connection.get('port', '')),
-            'access_token': connection.get('access_token', '') or '',
+            'host': raw_host, 'port': str(raw_port),
+            'access_token': raw_token or '',
             'platform_sdk': sdk, 'platform_platform': platform, 'platform_model': model,
         })
-        if not fields['id'] or not fields['host'] or fields['port'] == '' or not fields['access_token']:
-            raise ValueError('请填写账号、主机和端口等必要字段')
-        try:
-            port = int(fields['port'])
-        except (ValueError, TypeError) as error:
-            raise ValueError('端口或 intents 必须为整数') from error
-        is_intents = model.endswith('intents') or (sdk == 'mhyVila_link' and model == 'sandbox')
-        if port < 0 or (not is_intents and port > 65535):
-            raise ValueError('端口应在 0–65535 之间')
-        account_id = fields['id']
-        try:
-            account_id = int(account_id)
-        except ValueError:
-            pass
+    except (AttributeError, UnicodeError) as error:
+        raise ValueError('账号字段格式无效') from error
+    if (previous is None or replacing) and MASK in fields.values():
+        raise ValueError('新增账号不能使用脱敏占位符')
+    if (fields['id'] == '' or (isinstance(fields['id'], str) and not fields['id'].strip())
+            or not fields['host'] or fields['port'] == '' or not fields['access_token']):
+        raise ValueError('请填写账号、主机和端口等必要字段')
+    try:
+        port = int(fields['port'])
+    except (ValueError, TypeError) as error:
+        raise ValueError('端口或 intents 必须为整数') from error
+    is_intents = model.endswith('intents') or (sdk == 'mhyVila_link' and model == 'sandbox')
+    if port < 0 or (not is_intents and port > 65535):
+        raise ValueError('端口应在 0–65535 之间')
+    account_id = fields['id']
+    try:
+        account_id = int(account_id)
+    except ValueError:
+        pass
+    try:
         bot = OlivOS.API.bot_info_T(
             id=account_id, password=fields['password'],
             server_auto=connection.get('auto', False), server_type=connection['type'],
             host=fields['host'], port=port, access_token=fields['access_token'],
             platform_sdk=sdk, platform_platform=platform, platform_model=model,
         )
-        bot.extends = row.get('extends', {})
-        if not isinstance(bot.extends, dict):
-            raise ValueError('extends 必须为 JSON 对象')
-        qsign = bot.extends.get('qsign-server', [])
-        if not isinstance(qsign, list) or len(qsign) > 10 or any(
-            not isinstance(item, dict) or not all(isinstance(item.get(key, ''), str) for key in ('addr', 'key'))
-            for item in qsign
+    except UnicodeError as error:
+        raise ValueError('账号 ID 格式无效') from error
+    bot.extends = row.get('extends', {})
+    if not isinstance(bot.extends, dict):
+        raise ValueError('extends 必须为 JSON 对象')
+    qsign = bot.extends.get('qsign-server', [])
+    if not isinstance(qsign, list) or len(qsign) > 10 or any(
+        not isinstance(item, dict) or not all(isinstance(item.get(key, ''), str) for key in ('addr', 'key'))
+        for item in qsign
+    ):
+        raise ValueError('签名服务器必须为不超过 10 项的地址与 KEY 列表')
+    bot.enable, bot.debug_mode = row.get('enable', True), row.get('debug', False)
+    errors = OlivOS.accountAPI._validate_account_config(account_dict(bot))
+    if errors:
+        if old is not None and not replacing and (sdk, platform, model) == tuple(
+            old.platform[key] for key in ('sdk', 'platform', 'model')
         ):
-            raise ValueError('签名服务器必须为不超过 10 项的地址与 KEY 列表')
-        bot.enable, bot.debug_mode = row.get('enable', True), row.get('debug', False)
+            errors = [
+                (field, reason) for field, reason in errors
+                if field not in ('platform_type', 'sdk_type', 'model_type')
+            ]
+        if errors:
+            field, reason = errors[0]
+            raise ValueError(f'{field}：{reason}' if field else reason)
+    return bot
+
+
+def parse_accounts(body, previous):
+    if not isinstance(body, dict) or not isinstance(body.get('account'), list):
+        raise ValueError('请求必须包含 account 数组')
+    replace_hashes = body.get('replace_hashes', [])
+    if not isinstance(replace_hashes, list) or not all(isinstance(key, str) for key in replace_hashes):
+        raise ValueError('replace_hashes 必须为字符串数组')
+    replace_hashes = set(replace_hashes)
+    result = {}
+    hierarchy = account_schema()['hierarchy']
+    for row in body['account']:
+        bot = _parse_account_row(row, previous, hierarchy, replace_hashes)
         if bot.hash in result:
             raise ValueError('同一 SDK 和平台不能添加重复账号 ID')
         result[bot.hash] = bot
     return result
+
+
+def _strip_import_metadata(row):
+    if not isinstance(row, dict):
+        return row
+    # 外部文件不能引用本机已有账号或签名服务器的凭据。
+    row = {key: value for key, value in row.items() if key != 'hash'}
+    extends = row.get('extends')
+    if isinstance(extends, dict) and isinstance(extends.get('qsign-server'), list):
+        row['extends'] = extends.copy()
+        row['extends']['qsign-server'] = [
+            {key: value for key, value in item.items() if key != '_source_index'}
+            if isinstance(item, dict) else item for item in extends['qsign-server']
+        ]
+    return row
+
+
+def preview_import_accounts(payload):
+    if isinstance(payload, dict) and 'payload' in payload:
+        payload = payload['payload']
+    if isinstance(payload, dict):
+        rows = payload.get('account', [payload])
+    else:
+        rows = payload
+    if not isinstance(rows, list) or not rows:
+        raise ValueError('导入内容必须为账号对象或非空账号数组')
+
+    hierarchy = account_schema()['hierarchy']
+    items, last_valid = [], {}
+    for source_index, row in enumerate(rows):
+        item = {'source_index': source_index, 'valid': False, 'key': None, 'account': None, 'error': None}
+        try:
+            bot = _parse_account_row(_strip_import_metadata(row), None, hierarchy)
+            account = dict(account_dict(bot), id=str(bot.id))
+        except ValueError as error:
+            item['error'] = str(error)
+        except RecursionError:
+            item['error'] = '账号字段嵌套过深'
+        else:
+            item.update(valid=True, key=bot.hash, account=account)
+            last_valid[bot.hash] = source_index
+        items.append(item)
+    retained = [item for item in items if not item['valid'] or last_valid[item['key']] == item['source_index']]
+    return {'items': retained, 'batch_duplicates': len(items) - len(retained)}
 
 
 def parse_log_levels(value):
@@ -758,6 +850,14 @@ def register_routes(host):
             parse_accounts(body, load_accounts(host))
         result, code = host.submit_accounts(body)
         return jsonify(result), code
+
+    @app.post('/api/accounts/import/preview')
+    def account_import_preview():
+        try:
+            payload = request.get_json(silent=True)
+        except RecursionError as error:
+            raise ValueError('导入 JSON 嵌套过深') from error
+        return jsonify(preview_import_accounts(payload))
 
     @app.post('/api/accounts/qqguild/qr-bind')
     def qr_bind_create():
