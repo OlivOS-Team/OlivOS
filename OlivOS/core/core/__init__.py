@@ -22,5 +22,6 @@ from . import (
     diagnoseAPI,
     messageAPI,
     metadataAPI,
+    opkAPI,
     pluginAPI,
 )

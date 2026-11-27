@@ -132,6 +132,7 @@ const state = {
   pluginReload: null,
   pluginListGeneration: 0,
   pluginEventChain: Promise.resolve(),
+  opk: newOpkDraft(),
 };
 const titles = {
   dashboard: '仪表盘',
@@ -195,7 +196,7 @@ async function api(path, options = {}, discardObsolete = null) {
   const generation = state.authGeneration;
   const { authMessage, jsonText, ...requestOptions } = options;
   const headers = { 'X-Auth-Token': state.token, ...requestOptions.headers };
-  if (jsonText !== undefined || requestOptions.body !== undefined) {
+  if (jsonText !== undefined || (requestOptions.body !== undefined && !(requestOptions.body instanceof FormData))) {
     headers['Content-Type'] = 'application/json';
     requestOptions.body = jsonText ?? JSON.stringify(requestOptions.body);
   }
@@ -228,6 +229,7 @@ async function api(path, options = {}, discardObsolete = null) {
     const error = new Error(message);
     error.status = response.status;
     error.code = data.code;
+    error.data = data;
     error.authHandled = authHandled;
     throw error;
   }
@@ -606,6 +608,11 @@ function resetLogin(message = '') {
   state.pages = [];
   state.pluginReload = null;
   state.pluginListGeneration++;
+  state.opk = newOpkDraft();
+  $('plugin-files').hidden = true;
+  $('manage-plugin-files').setAttribute('aria-expanded', 'false');
+  renderOpkFiles();
+  renderOpkBatch();
   state.scheduleSettings = null;
   state.scheduleRequest++;
   state.scheduleSaving = false;
@@ -768,7 +775,7 @@ async function navigate(page) {
     if (!state.dirty) await loadAccounts();
     await refreshStatus();
   }
-  if (page === 'plugins') await Promise.all([loadPlugins(), loadTkBridgeSettings(), loadScheduleSettings()]);
+  if (page === 'plugins') await Promise.all([loadPlugins(), loadOpkFiles(), loadTkBridgeSettings(), loadScheduleSettings()]);
   if (page === 'logs') await openLogs();
   if (page === 'terminals') {
     await loadTerminals();
@@ -4474,6 +4481,577 @@ async function loadPlugins() {
   renderPluginNavigation();
   return result;
 }
+function newOpkDraft() {
+  return {
+    inventory: null, request: 0, loadError: '', filter: '*', selected: new Set(),
+    uploads: new Map(), deletes: new Set(), feedback: [], errors: [], itemErrors: {},
+    plan: null, busy: false,
+  };
+}
+
+function opkDir(path) {
+  return path ? `plugin/app/${path}` : 'plugin/app（根目录）';
+}
+
+function opkVersion(item) {
+  return `${item.version ?? '—'} / SVN ${item.svn ?? '—'}`;
+}
+
+function opkMessages(messages, className = '') {
+  const list = element('ul', null, { class: `opk-messages ${className}` });
+  for (const message of messages) list.append(element('li', message));
+  return list;
+}
+
+async function loadOpkFiles() {
+  const draft = state.opk;
+  const request = ++draft.request;
+  try {
+    const inventory = await api('/api/plugins/files');
+    if (draft !== state.opk || request !== draft.request) return false;
+    if (draft.plan && draft.plan.body.revision !== inventory.revision) {
+      draft.plan = null;
+      draft.errors = ['插件文件清单已变化，请重新校验并审阅预览。'];
+    }
+    draft.inventory = inventory;
+    draft.loadError = '';
+    const uploads = new Map();
+    for (const summary of inventory.staged) {
+      const existing = draft.uploads.get(summary.upload_id);
+      uploads.set(summary.upload_id, existing ? { ...existing, summary } : { summary, target: summary.target_dir });
+    }
+    draft.uploads = uploads;
+    const live = new Set(inventory.opks.map((item) => item.path));
+    draft.selected = new Set([...draft.selected].filter((path) => live.has(path)));
+    if (draft.filter !== '*' && draft.filter !== '' && !inventory.folders.some((dir) => dir.path === draft.filter)) {
+      draft.filter = '*';
+    }
+    return true;
+  } catch (error) {
+    if (draft === state.opk && request === draft.request && !error.authHandled && !error.authObsolete) {
+      draft.loadError = `无法读取插件文件：${error.message}`;
+    }
+    return false;
+  } finally {
+    if (draft === state.opk && request === draft.request) {
+      renderOpkFiles();
+      renderOpkBatch();
+    }
+  }
+}
+
+function opkSourceDirs(inventory) {
+  return new Set((inventory?.source_plugins || []).map((item) => item.path));
+}
+
+function opkFolderOptions(select, target, inventory, filter) {
+  const sources = opkSourceDirs(inventory);
+  const paths = new Set(['', ...(inventory?.folders || []).map((folder) => folder.path), ...sources]);
+  if (filter) select.append(element('option', '所有目录', { value: '*' }));
+  if (target !== '*' && !paths.has(target)) {
+    select.append(element('option', `${opkDir(target)} — 目录不可用`, { value: target, disabled: '' }));
+  }
+  for (const path of paths) {
+    const source = sources.has(path);
+    const label = opkDir(path) + (source ? ' — 源码目录，不可操作' : '');
+    const option = element('option', label, { value: path });
+    option.disabled = source;
+    select.append(option);
+  }
+  select.value = target;
+}
+
+function renderOpkDuplicates(groups) {
+  $('plugin-file-duplicates').hidden = !groups.length;
+  const container = $('opk-duplicate-groups');
+  container.replaceChildren();
+  for (const group of groups) {
+    const section = element('div', null, { class: 'opk-duplicate-group' });
+    section.append(element('strong', group.namespaces.join(' / ')));
+    if (group.has_case_conflict) section.append(' · 命名空间大小写冲突');
+    for (const item of group.items) {
+      const line = element('div', null, { class: 'opk-duplicate-entry' });
+      line.append(element('code', item.path, { class: 'opk-file-path' }),
+        element('span', item.is_opk ? 'OPK' : '源码插件', { class: item.is_opk ? 'opk-badge' : 'opk-badge muted' }),
+        element('span', `${item.namespace} · ${opkVersion(item)}`));
+      if (item.loaded || item.path === group.active_path) {
+        line.append(element('span', '当前正在加载', { class: 'opk-badge' }));
+      }
+      const others = group.items.filter((entry) => entry.is_opk && entry.path !== item.path);
+      if (others.length) {
+        const keep = button('保留此份', () => {
+          if (state.opk.busy) return;
+          state.opk.deletes.delete(item.path);
+          queueOpkDeletes(others.map((entry) => entry.path));
+          return openOpkBatch();
+        });
+        keep.setAttribute('aria-label', `保留此份：${item.path}`);
+        line.append(keep);
+      }
+      section.append(line);
+    }
+    container.append(section);
+  }
+}
+
+function selectedOpks() {
+  const draft = state.opk;
+  return (draft.inventory?.opks || []).filter((item) => draft.selected.has(item.path) &&
+    !draft.deletes.has(item.path) && (draft.filter === '*' || item.parent_dir === draft.filter));
+}
+
+function renderOpkSelection() {
+  const draft = state.opk;
+  const count = selectedOpks().length;
+  $('plugin-files-delete-selected').disabled = !count || draft.busy;
+  $('plugin-files-delete-selected').textContent = count ? `删除所选 OPK（${count}）` : '删除所选 OPK';
+}
+
+function renderOpkFiles() {
+  const draft = state.opk;
+  const inventory = draft.inventory;
+  $('plugin-files-pending').hidden = !inventory?.reload_required;
+  $('plugin-files-review').textContent = `查看待执行变更 (${draft.uploads.size + draft.deletes.size})`;
+  renderOpkDuplicates(inventory?.duplicates || []);
+  const filter = $('plugin-files-filter');
+  filter.replaceChildren();
+  opkFolderOptions(filter, draft.filter, inventory, true);
+  filter.disabled = !inventory;
+  const sources = $('plugin-files-sources');
+  sources.replaceChildren();
+  for (const source of inventory?.source_plugins || []) {
+    if (draft.filter !== '*' && source.parent_dir !== draft.filter) continue;
+    const entry = element('div', null, { class: 'opk-source' });
+    entry.append(element('span', '源码插件', { class: 'opk-badge muted' }), ' ',
+      element('code', source.path), ' · 不可上传到此处或通过 WebUI 删除');
+    sources.append(entry);
+  }
+  const rows = $('plugin-file-rows');
+  rows.replaceChildren();
+  const files = (inventory?.opks || []).filter((item) => draft.filter === '*' || item.parent_dir === draft.filter);
+  $('plugin-files-table').hidden = !files.length;
+  $('plugin-files-status').textContent = draft.loadError || (!inventory ? '正在读取插件文件…' :
+    files.length ? `${files.length} 个 OPK 文件` : '当前位置没有 OPK 文件。');
+  for (const item of files) {
+    const row = element('tr');
+    const selectCell = element('td');
+    const select = element('input', null, { type: 'checkbox', 'aria-label': `选择 ${item.path}` });
+    const queued = draft.deletes.has(item.path);
+    select.disabled = queued || draft.busy;
+    select.checked = !queued && draft.selected.has(item.path);
+    select.onchange = () => {
+      if (select.checked) draft.selected.add(item.path);
+      else draft.selected.delete(item.path);
+      renderOpkSelection();
+    };
+    selectCell.append(select);
+    const identity = element('td', item.name || '—');
+    identity.append(element('code', item.path, { class: 'opk-file-path' }));
+    const status = element('td');
+    const states = [item.loaded ? '当前已加载' : '未加载'];
+    if (queued) states.push('待删除');
+    if (item.nested) states.push(item.nested === 'opk' ? '内嵌 OPK' : '目录嵌套');
+    if (item.bom_error) states.push('app.json 含 UTF-8 BOM');
+    if (item.parse_error) states.push(`解析失败：${item.parse_error}`);
+    status.className = 'opk-file-status';
+    for (const label of states) status.append(element('span', label, { class: 'opk-badge' }));
+    const action = element('td');
+    const remove = button('加入删除草稿', () => queueOpkDeletes([item.path]));
+    remove.disabled = queued || draft.busy;
+    action.append(remove);
+    row.append(selectCell, identity, element('td', item.namespace || '—'), element('td', opkVersion(item)), status, action);
+    rows.append(row);
+  }
+  renderOpkSelection();
+}
+
+function invalidateOpkPlan(draft) {
+  draft.plan = null;
+  draft.errors = [];
+  draft.itemErrors = {};
+}
+
+function queueOpkDeletes(paths) {
+  const draft = state.opk;
+  if (draft.busy) return;
+  for (const path of paths) {
+    draft.deletes.add(path);
+    draft.selected.delete(path);
+  }
+  invalidateOpkPlan(draft);
+  renderOpkFiles();
+  renderOpkBatch();
+}
+
+function opkPreset(draft) {
+  return draft.filter === '*' ? '' : draft.filter;
+}
+
+function opkPlacements(item, inventory) {
+  const summary = item.summary;
+  const namespace = summary.namespace;
+  const existing = (inventory ? inventory.opks : summary.existing_opks).filter((opk) => namespace &&
+    opk.namespace === namespace);
+  const directories = [...new Set([item.target, ...existing.map((opk) => opk.parent_dir)])];
+  return { existing, directories };
+}
+
+function opkLivePlacementErrors(item, inventory) {
+  const { summary } = item;
+  if (!inventory) return item.target === summary.target_dir ? summary.errors : summary.validation_errors || [];
+  const errors = [...(summary.validation_errors || [])];
+  const folders = new Set((inventory.folders || []).map((dir) => dir.path));
+  if (!folders.has(item.target)) {
+    errors.push('上传目标必须是现有分类目录，不能选择源码插件目录或链接');
+  }
+  const namespace = summary.namespace;
+  if (!namespace) return errors;
+  const folded = namespace.toLowerCase();
+  const targetName = `${namespace}.opk`.toLowerCase();
+  for (const source of inventory.source_plugins || []) {
+    const path = source.path || 'plugin/app';
+    if (source.namespace?.toLowerCase() === folded && source.namespace !== namespace) {
+      errors.push(`${namespace} 与现有插件 ${source.namespace}（${path}）大小写冲突；namespace 和文件名必须与现有插件大小写完全一致`);
+    }
+    if (source.namespace === namespace) {
+      errors.push(`已存在同 namespace 的源码插件：${path}`);
+    }
+  }
+  for (const opk of inventory.opks || []) {
+    const stem = opk.filename ? opk.filename.slice(0, -4) : '';
+    const clashes = [opk.namespace, stem].filter((name) => name && name.toLowerCase() === folded && name !== namespace);
+    if (clashes.length) {
+      errors.push(`${namespace} 与现有插件 ${[...new Set(clashes)].join(' / ')}（${opk.path}）大小写冲突；namespace 和文件名必须与现有插件大小写完全一致`);
+    } else if (opk.namespace !== namespace && opk.parent_dir === item.target && opk.filename?.toLowerCase() === targetName) {
+      errors.push(`目标位置已被不同 namespace 的 OPK 占用：${opk.path}（${opk.namespace}）`);
+    }
+  }
+  return errors;
+}
+
+function editOpkItem(draft, card, control, change) {
+  change();
+  invalidateOpkPlan(draft);
+  const controls = 'select, input, button';
+  const position = [...card.querySelectorAll(controls)].indexOf(control);
+  renderOpkBatch();
+  document.getElementById(card.id)?.querySelectorAll(controls)[position]?.focus({ preventScroll: true });
+}
+
+function renderOpkUpload(item, draft, index) {
+  const { summary } = item;
+  const card = element('section', null, { class: 'opk-card', id: `opk-upload-${index}` });
+  card.append(element('h3', summary.filename),
+    element('p', `${summary.name || '—'} · ${summary.namespace || '—'} · ${opkVersion(summary)}`));
+  if (summary.nested) card.append(element('p',
+    `${summary.nested === 'opk' ? '内嵌 OPK' : '目录嵌套'}：提交时重建为标准 OPK。`));
+  if (summary.bom_error) card.append(element('p', 'app.json 含 UTF-8 BOM，请改为无 BOM 的 UTF-8 后重新上传。',
+    { class: 'opk-errors' }));
+  if (summary.warnings.length) card.append(opkMessages(summary.warnings));
+  const errors = [...new Set([...opkLivePlacementErrors(item, draft.inventory),
+    ...(draft.itemErrors[summary.upload_id] || [])])];
+  if (errors.length) {
+    card.classList.add('has-errors');
+    card.append(opkMessages(errors, 'opk-errors'));
+  }
+  const label = element('label', '上传目录');
+  const target = element('select');
+  opkFolderOptions(target, item.target, draft.inventory, false);
+  target.disabled = draft.busy;
+  target.onchange = () => editOpkItem(draft, card, target, () => {
+    item.target = target.value;
+    item.keep = undefined;
+  });
+  label.append(target);
+  card.append(label);
+  const { existing, directories } = opkPlacements(item, draft.inventory);
+  if (!errors.length && directories.length > 1) {
+    const choices = element('fieldset');
+    choices.disabled = draft.busy;
+    choices.append(element('legend', '同一插件已有安装：选择最终保留目录'));
+    for (const dir of directories) {
+      const choice = element('label', null, { class: 'check' });
+      const radio = element('input', null, { type: 'radio', name: `opk-keep-${index}`, value: dir });
+      radio.checked = item.keep === dir;
+      const destPath = dir ? `${dir}/${summary.namespace}.opk` : `${summary.namespace}.opk`;
+      const overwrites = existing.filter((opk) => opk.parent_dir === dir &&
+        opk.path.toLowerCase() === destPath.toLowerCase()).map((opk) => opk.path);
+      const deletes = existing.filter((opk) => !overwrites.includes(opk.path)).map((opk) => opk.path);
+      const effect = [opkDir(dir), ...overwrites.map((path) => `覆盖 ${path}`), ...deletes.map((path) => `删除 ${path}`)];
+      radio.onchange = () => editOpkItem(draft, card, radio, () => {
+        item.keep = dir;
+      });
+      choice.append(radio, element('span', effect.join(' · ')));
+      choices.append(choice);
+    }
+    card.append(choices);
+  } else if (!errors.length && existing.length) {
+    const destPath = item.target ? `${item.target}/${summary.namespace}.opk` : `${summary.namespace}.opk`;
+    for (const opk of existing) {
+      const verb = opk.path.toLowerCase() === destPath.toLowerCase() ? '将覆盖' : '将删除同命名空间旧副本';
+      card.append(element('p', `${verb} ${opk.path}（${opkVersion(opk)}）`));
+    }
+  }
+  if (summary.binary_warnings.length) {
+    const details = element('details', null, { class: 'opk-binary-warning', open: '' });
+    details.append(element('summary', `安全警告：包含 ${summary.binary_warnings.length} 个二进制文件或脚本`),
+      opkMessages(summary.binary_warnings));
+    const ack = element('label', null, { class: 'check' });
+    const check = element('input', null, { type: 'checkbox' });
+    check.checked = !!item.confirmBinaries;
+    check.disabled = draft.busy;
+    check.onchange = () => editOpkItem(draft, card, check, () => {
+      item.confirmBinaries = check.checked;
+    });
+    ack.append(check, '我已了解风险，确认安装包含二进制文件的插件');
+    card.append(details, ack);
+  }
+  const cancel = button('取消上传', () => discardOpkUploads(summary.upload_id));
+  cancel.disabled = draft.busy;
+  card.append(cancel);
+  return card;
+}
+
+function renderOpkBatch() {
+  const draft = state.opk;
+  const items = $('plugin-batch-items');
+  const count = draft.uploads.size + draft.deletes.size;
+  $('plugin-batch-location').textContent = `新上传默认放入 ${opkDir(opkPreset(draft))}。关闭弹窗不会清空草稿。`;
+  $('plugin-batch-input').disabled = draft.busy;
+  $('plugin-batch-clear').disabled = draft.busy || !count;
+  $('plugin-batch-validate').disabled = draft.busy || !count;
+  $('plugin-batch-validate').classList.toggle('primary', !draft.plan);
+  $('plugin-batch-validate').textContent = draft.plan
+    ? '重新预检'
+    : `确认执行（上传 ${draft.uploads.size} / 删除 ${draft.deletes.size}）`;
+  const feedback = $('plugin-batch-feedback');
+  feedback.replaceChildren();
+  if (draft.busy) feedback.append(element('p', '正在处理…'));
+  if (draft.feedback.length) feedback.append(opkMessages(draft.feedback));
+  items.replaceChildren();
+  if (draft.uploads.size) {
+    const uploads = element('section', null, { 'aria-labelledby': 'opk-uploads-title' });
+    uploads.append(element('h3', '待上传 .opk', { id: 'opk-uploads-title' }),
+      ...[...draft.uploads.values()].map((item, index) => renderOpkUpload(item, draft, index)));
+    items.append(uploads);
+  }
+  const deletes = element('section', null, { 'aria-labelledby': 'opk-deletes-title' });
+  deletes.append(element('h3', '待删除 .opk', { id: 'opk-deletes-title' }));
+  if (draft.deletes.size) items.append(deletes);
+  for (const path of draft.deletes) {
+    const card = element('section', null, { class: 'opk-card' });
+    const item = draft.inventory?.opks.find((opk) => opk.path === path);
+    card.append(element('h3', item ? `${item.name || item.filename} · ${opkVersion(item)}` : '待删除 OPK'),
+      element('code', path, { class: 'opk-file-path' }));
+    const errors = draft.itemErrors[path] || [];
+    if (errors.length) {
+      card.classList.add('has-errors');
+      card.append(opkMessages(errors, 'opk-errors'));
+    }
+    const undo = button('撤销删除', () => {
+      draft.deletes.delete(path);
+      invalidateOpkPlan(draft);
+      renderOpkFiles();
+      renderOpkBatch();
+      $('plugin-batch-input').focus();
+    });
+    undo.disabled = draft.busy;
+    card.append(undo);
+    deletes.append(card);
+  }
+  if (!count) items.append(element('p', '草稿中没有变更。', { class: 'hint' }));
+  renderOpkReview();
+}
+
+function renderOpkReview() {
+  const draft = state.opk;
+  const errors = $('plugin-batch-errors');
+  errors.replaceChildren();
+  const messages = [...(draft.loadError ? [draft.loadError] : []), ...draft.errors];
+  if (messages.length) errors.append(opkMessages(messages, 'opk-errors'));
+  const preview = $('plugin-batch-plan');
+  const confirm = $('plugin-batch-confirm');
+  confirm.disabled = draft.busy;
+  confirm.hidden = preview.hidden = !draft.plan;
+  preview.replaceChildren();
+  if (!draft.plan) return;
+  preview.append(element('h3', '最终变更预览', { id: 'plugin-batch-plan-title' }),
+    element('p', '确认后将修改磁盘文件；需另行重载插件才能生效。'));
+  for (const [key, title] of Object.entries({
+    will_write: '写入', will_overwrite: '覆盖', will_delete: '删除', will_dedup_delete: '去重删除', warnings: '警告',
+  })) {
+    const paths = draft.plan.plan[key];
+    if (paths.length) preview.append(element('strong', `${title}（${paths.length}）`), opkMessages(paths));
+  }
+}
+
+async function openOpkBatch() {
+  const dialog = $('plugin-batch-dialog');
+  if (!dialog.open) {
+    renderOpkBatch();
+    dialog.showModal();
+  }
+  await loadOpkFiles();
+}
+
+async function withOpkBatch(action) {
+  const draft = state.opk;
+  if (draft.busy) return;
+  draft.busy = true;
+  renderOpkBatch();
+  try {
+    await action(draft);
+  } catch (error) {
+    if (draft === state.opk && !error.authHandled && !error.authObsolete) draft.errors = [error.message];
+  } finally {
+    if (draft === state.opk) {
+      draft.busy = false;
+      renderOpkFiles();
+      renderOpkBatch();
+    }
+  }
+}
+
+const opkStagePath = '/api/plugins/upload/stage';
+
+function stageOpkFiles(files) {
+  if (!files.length) return;
+  return withOpkBatch(async (draft) => {
+    invalidateOpkPlan(draft);
+    const accepted = [...files].filter((file) => /\.opk$/i.test(file.name));
+    draft.feedback = [...files].filter((file) => !/\.opk$/i.test(file.name))
+      .map((file) => `${file.name}：只接受 .opk 文件`);
+    renderOpkBatch();
+    for (const file of accepted) {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('target_dir', opkPreset(draft));
+      try {
+        const summary = await api(opkStagePath, { method: 'POST', body: form });
+        draft.uploads.set(summary.upload_id, { summary, target: summary.target_dir });
+      } catch (error) {
+        if (error.authHandled || error.authObsolete) return;
+        draft.feedback.push(`${file.name}：${error.message}`);
+      }
+      renderOpkBatch();
+    }
+    if (accepted.length) await loadOpkFiles();
+  });
+}
+
+function discardOpkUploads(id) {
+  return withOpkBatch(async (draft) => {
+    invalidateOpkPlan(draft);
+    try {
+      await api(id ? `${opkStagePath}/${encodeURIComponent(id)}` : opkStagePath, { method: 'DELETE' });
+    } catch (error) {
+      if (error.status !== 404 || !id) throw error;
+    }
+    if (id) draft.uploads.delete(id);
+    else {
+      draft.uploads.clear();
+      draft.deletes.clear();
+      draft.feedback = [];
+    }
+    await loadOpkFiles();
+  });
+}
+
+function reviewOpkBatch(commit) {
+  return withOpkBatch(async (draft) => {
+    if ((!draft.inventory || draft.loadError) && !await loadOpkFiles()) return;
+    if (commit && !draft.plan) return;
+    const body = commit ? draft.plan.body : {
+      revision: draft.inventory.revision,
+      uploads: [...draft.uploads.values()].map((item) => ({
+        upload_id: item.summary.upload_id,
+        target_dir: item.target,
+        keep_dir: item.keep,
+        confirm_binaries: !!item.confirmBinaries,
+      })),
+      deletes: [...draft.deletes],
+    };
+    invalidateOpkPlan(draft);
+    let result;
+    try {
+      result = await api(`/api/plugins/batch/${commit ? 'commit' : 'validate'}`, { method: 'POST', body });
+    } catch (error) {
+      if (error.authHandled || error.authObsolete) return;
+      if (error.status === 409 && error.data?.conflict) {
+        const refreshed = await loadOpkFiles();
+        if (draft === state.opk) draft.errors = [refreshed
+          ? '文件清单已刷新。请检查草稿，重新校验并审阅预览。'
+          : '文件清单已变化。请刷新后重新校验并审阅预览。'];
+        return;
+      }
+      if (!error.data) throw error;
+      result = error.data;
+    }
+    if (!result.ok) {
+      draft.itemErrors = result.item_errors || {};
+      if (!result.applied) {
+        draft.errors = result.errors?.length ? result.errors : [result.error || '批次未通过，请检查标记的项目。'];
+        return;
+      }
+      draft.errors = result.error ? [result.error] : ['部分变更执行失败，请检查下方详情：'];
+      for (const item of result.applied) {
+        if (item.ok && item.action === 'write') draft.uploads.delete(item.upload_id);
+        if (item.ok && item.action === 'delete') draft.deletes.delete(item.path);
+        if (!item.ok) draft.errors.push(`${item.path}：${item.error || '操作失败'}`);
+      }
+    } else if (commit) {
+      draft.uploads.clear();
+      draft.deletes.clear();
+      draft.feedback = [];
+    } else {
+      draft.plan = { body, plan: result.plan };
+      return;
+    }
+    if (typeof result.reload_required === 'boolean') draft.inventory.reload_required = result.reload_required;
+    await loadOpkFiles();
+    if (draft === state.opk && result.ok) {
+      $('plugin-batch-dialog').close();
+      notify('插件文件变更已提交。');
+    }
+  }).then(() => {
+    if ($('plugin-batch-dialog').open && state.opk.plan) $('plugin-batch-plan').focus();
+  });
+}
+bind('manage-plugin-files', async () => {
+  const panel = $('plugin-files');
+  const open = panel.hidden;
+  panel.hidden = !open;
+  $('manage-plugin-files').setAttribute('aria-expanded', String(open));
+  if (open) await loadOpkFiles();
+});
+bind('upload-plugin', () => openOpkBatch());
+bind('plugin-files-review', () => openOpkBatch());
+bind('reload-plugin-files', () => runAction('reload', '/api/plugins/reload', '正在重载插件…'));
+bind('plugin-files-filter', () => {
+  state.opk.filter = $('plugin-files-filter').value;
+  renderOpkFiles();
+}, 'change');
+bind('plugin-files-delete-selected', () => queueOpkDeletes(selectedOpks().map((item) => item.path)));
+bind('plugin-batch-input', (event) => {
+  const files = [...event.target.files];
+  event.target.value = '';
+  return stageOpkFiles(files);
+}, 'change');
+bind('plugin-batch-validate', () => reviewOpkBatch(false));
+bind('plugin-batch-confirm', () => reviewOpkBatch(true));
+bind('plugin-batch-clear', () => discardOpkUploads());
+bind('plugin-batch-drop', (event) => {
+  event.preventDefault();
+  $('plugin-batch-drop').classList.remove('dragging');
+  return stageOpkFiles(event.dataTransfer?.files || []);
+}, 'drop');
+bind('plugin-batch-drop', (event) => {
+  event.preventDefault();
+  $('plugin-batch-drop').classList.add('dragging');
+}, 'dragover');
+bind('plugin-batch-drop', () => $('plugin-batch-drop').classList.remove('dragging'), 'dragleave');
+
+
 function scheduleTimezoneLabel(zone) {
   if (!zone) return '未知';
   if (zone === 'UTC') return '协调世界时';
@@ -4808,7 +5386,7 @@ async function restorePluginsAfterReload(reloaded = true) {
   const active = pending?.active ?? pluginPageRestoreTarget();
   const hadFrames = pending?.hadFrames || state.frames.size > 0;
   if (state.frames.size) destroyFrames();
-  await loadPlugins();
+  await Promise.all([loadPlugins(), reloaded ? loadOpkFiles() : null]);
   if (active && navigation === state.navigationGeneration && state.page === 'plugin-page') {
     const page = state.pages.find((entry) => embeddedPluginPage(entry) &&
       entry.namespace === active.namespace && entry.path === active.path);
@@ -5405,7 +5983,7 @@ window.addEventListener('message', async (ev) => {
 });
 // 同一个操作在插件页和仪表盘各有一个按钮，禁用状态必须同步。
 function actionButtons(kind) {
-  return kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins'] : ['check-update'];
+  return kind === 'reload' ? ['reload-plugins', 'dashboard-reload-plugins', 'reload-plugin-files'] : ['check-update'];
 }
 function clearAction(kind) {
   clearTimeout(state.actions[kind]?.timer);

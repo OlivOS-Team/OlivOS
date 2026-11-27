@@ -33,7 +33,7 @@ from flask import abort, g, jsonify, request, send_file, send_from_directory
 
 import OlivOS
 
-from . import resourceAPI, tkBridgeAPI
+from . import pluginFileAPI, resourceAPI, tkBridgeAPI
 
 MASK = '********'
 # 轮询与上报类协议没有长连接，超过该时间未收到活动即视为离线。
@@ -951,6 +951,8 @@ def register_routes(host):
                 'shallow_plugin_data_dict': host.plugins,
                 'shallow_plugin_order_list': host.plugin_order,
                 'shallow_plugin_priority_dict': host.plugin_priority,
+                'shallow_plugin_source_dict': host.plugin_sources,
+                'shallow_plugin_shadowed_list': host.plugin_shadowed,
                 'shallow_plugin_webui_list': host.plugin_pages,
                 'revision': plugin_priority_revision(document) if document is not None else None,
                 'priority_error': error,
@@ -982,6 +984,7 @@ def register_routes(host):
         return jsonify(settings=settings, active=active, choices=OlivOS.scheduleAPI.timezone_choices())
 
     tkBridgeAPI.register_routes(host)
+    pluginFileAPI.register_routes(host)
 
     @app.put('/api/plugins/priority')
     def plugin_priority():

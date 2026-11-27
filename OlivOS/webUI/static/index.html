@@ -841,6 +841,8 @@
         </section>
         <section id="plugins" class="page" hidden>
           <div class="toolbar plugin-toolbar">
+            <button id="upload-plugin" class="primary">上传插件 (.opk)</button>
+            <button id="manage-plugin-files" aria-expanded="false" aria-controls="plugin-files">插件文件管理</button>
             <button id="toggle-path">显示路径</button>
             <button id="open-plugin-folder">打开插件文件夹</button>
             <button id="reload-plugins" class="primary">重载插件</button>
@@ -852,6 +854,32 @@
               <button id="plugin-schedule-save" type="submit" disabled>保存时区</button>
             </form>
           </div>
+          <div id="plugin-files-pending" class="opk-callout opk-pending" hidden>
+            <strong role="status">插件文件已变更，点击重载插件以生效</strong>
+            <button id="reload-plugin-files" class="primary">立即重载插件</button>
+          </div>
+          <section id="plugin-file-duplicates" class="opk-callout" aria-labelledby="opk-duplicates-title" hidden>
+            <h2 id="opk-duplicates-title">检测到重复插件</h2>
+            <p>同一命名空间的多份文件可能互相覆盖。选择「保留此份」只会将其它 OPK 加入删除草稿，源码目录不可删除。</p>
+            <div id="opk-duplicate-groups"></div>
+          </section>
+          <section id="plugin-files" class="panel opk-management" aria-labelledby="plugin-files-title" hidden>
+            <h2 id="plugin-files-title">插件文件管理</h2>
+            <div class="toolbar opk-toolbar">
+              <label for="plugin-files-filter">目录</label>
+              <select id="plugin-files-filter"></select>
+              <button id="plugin-files-delete-selected" type="button" disabled>删除所选 OPK</button>
+              <button id="plugin-files-review" type="button" class="primary">查看待执行变更 (0)</button>
+            </div>
+            <p id="plugin-files-status" class="hint" role="status"></p>
+            <div id="plugin-files-sources" class="opk-sources"></div>
+            <div class="table-wrap" id="plugin-files-table" hidden>
+              <table>
+                <thead><tr><th scope="col">选择</th><th scope="col">路径 / 名称</th><th scope="col">命名空间</th><th scope="col">版本 / SVN</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+                <tbody id="plugin-file-rows"></tbody>
+              </table>
+            </div>
+          </section>
           <p class="hint plugin-schedule-status" id="plugin-schedule-status" role="status">正在读取时区设置…</p>
           <section id="tk-bridge-panel" aria-labelledby="tk-bridge-heading" hidden>
             <h2 id="tk-bridge-heading">可转换为 WebUI 的 GUI 面板</h2>
@@ -982,6 +1010,28 @@
           <button type="submit" class="primary">确定</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="plugin-batch-dialog" aria-labelledby="plugin-batch-title">
+      <div class="dialog-title">
+        <h2 id="plugin-batch-title">插件文件变更批次</h2>
+        <button data-close="plugin-batch-dialog" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="opk-batch-content">
+        <p class="hint" id="plugin-batch-location"></p>
+        <div id="plugin-batch-drop" class="opk-drop">
+          <label for="plugin-batch-input">选择或拖入 .opk 文件（可多选）</label>
+          <input id="plugin-batch-input" type="file" accept=".opk" multiple />
+        </div>
+        <div id="plugin-batch-feedback" role="status"></div>
+        <div id="plugin-batch-errors" role="alert"></div>
+        <div id="plugin-batch-items"></div>
+        <section id="plugin-batch-plan" aria-labelledby="plugin-batch-plan-title" tabindex="-1" hidden></section>
+      </div>
+      <div class="dialog-actions opk-toolbar">
+        <button id="plugin-batch-clear" type="button">清空全部变更</button>
+        <button id="plugin-batch-validate" type="button" class="primary">确认执行（上传 0 / 删除 0）</button>
+        <button id="plugin-batch-confirm" type="button" class="danger" hidden>确认提交变更</button>
+      </div>
     </dialog>
     <dialog id="menu-dialog">
       <div class="dialog-title">

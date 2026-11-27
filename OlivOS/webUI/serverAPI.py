@@ -39,8 +39,10 @@ from werkzeug.wrappers import Response
 
 import OlivOS
 
-from . import assetAPI, authAPI, localAPI, pageAPI, resourceAPI, tkBridgeAPI
+from . import assetAPI, authAPI, localAPI, pageAPI, pluginFileAPI, resourceAPI, tkBridgeAPI
 BUFFER_LIMIT = 500
+HTTP_BODY_LIMIT = 10 * 1024 * 1024
+UPLOAD_BODY_LIMIT = 100 * 1024 * 1024
 # 插件页面 iframe 保活数量上限：实测每个约 11MB，首个会拉起独立渲染进程（约 90MB）
 PLUGIN_PAGE_CACHE = 10
 PLUGIN_PAGE_CACHE_MAX = 20
@@ -99,6 +101,8 @@ class server(OlivOS.API.Proc_templet):
         self.runtime = runtime if runtime is not None else {}
         self.started_at = time.monotonic()
         self.lock = threading.RLock()
+        self.plugin_fs_lock = threading.RLock()
+        self.plugin_stage = pluginFileAPI.StageStore(self.root)
         self.tk_bridge = tkBridgeAPI.WebBridge(self)
         self.qr_bind_manager = OlivOS.qqGuildv2QrBindAPI.QrBindManager()
         self.accounts = copy.deepcopy(bot_info_dict or {})
@@ -116,6 +120,9 @@ class server(OlivOS.API.Proc_templet):
         self.plugins = {}
         self.plugin_order = []
         self.plugin_priority = {}
+        self.plugin_sources = {}
+        self.plugin_shadowed = []
+        self.plugin_files_changed_at = 0
         self.plugin_schedule_status = None
         self.plugin_pages = []
         self.plugin_roots = {}
@@ -165,7 +172,7 @@ class server(OlivOS.API.Proc_templet):
             prefix = 'OLIVOS_WEBUI_STATIC 中缺少前端资源' if static_override else 'WebUI 前端资源不完整'
             raise ValueError(prefix + '：' + ', '.join(incomplete))
         self.app = Flask(__name__, static_folder=None)
-        self.app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
+        self.app.config['MAX_CONTENT_LENGTH'] = UPLOAD_BODY_LIMIT
         pageAPI.register_routes(self)
 
     def authenticate(self, token, address, origin=None, host=None, password=None, ticket=None):
@@ -376,6 +383,13 @@ class server(OlivOS.API.Proc_templet):
                 ):
                     if field in update:
                         setattr(self, attribute, copy.deepcopy(update[field]))
+                if not update.get('priority_only') or 'shallow_plugin_source_dict' in update:
+                    self.plugin_sources = copy.deepcopy(update.get('shallow_plugin_source_dict', {}))
+                if not update.get('priority_only') or 'shallow_plugin_shadowed_list' in update:
+                    self.plugin_shadowed = copy.deepcopy(update.get('shallow_plugin_shadowed_list', []))
+                if (update.get('ready') and not update.get('priority_only')
+                        and update.get('load_started', 0) >= self.plugin_files_changed_at):
+                    self.plugin_files_changed_at = 0
                 roots = update.get('shallow_plugin_webui_roots', {})
                 if roots or update.get('ready'):
                     self.retired_plugin_roots.update(set(self.plugin_roots.values()) - set(roots.values()))
@@ -614,14 +628,41 @@ class server(OlivOS.API.Proc_templet):
     async def http(self, request):
         if request.path.startswith('/ws/'):
             return await self.websocket(request)
-        body = await request.read()
+        started_at = time.monotonic()
+        upload = request.method == 'POST' and request.path == pluginFileAPI.STAGE_URL
+        limit = UPLOAD_BODY_LIMIT if upload else HTTP_BODY_LIMIT
+        too_large = {'error': f'请求体超过 {limit // (1024 * 1024)} MiB 上限'}
+        route = pluginFileAPI.STAGE_URL if upload else '<body-limit>'
+        remote = getattr(request, 'remote', '')
+        host_header = getattr(request, 'host', None)
+        if request.content_length is not None and request.content_length > limit:
+            self.log_access(request.method, route, 413, remote, started_at, too_large['error'],
+                            request.headers.get('Origin'), host_header)
+            return web.json_response(too_large, status=413)
+        # 上传体超过 1 MiB 后转入临时文件，避免同时在 aiohttp 和 Flask 中缓存整份上传。
+        buffer = tempfile.SpooledTemporaryFile(max_size=1024 * 1024) if upload else io.BytesIO()
+        with buffer as body:
+            length = 0
+            async for chunk in request.content.iter_chunked(64 * 1024):
+                length += len(chunk)
+                if length > limit:
+                    self.log_access(request.method, route, 413, remote, started_at, too_large['error'],
+                                    request.headers.get('Origin'), host_header)
+                    return web.json_response(too_large, status=413)
+                body.write(chunk)
+            body.seek(0)
+            return await self._dispatch_http(request, body, length)
+
+    async def _dispatch_http(self, request, body, length):
         # aiohttp 负责同端口 WS 握手；所有 HTTP 路由、认证和响应仍由 Flask 执行。
         builder = EnvironBuilder(path=request.path, base_url=f'{request.scheme}://{request.host}',
                                  query_string=request.query_string, method=request.method,
-                                 headers=list(request.headers.items()), input_stream=io.BytesIO(body),
-                                 content_length=len(body), environ_base={'REMOTE_ADDR': request.remote or ''})
+                                 headers=list(request.headers.items()), input_stream=body,
+                                 content_length=length, environ_base={'REMOTE_ADDR': request.remote or ''})
         try:
             environ = builder.get_environ()
+            # aiohttp 已移除传输分块；WSGI 必须使用重新计算的 Content-Length。
+            environ.pop('HTTP_TRANSFER_ENCODING', None)
             if request.transport is not None:
                 environ['olivos.tk_bridge.local'] = request.transport.get_extra_info('sockname')
                 environ['olivos.tk_bridge.peer'] = request.transport.get_extra_info('peername')
@@ -641,12 +682,13 @@ class server(OlivOS.API.Proc_templet):
             await self._serve_locked()
 
     async def _serve_locked(self):
-        app = web.Application(client_max_size=1024 * 1024)
+        app = web.Application(client_max_size=UPLOAD_BODY_LIMIT)
         app.router.add_route('*', '/{path:.*}', self.http)
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
         listener = None
         try:
+            self.plugin_stage.clean_residue()
             self.local_manager = localAPI.LocalServer(self.root, self.local_action)
             self.local_manager.start()
             # 构造和启动之间，离线重置可能已更新凭据。
@@ -687,6 +729,7 @@ class server(OlivOS.API.Proc_templet):
             self.log(2, f"WebUI 已启动：http://{self.config['host']}:{self.config['port']}；"
                         f"认证文件：{self.config['auth_path']}")
             next_bridge_maintenance = time.monotonic()
+            next_stage_maintenance = next_bridge_maintenance + 30
             while not self.stop_event.is_set():
                 for _ in range(256):
                     try:
@@ -698,6 +741,12 @@ class server(OlivOS.API.Proc_templet):
                 if now >= next_bridge_maintenance:
                     self.tk_bridge.maintain()
                     next_bridge_maintenance = now + 0.25
+                if now >= next_stage_maintenance and self.plugin_fs_lock.acquire(blocking=False):
+                    try:
+                        self.plugin_stage.expire()
+                        next_stage_maintenance = now + 30
+                    finally:
+                        self.plugin_fs_lock.release()
                 await asyncio.sleep(self.Proc_info.scan_interval)
         finally:
             self.qr_bind_manager.close()
@@ -710,6 +759,8 @@ class server(OlivOS.API.Proc_templet):
             for socket in list(self.sockets):
                 await socket.close()
             await runner.cleanup()
+            with self.plugin_fs_lock:
+                self.plugin_stage.clear()
             try:
                 current = json.loads(self.listen_path.read_text(encoding='utf-8'))
                 if listener is not None and current == listener:

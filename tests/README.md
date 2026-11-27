@@ -120,6 +120,7 @@ V8 block 分支参考 **92.53%**（1401/1514）。报告识别并去除了 106 �
 | 消息结构扩展 | `test_messages_extended.py` | 全部 PARA 段往返、OBV12/Milky 解析、CQ/OP 转义、未知段与畸形中间值 |
 | 插件调度 | `test_plugin_dispatch.py` | 调用顺序与优先级覆盖、热重载、阻断、平台过滤、异常捕获、未知账号和重载请求 |
 | 插件 WebUI 资源 | `test_opk_webui_lifecycle.py` | 源码/OPK、路径与 namespace、init 资源、重载/卸载、文件占用、越界和链接限制 |
+| OPK 与 WebUI 插件文件管理 | `test_opk_management.py` | 安全校验、单层套娃规范化、加载诊断与精确来源、上传限额、批量预检/提交、覆盖去重、并发版本与路径保护 |
 | 账号与 SDK 边界 | `test_adapters.py` | 20 个适配器的账号映射、OneBot 消息/通知/请求、虚拟终端、活动时间、QQ webhook 验签 |
 | 全部 SDK 事件 | `test_sdk_events.py` | 全部 20 个事件入口的事件映射、文本转换、不支持输入及后续恢复；新增 SDK 漏测检查 |
 | 协议连接 | `test_onebot_connection.py` | 反向 WebSocket 认证、断开后取消另一任务及连接计数 |
