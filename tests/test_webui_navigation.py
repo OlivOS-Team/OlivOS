@@ -1938,11 +1938,85 @@ def test_account_mouse_drag_uses_threshold_and_captures_outside_handle(account_t
         assert account_pointer_capture(browser, 'mouse')
         assert account_order(browser) == list(ACCOUNT_IDS)
         assert not browser.text('#accounts-dirty')
+        motion = browser.driver.execute_script('''
+            const rows = [...document.querySelectorAll('#account-rows tr')];
+            const shiftY = (node) => new DOMMatrixReadOnly(getComputedStyle(node).transform).m42;
+            const targetY = (node) => {
+              const match = node.style.transform.match(/translate3d\\([^,]+,\\s*([-\\d.]+)px/);
+              return match ? Number(match[1]) : 0;
+            };
+            return {
+              sorting: document.getElementById('account-rows').classList.contains('account-rows-sorting'),
+              bodyDragging: document.body.classList.contains('account-dragging-active'),
+              draggedY: shiftY(rows[0]),
+              sibling1TargetY: targetY(rows[1]),
+              sibling2TargetY: targetY(rows[2]),
+              siblingTransition: getComputedStyle(rows[1]).transitionProperty,
+            };
+        ''')
+        assert motion['sorting'] and motion['bodyDragging']
+        assert motion['draggedY'] > 20
+        assert motion['sibling1TargetY'] < -20 and motion['sibling2TargetY'] < -20
+        assert 'transform' in motion['siblingTransition']
     finally:
         mouse_account_pointer(browser, 'mouseReleased', x, target)
     assert account_order(browser) == [51002, 51003, 51001]
     assert selected_accounts(browser) == [51001]
     assert browser.text('#accounts-dirty') == '有未应用的修改'
+    assert browser.driver.execute_script('''
+        const rows = [...document.querySelectorAll('#account-rows tr')];
+        return !document.getElementById('account-rows').classList.contains('account-rows-sorting') &&
+          !document.body.classList.contains('account-dragging-active') &&
+          rows.every(row => row.style.transform === '');
+    ''')
+
+
+@pytest.mark.browser
+def test_account_sort_animates_reorder_and_respects_reduced_motion(account_transfer):
+    from selenium.webdriver.common.keys import Keys
+
+    browser = account_transfer
+    driver = browser.driver
+    driver.execute_script('''
+        const originalAnimate = Element.prototype.animate;
+        window.accountSortAnimations = [];
+        Element.prototype.animate = function(keyframes, options) {
+          if (this.matches('#account-rows tr')) {
+            window.accountSortAnimations.push({
+              rowId: this.dataset.accountRowId,
+              from: keyframes[0]?.transform || '',
+              to: keyframes.at(-1)?.transform || '',
+              duration: options?.duration || 0,
+            });
+          }
+          return originalAnimate.call(this, keyframes, options);
+        };
+    ''')
+    driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+        'features': [{'name': 'prefers-reduced-motion', 'value': 'no-preference'}],
+    })
+    try:
+        browser.find(f'{account_row(1)} .account-drag-handle').send_keys(Keys.ARROW_DOWN)
+        assert account_order(browser) == [51002, 51001, 51003]
+        recorded = driver.execute_script('return window.accountSortAnimations')
+        assert len(recorded) == 2
+        assert all(item['from'].startswith('translate3d(0, ') and item['to'] == 'translate3d(0, 0, 0)'
+                   and item['duration'] > 0 for item in recorded)
+        browser.wait.until(lambda _: driver.execute_script('''
+            const rows = [...document.querySelectorAll('#account-rows tr')];
+            return rows.every(row => !row.classList.contains('account-row-settling') &&
+              row.getAnimations().every(animation => animation.playState === 'finished'));
+        '''))
+
+        driver.execute_script('window.accountSortAnimations = [];')
+        driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {
+            'features': [{'name': 'prefers-reduced-motion', 'value': 'reduce'}],
+        })
+        browser.find(f'{account_row(2)} .account-drag-handle').send_keys(Keys.ARROW_UP)
+        assert account_order(browser) == list(ACCOUNT_IDS)
+        assert driver.execute_script('return window.accountSortAnimations') == []
+    finally:
+        driver.execute_cdp_cmd('Emulation.setEmulatedMedia', {'features': []})
 
 
 @pytest.mark.browser

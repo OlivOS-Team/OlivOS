@@ -2781,9 +2781,11 @@ function renderAccounts() {
       const direction = { ArrowUp: -1, ArrowDown: 1 }[event.key];
       if (!direction || state.accountDragging) return;
       event.preventDefault();
+      const beforeTops = captureAccountRowTops();
       if (reorderAccounts(index, index + direction)) {
         renderAccounts();
         document.activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        animateAccountRows(beforeTops, String(rowId));
       }
     };
     const select = element('input', null, {
@@ -2860,6 +2862,35 @@ function reorderAccounts(from, to) {
   return true;
 }
 
+const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function captureAccountRowTops() {
+  const tops = new Map();
+  for (const row of $('account-rows').rows) {
+    if (row.dataset.accountRowId) tops.set(row.dataset.accountRowId, row.getBoundingClientRect().top);
+  }
+  return tops;
+}
+
+function animateAccountRows(beforeTops, elevatedRowId = null) {
+  if (!beforeTops?.size || reducedMotionQuery.matches) return;
+  for (const row of $('account-rows').rows) {
+    const before = beforeTops.get(row.dataset.accountRowId);
+    if (before === undefined || typeof row.animate !== 'function') continue;
+    const deltaY = before - row.getBoundingClientRect().top;
+    if (Math.abs(deltaY) < 0.5) continue;
+    const elevated = elevatedRowId !== null && row.dataset.accountRowId === elevatedRowId;
+    const animation = row.animate(
+      [{ transform: `translate3d(0, ${deltaY}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
+      { duration: 160, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+    );
+    if (elevated) {
+      row.classList.add('account-row-settling');
+      animation.onfinish = animation.oncancel = () => row.classList.remove('account-row-settling');
+    }
+  }
+}
+
 function startAccountDrag(event, from) {
   if (!event.isPrimary || event.button !== 0 || state.accountDragging || state.accounts.length < 2) return;
   const handle = event.currentTarget;
@@ -2869,19 +2900,62 @@ function startAccountDrag(event, from) {
   handle.focus({ preventScroll: true });
   event.preventDefault();
   state.accountDragging = {
-    handle, rows: rows.rows, from, to: from, pointerId: event.pointerId, startY: event.clientY,
+    handle, tbody: rows, rows: rows.rows, from, to: from, pointerId: event.pointerId, startY: event.clientY,
     scroll: main.scrollHeight > main.clientHeight ? main : document.scrollingElement,
     active: false, y: event.clientY, frame: null, marker: null,
+    baseTops: null, heights: null, height: 0, startAnchor: 0,
   };
 }
 
+function activateAccountDrag(drag) {
+  for (const row of drag.rows) {
+    for (const animation of row.getAnimations?.() || []) animation.cancel();
+    row.style.transform = '';
+  }
+  const tbodyTop = drag.tbody.getBoundingClientRect().top;
+  drag.baseTops = Array.from(drag.rows, (row) => row.getBoundingClientRect().top - tbodyTop);
+  drag.heights = Array.from(drag.rows, (row) => row.getBoundingClientRect().height);
+  drag.height = drag.heights[drag.from] || 0;
+  drag.startAnchor = drag.startY - tbodyTop;
+  drag.active = true;
+  document.body.classList.add('account-dragging-active');
+  drag.tbody.classList.add('account-rows-sorting');
+  drag.rows[drag.from].classList.add('account-row-dragging');
+}
+
+function updateAccountDragOffset(drag) {
+  if (!drag.active || !drag.baseTops) return;
+  const tbodyTop = drag.tbody.getBoundingClientRect().top;
+  const rawDy = (drag.y - tbodyTop) - drag.startAnchor;
+  const minDy = -drag.baseTops[drag.from];
+  const lastIndex = drag.baseTops.length - 1;
+  const maxDy = (drag.baseTops[lastIndex] + drag.heights[lastIndex]) - (drag.baseTops[drag.from] + drag.height);
+  const dy = Math.max(minDy, Math.min(maxDy, rawDy));
+  drag.rows[drag.from].style.transform = `translate3d(0, ${dy}px, 0)`;
+}
+
+function applyAccountDragShifts(drag) {
+  for (let index = 0; index < drag.rows.length; index += 1) {
+    if (index === drag.from) continue;
+    let shift = 0;
+    if (drag.to > drag.from && index > drag.from && index <= drag.to) shift = -drag.height;
+    else if (drag.to < drag.from && index >= drag.to && index < drag.from) shift = drag.height;
+    drag.rows[index].style.transform = shift ? `translate3d(0, ${shift}px, 0)` : '';
+  }
+}
+
 function markAccountDrop(drag) {
+  const tbodyTop = drag.tbody.getBoundingClientRect().top;
   let first = 0;
   let last = drag.rows.length;
   while (first < last) {
     const index = (first + last) >> 1;
-    const bounds = drag.rows[index].getBoundingClientRect();
-    const middle = (bounds.top + bounds.bottom) / 2;
+    const middle = drag.baseTops
+      ? tbodyTop + drag.baseTops[index] + drag.heights[index] / 2
+      : (() => {
+          const bounds = drag.rows[index].getBoundingClientRect();
+          return (bounds.top + bounds.bottom) / 2;
+        })();
     if (drag.y < middle || (drag.y === middle && index < drag.from)) last = index;
     else first = index + 1;
   }
@@ -2891,6 +2965,7 @@ function markAccountDrop(drag) {
   drag.to = to;
   drag.marker = to === drag.from ? null : drag.rows[to];
   drag.marker?.classList.add(to < drag.from ? 'account-drop-before' : 'account-drop-after');
+  applyAccountDragShifts(drag);
 }
 
 function scrollAccountDrag(drag) {
@@ -2904,6 +2979,7 @@ function scrollAccountDrag(drag) {
   const before = drag.scroll.scrollTop;
   drag.scroll.scrollTop += Math.sign(distance) * Math.min(24, Math.ceil(Math.abs(distance) / 3));
   if (drag.scroll.scrollTop !== before) {
+    updateAccountDragOffset(drag);
     markAccountDrop(drag);
     drag.frame = requestAnimationFrame(() => scrollAccountDrag(drag));
   }
@@ -2915,9 +2991,9 @@ function moveAccountDrag(event) {
   drag.y = event.clientY;
   if (!drag.active) {
     if (Math.abs(drag.y - drag.startY) < 4) return;
-    drag.active = true;
-    drag.rows[drag.from].classList.add('account-row-dragging');
+    activateAccountDrag(drag);
   }
+  updateAccountDragOffset(drag);
   markAccountDrop(drag);
   if (drag.frame === null) drag.frame = requestAnimationFrame(() => scrollAccountDrag(drag));
 }
@@ -2927,6 +3003,7 @@ function endAccountDrag(event, commit) {
   if (drag?.pointerId !== event.pointerId) return;
   if (commit && drag.active) {
     drag.y = event.clientY;
+    updateAccountDragOffset(drag);
     markAccountDrop(drag);
   }
   finishAccountDrag(commit);
@@ -2935,13 +3012,21 @@ function endAccountDrag(event, commit) {
 function finishAccountDrag(commit, repaint = true) {
   const drag = state.accountDragging;
   if (!drag) return;
+  const beforeTops = repaint && drag.active ? captureAccountRowTops() : null;
+  const movedRowId = drag.active ? drag.rows[drag.from]?.dataset.accountRowId ?? null : null;
   state.accountDragging = null;
   if (drag.frame !== null) cancelAnimationFrame(drag.frame);
   if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
-  drag.rows[drag.from].classList.remove('account-row-dragging');
+  document.body.classList.remove('account-dragging-active');
+  drag.tbody.classList.remove('account-rows-sorting');
+  for (const row of drag.rows) row.style.transform = '';
+  drag.rows[drag.from]?.classList.remove('account-row-dragging');
   drag.marker?.classList.remove('account-drop-before', 'account-drop-after');
   if (commit && drag.active) reorderAccounts(drag.from, drag.to);
-  if (repaint) renderAccounts();
+  if (repaint) {
+    renderAccounts();
+    animateAccountRows(beforeTops, movedRowId);
+  }
 }
 
 function portableAccount(account) {
