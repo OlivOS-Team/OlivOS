@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+import requests
 
 import OlivOS
 
@@ -156,11 +157,11 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
     [
         (
             {'http': 'http://proxy.example.com:8080'},
-            {'http': 'proxy.example.com:8080'},
+            {'http': 'http://proxy.example.com:8080'},
         ),
         (
             {'https': 'https://tunnel.example.com:8443'},
-            {'https': 'tunnel.example.com:8443'},
+            {'https': 'https://tunnel.example.com:8443'},
         ),
         (
             {
@@ -168,8 +169,8 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
                 'https': 'https://https.server.example.com:8443',
             },
             {
-                'http': 'http.example.com:8080',
-                'https': 'https.server.example.com:8443',
+                'http': 'http://http.example.com:8080',
+                'https': 'https://https.server.example.com:8443',
             },
         ),
         (
@@ -178,8 +179,18 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
                 'https': 'HTTPS://Server.Example.com:8443',
             },
             {
-                'http': 'Proxy.Example.com:8080',
-                'https': 'Server.Example.com:8443',
+                'http': 'HTTP://Proxy.Example.com:8080',
+                'https': 'HTTPS://Server.Example.com:8443',
+            },
+        ),
+        (
+            {
+                'http': 'http://localhost:7890',
+                'https': 'http://user:pass@proxy.example.com:8080',
+            },
+            {
+                'http': 'http://localhost:7890',
+                'https': 'http://user:pass@proxy.example.com:8080',
             },
         ),
         (
@@ -188,7 +199,7 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
                 'https': 'http://proxy.example.com:8080',
             },
             {
-                'http': '127.0.0.1:7890',
+                'http': 'http://127.0.0.1:7890',
                 'https': 'http://proxy.example.com:8080',
             },
         ),
@@ -207,13 +218,21 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
             {'no': 'notion.so,only.internal,localhost'},
         ),
         (
-            {'http': 'proxy.example.com:8080'},
-            {'http': 'proxy.example.com:8080'},
+            {
+                'http': 'proxy.example.com:8080',
+                'https': 'localhost:7890',
+                'all': '//proxy:8080',
+            },
+            {
+                'http': 'http://proxy.example.com:8080',
+                'https': 'http://localhost:7890',
+                'all': 'http://proxy:8080',
+            },
         ),
         ({}, {}),
     ],
 )
-def test_get_system_proxy_strips_only_matching_scheme_prefix(monkeypatch, raw_proxies, expected):
+def test_get_system_proxy_preserves_scheme_without_mangling_hostnames(monkeypatch, raw_proxies, expected):
     original = dict(raw_proxies)
     monkeypatch.setattr(urllib.request, 'getproxies', lambda: raw_proxies)
     assert OlivOS.webTool.get_system_proxy() == expected
@@ -221,16 +240,72 @@ def test_get_system_proxy_strips_only_matching_scheme_prefix(monkeypatch, raw_pr
 
 
 @pytest.mark.parametrize(
+    ('raw_proxies', 'request_url', 'expected_scheme', 'expected_host', 'expected_port', 'expected_auth'),
+    [
+        ({'http': 'http://proxy.example.com:8080'}, 'http://example.invalid/', 'http', 'proxy.example.com', 8080, None),
+        ({'http': 'http://localhost:7890'}, 'http://example.invalid/', 'http', 'localhost', 7890, None),
+        ({'http': 'http://proxy:8080'}, 'http://example.invalid/', 'http', 'proxy', 8080, None),
+        ({'http': 'localhost:7890'}, 'http://example.invalid/', 'http', 'localhost', 7890, None),
+        (
+            {'http': 'http://user:pass@proxy.example.com:8080'},
+            'http://example.invalid/',
+            'http',
+            'proxy.example.com',
+            8080,
+            'user:pass',
+        ),
+        (
+            {'https': 'https://tunnel.example.com:8443'},
+            'https://example.invalid/',
+            'https',
+            'tunnel.example.com',
+            8443,
+            None,
+        ),
+        (
+            {'https': 'http://proxy.example.com:8080'},
+            'https://example.invalid/',
+            'http',
+            'proxy.example.com',
+            8080,
+            None,
+        ),
+    ],
+)
+def test_get_system_proxy_result_is_accepted_by_requests_adapter(
+    monkeypatch, raw_proxies, request_url, expected_scheme, expected_host, expected_port, expected_auth
+):
+    monkeypatch.setattr(urllib.request, 'getproxies', lambda: dict(raw_proxies))
+    proxies = OlivOS.webTool.get_system_proxy()
+    adapter = requests.adapters.HTTPAdapter()
+    prepared = requests.Request('GET', request_url).prepare()
+    if hasattr(adapter, 'get_connection_with_tls_context'):
+        adapter.get_connection_with_tls_context(prepared, verify=True, proxies=proxies)
+    else:
+        adapter.get_connection(request_url, proxies=proxies)
+    proxy_manager = list(adapter.proxy_manager.values())[-1]
+    assert proxy_manager.proxy.scheme == expected_scheme
+    assert proxy_manager.proxy.host == expected_host
+    assert proxy_manager.proxy.port == expected_port
+    assert proxy_manager.proxy.auth == expected_auth
+
+
+@pytest.mark.parametrize(
     ('raw_proxies', 'proxy_type', 'expected'),
     [
         ({'http': 'http://proxy.example.com:8080'}, 'http', ('proxy.example.com', '8080', 'http')),
+        ({'http': 'http://localhost:7890'}, 'http', ('localhost', '7890', 'http')),
+        ({'http': 'http://proxy:8080'}, 'http', ('proxy', '8080', 'http')),
         ({'https': 'https://tunnel.example.com:8443'}, 'https', ('tunnel.example.com', '8443', 'https')),
         ({'http': 'http://http.example.com:8080/'}, 'http', ('http.example.com', '8080', 'http')),
         ({'http': 'http://127.0.0.1:7890'}, 'http', ('127.0.0.1', '7890', 'http')),
+        ({'http': 'http://[::1]:8080'}, 'http', ('::1', '8080', 'http')),
         ({'http': 'socks5://socks.example.com:1080'}, 'http', (None, None, None)),
+        ({'http': 'http://user:pass@proxy.example.com:8080'}, 'http', (None, None, None)),
         ({'http': 'http://proxy.example.com'}, 'http', (None, None, None)),
         ({'http': 'http://:8080'}, 'http', (None, None, None)),
         ({'http': 'http://proxy.example.com:'}, 'http', (None, None, None)),
+        ({'http': 'http://proxy.example.com:notaport'}, 'http', (None, None, None)),
         ({}, 'http', (None, None, None)),
     ],
 )
@@ -247,10 +322,11 @@ def test_get_system_proxy_tuple_extracts_host_and_port_without_mangling(
         ({'http': 'http://proxy.example.com:8080'}, ('proxy.example.com', '8080', 'http')),
         ({'http': 'proxy.example.com:8080'}, ('proxy.example.com', '8080', 'http')),
         ({'http': 'http.example.com:8080'}, ('http.example.com', '8080', 'http')),
+        ({'http': '//localhost:7890'}, ('localhost', '7890', 'http')),
         (None, (None, None, None)),
     ],
 )
-def test_get_system_proxy_tuple_is_idempotent_on_proxy_values(monkeypatch, proxy_map, expected):
+def test_get_system_proxy_tuple_accepts_prefixed_and_bare_values(monkeypatch, proxy_map, expected):
     monkeypatch.setattr(OlivOS.webTool, 'get_system_proxy', lambda: proxy_map)
     assert OlivOS.webTool.get_system_proxy_tuple('http') == expected
 
@@ -262,7 +338,7 @@ def test_get_system_proxy_reads_environment_variables_without_corrupting_hostnam
     monkeypatch.setenv('http_proxy', 'http://proxy.example.com:8080')
     monkeypatch.setenv('https_proxy', 'https://tunnel.example.com:8443')
     assert OlivOS.webTool.get_system_proxy() == {
-        'http': 'proxy.example.com:8080',
-        'https': 'tunnel.example.com:8443',
+        'http': 'http://proxy.example.com:8080',
+        'https': 'https://tunnel.example.com:8443',
     }
     assert OlivOS.webTool.get_system_proxy_tuple('http') == ('proxy.example.com', '8080', 'http')
