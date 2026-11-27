@@ -2112,6 +2112,10 @@ def test_account_touch_drag_can_cancel_and_reorder_at_320px(account_transfer):
         assert account_order(browser) == list(ACCOUNT_IDS)
         assert not browser.text('#accounts-dirty')
         assert not account_pointer_capture(browser, 'touch')
+        browser.wait.until(lambda _: driver.execute_script('''
+            return [...document.querySelectorAll('#account-rows tr')].every(
+              row => row.getAnimations().every(animation => animation.playState === 'finished'));
+        '''))
 
         touch('touchStart', y)
         touch('touchMove', target)
