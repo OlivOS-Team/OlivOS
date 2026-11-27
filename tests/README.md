@@ -144,7 +144,7 @@ V8 block 分支参考 **92.53%**（1401/1514）。报告识别并去除了 106 �
 | 外部程序启动器 | `test_libbooter_support.py` | 启动器分派、账号修复文件、旧 GBK 压缩包、假子进程与假服务器；仅 Windows 运行，不运行 NapCat/go-cqhttp |
 | 数据存储 | `test_user_database.py`, `test_legacy_config.py` | SQLite 持久化/隔离/并发/序列化，以及旧用户/群配置接口 |
 | 输入流缓存 | `test_iostream.py` | pickle 读写、缓存创建与清理、损坏文件、只读和并发边界 |
-| 启动与辅助功能 | `test_boot_and_metadata.py` | 配置合并、启动顺序、元数据、本地化、资源定位、更新请求与进程终止边界 |
+| 启动与辅助功能 | `test_boot_and_metadata.py` | 配置合并、启动顺序、元数据、本地化、资源定位、更新请求、系统代理解析与进程终止边界 |
 | 启动运行时 | `test_boot_runtime.py` | 启动装配、按账号/模型创建进程、控制包路由、停止与清理，全部使用假进程和假队列 |
 | 日志 | `test_logging.py` | 文本清理、队列满、等级过滤、文件批量写入、GUI 转发 |
 | 原生终端 | `test_native_terminal.py` | 坏历史记录、特殊字符串、控件异常、限频与轮转、后续记录继续显示 |

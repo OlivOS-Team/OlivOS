@@ -30,6 +30,16 @@ OlivOS_http_timeout = (5.0, 20.0)
 OlivOS_http_timeout_transfer = (5.0, 60.0)
 
 
+def _strip_proxy_prefix(proxy_url, scheme):
+    """仅按精确协议前缀 `<scheme>://` 剥离，避免 lstrip 误删主机名首字母。"""
+    if not isinstance(proxy_url, str) or not scheme:
+        return proxy_url
+    prefix = '%s://' % scheme
+    if proxy_url.lower().startswith(prefix.lower()):
+        return proxy_url[len(prefix):]
+    return proxy_url
+
+
 def get_system_proxy():
     res = None
     if False and platform.system() == 'Windows':
@@ -47,9 +57,10 @@ def get_system_proxy():
                 'https': res_data[0]
             }
     else:
-        res = urllib.request.getproxies()
-        for res_this in res:
-            res[res_this] = res[res_this].lstrip('%s://' % res_this)
+        raw_proxies = urllib.request.getproxies()
+        res = {}
+        for res_this in raw_proxies:
+            res[res_this] = _strip_proxy_prefix(raw_proxies[res_this], res_this)
     return res
 
 
@@ -163,7 +174,9 @@ def get_system_proxy_tuple(proxy_type='http'):
     res_data = get_system_proxy()
     if res_data is not None:
         if proxy_type in res_data:
-            res_data_1 = res_data[proxy_type].lstrip('%s://' % proxy_type).split(':')
-            if len(res_data_1) == 2:
-                res = (res_data_1[0], res_data_1[1], proxy_type)
+            proxy_addr = _strip_proxy_prefix(res_data[proxy_type], proxy_type)
+            if isinstance(proxy_addr, str):
+                res_data_1 = proxy_addr.rstrip('/').split(':')
+                if len(res_data_1) == 2 and res_data_1[0] and res_data_1[1]:
+                    res = (res_data_1[0], res_data_1[1], proxy_type)
     return res

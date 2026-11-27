@@ -1,6 +1,8 @@
 """Boot configuration, localization and resource helpers without starting bot workers."""
 
 import copy
+import os
+import urllib.request
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -147,3 +149,120 @@ def test_restart_lookup_treats_component_in_rebuild_window_as_missing():
 
     proc_this.Proc_info.rx_queue = None
     assert OlivOS.bootAPI.get_proc_for_restart({'OlivOS_plugin': proc_this}, 'OlivOS_plugin') is None
+
+
+@pytest.mark.parametrize(
+    ('raw_proxies', 'expected'),
+    [
+        (
+            {'http': 'http://proxy.example.com:8080'},
+            {'http': 'proxy.example.com:8080'},
+        ),
+        (
+            {'https': 'https://tunnel.example.com:8443'},
+            {'https': 'tunnel.example.com:8443'},
+        ),
+        (
+            {
+                'http': 'http://http.example.com:8080',
+                'https': 'https://https.server.example.com:8443',
+            },
+            {
+                'http': 'http.example.com:8080',
+                'https': 'https.server.example.com:8443',
+            },
+        ),
+        (
+            {
+                'http': 'HTTP://Proxy.Example.com:8080',
+                'https': 'HTTPS://Server.Example.com:8443',
+            },
+            {
+                'http': 'Proxy.Example.com:8080',
+                'https': 'Server.Example.com:8443',
+            },
+        ),
+        (
+            {
+                'http': 'http://127.0.0.1:7890',
+                'https': 'http://proxy.example.com:8080',
+            },
+            {
+                'http': '127.0.0.1:7890',
+                'https': 'http://proxy.example.com:8080',
+            },
+        ),
+        (
+            {
+                'http': 'socks5://socks.example.com:1080',
+                'https': 'socks5h://socks.example.com:1080',
+            },
+            {
+                'http': 'socks5://socks.example.com:1080',
+                'https': 'socks5h://socks.example.com:1080',
+            },
+        ),
+        (
+            {'no': 'notion.so,only.internal,localhost'},
+            {'no': 'notion.so,only.internal,localhost'},
+        ),
+        (
+            {'http': 'proxy.example.com:8080'},
+            {'http': 'proxy.example.com:8080'},
+        ),
+        ({}, {}),
+    ],
+)
+def test_get_system_proxy_strips_only_matching_scheme_prefix(monkeypatch, raw_proxies, expected):
+    original = dict(raw_proxies)
+    monkeypatch.setattr(urllib.request, 'getproxies', lambda: raw_proxies)
+    assert OlivOS.webTool.get_system_proxy() == expected
+    assert raw_proxies == original
+
+
+@pytest.mark.parametrize(
+    ('raw_proxies', 'proxy_type', 'expected'),
+    [
+        ({'http': 'http://proxy.example.com:8080'}, 'http', ('proxy.example.com', '8080', 'http')),
+        ({'https': 'https://tunnel.example.com:8443'}, 'https', ('tunnel.example.com', '8443', 'https')),
+        ({'http': 'http://http.example.com:8080/'}, 'http', ('http.example.com', '8080', 'http')),
+        ({'http': 'http://127.0.0.1:7890'}, 'http', ('127.0.0.1', '7890', 'http')),
+        ({'http': 'socks5://socks.example.com:1080'}, 'http', (None, None, None)),
+        ({'http': 'http://proxy.example.com'}, 'http', (None, None, None)),
+        ({'http': 'http://:8080'}, 'http', (None, None, None)),
+        ({'http': 'http://proxy.example.com:'}, 'http', (None, None, None)),
+        ({}, 'http', (None, None, None)),
+    ],
+)
+def test_get_system_proxy_tuple_extracts_host_and_port_without_mangling(
+    monkeypatch, raw_proxies, proxy_type, expected
+):
+    monkeypatch.setattr(urllib.request, 'getproxies', lambda: dict(raw_proxies))
+    assert OlivOS.webTool.get_system_proxy_tuple(proxy_type) == expected
+
+
+@pytest.mark.parametrize(
+    ('proxy_map', 'expected'),
+    [
+        ({'http': 'http://proxy.example.com:8080'}, ('proxy.example.com', '8080', 'http')),
+        ({'http': 'proxy.example.com:8080'}, ('proxy.example.com', '8080', 'http')),
+        ({'http': 'http.example.com:8080'}, ('http.example.com', '8080', 'http')),
+        (None, (None, None, None)),
+    ],
+)
+def test_get_system_proxy_tuple_is_idempotent_on_proxy_values(monkeypatch, proxy_map, expected):
+    monkeypatch.setattr(OlivOS.webTool, 'get_system_proxy', lambda: proxy_map)
+    assert OlivOS.webTool.get_system_proxy_tuple('http') == expected
+
+
+def test_get_system_proxy_reads_environment_variables_without_corrupting_hostnames(monkeypatch):
+    for key in list(os.environ):
+        if key.lower().endswith('_proxy'):
+            monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('http_proxy', 'http://proxy.example.com:8080')
+    monkeypatch.setenv('https_proxy', 'https://tunnel.example.com:8443')
+    assert OlivOS.webTool.get_system_proxy() == {
+        'http': 'proxy.example.com:8080',
+        'https': 'tunnel.example.com:8443',
+    }
+    assert OlivOS.webTool.get_system_proxy_tuple('http') == ('proxy.example.com', '8080', 'http')
