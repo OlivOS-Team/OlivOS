@@ -2553,6 +2553,27 @@ def test_account_transfer_review_edge_cases(account_transfer):
     browser.click(ACCOUNT_IMPORT_CANCEL)
     assert not browser.find(ACCOUNT_IMPORT).is_displayed()
 
+    # 4) 账号启用开关圆点在开启与关闭状态下均应垂直居中且左右边距对称。
+    assert driver.execute_script('''
+        const sw = document.querySelector('#account-rows .switch');
+        const track = getComputedStyle(sw);
+        const thumb = getComputedStyle(sw, '::before');
+        const rect = sw.getBoundingClientRect();
+        const borderX = parseFloat(track.borderLeftWidth) + parseFloat(track.borderRightWidth);
+        const borderY = parseFloat(track.borderTopWidth) + parseFloat(track.borderBottomWidth);
+        const padX = parseFloat(track.paddingLeft) + parseFloat(track.paddingRight);
+        const padY = parseFloat(track.paddingTop) + parseFloat(track.paddingBottom);
+        const thumbW = parseFloat(thumb.width);
+        const thumbH = parseFloat(thumb.height);
+        const tx = new DOMMatrixReadOnly(thumb.transform).m41;
+        const leftInset = parseFloat(track.borderLeftWidth) + parseFloat(track.paddingLeft);
+        const rightGapChecked = rect.width - (leftInset + tx + thumbW);
+        return track.display === 'inline-flex' && track.alignItems === 'center' &&
+          Math.abs((rect.height - borderY - padY) - thumbH) < 0.5 &&
+          Math.abs(leftInset - rightGapChecked) < 0.5 &&
+          Math.abs((rect.width - borderX - padX) - (thumbW + tx)) < 0.5;
+    ''')
+
 
 @pytest.mark.browser
 def test_mobile_custom_select_menu_opens_above_and_fits_viewport(browser):
