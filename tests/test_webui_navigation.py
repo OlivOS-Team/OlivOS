@@ -5431,3 +5431,59 @@ def test_short_viewport_dialog_fits_viewport_and_scrolls(browser):
         return result;
     ''')
     assert dialog_metrics == {'fitsViewport': True, 'overflowY': 'auto', 'canScroll': True}
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('mode,width,height,mobile', [
+    ('desktop-expanded', 1280, 900, False),
+    ('desktop-collapsed', 1280, 900, False),
+    ('mobile-drawer', 390, 760, True),
+])
+def test_sidebar_head_divider_matches_footer_on_desktop_and_mobile(browser, mode, width, height, mobile):
+    driver = browser.driver
+    set_viewport(browser, width, height, mobile_device=mobile)
+    if mobile:
+        browser.open_sidebar()
+    elif mode == 'desktop-collapsed':
+        driver.execute_script('setSidebarCollapsed(true, false)')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return document.getElementById('sidebar').getBoundingClientRect().width < 70"))
+    try:
+        metrics = driver.execute_script('''
+            const aside = document.getElementById('sidebar');
+            const head = aside.querySelector('.sidebar-head');
+            const brand = aside.querySelector('.brand');
+            const scrollBox = aside.querySelector('.sidebar-scroll');
+            const footer = aside.querySelector('.sidebar-footer');
+            const headStyle = getComputedStyle(head);
+            const footerStyle = getComputedStyle(footer);
+            const asideRect = aside.getBoundingClientRect();
+            const headRect = head.getBoundingClientRect();
+            const brandRect = brand.getBoundingClientRect();
+            const scrollRect = scrollBox.getBoundingClientRect();
+            return {
+              borderWidthMatch: headStyle.borderBottomWidth === footerStyle.borderTopWidth
+                && headStyle.borderBottomWidth === '1px',
+              borderStyleMatch: headStyle.borderBottomStyle === footerStyle.borderTopStyle
+                && headStyle.borderBottomStyle === 'solid',
+              borderColorMatch: headStyle.borderBottomColor === footerStyle.borderTopColor,
+              fullWidth: Math.abs(headRect.width - aside.clientWidth) <= 1,
+              breathingRoom: headRect.bottom - brandRect.bottom >= 9.5,
+              noScrollOverlap: scrollRect.top >= headRect.bottom - 0.5,
+              insideAside: headRect.left >= asideRect.left - 0.5 && headRect.right <= asideRect.right + 0.5,
+            };
+        ''')
+    finally:
+        if mobile:
+            driver.execute_script('setSidebarOpen(false)')
+        elif mode == 'desktop-collapsed':
+            driver.execute_script('setSidebarCollapsed(false, false)')
+    assert metrics == {
+        'borderWidthMatch': True,
+        'borderStyleMatch': True,
+        'borderColorMatch': True,
+        'fullWidth': True,
+        'breathingRoom': True,
+        'noScrollOverlap': True,
+        'insideAside': True,
+    }, (mode, metrics)
