@@ -30,6 +30,20 @@ OlivOS_http_timeout = (5.0, 20.0)
 OlivOS_http_timeout_transfer = (5.0, 60.0)
 
 
+def _normalize_proxy_url(proxy_url, scheme):
+    """规范化代理 URL：保留已有协议方案，仅为缺少协议的 HTTP(S)/all 代理补齐 `http://`。"""
+    if not isinstance(proxy_url, str):
+        return proxy_url
+    value = proxy_url.strip()
+    if not value or '://' in value:
+        return value
+    if isinstance(scheme, str) and scheme.lower() in ('http', 'https', 'all'):
+        if value.startswith('//'):
+            return 'http:%s' % value
+        return 'http://%s' % value
+    return value
+
+
 def get_system_proxy():
     res = None
     if False and platform.system() == 'Windows':
@@ -47,9 +61,10 @@ def get_system_proxy():
                 'https': res_data[0]
             }
     else:
-        res = urllib.request.getproxies()
-        for res_this in res:
-            res[res_this] = res[res_this].lstrip('%s://' % res_this)
+        raw_proxies = urllib.request.getproxies()
+        res = {}
+        for res_this in raw_proxies:
+            res[res_this] = _normalize_proxy_url(raw_proxies[res_this], res_this)
     return res
 
 
@@ -160,10 +175,28 @@ def access_token_matches(expected, headers=None, url=''):
 
 def get_system_proxy_tuple(proxy_type='http'):
     res = (None, None, None)
+    if not proxy_type:
+        return res
     res_data = get_system_proxy()
-    if res_data is not None:
-        if proxy_type in res_data:
-            res_data_1 = res_data[proxy_type].lstrip('%s://' % proxy_type).split(':')
-            if len(res_data_1) == 2:
-                res = (res_data_1[0], res_data_1[1], proxy_type)
+    if res_data is not None and proxy_type in res_data:
+        raw_addr = res_data[proxy_type]
+        if isinstance(raw_addr, str):
+            raw_addr = raw_addr.strip()
+            if raw_addr:
+                try:
+                    if '://' in raw_addr:
+                        parsed = urlparse(raw_addr)
+                        if parsed.scheme.lower() != str(proxy_type).lower():
+                            return res
+                    elif raw_addr.startswith('//'):
+                        parsed = urlparse('%s:%s' % (proxy_type, raw_addr))
+                    else:
+                        parsed = urlparse('%s://%s' % (proxy_type, raw_addr))
+                    port = parsed.port
+                except ValueError:
+                    return res
+                if parsed.username is not None or parsed.password is not None:
+                    return res
+                if parsed.hostname and port is not None:
+                    res = (parsed.hostname, str(port), proxy_type)
     return res
