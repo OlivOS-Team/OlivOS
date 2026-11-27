@@ -18,20 +18,23 @@ import platform
 import threading
 import time
 import sys
-import importlib
+import importlib.util
 import os
 import json
 import traceback
-import zipfile
 import shutil
+import tempfile
+from contextlib import ExitStack
+from pathlib import Path
 from queue import Empty
+from types import ModuleType
 from uuid import uuid4
 
 if platform.system() == 'Windows':
     import tkinter
 
 import OlivOS
-from OlivOS.core.core import API, tkBridgeAPI
+from OlivOS.core.core import API, opkAPI, tkBridgeAPI
 from OlivOS.core.core.pluginSchedule import PluginSchedule
 
 modelName = 'pluginAPI'
@@ -62,6 +65,13 @@ def doOpkRemove(plugin_path, plugin_dir):
     if len(plugin_dir) > 4:
         if plugin_dir[-4:] == '.opk':
             removeDir(plugin_path + plugin_dir[:-4])
+
+
+def _discard_list_item(sequence, item):
+    try:
+        sequence.remove(item)
+    except ValueError:
+        pass
 
 
 def load_plugin_priority(path=None, root='.'):
@@ -180,6 +190,24 @@ def parse_restart_interval(value):
     return seconds
 
 
+class _PluginFinder:
+    """让插件之间的导入使用本次入选副本，而非同名源码或其他 OPK。"""
+
+    def __init__(self, plugins):
+        self.roots = {}
+        for plugin in plugins:
+            self.roots.setdefault(plugin['module_name'], plugin['plugin_root'])
+
+    def find_spec(self, fullname, path=None, target=None):
+        root = self.roots.get(fullname)
+        if root is None:
+            return None
+        entry = os.path.join(root, '__init__.py')
+        if not os.path.isfile(entry):
+            raise ImportError(f'{fullname}.__init__ not found')
+        return importlib.util.spec_from_file_location(fullname, entry, submodule_search_locations=[root])
+
+
 class shallow(API.Proc_templet):
     def __init__(self, Proc_name='native_plugin', scan_interval=0.001, dead_interval=1, rx_queue=None, tx_queue=None,
                  control_queue=None, logger_proc=None, debug_mode=False, plugin_func_dict=None, bot_info_dict=None,
@@ -215,6 +243,7 @@ class shallow(API.Proc_templet):
         self.Proc_data['bot_info_dict'] = bot_info_dict
         self.Proc_data['main_tk'] = None
         self.plugin_models_dict = {}
+        self.plugin_shadowed_list = []
         self.plugin_models_call_list = []
         self.tx_queue = []
         self.menu_queue = []
@@ -763,38 +792,37 @@ class shallow(API.Proc_templet):
                 self.run_plugin_data_release_by_name(plugin_models_index_this)
 
     def run_plugin_data_release_by_name(self, plugin_models_index_this):
-        func_name = 'release_data'
-        dataPath = './plugin/data/%s/data' % plugin_models_index_this
-        dataPathFromList = [
-            './plugin/app/%s/data' % plugin_models_index_this,
-            './plugin/tmp/%s/data' % plugin_models_index_this
-        ]
-        for dataPathFrom in dataPathFromList:
-            if (
-                os.path.exists(dataPathFrom)
-                and os.path.isdir(dataPathFrom)
-            ):
+        from OlivOS.webUI import resourceAPI
+
+        plugin = self.plugin_models_dict[plugin_models_index_this]
+        data_from = Path(plugin['plugin_root']) / 'data'
+        if not data_from.is_dir():
+            return
+        data_path = Path('plugin/data') / plugin_models_index_this / 'data'
+        try:
+            # 仅从入选副本释放资源，合并而不删除运行数据或跟随目标目录内的链接。
+            for target in (data_path.parent, data_path):
                 try:
-                    removeDir(dataPath)
-                    shutil.copytree(dataPathFrom, dataPath)
-                    self.log(2, OlivOS.L10NAPI.getTrans(
-                        'OlivOS plugin [{0}] call [{1}] done', [
-                            self.plugin_models_dict[plugin_models_index_this]['name'],
-                            func_name
-                        ],
-                        modelName
-                    ))
-                except Exception as e:
-                    self.log(4, OlivOS.L10NAPI.getTrans(
-                        'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}', [
-                            self.plugin_models_dict[plugin_models_index_this]['name'],
-                            func_name,
-                            str(e),
-                            traceback.format_exc()
-                        ],
-                        modelName
-                    ))
-                break
+                    linked = resourceAPI.is_link(target)
+                except FileNotFoundError:
+                    break
+                if linked:
+                    raise ValueError(f'Data destination must not be a link: {target}')
+            for directory, subdirectories, files in os.walk(data_path):
+                for name in subdirectories + files:
+                    target = Path(directory) / name
+                    if resourceAPI.is_link(target):
+                        raise ValueError(f'Data destination must not be a link: {target}')
+            shutil.copytree(data_from, data_path, dirs_exist_ok=True)
+        except (OSError, ValueError) as error:
+            self.log(4, OlivOS.L10NAPI.getTrans(
+                'OlivOS plugin [{0}] call [{1}] failed: {2}\n{3}',
+                [plugin['name'], 'release_data', str(error), traceback.format_exc()], modelName
+            ))
+        else:
+            self.log(2, OlivOS.L10NAPI.getTrans(
+                'OlivOS plugin [{0}] call [{1}] done', [plugin['name'], 'release_data'], modelName
+            ))
 
     def run_plugin_func(self, plugin_event, func_name):
         for plugin_models_index_this in self.plugin_models_call_list:
@@ -842,9 +870,12 @@ class shallow(API.Proc_templet):
         tmp_plugin_webui_paths = {}
         tmp_plugin_order_list = []
         tmp_plugin_priority_dict = {}
+        tmp_plugin_source_dict = {}
         for plugin_models_index_this in self.plugin_models_call_list:
             if plugin_models_index_this in self.plugin_models_dict:
                 plugin_models_this = self.plugin_models_dict[plugin_models_index_this]
+                if 'source' in plugin_models_this:
+                    tmp_plugin_source_dict[plugin_models_this['namespace']] = plugin_models_this['source']
                 priority_default_this = plugin_models_this.get(
                     'priority_default',
                     plugin_models_this.get('priority', plugin_priority_default)
@@ -918,6 +949,8 @@ class shallow(API.Proc_templet):
                     'load_started': self.Proc_data.get('webui_load_started', 0),
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
                     'shallow_plugin_data_dict': tmp_plugin_dict_send,
+                    'shallow_plugin_source_dict': tmp_plugin_source_dict,
+                    'shallow_plugin_shadowed_list': self.plugin_shadowed_list,
                     'shallow_plugin_order_list': tmp_plugin_order_list,
                     'shallow_plugin_priority_dict': tmp_plugin_priority_dict,
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,
@@ -990,7 +1023,7 @@ class shallow(API.Proc_templet):
                     continue
                 item_full_path = os.path.join(full_path, item)
                 item_relative_path = os.path.join(current_path, item) if current_path else item
-                if item.endswith('.opk') and os.path.isfile(item_full_path):
+                if item.lower().endswith('.opk') and os.path.isfile(item_full_path):
                     plugin_list.append((item_relative_path, True, item_full_path))
                 elif os.path.isdir(item_full_path):
                     sub_plugins = self.find_plugins_recursive(base_path, item_relative_path, depth + 1, max_depth)
@@ -998,300 +1031,211 @@ class shallow(API.Proc_templet):
         return plugin_list
 
     def load_plugin_list(self):
+        self.plugin_models_dict = {}
+        self.plugin_shadowed_list = []
+        candidates = {}
+        for relative_path, is_opk, source_path in self.find_plugins_recursive(plugin_path):
+            try:
+                plugin = self._read_plugin_candidate(relative_path, is_opk, source_path)
+                namespace = plugin['namespace']
+                self.database._init_namespace(namespace)
+            except opkAPI.OPKError as error:
+                self._log_plugin_skip(relative_path, str(error))
+                continue
+            except Exception as error:
+                self._log_plugin_skip(relative_path, f'{error}\n{traceback.format_exc()}')
+                continue
+            previous = candidates.get(namespace)
+            if previous is not None:
+                self.plugin_shadowed_list.append(dict(previous['source'], namespace=namespace))
+                self.log(3, f'Duplicate plugin [{namespace}]: [{previous["source"]["path"]}] is shadowed by '
+                         f'[{plugin["source"]["path"]}]')
+            candidates[namespace] = plugin
+
+        # 先准备所有入选插件，再执行 import/init，以保留插件间相互导入的能力。
+        with ExitStack() as cleanup:
+            prepared = []
+            for plugin in candidates.values():
+                try:
+                    self._prepare_plugin(plugin, cleanup)
+                    prepared.append(plugin)
+                except (opkAPI.OPKError, OSError) as error:
+                    self._log_plugin_skip(plugin['source']['path'], str(error))
+            importlib.invalidate_caches()
+            self._forget_loaded_plugins()
+            finder = _PluginFinder(prepared)
+            sys.meta_path.insert(0, finder)
+            cleanup.callback(_discard_list_item, sys.meta_path, finder)
+            for plugin in prepared:
+                self._load_plugin(plugin)
+
+            # init 可生成可发布资源；解包目录必须在缓存创建后才回收。
+            self._cache_plugin_resources()
+        self.plugin_models_call_list = build_plugin_call_order(self.plugin_models_dict, load_plugin_priority())
+        self.log(2, OlivOS.L10NAPI.getTrans(
+            'Total count [{0}] OlivOS plugin is loaded by OlivOS plugin shallow [{1}]',
+            [len(self.plugin_models_dict), self.Proc_name],
+            modelName
+        ))
+
+    def _log_plugin_skip(self, path, reason):
+        self.log(4, OlivOS.L10NAPI.getTrans(
+            'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}',
+            [path, self.Proc_name, reason], modelName
+        ))
+
+    def _read_plugin_candidate(self, relative_path, is_opk, source_path):
+        source_path = os.path.abspath(source_path)
+        nested = None
+        if is_opk:
+            inspection = opkAPI.inspect_opk(source_path)
+            appconf, namespace = inspection['manifest'], inspection['namespace']
+            warnings, nested = inspection['warnings'], inspection['nested']
+            module_name = namespace
+        else:
+            appconf = opkAPI.load_app_json_file(os.path.join(source_path, 'app.json'))
+            module_name = os.path.basename(source_path)
+            namespace, warnings = opkAPI.validate_manifest(appconf, module_name)
+        for warning in warnings:
+            self.log(3, f'OlivOS plugin [{relative_path}]: {warning}')
+        normalized_relative = '' if relative_path == '.' else Path(relative_path).as_posix()
+        return {
+            'appconf': appconf,
+            'namespace': namespace,
+            'module_name': module_name,
+            'folder_path': '' if relative_path == '.' else os.path.dirname(relative_path),
+            'source': {'is_opk': is_opk, 'path': normalized_relative},
+            'source_file': source_path,
+            'nested': nested,
+            'name': appconf['name'],
+            'priority': appconf['priority'],
+            'support': appconf['support'],
+            'menu_config': appconf.get('menu_config'),
+            'webui_config': appconf.get('webui_config'),
+            'message_mode': appconf.get('message_mode', OlivOS.infoAPI.OlivOS_message_mode_tx_default),
+            'author': appconf.get('author', 'N/A'),
+            'svn': appconf.get('svn', 0),
+            'version': appconf.get('version', '0'),
+            'info': appconf.get('info', 'N/A'),
+            'compatible_svn': appconf.get('compatible_svn', OlivOS.infoAPI.OlivOS_compatible_svn_default),
+        }
+
+    def _prepare_plugin(self, plugin, cleanup):
+        root = plugin['source_file']
+        if plugin['source']['is_opk']:
+            from OlivOS.webUI import resourceAPI
+
+            directory = os.path.abspath(plugin_path_tmp)
+            os.makedirs(directory, exist_ok=True)
+            if resourceAPI.is_link(Path(directory)):
+                raise OSError('OPK temporary root must not be a symbolic link or junction')
+            root = os.path.join(directory, plugin['namespace'])
+            try:
+                os.mkdir(root)
+            except FileExistsError:
+                # 不删除或重用其他插件、用户或并发加载器已存在的目录。
+                work = tempfile.mkdtemp(prefix='.opk-', dir=directory)
+                cleanup.callback(removeDir, work)
+                root = os.path.join(work, plugin['namespace'])
+            else:
+                cleanup.callback(removeDir, root)
+            archive_stat = self._archive_identity(plugin['source_file'])
+            inspection = opkAPI.extract_opk(plugin['source_file'], root)
+            manifest = opkAPI.load_app_json_file(os.path.join(root, 'app.json'))
+            if (inspection['namespace'] != plugin['namespace'] or inspection['nested'] != plugin['nested']
+                    or manifest != plugin['appconf'] or self._archive_identity(plugin['source_file']) != archive_stat):
+                raise opkAPI.OPKError('changed', 'OPK changed while loading')
+            plugin['archive_stat'] = archive_stat
+        plugin.update(plugin_root=root, webui_root=root)
+        parent = os.path.dirname(root)
+        if parent not in map(os.path.abspath, sys.path):
+            sys.path.insert(0, parent)
+            if plugin['source']['is_opk'] and parent != os.path.abspath(plugin_path_tmp):
+                cleanup.callback(_discard_list_item, sys.path, parent)
+
+    @staticmethod
+    def _archive_identity(path):
+        info = os.stat(path)
+        return info.st_dev, info.st_ino, info.st_mtime_ns, info.st_size
+
+    @staticmethod
+    def _forget_loaded_plugins():
+        modules = sys.modules.copy()
+        names = {name for name, module in modules.items()
+                 if isinstance(module, ModuleType) and vars(module).get('_olivos_loaded_plugin')}
+        for name in modules:
+            if name.partition('.')[0] in names:
+                sys.modules.pop(name, None)
+
+    def _import_plugin(self, plugin):
+        name, root = plugin['module_name'], plugin['plugin_root']
+        entry = os.path.join(root, '__init__.py')
+        try:
+            module = importlib.import_module(name)
+        except BaseException:
+            # Python 回滚失败的包导入，但不回滚已经成功导入的子模块。
+            for submodule in list(sys.modules):
+                if submodule.startswith(name + '.'):
+                    sys.modules.pop(submodule, None)
+            raise
+        existing = getattr(module, '__file__', None)
+        if existing is None or os.path.normcase(os.path.abspath(existing)) != os.path.normcase(entry):
+            raise ImportError(f'Plugin module [{name}] is already imported from [{existing}]')
+        module._olivos_loaded_plugin = True
+        return module
+
+    def _load_plugin(self, plugin):
+        namespace = plugin['namespace']
+        try:
+            module = self._import_plugin(plugin)
+            if not hasattr(module, 'main'):
+                raise ImportError(f'{namespace}.main not found')
+            if not hasattr(module.main, 'Event'):
+                raise ImportError(f'{namespace}.main.Event not found')
+        except Exception as error:
+            self._log_plugin_skip(plugin['source']['path'], f'{error}\n{traceback.format_exc()}')
+            return
+
+        plugin['model'] = module
+        self.plugin_models_dict[namespace] = plugin
+        if hasattr(module.main.Event, 'init'):
+            try:
+                module.main.Event.init(plugin_event=None, Proc=self)
+            except Exception as error:
+                # 与旧加载器一致，init 失败的实例仍保留在线，但不重写原包。
+                plugin['schedule_init_failed'] = True
+                self._log_plugin_skip(plugin['source']['path'], f'init: {error}\n{traceback.format_exc()}')
+            else:
+                self.log(2, OlivOS.L10NAPI.getTrans(
+                    'OlivOS plugin [{0}] call [{1}] done', [plugin['name'], 'init'], modelName
+                ))
+        if plugin['nested'] and not plugin.get('schedule_init_failed'):
+            self._rebuild_nested_plugin(plugin)
+        self.log(2, OlivOS.L10NAPI.getTrans(
+            'OlivOS plugin [{0}] is loaded by OlivOS plugin shallow [{1}]',
+            [plugin['name'], self.Proc_name], modelName
+        ))
+        self.run_plugin_data_release_by_name(namespace)
+
+    def _rebuild_nested_plugin(self, plugin):
         from OlivOS.webUI import resourceAPI
 
-        total_models_count = 0
-        self.plugin_models_dict = {}
-        skip_result = ''
-        func_init_name = 'init'
-        # 递归查找插件
-        plugin_dir_list_with_info = self.find_plugins_recursive(plugin_path)
-        opk_plugin_list = []
-        # 解包opk格式插件
-        for plugin_dir_this_tmp, is_opk, full_path_info in plugin_dir_list_with_info:
-            flag_is_opk = is_opk
-            try:
-                plugin_dir_this = plugin_dir_this_tmp
-                if flag_is_opk and len(plugin_dir_this_tmp) > 4:
-                    if plugin_dir_this_tmp[-4:] == '.opk':
-                        plugin_dir_this = plugin_dir_this_tmp[:-4]
-                        opkFile = zipfile.ZipFile(os.path.join(plugin_path, plugin_dir_this_tmp))
-                        opkFile_list = opkFile.namelist()
-                        releaseDir(plugin_path_tmp)
-                        doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        opk_plugin_list.append(plugin_dir_this_tmp)
-                        releaseDir(os.path.join(plugin_path_tmp, plugin_dir_this))
-                        for opkFile_list_this in opkFile_list:
-                            opkFile.extract(opkFile_list_this, os.path.join(plugin_path_tmp, plugin_dir_this))
-            except Exception as e:
-                doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                # traceback.print_exc()
-                self.log(3, OlivOS.L10NAPI.getTrans(
-                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}\n{3}', [
-                        plugin_dir_this,
-                        self.Proc_name,
-                        str(e),
-                        traceback.format_exc()
-                    ],
-                    modelName
-                ))
-                continue
+        relative = plugin['source']['path']
+        path = plugin['source_file']
+        try:
+            if resourceAPI.is_link(Path(plugin_path)) or not resourceAPI.mounted(path, plugin_path):
+                raise OSError('nested OPK path contains a symbolic link or junction')
+            if self._archive_identity(path) != plugin['archive_stat']:
+                raise OSError('original OPK changed after extraction')
+            opkAPI.rebuild_opk_file(path, path)
+        except (OSError, opkAPI.OPKError) as error:
+            self.log(3, f'Failed to rebuild nested OPK [{relative}]: {error}')
+        else:
+            self.log(2, f'Rebuilt nested OPK [{relative}] as a flat archive')
 
-        plugin_models_dict = {}
+    def _cache_plugin_resources(self):
+        from OlivOS.webUI import resourceAPI
 
-        # 统一载入插件
-        for plugin_dir_this_tmp, is_opk, full_path_info in plugin_dir_list_with_info:
-            flag_is_opk = is_opk
-            plugin_models_app_conf = None
-            skip_result = None
-            skip_result_level = None
-            try:
-                plugin_dir_this = plugin_dir_this_tmp
-                if flag_is_opk and len(plugin_dir_this_tmp) > 4:
-                    if plugin_dir_this_tmp[-4:] == '.opk':
-                        plugin_dir_this = plugin_dir_this_tmp[:-4]
-                if len(plugin_dir_this) > 0:
-                    if plugin_dir_this[0] not in ['.']:
-                        try:
-                            if flag_is_opk:
-                                app_json_path = os.path.join(plugin_path_tmp, plugin_dir_this, 'app.json')
-                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
-                                    plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
-                            else:
-                                app_json_path = os.path.join(plugin_path, plugin_dir_this, 'app.json')
-                                with open(app_json_path, 'r', encoding='utf-8') as plugin_models_app_conf_f:
-                                    plugin_models_app_conf = json.loads(plugin_models_app_conf_f.read())
-                        except Exception:
-                            traceback.print_exc()
-                            plugin_models_app_conf = None
-                        plugin_models_dict_this = {}
-                        if plugin_models_app_conf is None:
-                            skip_result = plugin_dir_this + '/app.json' + ' not found'
-                            skip_result_level = 4
-                        else:
-                            # 获取插件的模块名
-                            plugin_module_name = os.path.basename(plugin_dir_this.rstrip(os.sep).rstrip('/'))
-                            # 获取插件所在的文件夹路径
-                            plugin_folder_path = (
-                                os.path.dirname(plugin_dir_this)
-                                if os.sep in plugin_dir_this or '/' in plugin_dir_this
-                                else ''
-                            )
-
-                            # 优先使用 app.json 中定义的 namespace,如果没有则使用插件模块名
-                            if 'namespace' in plugin_models_app_conf:
-                                plugin_namespace = plugin_models_app_conf['namespace']
-                            else:
-                                plugin_namespace = plugin_module_name
-
-                            plugin_models_dict_this = {
-                                'appconf': plugin_models_app_conf,
-                                'priority': plugin_models_app_conf['priority'],
-                                'namespace': plugin_namespace,
-                                'module_name': plugin_module_name,
-                                'folder_path': plugin_folder_path,
-                                'name': plugin_models_app_conf['name'],
-                                'support': plugin_models_app_conf['support'],
-                                'menu_config': None
-                            }
-                            if 'menu_config' in plugin_models_app_conf:
-                                plugin_models_dict_this['menu_config'] = plugin_models_app_conf['menu_config']
-                            plugin_models_dict_this['webui_config'] = plugin_models_app_conf.get('webui_config')
-                            if 'message_mode' in plugin_models_app_conf:
-                                plugin_models_dict_this['message_mode'] = plugin_models_app_conf['message_mode']
-                            else:
-                                plugin_models_dict_this['message_mode'] = OlivOS.infoAPI.OlivOS_message_mode_tx_default
-                            if 'author' in plugin_models_app_conf:
-                                plugin_models_dict_this['author'] = plugin_models_app_conf['author']
-                            else:
-                                plugin_models_dict_this['author'] = 'N/A'
-                            if 'svn' in plugin_models_app_conf:
-                                plugin_models_dict_this['svn'] = plugin_models_app_conf['svn']
-                            else:
-                                plugin_models_dict_this['svn'] = 0
-                            if 'version' in plugin_models_app_conf:
-                                plugin_models_dict_this['version'] = plugin_models_app_conf['version']
-                            else:
-                                plugin_models_dict_this['version'] = '0'
-                            if 'info' in plugin_models_app_conf:
-                                plugin_models_dict_this['info'] = plugin_models_app_conf['info']
-                            else:
-                                plugin_models_dict_this['info'] = 'N/A'
-                            if 'compatible_svn' in plugin_models_app_conf:
-                                plugin_models_dict_this['compatible_svn'] = plugin_models_app_conf['compatible_svn']
-                            else:
-                                plugin_models_dict_this['compatible_svn'] = OlivOS.infoAPI.OlivOS_compatible_svn_default
-                            if plugin_models_dict_this['compatible_svn'] >= OlivOS.infoAPI.OlivOS_SVN_Compatible:
-                                pass
-                            elif plugin_models_dict_this[
-                                'compatible_svn'] >= OlivOS.infoAPI.OlivOS_SVN_OldCompatible and \
-                                    plugin_models_dict_this['compatible_svn'] <= OlivOS.infoAPI.OlivOS_SVN_Compatible:
-                                self.log(3, OlivOS.L10NAPI.getTrans(
-                                    'OlivOS plugin [{0}] is support for old OlivOS version {1}', [
-                                        plugin_models_dict_this['name'],
-                                        str(plugin_models_dict_this['compatible_svn'])
-                                    ],
-                                    modelName
-                                ))
-                            elif plugin_models_dict_this['compatible_svn'] <= OlivOS.infoAPI.OlivOS_SVN_OldCompatible:
-                                skip_result = OlivOS.L10NAPI.getTrans(
-                                    'is support for old OlivOS version {0}', [
-                                        str(plugin_models_dict_this['compatible_svn'])
-                                    ],
-                                    modelName
-                                )
-                                self.log(4, OlivOS.L10NAPI.getTrans(
-                                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}', [
-                                        plugin_models_dict_this['name'],
-                                        self.Proc_name,
-                                        skip_result
-                                    ],
-                                    modelName
-                                ))
-                                continue
-
-                            # 自动修改解包名称
-                            if flag_is_opk:
-                                plugin_namespace = plugin_models_dict_this['namespace']
-                                if plugin_namespace != plugin_dir_this:
-                                    removeDir(os.path.join(plugin_path_tmp, plugin_namespace))
-                                    shutil.move(
-                                        os.path.join(plugin_path_tmp, plugin_dir_this),
-                                        os.path.join(plugin_path_tmp, plugin_namespace)
-                                    )
-                                    removeDir(os.path.join(plugin_path_tmp, plugin_dir_this))
-                                    plugin_dir_this = plugin_namespace
-                                plugin_models_dict_this['module_name'] = plugin_namespace
-
-                            # OPK 可能已按 namespace 移动，记录最终导入目录。
-                            plugin_models_dict_this['webui_root'] = os.path.abspath(os.path.join(
-                                plugin_path_tmp if flag_is_opk else plugin_path, plugin_dir_this
-                            ))
-
-                            # 完成配置数据库中对应插件命名空间的表格页初始化
-                            self.database._init_namespace(plugin_models_dict_this['namespace'])
-
-                            # 使用 namespace 作为字典的 key
-                            plugin_namespace_key = plugin_models_dict_this['namespace']
-                            plugin_models_dict[plugin_namespace_key] = {
-                                'isOPK': flag_is_opk,
-                                'data': plugin_models_dict_this,
-                                'plugin_dir': plugin_dir_this  # 保存原始目录路径用于后续加载
-                            }
-                        # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                    else:
-                        # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        skip_result = 'mask path'
-                else:
-                    # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                    skip_result = 'name too short'
-            except Exception as e:
-                # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                # traceback.print_exc()
-                skip_result = '%s\n%s' % (
-                    str(e),
-                    traceback.format_exc()
-                )
-                skip_result_level = 4
-            if skip_result is not None:
-                if skip_result_level is None:
-                    skip_result_level = 3
-                self.log(skip_result_level, OlivOS.L10NAPI.getTrans(
-                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}', [
-                        plugin_dir_this, self.Proc_name, skip_result
-                    ],
-                    modelName
-                ))
-
-        for plugin_models_dict_this_key in plugin_models_dict:
-            try:
-                # 从这里开始导入实际模块
-                plugin_models_dict_this = plugin_models_dict[plugin_models_dict_this_key]['data']
-                plugin_namespace = plugin_models_dict_this_key  # 这是 namespace
-                plugin_dir_this = (
-                    plugin_models_dict[plugin_models_dict_this_key].get('plugin_dir', plugin_namespace)  # 这是实际目录路径
-                )
-                flag_is_opk = plugin_models_dict[plugin_models_dict_this_key]['isOPK']
-                # 处理子目录中的插件
-                # 获取插件的模块名
-                plugin_module_name = (
-                    plugin_models_dict_this.get('module_name', os.path.basename(plugin_dir_this.rstrip(os.sep)))
-                )
-                # 获取插件所在的父目录
-                plugin_folder_path = (
-                    os.path.dirname(plugin_dir_this) if flag_is_opk
-                    else plugin_models_dict_this.get('folder_path', '')
-                )
-                if plugin_folder_path:
-                    # 插件在子目录中,需要将父目录添加到 sys.path
-                    if flag_is_opk:
-                        plugin_parent_full_path = os.path.join(plugin_path_tmp, plugin_folder_path)
-                    else:
-                        plugin_parent_full_path = os.path.join(plugin_path, plugin_folder_path)
-                    # 添加到 sys.path (如果还没有添加)
-                    if plugin_parent_full_path not in sys.path:
-                        sys.path.insert(0, plugin_parent_full_path)
-
-                plugin_models_tmp = importlib.import_module(plugin_module_name)
-                plugin_models_dict_this['model'] = plugin_models_tmp
-                if hasattr(plugin_models_tmp, 'main'):
-                    if hasattr(plugin_models_tmp.main, 'Event'):
-                        self.plugin_models_dict[plugin_namespace] = plugin_models_dict_this
-                        if hasattr(plugin_models_tmp.main.Event, func_init_name):
-                            try:
-                                plugin_models_tmp.main.Event.init(plugin_event=None, Proc=self)
-                                self.log(2, OlivOS.L10NAPI.getTrans(
-                                    'OlivOS plugin [{0}] call [{1}] done', [
-                                        plugin_models_dict_this['name'],
-                                        func_init_name
-                                    ],
-                                    modelName
-                                ))
-                            except Exception as e:
-                                plugin_models_dict_this['schedule_init_failed'] = True
-                                self.log(4, OlivOS.L10NAPI.getTrans(
-                                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}\n{3}', [
-                                        plugin_models_dict_this['name'],
-                                        func_init_name,
-                                        str(e),
-                                        traceback.format_exc()
-                                    ],
-                                    modelName
-                                ))
-                        total_models_count += 1
-                        self.log(2, OlivOS.L10NAPI.getTrans(
-                            'OlivOS plugin [{0}] is loaded by OlivOS plugin shallow [{1}]', [
-                                plugin_models_dict_this['name'],
-                                self.Proc_name
-                            ],
-                            modelName
-                        ))
-                        # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                        self.run_plugin_data_release_by_name(plugin_namespace)
-                        continue
-                    else:
-                        skip_result = plugin_namespace + '.main.Event' + ' not found'
-                        skip_result_level = 4
-                else:
-                    skip_result = plugin_namespace + '.main' + ' not found'
-                    skip_result_level = 4
-            except Exception as e:
-                # doOpkRemove(plugin_path_tmp, plugin_dir_this_tmp)
-                # traceback.print_exc()
-                skip_result = '%s\n%s' % (
-                    str(e),
-                    traceback.format_exc()
-                )
-                skip_result_level = 4
-            if skip_result is not None:
-                if skip_result_level is None:
-                    skip_result_level = 3
-                self.log(skip_result_level, OlivOS.L10NAPI.getTrans(
-                    'OlivOS plugin [{0}] is skiped by OlivOS plugin shallow [{1}]: {2}',
-                    [plugin_namespace, self.Proc_name, skip_result]
-                ))
-
-        # 页面资源在全部 init 完成后生成独立快照，导入缓存随后正常清理。
         for namespace, plugin in self.plugin_models_dict.items():
             if not isinstance(plugin.get('webui_config'), list):
                 continue
@@ -1300,25 +1244,12 @@ class shallow(API.Proc_templet):
                 resources, pages = resourceAPI.declaration(source, plugin['appconf'])
                 if not resourceAPI.valid_namespace(namespace):
                     raise ValueError('Invalid WebUI namespace')
-                if plugin_models_dict[namespace]['isOPK'] and resources:
+                if plugin['source']['is_opk']:
                     runtime_root = os.path.dirname(os.path.dirname(os.path.abspath(plugin_path_tmp)))
-                    plugin['webui_root'] = resourceAPI.build_cache(runtime_root, source, namespace, resources)
-                elif plugin_models_dict[namespace]['isOPK']:
-                    plugin['webui_root'] = ''
+                    plugin['webui_root'] = (
+                        resourceAPI.build_cache(runtime_root, source, namespace, resources) if resources else ''
+                    )
                 plugin.update(webui_resources=resources, webui_config=pages)
             except (OSError, ValueError, RuntimeError) as error:
                 plugin.update(webui_resources=[], webui_config=[], webui_root='')
                 self.log(4, f'WebUI resources [{namespace}]: {error}')
-        # 只回收本次 OPK 的解包目录，保留 tmp 根目录及其他插件的临时文件。
-        for item in plugin_models_dict.values():
-            if item['isOPK']:
-                removeDir(os.path.join(plugin_path_tmp, item['plugin_dir']))
-        # 插件调用列表按照生效优先级排序
-        self.plugin_models_call_list = build_plugin_call_order(
-            self.plugin_models_dict, load_plugin_priority()
-        )
-        self.log(2, OlivOS.L10NAPI.getTrans(
-            'Total count [{0}] OlivOS plugin is loaded by OlivOS plugin shallow [{1}]',
-            [total_models_count, self.Proc_name],
-            modelName
-        ))

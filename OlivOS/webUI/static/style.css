@@ -2610,6 +2610,160 @@ body.account-dragging-active {
 .plugin-toolbar {
   margin-bottom: 6px;
 }
+.opk-callout,
+.opk-management {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  overflow-wrap: anywhere;
+}
+.opk-callout {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.opk-pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-inline-start: 4px solid var(--danger);
+}
+.opk-callout h2,
+.opk-management h2 {
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+}
+.opk-toolbar {
+  flex-wrap: wrap;
+}
+.opk-toolbar select,
+#plugin-batch-dialog select,
+#plugin-batch-input {
+  min-width: 0;
+  max-width: 100%;
+}
+.opk-source {
+  margin: 0 0 8px;
+  padding: 8px;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: var(--control-radius);
+}
+.opk-file-path {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.opk-duplicate-group + .opk-duplicate-group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--danger-border);
+}
+.opk-duplicate-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.opk-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--primary-border);
+  border-radius: 8px;
+  color: var(--brand);
+  background: var(--primary-bg);
+  font-size: 0.85em;
+}
+#plugin-batch-dialog {
+  width: min(840px, calc(100vw - 24px));
+  padding: clamp(12px, 3vw, 24px);
+  overflow-wrap: anywhere;
+  overflow: hidden;
+}
+#plugin-batch-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.opk-batch-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 4px;
+}
+#plugin-batch-dialog .dialog-actions {
+  flex: none;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.opk-binary-warning {
+  padding: 8px 12px;
+  border-inline-start: 4px solid var(--danger);
+  color: var(--danger);
+}
+.opk-drop,
+.opk-card,
+#plugin-batch-plan {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+}
+.opk-drop {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  border: 1px dashed var(--primary-border);
+  background: var(--primary-bg);
+}
+.opk-drop.dragging {
+  border-color: var(--accent);
+  background: var(--primary-hover);
+}
+.opk-card.has-errors {
+  border-color: var(--danger-border);
+  border-inline-start: 4px solid var(--danger);
+}
+.opk-card h3,
+#plugin-batch-plan h3 {
+  margin: 0 0 8px;
+}
+.opk-card label,
+.opk-card fieldset {
+  margin: 8px 0;
+}
+.opk-card fieldset {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+}
+.opk-card details,
+.opk-card p {
+  margin: 8px 0;
+}
+#plugin-batch-plan {
+  background: var(--bg);
+}
+#plugin-batch-plan ul,
+.opk-messages {
+  padding-inline-start: 22px;
+}
+.opk-errors {
+  color: var(--danger);
+}
+.opk-badge.muted {
+  color: var(--muted);
+  border-color: var(--line);
+  background: var(--bg);
+}
+.opk-file-status .opk-badge {
+  margin: 2px 4px 2px 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .plugin-schedule-form {
   display: flex;
   flex-wrap: wrap;
