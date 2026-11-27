@@ -950,7 +950,7 @@ class shallow(API.Proc_templet):
                     'shallow_plugin_menu_list': tmp_plugin_list_send,
                     'shallow_plugin_data_dict': tmp_plugin_dict_send,
                     'shallow_plugin_source_dict': tmp_plugin_source_dict,
-                    'shallow_plugin_shadowed_list': self.plugin_shadowed_list,
+                    'shallow_plugin_shadowed_list': getattr(self, 'plugin_shadowed_list', []),
                     'shallow_plugin_order_list': tmp_plugin_order_list,
                     'shallow_plugin_priority_dict': tmp_plugin_priority_dict,
                     'shallow_plugin_webui_list': tmp_plugin_webui_send,
