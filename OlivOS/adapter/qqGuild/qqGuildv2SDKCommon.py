@@ -354,6 +354,8 @@ sdkQQGroupApiDenied = set()
 sdkQQGroupApiBackoff = {}
 sdkQQGroupApiBackoffMaxSize = 2000
 qqGroupApiDeniedCode = 11253
+# QQ OpenAPI V2 常见同时返回旧 code(11253) 与新版 8 位 err_code(40012010)。
+qqGroupApiDeniedCodes = {11253, 40012010}
 # 11255 降级为 suspect 后的复核状态（按 (bot_hash, group_openid) 隔离，单后台线程消费）。
 sdkQQGroupSuspectState = {}
 sdkQQGroupSuspectDue = []
@@ -2168,7 +2170,7 @@ def _verify_qq_group_suspect(
         _clear_qq_group_suspect_state(bot_hash, gid)
         _clear_qq_group_backoff_for_group(bot_hash, gid)
         return
-    if api_res.get('error_code', None) == 11255:
+    if _qq_api_result_has_code(api_res, {11255}):
         now = time.monotonic()
         should_remove = False
         reschedule_delay = None
@@ -2226,6 +2228,47 @@ def _verify_qq_group_suspect(
         )
 
 
+def _parse_qq_api_code_value(value):
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text == '':
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return text
+    return value
+
+
+def _extract_qq_api_codes(raw_obj):
+    """同时解析 err_code 与 code，避免新版 8 位 err_code 或 err_code=None 遮蔽 5 位 code。"""
+    if not isinstance(raw_obj, dict):
+        return None, set()
+    err_code = _parse_qq_api_code_value(raw_obj.get('err_code', None))
+    code = _parse_qq_api_code_value(raw_obj.get('code', None))
+    all_codes = set()
+    if err_code is not None:
+        all_codes.add(err_code)
+    if code is not None:
+        all_codes.add(code)
+    primary = err_code if err_code is not None else code
+    return primary, all_codes
+
+
+def _qq_api_result_has_code(api_res, target_codes):
+    if not isinstance(api_res, dict):
+        return False
+    error_code = _parse_qq_api_code_value(api_res.get('error_code', None))
+    if error_code in target_codes:
+        return True
+    _, all_codes = _extract_qq_api_codes(api_res.get('response', None))
+    return bool(all_codes & target_codes)
+
+
 def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
     # 统一请求入口:按 bot 隔离的权限禁用、群级退避与接口滑动窗口。
     group_openid = getattr(getattr(api_obj, 'metadata', None), 'group_openid', None)
@@ -2278,30 +2321,25 @@ def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
             raw_obj = json.loads(api_obj.res)
         except Exception:
             raw_obj = None
-    api_code = None
+    api_code, api_codes = _extract_qq_api_codes(raw_obj)
     error_message = None
     if type(raw_obj) is dict:
-        api_code = raw_obj.get('err_code', raw_obj.get('code', None))
-        if isinstance(api_code, str):
-            try:
-                api_code = int(api_code.strip())
-            except (TypeError, ValueError):
-                pass
         error_message = raw_obj.get('message', raw_obj.get('msg', None))
     flag_success = (
         api_obj.res_code is not None
         and 200 <= api_obj.res_code < 300
-        and api_code in [None, 0]
+        and all(code_val == 0 for code_val in api_codes)
     )
-    if api_code == qqGroupApiDeniedCode:
+    is_denied = bool(api_codes & qqGroupApiDeniedCodes)
+    if is_denied:
         _mark_qq_group_api_denied(bot_hash, op_key)
         error_message = (
             'QQ official API %d: application has no access permission '
             '(invitation whitelist required)' % qqGroupApiDeniedCode
         )
-    elif api_code == 11255 and group_openid is not None:
+    elif 11255 in api_codes and group_openid is not None:
         _mark_qq_group_suspect(bot_hash, bot_info, str(group_openid), op_key)
-    elif api_code in (100017, 40023001):
+    elif bool(api_codes & {100017, 40023001}):
         _set_qq_group_api_backoff(bot_hash, op_key, str(group_openid), 3600.0)
     return {
         'active': flag_success,
@@ -2310,7 +2348,7 @@ def _do_qq_group_api_request(bot_info, api_obj, req_type, op_key, wait=False):
         'error': None if flag_success else error_message,
         'response': raw_obj,
         'raw_response': api_obj.res,
-        'denied': api_code == qqGroupApiDeniedCode,
+        'denied': is_denied,
         'rate_limited': False,
         'backed_off': False
     }
@@ -2442,6 +2480,7 @@ def _qq_group_fetch_member_pages(
         'ok': False,
         'error': None,
         'error_code': None,
+        'http_status': None,
         'denied': False,
         'rate_limited': False,
         'backed_off': False,
@@ -2472,6 +2511,7 @@ def _qq_group_fetch_member_pages(
         if not api_res.get('active', False):
             result['error'] = api_res.get('error', 'api request failed')
             result['error_code'] = api_res.get('error_code', None)
+            result['http_status'] = api_res.get('http_status', None)
             result['denied'] = api_res.get('denied', False)
             result['rate_limited'] = api_res.get('rate_limited', False)
             result['backed_off'] = api_res.get('backed_off', False)
@@ -3017,11 +3057,17 @@ def _qq_group_warm_step_with_wait():
     if callable(log_func):
         log_func(
             2,
-            'QQ 群 %s 成员后台续翻中止，恢复为增量缓存（denied=%s, rate_limited=%s, backed_off=%s, error=%s）' % (
+            (
+                'QQ 群 %s 成员后台续翻中止，恢复为增量缓存'
+                '（denied=%s, rate_limited=%s, backed_off=%s, '
+                'http_status=%s, error_code=%s, error=%s）'
+            ) % (
                 gid,
                 fetch_result.get('denied', False),
                 fetch_result.get('rate_limited', False),
                 fetch_result.get('backed_off', False),
+                fetch_result.get('http_status', None),
+                fetch_result.get('error_code', None),
                 fetch_result.get('error', None)
             ),
             [(modelName, 'default')]
@@ -3134,12 +3180,12 @@ def _qq_group_member_tier1_complete(bot_hash, bot_info, group_openid, member_ope
         api_res = _do_qq_group_api_request(bot_info, api_obj, 'GET', 'group_member_info')
         if (
             api_res.get('denied', False)
-            or api_res.get('error_code', None) == qqGroupApiDeniedCode
+            or _qq_api_result_has_code(api_res, qqGroupApiDeniedCodes)
         ):
             return 'denied'
         if api_res.get('backed_off', False):
             return 'failed'
-        if api_res.get('error_code', None) == 11255:
+        if _qq_api_result_has_code(api_res, {11255}):
             # 11255 群异常已交给 suspect 流程，单成员不再重试。
             return 'suspect'
         if api_res.get('rate_limited', False):
@@ -3699,12 +3745,11 @@ def _get_qq_group_self_open_id(bot_hash, group_openid, bot_info, now=None):
             )
             if api_res.get('denied', False):
                 return None
-            code = api_res.get('error_code', None)
-            if code == 11255:
+            if _qq_api_result_has_code(api_res, {11255}):
                 # 11255 语义未公开：不在这里删库，只标 suspect 并换下一个种子群。
                 qqStore.mark_group_suspect(bot_hash, candidate)
                 continue
-            if code in (100017, 40023001):
+            if _qq_api_result_has_code(api_res, {100017, 40023001}):
                 with sdkSubSelfOpenInfoLock:
                     sdkSubSelfOpenInfoRetryAt[cache_key] = request_time + 3600.0
                 continue
@@ -5075,14 +5120,7 @@ def _log_qq_user_info_minor_mode(openid):
 
 
 def _qq_user_info_code(raw_obj):
-    if not isinstance(raw_obj, dict):
-        return None
-    api_code = raw_obj.get('err_code', raw_obj.get('code', None))
-    if isinstance(api_code, str):
-        try:
-            api_code = int(api_code.strip())
-        except (TypeError, ValueError):
-            return api_code
+    api_code, _ = _extract_qq_api_codes(raw_obj)
     return api_code
 
 
@@ -5108,14 +5146,14 @@ def _fetch_qq_user_basic_info(target_event, openid):
             raw_obj = None
     if not isinstance(raw_obj, dict):
         return None
-    api_code = _qq_user_info_code(raw_obj)
+    _, api_codes = _extract_qq_api_codes(raw_obj)
     flag_success = (
         api_obj.res_code is not None
         and 200 <= api_obj.res_code < 300
-        and api_code in [None, 0]
+        and all(code_val == 0 for code_val in api_codes)
     )
-    if not flag_success or api_code == qqUserInfoNoFriendCode:
-        if api_code in qqUserInfoMinorModeCodes:
+    if not flag_success or qqUserInfoNoFriendCode in api_codes:
+        if bool(api_codes & qqUserInfoMinorModeCodes):
             # 未成年人模式下平台不返回用户资料。这是账号自身状态,换接口也没用,
             # 只按 miss 处理:不进缓存、不编数据,调用方回落到事件里的昵称。
             _log_qq_user_info_minor_mode(openid)
@@ -5985,7 +6023,7 @@ class event_action_common(object):
     def _check_qq_group_send_result_suspect(target_event, chat_type, chat_id, result):
         if chat_type != 'qq_group' or not isinstance(result, dict):
             return
-        if result.get('data', {}).get('error_code', None) == 11255:
+        if _qq_api_result_has_code(result.get('data', None), {11255}):
             event_action._mark_qq_group_suspect_from_event(
                 target_event, chat_id, 'send_message'
             )
@@ -5994,7 +6032,8 @@ class event_action_common(object):
         if type_chat != 'qq_groups' or api_obj is None:
             return
         raw_obj = init_api_json(getattr(api_obj, 'res', None))
-        if event_action._get_api_error_code(raw_obj) == 11255:
+        _, all_codes = _extract_qq_api_codes(raw_obj)
+        if 11255 in all_codes:
             event_action._mark_qq_group_suspect_from_event(
                 target_event, chat_id, op_key
             )

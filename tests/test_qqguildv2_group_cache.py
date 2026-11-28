@@ -109,6 +109,56 @@ def test_11253_disables_interface_permanently_and_logs_once(group_api, monkeypat
     assert proc.log.call_count == 1
 
 
+@pytest.mark.parametrize('payload,expected_primary', [
+    ({'code': 11253, 'err_code': 40012010, 'message': '应用无接口访问权限'}, 40012010),
+    ({'code': 11253, 'err_code': 40099999, 'message': '应用无接口访问权限'}, 40099999),
+    ({'err_code': 40012010, 'message': '应用无接口访问权限'}, 40012010),
+    ({'code': 11253, 'err_code': None, 'message': '应用无接口访问权限'}, 11253),
+])
+def test_dual_code_11253_and_40012010_disables_interface_permanently(
+    group_api, payload, expected_primary
+):
+    bot, bot_hash, proc = group_api
+    api = SimpleNamespace(
+        metadata=SimpleNamespace(group_openid='group'),
+        res=json.dumps(payload, ensure_ascii=False),
+        res_code=400,
+        do_api=Mock()
+    )
+    first = common._do_qq_group_api_request(bot, api, 'GET', 'group_member_list')
+    second = common._do_qq_group_api_request(bot, api, 'GET', 'group_member_list')
+    assert first['active'] is False
+    assert first['denied'] is True
+    assert first['http_status'] == 400
+    assert first['error_code'] == expected_primary
+    assert second['denied'] is True
+    assert common._check_qq_group_api_denied(bot_hash, 'group_member_list') is True
+    assert api.do_api.call_count == 1
+    assert proc.log.call_count == 1
+
+
+def test_dual_code_11255_still_marks_group_suspect(group_api, monkeypatch):
+    bot, bot_hash, _ = group_api
+    scheduled = []
+    monkeypatch.setattr(
+        common,
+        '_schedule_qq_group_suspect_verify',
+        lambda bh, bi, gid: scheduled.append((bh, gid)) or True
+    )
+    store.touch_group(bot_hash, 'group')
+    api = SimpleNamespace(
+        metadata=SimpleNamespace(group_openid='group'),
+        res=json.dumps({'code': 11255, 'err_code': 40099998, 'message': 'group error'}),
+        res_code=400,
+        do_api=Mock()
+    )
+    res = common._do_qq_group_api_request(bot, api, 'GET', 'group_member_list')
+    assert res['denied'] is False
+    assert res['error_code'] == 40099998
+    assert store.get_group(bot_hash, 'group')['state'] == 'suspect'
+    assert scheduled == [(str(bot_hash), 'group')]
+
+
 def test_11255_marks_group_suspect_and_preserves_members(group_api, monkeypatch):
     bot, bot_hash, _ = group_api
     scheduled = []

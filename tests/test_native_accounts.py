@@ -585,3 +585,17 @@ def test_native_reopen_syncs_clean_draft_and_confirms_stale_dirty_draft(hidden_r
     host.account_data_commit()
     assert not window.winfo_exists() and host.UIData['flag_commit'] and not control.empty()
     assert confirm.call_count == 2
+
+
+def test_native_account_tree_preserves_account_order(hidden_root):
+    bots = [
+        OlivOS.API.bot_info_T(
+            id=account_id, platform_sdk='terminal_link', platform_platform='terminal', platform_model='default'
+        )
+        for account_id in (10001, 10002, 10003)
+    ]
+    host, _ = _host({bot.hash: bot for bot in bots})
+    tree = host.UIObject['tree']
+    items = tree.get_children()
+    assert [tree.item(item, 'text') for item in items] == [bot.hash for bot in bots]
+    assert [str(tree.item(item, 'values')[1]) for item in items] == ['10001', '10002', '10003']

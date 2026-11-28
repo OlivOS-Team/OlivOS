@@ -1,11 +1,13 @@
 """真实浏览器验证插件分组、独立功能页面、保活及响应式侧栏。"""
 
+import base64
 import json
 import re
 import queue
 import threading
 import time
 from types import SimpleNamespace
+from urllib.parse import unquote
 
 import pytest
 
@@ -1326,6 +1328,28 @@ def account_qr(browser, monkeypatch):
     return SimpleNamespace(remote=remote, calls=calls)
 
 
+@pytest.fixture
+def qr_device(browser, request):
+    device = getattr(request, 'param', 'touch')
+    driver = browser.driver
+    if device == 'desktop':
+        yield
+        return
+    set_viewport(browser, 390, 700, mobile_device=True)
+    if device == 'mobile-agent':
+        driver.execute_cdp_cmd('Emulation.setUserAgentOverride', {'userAgent': 'Mozilla/5.0 (iPhone) Mobile'})
+        try:
+            yield
+        finally:
+            driver.execute_cdp_cmd('Emulation.setUserAgentOverride', {'userAgent': ''})
+    else:
+        driver.execute_cdp_cmd('Emulation.setTouchEmulationEnabled', {'enabled': True, 'maxTouchPoints': 1})
+        try:
+            yield
+        finally:
+            driver.execute_cdp_cmd('Emulation.setTouchEmulationEnabled', {'enabled': False})
+
+
 def choose_account_preset(browser, title):
     from selenium.webdriver.common.by import By
     browser.click('#account-preset')
@@ -1360,6 +1384,242 @@ def assert_revoked_blob(browser, url):
         const done = arguments[1];
         fetch(arguments[0]).then(() => done(false), () => done(true));
     ''', url)
+
+
+def assert_no_qq_jump(browser):
+    for selector in ('#qr-qq-jump', '#qr-toggle-code', '#qr-jump-hint'):
+        assert not browser.find(selector).is_displayed()
+    assert browser.find('#qr-qq-jump').raw().get_dom_attribute('href') is None
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('qr_device', ['touch', 'mobile-agent'], indirect=True)
+def test_mobile_qr_prefers_qq_jump_with_exact_utf8_url(browser, account_qr, qr_device, monkeypatch):
+    connect_url = 'https://q.qq.com/授权'
+    monkeypatch.setattr(OlivOS.qqGuildv2QrBindAPI, '_CONNECT_URL', connect_url)
+    manager = browser.host.qr_bind_manager
+    create = manager.create_session
+
+    def padded_session():
+        session = create()
+        return dict(session, qr_url=f" \t{session['qr_url']}\n ")
+
+    monkeypatch.setattr(manager, 'create_session', padded_session)
+    quick_account_qr(browser)
+    browser.wait.until(lambda _: browser.find('#qr-qq-jump').is_displayed())
+    assert browser.text('#qr-qq-jump') == '在 QQ 中登录'
+    assert browser.text('#qr-toggle-code') == '改用二维码'
+    assert browser.attribute('#qr-toggle-code', 'aria-expanded') == 'false'
+    assert browser.find('#qr-qq-jump').raw().get_dom_attribute('target') is None
+    assert not browser.find('#qr-image').is_displayed() and not browser.find('#qr-link').is_displayed()
+    assert browser.find('#qr-image').raw().get_dom_attribute('src') is None
+
+    href = browser.attribute('#qr-qq-jump', 'href')
+    assert href.startswith('mqqapi://forward/url?')
+    encoded, plugin_auth = href.split('?', 1)[1].split('&')
+    assert plugin_auth == 'plg_auth=1'
+    params = dict(part.split('=', 1) for part in unquote(encoded).split('&'))
+    assert params['src_type'] == 'web' and params['version'] == '1'
+    assert params['t'].isdigit()
+    decoded = base64.b64decode(params['url_prefix'], validate=True).decode('utf-8')
+    task_id, = account_qr.remote.keys
+    assert decoded == f'{connect_url}?task_id={task_id}&_wv=2'
+
+
+@pytest.mark.browser
+def test_mobile_qr_jump_actions_fit_viewport_and_align_labels(browser, account_qr, qr_device):
+    quick_account_qr(browser)
+    browser.wait.until(lambda _: browser.find('#qr-qq-jump').is_displayed())
+    jump, toggle = browser.driver.execute_script('''
+        return ['#qr-qq-jump', '#qr-toggle-code'].map(selector => {
+            const control = document.querySelector(selector);
+            const rect = control.getBoundingClientRect();
+            const text = document.createRange();
+            text.selectNodeContents(control);
+            const label = text.getBoundingClientRect();
+            return {
+                height: rect.height, top: rect.top, center: (label.top + label.bottom) / 2,
+                fits: rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight,
+            };
+        });
+    ''')
+    assert jump['fits'] and toggle['fits']
+    assert jump['height'] == toggle['height'] >= 44
+    assert jump['top'] == toggle['top']
+    assert jump['center'] == pytest.approx(toggle['center'], abs=1)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('origin', ['http://q.qq.com', 'https://q.qq.com.example.test', 'https://bot@q.qq.com'])
+def test_mobile_qr_keeps_untrusted_url_out_of_links(browser, account_qr, qr_device, monkeypatch, origin):
+    monkeypatch.setattr(OlivOS.qqGuildv2QrBindAPI, '_CONNECT_URL', origin + '/connect.html')
+    quick_account_qr(browser)
+    qr_blob(browser)
+    assert_no_qq_jump(browser)
+    assert not browser.find('#qr-link').is_displayed()
+    assert browser.find('#qr-link').raw().get_dom_attribute('href') is None
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize(('qr_device', 'message'), [
+    ('touch', '正在准备 QQ 登录…'), ('desktop', '正在获取二维码…'),
+], indirect=['qr_device'])
+def test_account_qr_preparation_hint_matches_device(browser, account_qr, qr_device, monkeypatch, message):
+    manager = browser.host.qr_bind_manager
+    create = manager.create_session
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_create():
+        entered.set()
+        assert release.wait(15)
+        return create()
+
+    monkeypatch.setattr(manager, 'create_session', slow_create)
+    quick_account_qr(browser)
+    try:
+        assert entered.wait(5)
+        assert browser.text('#qr-status') == message
+    finally:
+        release.set()
+    browser.wait.until(lambda _: '确认绑定' in browser.text('#qr-status'))
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('expire', [False, True], ids=['loaded', 'expired-during-load'])
+def test_mobile_qr_disclosure_shows_code_and_web_fallback(browser, account_qr, qr_device, monkeypatch, expire):
+    manager = browser.host.qr_bind_manager
+    get_png = manager.get_qr_png
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_image(bind_id):
+        png = get_png(bind_id)
+        entered.set()
+        assert release.wait(15)
+        return png
+
+    monkeypatch.setattr(manager, 'get_qr_png', slow_image)
+    quick_account_qr(browser)
+    browser.click('#qr-toggle-code')
+    try:
+        assert entered.wait(5)
+        assert browser.text('#qr-status') == '正在加载二维码…'
+        if expire:
+            account_qr.remote.status = 3
+            browser.driver.execute_script("document.dispatchEvent(new Event('visibilitychange'))")
+            browser.wait.until(lambda _: '二维码已过期' in browser.text('#qr-status'))
+    finally:
+        release.set()
+    if expire:
+        browser.wait.until(lambda _: any(method == 'GET' and path.endswith('/qrcode')
+                                         for method, path, _ in account_qr.calls))
+        assert '二维码已过期' in browser.text('#qr-status')
+        assert not browser.find('#qr-image').is_displayed()
+        assert_no_qq_jump(browser)
+        return
+    blob = qr_blob(browser)
+    assert browser.text('#qr-status') == '请在 QQ 中确认绑定。'
+    assert browser.find('#qr-image').is_displayed() and browser.find('#qr-link').is_displayed()
+    assert browser.attribute('#qr-link', 'href').startswith('https://q.qq.com/qqbot/openclaw/connect.html?')
+    assert browser.attribute('#qr-toggle-code', 'aria-expanded') == 'true'
+    browser.click('#qr-toggle-code')
+    assert not browser.find('#qr-image').is_displayed() and not browser.find('#qr-link').is_displayed()
+    browser.click('#qr-toggle-code')
+    assert qr_blob(browser) == blob and browser.find('#qr-image').is_displayed()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize(('end', 'message'), [('cancel', ''), ('expire', '过期'), ('error', '扫码状态无效')])
+def test_mobile_qr_ending_clears_jump_and_stops_polling(browser, account_qr, qr_device, end, message):
+    quick_account_qr(browser)
+    browser.click('#qr-toggle-code')
+    blob = qr_blob(browser)
+    if end == 'cancel':
+        browser.click('#qr-actions [data-close="qr-dialog"]')
+        assert not browser.find('#qr-dialog').is_displayed()
+    else:
+        account_qr.remote.status = 3 if end == 'expire' else 9
+        browser.wait.until(lambda _: message in browser.text('#qr-status'))
+    path = browser.wait.until(lambda _: next((path for method, path, status in account_qr.calls
+                                             if method == 'DELETE' and '/qr-bind/' in path and status == '200'), ''))
+    assert_no_qq_jump(browser)
+    assert browser.find('#qr-link').raw().get_dom_attribute('href') is None
+    assert browser.find('#qr-image').raw().get_dom_attribute('src') is None
+    assert_revoked_blob(browser, blob)
+    polls = [call for call in account_qr.calls if call[:2] == ('GET', path)]
+    browser.driver.execute_async_script('''
+        document.dispatchEvent(new Event('visibilitychange'));
+        setTimeout(arguments[0], 2200);
+    ''')
+    assert [call for call in account_qr.calls if call[:2] == ('GET', path)] == polls
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('return_during_poll', [False, True], ids=['repeat-visible', 'return-while-polling'])
+def test_mobile_qr_foreground_polls_once_without_waiting_for_timer(
+    browser, account_qr, qr_device, monkeypatch, return_during_poll,
+):
+    import requests
+
+    manager = browser.host.qr_bind_manager
+    create = manager.create_session
+    monkeypatch.setattr(manager, 'create_session', lambda: dict(create(), poll_interval=60))
+    remote = account_qr.remote
+    remote.status = 1 if return_during_poll else 2
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_poll(url, **kwargs):
+        response = remote.post(url, **kwargs)
+        if url.endswith('/poll_bind_result') and not entered.is_set():
+            entered.set()
+            assert release.wait(15)
+        return response
+
+    monkeypatch.setattr(requests, 'post', slow_poll)
+    quick_account_qr(browser)
+    browser.wait.until(lambda _: browser.find('#qr-qq-jump').is_displayed())
+    try:
+        # 记录 GET 发起而非响应，避免服务端的会话锁掩盖并发请求。
+        hidden, paths = browser.driver.execute_script('''
+            const send = window.fetch;
+            const polls = [];
+            window.fetch = (path, options) => {
+              if (typeof path === 'string' && /^\\/api\\/accounts\\/qqguild\\/qr-bind\\/[^/]+$/.test(path) &&
+                  (options?.method ?? 'GET') === 'GET') polls.push(path);
+              return send(path, options);
+            };
+            window.qrPolls = polls;
+            window.changeQrVisibility = (hidden) => {
+              Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+              try {
+                document.dispatchEvent(new Event('visibilitychange'));
+              } finally {
+                delete document.hidden;
+              }
+            };
+            window.changeQrVisibility(true);
+            const hidden = polls.length;
+            window.changeQrVisibility(false);
+            window.changeQrVisibility(false);
+            return [hidden, polls];
+        ''')
+        assert hidden == 0
+        path, = paths
+        assert entered.wait(5)
+        if return_during_poll:
+            remote.status = 2
+            assert browser.driver.execute_script('''
+                window.changeQrVisibility(true);
+                window.changeQrVisibility(false);
+                window.changeQrVisibility(false);
+                return window.qrPolls;
+            ''') == [path]
+    finally:
+        release.set()
+    browser.wait.until(lambda _: remote.app_id in browser.text('#account-rows'))
+    expected = 2 if return_during_poll else 1
+    assert browser.driver.execute_script('return window.qrPolls') == [path] * expected
+    assert account_qr.calls.count(('GET', path, '200')) == expected
+    assert_no_qq_jump(browser)
 
 
 @pytest.mark.browser
@@ -1472,6 +1732,7 @@ def test_account_qr_editor_stages_until_manual_save(browser, account_qr, preset,
     browser.click('#account-qr-fill')
     qr_blob(browser)
     assert browser.attribute('#qr-link', 'href').startswith('https://q.qq.com/qqbot/openclaw/connect.html?')
+    assert_no_qq_jump(browser)
     remote.status = 2
     browser.wait.until(lambda _: not browser.find('#qr-dialog').is_displayed())
     if review:
@@ -1551,7 +1812,8 @@ def test_account_qr_cancel_inflight_never_applies_late_result(browser, account_q
 
 
 @pytest.mark.browser
-def test_terminal_qr_keeps_original_link_and_releases_image_on_escape(browser, tmp_path):
+@pytest.mark.parametrize('qr_device', ['desktop', 'touch'], indirect=True)
+def test_terminal_qr_keeps_original_link_and_releases_image_on_escape(browser, tmp_path, qr_device):
     import qrcode
     from selenium.webdriver.common.keys import Keys
 
@@ -1578,6 +1840,7 @@ def test_terminal_qr_keeps_original_link_and_releases_image_on_escape(browser, t
     assert str(bot.id) in browser.text('#qr-title')
     assert browser.attribute('#qr-link', 'href') == url
     assert not browser.find('#qr-actions').is_displayed() and not browser.find('#qr-status').is_displayed()
+    assert_no_qq_jump(browser)
     browser.find('#qr-dialog [data-close]').send_keys(Keys.ESCAPE)
     browser.wait.until(lambda _: not browser.find('#qr-dialog').is_displayed())
     assert_revoked_blob(browser, blob)
@@ -5431,3 +5694,159 @@ def test_short_viewport_dialog_fits_viewport_and_scrolls(browser):
         return result;
     ''')
     assert dialog_metrics == {'fitsViewport': True, 'overflowY': 'auto', 'canScroll': True}
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('mode,width,height,mobile', [
+    ('desktop-expanded', 1280, 900, False),
+    ('desktop-collapsed', 1280, 900, False),
+    ('mobile-drawer', 390, 760, True),
+])
+def test_sidebar_head_divider_matches_footer_on_desktop_and_mobile(browser, mode, width, height, mobile):
+    driver = browser.driver
+    set_viewport(browser, width, height, mobile_device=mobile)
+    if mobile:
+        browser.open_sidebar()
+    elif mode == 'desktop-collapsed':
+        driver.execute_script('setSidebarCollapsed(true, false)')
+        browser.wait.until(lambda _: driver.execute_script(
+            "return document.getElementById('sidebar').getBoundingClientRect().width < 70"))
+    try:
+        metrics = driver.execute_script('''
+            const aside = document.getElementById('sidebar');
+            const head = aside.querySelector('.sidebar-head');
+            const brand = aside.querySelector('.brand');
+            const scrollBox = aside.querySelector('.sidebar-scroll');
+            const footer = aside.querySelector('.sidebar-footer');
+            const headStyle = getComputedStyle(head);
+            const footerStyle = getComputedStyle(footer);
+            const asideRect = aside.getBoundingClientRect();
+            const headRect = head.getBoundingClientRect();
+            const brandRect = brand.getBoundingClientRect();
+            const scrollRect = scrollBox.getBoundingClientRect();
+            return {
+              borderWidthMatch: headStyle.borderBottomWidth === footerStyle.borderTopWidth
+                && headStyle.borderBottomWidth === '1px',
+              borderStyleMatch: headStyle.borderBottomStyle === footerStyle.borderTopStyle
+                && headStyle.borderBottomStyle === 'solid',
+              borderColorMatch: headStyle.borderBottomColor === footerStyle.borderTopColor,
+              fullWidth: Math.abs(headRect.width - aside.clientWidth) <= 1,
+              breathingRoom: headRect.bottom - brandRect.bottom >= 9.5,
+              noScrollOverlap: scrollRect.top >= headRect.bottom - 0.5,
+              insideAside: headRect.left >= asideRect.left - 0.5 && headRect.right <= asideRect.right + 0.5,
+            };
+        ''')
+    finally:
+        if mobile:
+            driver.execute_script('setSidebarOpen(false)')
+        elif mode == 'desktop-collapsed':
+            driver.execute_script('setSidebarCollapsed(false, false)')
+    assert metrics == {
+        'borderWidthMatch': True,
+        'borderStyleMatch': True,
+        'borderColorMatch': True,
+        'fullWidth': True,
+        'breathingRoom': True,
+        'noScrollOverlap': True,
+        'insideAside': True,
+    }, (mode, metrics)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('width,height,mobile', [
+    (1280, 900, False),
+    (390, 760, True),
+])
+def test_plugin_files_renders_operable_opks_above_source_plugins(browser, width, height, mobile):
+    import zipfile
+
+    app_dir = browser.host.root / 'plugin/app'
+    source_root = app_dir / 'SourceDemo'
+    source_root.mkdir(parents=True, exist_ok=True)
+    (source_root / 'app.json').write_text(json.dumps({
+        'name': '源码演示', 'namespace': 'SourceDemo', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+    }), encoding='utf-8')
+
+    source_only_dir = app_dir / '源码区' / 'SourceOnly'
+    source_only_dir.mkdir(parents=True, exist_ok=True)
+    (source_only_dir / 'app.json').write_text(json.dumps({
+        'name': '仅源码演示', 'namespace': 'SourceOnly', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+    }), encoding='utf-8')
+
+    opk_dir = app_dir / '实用'
+    opk_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(opk_dir / 'OpkDemo.opk', 'w') as archive:
+        archive.writestr('app.json', json.dumps({
+            'name': 'OPK演示', 'namespace': 'OpkDemo', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+        }))
+        archive.writestr('__init__.py', 'from . import main\n')
+        archive.writestr('main.py', 'class Event:\n    pass\n')
+
+    driver = browser.driver
+    set_viewport(browser, width, height, mobile_device=mobile)
+    if mobile:
+        browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('plugins').hidden"))
+    browser.click('#manage-plugin-files')
+    browser.wait.until(lambda _: driver.execute_script('''
+        const panel = document.getElementById('plugin-files');
+        const table = document.getElementById('plugin-files-table');
+        const sources = document.getElementById('plugin-files-sources');
+        return !panel.hidden && !table.hidden && !sources.hidden
+          && document.querySelectorAll('#plugin-file-rows tr').length > 0
+          && sources.querySelectorAll('.opk-source').length >= 2;
+    '''))
+
+    all_metrics = driver.execute_script('''
+        const table = document.getElementById('plugin-files-table');
+        const sources = document.getElementById('plugin-files-sources');
+        const filter = document.getElementById('plugin-files-filter');
+        const tableRect = table.getBoundingClientRect();
+        const sourcesRect = sources.getBoundingClientRect();
+        const sourcesStyle = getComputedStyle(sources);
+        const options = [...filter.options];
+        const firstDisabled = options.findIndex((opt) => opt.disabled);
+        const lastEnabled = options.reduce((idx, opt, i) => (opt.disabled ? idx : i), -1);
+        return {
+          tableBeforeSourcesInDom: Boolean(table.compareDocumentPosition(sources) & Node.DOCUMENT_POSITION_FOLLOWING),
+          tableAboveSourcesVisually: tableRect.bottom <= sourcesRect.top + 0.5,
+          sourcesDividerShown: sourcesStyle.borderTopWidth === '1px' && sourcesStyle.borderTopStyle === 'solid',
+          enabledOptionsBeforeDisabled: firstDisabled !== -1 && lastEnabled < firstDisabled,
+        };
+    ''')
+    assert all_metrics == {
+        'tableBeforeSourcesInDom': True,
+        'tableAboveSourcesVisually': True,
+        'sourcesDividerShown': True,
+        'enabledOptionsBeforeDisabled': True,
+    }, all_metrics
+
+    opk_only_metrics = driver.execute_script('''
+        const filter = document.getElementById('plugin-files-filter');
+        filter.value = '实用';
+        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        return {
+          tableHidden: document.getElementById('plugin-files-table').hidden,
+          sourcesHidden: document.getElementById('plugin-files-sources').hidden,
+        };
+    ''')
+    assert opk_only_metrics == {'tableHidden': False, 'sourcesHidden': True}, opk_only_metrics
+
+    source_only_metrics = driver.execute_script('''
+        const filter = document.getElementById('plugin-files-filter');
+        filter.value = '源码区';
+        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        const sources = document.getElementById('plugin-files-sources');
+        return {
+          tableHidden: document.getElementById('plugin-files-table').hidden,
+          sourcesHidden: sources.hidden,
+          noTopDividerWhenTableHidden: getComputedStyle(sources).borderTopWidth === '0px',
+        };
+    ''')
+    assert source_only_metrics == {
+        'tableHidden': True,
+        'sourcesHidden': False,
+        'noTopDividerWhenTableHidden': True,
+    }, source_only_metrics

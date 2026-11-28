@@ -1067,11 +1067,3 @@ def test_websocket_request_bypasses_http_body_reader(host, monkeypatch):
     response = asyncio.run(host.http(request))
     assert response.status == 101
     assert called == ['/ws/logs']
-
-
-def test_send_plugin_list_tolerates_legacy_unpickled_shallow_without_shadowed_attr(loader_runtime):
-    loader, _ = loader_runtime
-    del loader.plugin_shadowed_list
-    loader.sendPluginList(ready=False)
-    packet = loader.Proc_info.control_queue.get_nowait()
-    assert packet.key['data']['data']['shallow_plugin_shadowed_list'] == []

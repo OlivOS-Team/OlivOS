@@ -141,7 +141,9 @@ button:hover:not(:disabled, .active),
   background: var(--control-bg-hover);
 }
 .button-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-decoration: none;
 }
 button:disabled {
@@ -152,12 +154,14 @@ button:active:not(:disabled) {
   background: var(--control-bg-active);
   border-color: var(--accent);
 }
-button.primary {
+button.primary,
+.button-link.primary {
   background: var(--primary-bg);
   border-color: var(--primary-border);
   color: var(--brand);
 }
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled),
+.button-link.primary:hover {
   background: var(--primary-hover);
   border-color: var(--accent);
 }
@@ -393,7 +397,7 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 20px 16px 16px;
+  padding: 16px;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
@@ -408,7 +412,9 @@ aside {
 }
 .sidebar-head {
   flex: 0 0 auto;
-  padding: calc(24px + env(safe-area-inset-top)) 16px 0;
+  padding: calc(24px + env(safe-area-inset-top)) 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -974,6 +980,7 @@ nav h2 {
   /* 折叠与展开沿用移动端抽屉的 180ms 节奏：面板宽度先收，文字同步淡出并收窄，
      收起后不会出现「内容先消失、面板再跳一下」的观感。 */
   aside,
+  .sidebar-head,
   .sidebar-scroll,
   .sidebar-footer,
   .brand,
@@ -2644,12 +2651,20 @@ body.account-dragging-active {
   min-width: 0;
   max-width: 100%;
 }
+#plugin-files-table:not([hidden]) + .opk-sources {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 .opk-source {
   margin: 0 0 8px;
   padding: 8px;
   color: var(--muted);
   background: var(--bg);
   border-radius: var(--control-radius);
+}
+.opk-source:last-child {
+  margin-bottom: 0;
 }
 .opk-file-path {
   display: block;
@@ -3129,6 +3144,7 @@ dialog::backdrop {
   summary::before,
   #shell,
   aside,
+  .sidebar-head,
   .sidebar-scroll,
   .sidebar-footer,
   .brand,
@@ -3301,6 +3317,14 @@ dialog::backdrop {
 }
 #qr-dialog {
   width: min(420px, calc(100vw - 30px));
+}
+#qr-jump-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#qr-jump:not([hidden]) + #qr-code:not([hidden]) {
+  margin-top: 12px;
 }
 #qr-image {
   width: 100%;
@@ -3519,11 +3543,11 @@ dialog::backdrop {
       visibility 0s linear 180ms;
   }
   .sidebar-head {
-    padding: calc(16px + env(safe-area-inset-top)) 16px 0;
+    padding: calc(16px + env(safe-area-inset-top)) 16px 12px;
   }
   .sidebar-scroll {
     gap: 20px;
-    padding: 16px 16px 12px;
+    padding: 12px 16px 12px;
     overflow-x: hidden;
   }
   .sidebar-footer {
@@ -3606,6 +3630,7 @@ dialog::backdrop {
 @media (max-height: 760px) {
   .sidebar-head {
     padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: 10px;
   }
   .sidebar-scroll {
     gap: 12px;

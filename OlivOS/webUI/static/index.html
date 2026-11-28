@@ -872,13 +872,13 @@
               <button id="plugin-files-review" type="button" class="primary">查看待执行变更 (0)</button>
             </div>
             <p id="plugin-files-status" class="hint" role="status"></p>
-            <div id="plugin-files-sources" class="opk-sources"></div>
             <div class="table-wrap" id="plugin-files-table" hidden>
               <table>
                 <thead><tr><th scope="col">选择</th><th scope="col">路径 / 名称</th><th scope="col">命名空间</th><th scope="col">版本 / SVN</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
                 <tbody id="plugin-file-rows"></tbody>
               </table>
             </div>
+            <div id="plugin-files-sources" class="opk-sources" hidden></div>
           </section>
           <p class="hint plugin-schedule-status" id="plugin-schedule-status" role="status">正在读取时区设置…</p>
           <section id="tk-bridge-panel" aria-labelledby="tk-bridge-heading" hidden>
@@ -1054,8 +1054,17 @@
         <h2 id="qr-title">扫码登录</h2>
         <button data-close="qr-dialog" aria-label="关闭">×</button>
       </div>
-      <img id="qr-image" alt="账号登录二维码" />
-      <a id="qr-link" target="_blank" rel="noopener noreferrer" hidden>打开扫码登录页面</a>
+      <div id="qr-jump" hidden>
+        <p id="qr-jump-hint" class="hint">将跳转到 QQ 完成官方机器人授权。也可以改用二维码或网页授权。</p>
+        <div id="qr-jump-actions">
+          <a id="qr-qq-jump" class="button-link primary" aria-describedby="qr-jump-hint">在 QQ 中登录</a>
+          <button id="qr-toggle-code" type="button" aria-controls="qr-code" aria-expanded="false">改用二维码</button>
+        </div>
+      </div>
+      <div id="qr-code">
+        <img id="qr-image" alt="账号登录二维码" hidden />
+        <a id="qr-link" target="_blank" rel="noopener noreferrer" hidden>打开扫码登录页面</a>
+      </div>
       <p id="qr-status" role="status" hidden></p>
       <div id="qr-actions" class="dialog-actions" hidden>
         <button id="qr-refresh" type="button">刷新二维码</button>
