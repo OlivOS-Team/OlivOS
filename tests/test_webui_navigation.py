@@ -5487,3 +5487,103 @@ def test_sidebar_head_divider_matches_footer_on_desktop_and_mobile(browser, mode
         'noScrollOverlap': True,
         'insideAside': True,
     }, (mode, metrics)
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('width,height,mobile', [
+    (1280, 900, False),
+    (390, 760, True),
+])
+def test_plugin_files_renders_operable_opks_above_source_plugins(browser, width, height, mobile):
+    import zipfile
+
+    app_dir = browser.host.root / 'plugin/app'
+    source_root = app_dir / 'SourceDemo'
+    source_root.mkdir(parents=True, exist_ok=True)
+    (source_root / 'app.json').write_text(json.dumps({
+        'name': '源码演示', 'namespace': 'SourceDemo', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+    }), encoding='utf-8')
+
+    source_only_dir = app_dir / '源码区' / 'SourceOnly'
+    source_only_dir.mkdir(parents=True, exist_ok=True)
+    (source_only_dir / 'app.json').write_text(json.dumps({
+        'name': '仅源码演示', 'namespace': 'SourceOnly', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+    }), encoding='utf-8')
+
+    opk_dir = app_dir / '实用'
+    opk_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(opk_dir / 'OpkDemo.opk', 'w') as archive:
+        archive.writestr('app.json', json.dumps({
+            'name': 'OPK演示', 'namespace': 'OpkDemo', 'version': '1.0.0', 'svn': 1, 'compatible_svn': 190,
+        }))
+        archive.writestr('__init__.py', 'from . import main\n')
+        archive.writestr('main.py', 'class Event:\n    pass\n')
+
+    driver = browser.driver
+    set_viewport(browser, width, height, mobile_device=mobile)
+    if mobile:
+        browser.open_sidebar()
+    browser.click('[data-page="plugins"]')
+    browser.wait.until(lambda _: driver.execute_script(
+        "return !document.getElementById('plugins').hidden"))
+    browser.click('#manage-plugin-files')
+    browser.wait.until(lambda _: driver.execute_script('''
+        const panel = document.getElementById('plugin-files');
+        const table = document.getElementById('plugin-files-table');
+        const sources = document.getElementById('plugin-files-sources');
+        return !panel.hidden && !table.hidden && !sources.hidden
+          && document.querySelectorAll('#plugin-file-rows tr').length > 0
+          && sources.querySelectorAll('.opk-source').length >= 2;
+    '''))
+
+    all_metrics = driver.execute_script('''
+        const table = document.getElementById('plugin-files-table');
+        const sources = document.getElementById('plugin-files-sources');
+        const filter = document.getElementById('plugin-files-filter');
+        const tableRect = table.getBoundingClientRect();
+        const sourcesRect = sources.getBoundingClientRect();
+        const sourcesStyle = getComputedStyle(sources);
+        const options = [...filter.options];
+        const firstDisabled = options.findIndex((opt) => opt.disabled);
+        const lastEnabled = options.reduce((idx, opt, i) => (opt.disabled ? idx : i), -1);
+        return {
+          tableBeforeSourcesInDom: Boolean(table.compareDocumentPosition(sources) & Node.DOCUMENT_POSITION_FOLLOWING),
+          tableAboveSourcesVisually: tableRect.bottom <= sourcesRect.top + 0.5,
+          sourcesDividerShown: sourcesStyle.borderTopWidth === '1px' && sourcesStyle.borderTopStyle === 'solid',
+          enabledOptionsBeforeDisabled: firstDisabled !== -1 && lastEnabled < firstDisabled,
+        };
+    ''')
+    assert all_metrics == {
+        'tableBeforeSourcesInDom': True,
+        'tableAboveSourcesVisually': True,
+        'sourcesDividerShown': True,
+        'enabledOptionsBeforeDisabled': True,
+    }, all_metrics
+
+    opk_only_metrics = driver.execute_script('''
+        const filter = document.getElementById('plugin-files-filter');
+        filter.value = '实用';
+        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        return {
+          tableHidden: document.getElementById('plugin-files-table').hidden,
+          sourcesHidden: document.getElementById('plugin-files-sources').hidden,
+        };
+    ''')
+    assert opk_only_metrics == {'tableHidden': False, 'sourcesHidden': True}, opk_only_metrics
+
+    source_only_metrics = driver.execute_script('''
+        const filter = document.getElementById('plugin-files-filter');
+        filter.value = '源码区';
+        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        const sources = document.getElementById('plugin-files-sources');
+        return {
+          tableHidden: document.getElementById('plugin-files-table').hidden,
+          sourcesHidden: sources.hidden,
+          noTopDividerWhenTableHidden: getComputedStyle(sources).borderTopWidth === '0px',
+        };
+    ''')
+    assert source_only_metrics == {
+        'tableHidden': True,
+        'sourcesHidden': False,
+        'noTopDividerWhenTableHidden': True,
+    }, source_only_metrics

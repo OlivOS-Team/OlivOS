@@ -2647,12 +2647,20 @@ body.account-dragging-active {
   min-width: 0;
   max-width: 100%;
 }
+#plugin-files-table:not([hidden]) + .opk-sources {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 .opk-source {
   margin: 0 0 8px;
   padding: 8px;
   color: var(--muted);
   background: var(--bg);
   border-radius: var(--control-radius);
+}
+.opk-source:last-child {
+  margin-bottom: 0;
 }
 .opk-file-path {
   display: block;

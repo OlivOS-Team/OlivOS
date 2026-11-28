@@ -4546,7 +4546,9 @@ function opkSourceDirs(inventory) {
 
 function opkFolderOptions(select, target, inventory, filter) {
   const sources = opkSourceDirs(inventory);
-  const paths = new Set(['', ...(inventory?.folders || []).map((folder) => folder.path), ...sources]);
+  const operable = [...new Set(['', ...(inventory?.folders || []).map((folder) => folder.path)])]
+    .filter((path) => !sources.has(path));
+  const paths = new Set([...operable, ...sources]);
   if (filter) select.append(element('option', '所有目录', { value: '*' }));
   if (target !== '*' && !paths.has(target)) {
     select.append(element('option', `${opkDir(target)} — 目录不可用`, { value: target, disabled: '' }));
@@ -4626,6 +4628,7 @@ function renderOpkFiles() {
       element('code', source.path), ' · 不可上传到此处或通过 WebUI 删除');
     sources.append(entry);
   }
+  sources.hidden = !sources.childElementCount;
   const rows = $('plugin-file-rows');
   rows.replaceChildren();
   const files = (inventory?.opks || []).filter((item) => draft.filter === '*' || item.parent_dir === draft.filter);
