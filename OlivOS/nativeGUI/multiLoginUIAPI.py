@@ -706,7 +706,7 @@ class HostUI(object):
         for Account_hash_this in self.UIData['Account_data']:
             item_id = self.UIObject['tree'].insert(
                 '',
-                0,
+                tkinter.END,
                 text=Account_hash_this,
                 values=(
                     '',
