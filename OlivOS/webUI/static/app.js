@@ -4326,6 +4326,23 @@ function openTerminal(terminal) {
   );
 }
 const qrBindPath = '/api/accounts/qqguild/qr-bind';
+const qrBindOrigin = 'https://q.qq.com';
+
+function prefersQQJumpLogin() {
+  return /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent) ||
+    Boolean(window.matchMedia?.('(pointer: coarse) and (max-width: 56rem)').matches);
+}
+
+function buildQQForwardUrl(qrUrl) {
+  if (typeof qrUrl !== 'string') return '';
+  qrUrl = qrUrl.trim();
+  if (!safeURL(qrUrl, qrBindOrigin)) return '';
+  let binary = '';
+  for (const byte of new TextEncoder().encode(qrUrl)) binary += String.fromCharCode(byte);
+  const base64Url = btoa(binary);
+  const inner = `src_type=web&version=1&url_prefix=${base64Url}&t=${Date.now()}`;
+  return `mqqapi://forward/url?${encodeURIComponent(inner)}&plg_auth=1`;
+}
 
 function deleteQrBind(path, token) {
   // 卸载时仍发出 DELETE；过期登录的清理响应不应打断新登录。
@@ -4344,6 +4361,11 @@ function releaseQRCode() {
   $('qr-image').hidden = $('qr-link').hidden = true;
   $('qr-image').removeAttribute('src');
   $('qr-link').removeAttribute('href');
+  $('qr-jump').hidden = true;
+  $('qr-qq-jump').removeAttribute('href');
+  $('qr-code').hidden = false;
+  $('qr-toggle-code').setAttribute('aria-expanded', 'false');
+  $('qr-toggle-code').textContent = '改用二维码';
   return removal;
 }
 
@@ -4360,7 +4382,9 @@ function openQRCode(title, apply = null) {
   $('qr-title').textContent = title;
   $('qr-image').hidden = $('qr-link').hidden = true;
   $('qr-status').hidden = $('qr-actions').hidden = !apply;
-  $('qr-status').textContent = apply ? '正在获取二维码…' : '';
+  $('qr-status').textContent = apply
+    ? (prefersQQJumpLogin() ? '正在准备 QQ 登录…' : '正在获取二维码…')
+    : '';
   if (!$('qr-dialog').open) $('qr-dialog').showModal();
   return qr;
 }
@@ -4388,7 +4412,8 @@ function setQRLink(url, origin = null) {
 }
 
 async function showQRCode(terminal) {
-  if (state.qr?.apply) return; // 终端推送不能取代用户正在确认的官方绑定。
+  // 终端推送不能取代用户正在确认的官方绑定。
+  if (state.qr?.apply && qrIsOpen(state.qr)) return;
   const qr = openQRCode(`请使用账号 ${terminal.id || terminal.hash} 扫码`);
   setQRLink(terminal.qrcode_url);
   if (!terminal.qrcode) return;
@@ -4409,8 +4434,36 @@ function showQrBindError(qr, message) {
   $('qr-status').textContent = message;
 }
 
-async function pollQrBind(qr, interval) {
-  if (!qrIsOpen(qr)) return;
+async function toggleQrBindCode() {
+  const qr = state.qr;
+  if (!qr?.apply || !qrIsOpen(qr) || $('qr-jump').hidden) return;
+  const expanded = $('qr-code').hidden;
+  $('qr-code').hidden = !expanded;
+  $('qr-toggle-code').setAttribute('aria-expanded', String(expanded));
+  $('qr-toggle-code').textContent = expanded ? '收起二维码' : '改用二维码';
+  if (!expanded || qr.imageURL || qr.loadingImage) return;
+  qr.loadingImage = true;
+  $('qr-status').textContent = '正在加载二维码…';
+  try {
+    await loadQRImage(qr, `${qr.path}/qrcode`);
+    if (qrIsOpen(qr)) $('qr-status').textContent = qr.waitMessage;
+  } catch (error) {
+    showQrBindError(qr, error.message);
+  } finally {
+    qr.loadingImage = false;
+  }
+}
+
+function scheduleQrBindPoll(qr) {
+  if (!qrIsOpen(qr) || qr.polling || qr.timer) return;
+  qr.timer = setTimeout(() => pollQrBind(qr), qr.interval);
+}
+
+async function pollQrBind(qr) {
+  if (!qrIsOpen(qr) || !qr.path || qr.polling || qr.controller.signal.aborted) return;
+  clearTimeout(qr.timer);
+  qr.timer = null;
+  qr.polling = true;
   try {
     const result = await api(qr.path, { signal: qr.controller.signal });
     if (!qrIsOpen(qr)) return;
@@ -4426,13 +4479,20 @@ async function pollQrBind(qr, interval) {
         notifyError(error);
       }
     } else if (result.status === 0 || result.status === 1) {
-      $('qr-status').textContent = '请使用手机 QQ 扫码并确认绑定。';
-      qr.timer = setTimeout(() => pollQrBind(qr, interval), interval);
+      if (!qr.loadingImage) $('qr-status').textContent = qr.waitMessage;
     } else {
       showQrBindError(qr, '二维码已过期，请刷新二维码。');
     }
   } catch (error) {
     showQrBindError(qr, error.message);
+  } finally {
+    qr.polling = false;
+    if (qr.repollOnSettle && qrIsOpen(qr)) {
+      qr.repollOnSettle = false;
+      pollQrBind(qr);
+    } else {
+      scheduleQrBindPoll(qr);
+    }
   }
 }
 
@@ -4443,13 +4503,21 @@ async function startQrBind(apply) {
     // 不中断建单：即便用户已取消，也必须接收迟到的 bind_id 并释放服务端会话。
     const result = await api(qrBindPath, { method: 'POST' }, (late) => deleteQrBind(pathFor(late), qr.token));
     if (!qrIsOpen(qr)) return deleteQrBind(pathFor(result), qr.token);
+    qr.interval = result.poll_interval * 1000;
     qr.path = pathFor(result);
-    setQRLink(result.qr_url, 'https://q.qq.com');
-    await loadQRImage(qr, `${qr.path}/qrcode`);
+    const jumpUrl = prefersQQJumpLogin() && buildQQForwardUrl(result.qr_url);
+    qr.waitMessage = jumpUrl ? '请在 QQ 中确认绑定。' : '请使用手机 QQ 扫码并确认绑定。';
+    setQRLink(result.qr_url, qrBindOrigin);
+    if (jumpUrl) {
+      $('qr-code').hidden = true;
+      $('qr-qq-jump').href = jumpUrl;
+      $('qr-jump').hidden = false;
+    } else {
+      await loadQRImage(qr, `${qr.path}/qrcode`);
+    }
     if (!qrIsOpen(qr)) return;
-    $('qr-status').textContent = '请使用手机 QQ 扫码并确认绑定。';
-    const interval = result.poll_interval * 1000;
-    qr.timer = setTimeout(() => pollQrBind(qr, interval), interval);
+    $('qr-status').textContent = qr.waitMessage;
+    scheduleQrBindPoll(qr);
   } catch (error) {
     showQrBindError(qr, error.message);
   }
@@ -6202,6 +6270,7 @@ bind('account-add-qr', () => {
   return startQrBind(createScannedAccount);
 });
 bind('account-qr-fill', () => startQrBind(fillScannedAccount));
+bind('qr-toggle-code', toggleQrBindCode);
 bind('qr-refresh', () => {
   if (state.qr?.apply) return startQrBind(state.qr.apply);
 });
@@ -6436,9 +6505,20 @@ bind('tk-bridge-dialog', () => {
   if (!$('tk-bridge-dialog').open) finishTkPreview();
 }, 'close');
 document.addEventListener('visibilitychange', () => {
+  const qr = state.qr;
   if (document.hidden) {
+    if (qr?.apply && qrIsOpen(qr)) qr.sawHidden = true;
     stopUptimeLoop();
     return;
+  }
+  if (qr?.apply && qr.path) {
+    if (qr.polling && qr.sawHidden) {
+      qr.repollOnSettle = true;
+      qr.sawHidden = false;
+    } else if (!qr.polling) {
+      qr.sawHidden = false;
+      pollQrBind(qr);
+    }
   }
   if (state.tkBridge?.id) refreshTkPreview(state.tkBridge);
   if (state.token && isStatusPage(state.page)) {

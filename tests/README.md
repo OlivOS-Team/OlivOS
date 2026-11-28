@@ -127,7 +127,7 @@ V8 block 分支参考 **92.53%**（1401/1514）。报告识别并去除了 106 �
 | API 事件路由 | `test_api_event_routing.py` | `reply`/`send`/查询/管理动作的跨平台支持矩阵、未支持平台不串路由、远程模式短路 |
 | Adapter 出站 API | `test_adapter_api_contracts.py`, `test_adapter_api_extended.py` | OneBot/KOOK/小黑盒/Milky 的 URL、鉴权、请求体、成功与错误响应、异步受理和返回归一化 |
 | 协议传输循环 | `test_adapter_transports.py` | Link/Host/Webhook/Poll 的入站帧、出站控制包、停止、异常帧、队列与重连路径 |
-| QQ 官方扫码绑定 | `test_qqguild_qr_bind.py`、`test_webui.py`、`test_native_accounts.py`、`test_webui_navigation.py` | 离线 QQ 端点、AES-GCM 解密与一次性交付、过期/取消、认证与禁止缓存、快捷落盘与编辑草稿、移动和桌面侧栏置顶 |
+| QQ 官方扫码绑定 | `test_qqguild_qr_bind.py`、`test_webui.py`、`test_native_accounts.py`、`test_webui_navigation.py` | 离线 QQ 端点、AES-GCM 解密与一次性交付、过期/取消、认证与禁止缓存、快捷落盘与编辑草稿、授权链接来源校验与 UTF-8 编码、移动按钮触控尺寸与对齐、二维码按需加载与提示、回前台轮询去重与在途补查、退出清理和终端扫码隔离 |
 | QQ 官方机器人消息 | `test_qqguildv2_messages.py` | 图片卡片、合并转发、未知卡片类型与无效图片回退 |
 | QQ 官方机器人发送重试 | `test_qqguildv2_send_retry.py` | 按错误码分档重试（长度/服务端异常最多重试三次，超时/5xx/429 不重试）、重试与拆段占用被动回复额度、长度降级为纯文本并按字节拆段、内联标签不被切断 |
 | QQ 官方机器人被动回复规则 | `test_qqguildv2_passive_rules.py` | 群消息 `msg_id` 私聊回复发送者（仅限发送者本人）、群内与单聊共用同一个次数上限、群主/管理员 50 次与普通成员 5 次、11253 兜底、60 分钟有效期 |

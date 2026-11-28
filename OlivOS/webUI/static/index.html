@@ -1054,8 +1054,17 @@
         <h2 id="qr-title">扫码登录</h2>
         <button data-close="qr-dialog" aria-label="关闭">×</button>
       </div>
-      <img id="qr-image" alt="账号登录二维码" />
-      <a id="qr-link" target="_blank" rel="noopener noreferrer" hidden>打开扫码登录页面</a>
+      <div id="qr-jump" hidden>
+        <p id="qr-jump-hint" class="hint">将跳转到 QQ 完成官方机器人授权。也可以改用二维码或网页授权。</p>
+        <div id="qr-jump-actions">
+          <a id="qr-qq-jump" class="button-link primary" aria-describedby="qr-jump-hint">在 QQ 中登录</a>
+          <button id="qr-toggle-code" type="button" aria-controls="qr-code" aria-expanded="false">改用二维码</button>
+        </div>
+      </div>
+      <div id="qr-code">
+        <img id="qr-image" alt="账号登录二维码" hidden />
+        <a id="qr-link" target="_blank" rel="noopener noreferrer" hidden>打开扫码登录页面</a>
+      </div>
       <p id="qr-status" role="status" hidden></p>
       <div id="qr-actions" class="dialog-actions" hidden>
         <button id="qr-refresh" type="button">刷新二维码</button>

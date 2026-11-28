@@ -141,7 +141,9 @@ button:hover:not(:disabled, .active),
   background: var(--control-bg-hover);
 }
 .button-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-decoration: none;
 }
 button:disabled {
@@ -152,12 +154,14 @@ button:active:not(:disabled) {
   background: var(--control-bg-active);
   border-color: var(--accent);
 }
-button.primary {
+button.primary,
+.button-link.primary {
   background: var(--primary-bg);
   border-color: var(--primary-border);
   color: var(--brand);
 }
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled),
+.button-link.primary:hover {
   background: var(--primary-hover);
   border-color: var(--accent);
 }
@@ -3313,6 +3317,14 @@ dialog::backdrop {
 }
 #qr-dialog {
   width: min(420px, calc(100vw - 30px));
+}
+#qr-jump-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#qr-jump:not([hidden]) + #qr-code:not([hidden]) {
+  margin-top: 12px;
 }
 #qr-image {
   width: 100%;
