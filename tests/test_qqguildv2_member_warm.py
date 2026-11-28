@@ -303,6 +303,30 @@ def test_warm_worker_denied_discards_and_resets_active(warm_ctx, monkeypatch):
     assert store.get_group(account_b.hash, 'g_other_bot')['members_state'] == 'warming'
 
 
+def test_warm_dual_code_40012010_aborts_clears_bot_queue_and_logs_status_and_code(warm_ctx, monkeypatch):
+    account, _, sdk_bot, proc = warm_ctx
+    monkeypatch.setattr(common, '_ensure_qq_group_warm_thread', Mock())
+    monkeypatch.setattr(common.API, 'getQQGroupMembers', make_members_api({
+        '': (400, {'code': 11253, 'err_code': 40012010, 'message': '应用无接口访问权限'})
+    }))
+
+    store.touch_group(account.hash, 'g_dual1')
+    store.touch_group(account.hash, 'g_dual2')
+    assert common._enqueue_qq_group_warm(account.hash, sdk_bot, 'g_dual1', start_cursor='') is True
+    assert common._enqueue_qq_group_warm(account.hash, sdk_bot, 'g_dual2', start_cursor='') is True
+
+    assert common._qq_group_warm_step() is True
+    assert common._check_qq_group_api_denied(account.hash, 'group_member_list') is True
+    assert list(common.sdkQQGroupWarmQueue) == []
+    assert store.get_group(account.hash, 'g_dual1')['members_state'] == 'active'
+    assert store.get_group(account.hash, 'g_dual2')['members_state'] == 'active'
+    abort_logs = [call.args[1] for call in proc.log.call_args_list if '成员后台续翻中止' in str(call.args[1])]
+    assert len(abort_logs) == 1
+    assert 'denied=True' in abort_logs[0]
+    assert 'http_status=400' in abort_logs[0]
+    assert 'error_code=40012010' in abort_logs[0]
+
+
 def test_warm_queue_overflow_drops_oldest_and_clears_pending(warm_ctx, monkeypatch):
     account, _, sdk_bot, _ = warm_ctx
     monkeypatch.setattr(common, '_ensure_qq_group_warm_thread', Mock())
